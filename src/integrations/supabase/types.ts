@@ -14,16 +14,348 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      chat_logs: {
+        Row: {
+          batch: string
+          id: string
+          message: string
+          receiver_id: string | null
+          sender_id: string | null
+          subject: string
+          timestamp: string
+        }
+        Insert: {
+          batch: string
+          id?: string
+          message: string
+          receiver_id?: string | null
+          sender_id?: string | null
+          subject: string
+          timestamp?: string
+        }
+        Update: {
+          batch?: string
+          id?: string
+          message?: string
+          receiver_id?: string | null
+          sender_id?: string | null
+          subject?: string
+          timestamp?: string
+        }
+        Relationships: []
+      }
+      exams: {
+        Row: {
+          batch: string
+          created_at: string
+          date: string
+          id: string
+          name: string
+          subject: string
+          type: Database["public"]["Enums"]["exam_type"]
+          updated_at: string
+        }
+        Insert: {
+          batch: string
+          created_at?: string
+          date: string
+          id?: string
+          name: string
+          subject: string
+          type: Database["public"]["Enums"]["exam_type"]
+          updated_at?: string
+        }
+        Update: {
+          batch?: string
+          created_at?: string
+          date?: string
+          id?: string
+          name?: string
+          subject?: string
+          type?: Database["public"]["Enums"]["exam_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      extra_classes: {
+        Row: {
+          batch: string
+          created_at: string
+          created_by: string | null
+          date: string
+          end_time: string
+          id: string
+          link: string | null
+          reason: string | null
+          start_time: string
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          batch: string
+          created_at?: string
+          created_by?: string | null
+          date: string
+          end_time: string
+          id?: string
+          link?: string | null
+          reason?: string | null
+          start_time: string
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          batch?: string
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          end_time?: string
+          id?: string
+          link?: string | null
+          reason?: string | null
+          start_time?: string
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      feedback: {
+        Row: {
+          batch: string
+          created_at: string
+          date: string
+          feedback_text: string
+          id: string
+          subject: string
+          submitted_by: string | null
+        }
+        Insert: {
+          batch: string
+          created_at?: string
+          date?: string
+          feedback_text: string
+          id?: string
+          subject: string
+          submitted_by?: string | null
+        }
+        Update: {
+          batch?: string
+          created_at?: string
+          date?: string
+          feedback_text?: string
+          id?: string
+          subject?: string
+          submitted_by?: string | null
+        }
+        Relationships: []
+      }
+      notes: {
+        Row: {
+          batch: string
+          created_at: string
+          file_url: string
+          filename: string
+          id: string
+          subject: string
+          tags: string[] | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          batch: string
+          created_at?: string
+          file_url: string
+          filename: string
+          id?: string
+          subject: string
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          batch?: string
+          created_at?: string
+          file_url?: string
+          filename?: string
+          id?: string
+          subject?: string
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          message: string
+          target_batch: string | null
+          target_role: Database["public"]["Enums"]["user_role"] | null
+          target_subject: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          message: string
+          target_batch?: string | null
+          target_role?: Database["public"]["Enums"]["user_role"] | null
+          target_subject?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          message?: string
+          target_batch?: string | null
+          target_role?: Database["public"]["Enums"]["user_role"] | null
+          target_subject?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          batch: string | null
+          created_at: string
+          email: string
+          exams: string[] | null
+          id: string
+          is_active: boolean
+          name: string
+          role: Database["public"]["Enums"]["user_role"]
+          subjects: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          batch?: string | null
+          created_at?: string
+          email: string
+          exams?: string[] | null
+          id?: string
+          is_active?: boolean
+          name: string
+          role?: Database["public"]["Enums"]["user_role"]
+          subjects?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          batch?: string | null
+          created_at?: string
+          email?: string
+          exams?: string[] | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          role?: Database["public"]["Enums"]["user_role"]
+          subjects?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      recordings: {
+        Row: {
+          batch: string
+          created_at: string
+          date: string
+          embed_link: string
+          id: string
+          subject: string
+          topic: string
+          updated_at: string
+        }
+        Insert: {
+          batch: string
+          created_at?: string
+          date: string
+          embed_link: string
+          id?: string
+          subject: string
+          topic: string
+          updated_at?: string
+        }
+        Update: {
+          batch?: string
+          created_at?: string
+          date?: string
+          embed_link?: string
+          id?: string
+          subject?: string
+          topic?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      schedules: {
+        Row: {
+          batch: string
+          created_at: string
+          day_of_week: number
+          end_time: string
+          id: string
+          link: string | null
+          start_time: string
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          batch: string
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          id?: string
+          link?: string | null
+          start_time: string
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          batch?: string
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          link?: string | null
+          start_time?: string
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_current_user_batch: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      get_current_user_role: {
+        Args: Record<PropertyKey, never>
+        Returns: Database["public"]["Enums"]["user_role"]
+      }
+      get_current_user_subjects: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
     }
     Enums: {
-      [_ in never]: never
+      exam_type: "mock" | "final" | "practice"
+      user_role: "student" | "teacher" | "super_admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +482,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      exam_type: ["mock", "final", "practice"],
+      user_role: ["student", "teacher", "super_admin"],
+    },
   },
 } as const
