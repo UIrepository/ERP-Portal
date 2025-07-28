@@ -1,3 +1,4 @@
+
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -80,6 +81,19 @@ export const MonitoringDashboard = () => {
       return activities.slice(0, 50);
     },
   });
+
+  const getActivityTitle = (activity: any) => {
+    switch (activity.type) {
+      case 'note':
+        return activity.title || 'Untitled Note';
+      case 'recording':
+        return activity.topic || 'Untitled Recording';
+      case 'extra_class':
+        return `${activity.subject} - Extra Class`;
+      default:
+        return 'Activity';
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -244,10 +258,7 @@ export const MonitoringDashboard = () => {
                     <div>
                       <h3 className="font-semibold capitalize">{activity.type.replace('_', ' ')}</h3>
                       <p className="text-sm text-muted-foreground">
-                        {activity.type === 'note' ? activity.title : 
-                         activity.type === 'recording' ? activity.topic : 
-                         activity.type === 'extra_class' ? `${activity.subject} - Extra Class` : 
-                         'Activity'}
+                        {getActivityTitle(activity)}
                       </p>
                       <div className="flex gap-2 mt-2">
                         {activity.subject && <Badge variant="outline">{activity.subject}</Badge>}

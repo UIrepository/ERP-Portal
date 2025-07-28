@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      analytics_events: {
+        Row: {
+          batch: string | null
+          created_at: string | null
+          event_type: string
+          id: string
+          metadata: Json | null
+          resource_id: string | null
+          subject: string | null
+          user_id: string | null
+        }
+        Insert: {
+          batch?: string | null
+          created_at?: string | null
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          resource_id?: string | null
+          subject?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          batch?: string | null
+          created_at?: string | null
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          resource_id?: string | null
+          subject?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       chat_logs: {
         Row: {
           batch: string
@@ -226,6 +259,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          bank_details: Json | null
           batch: string | null
           created_at: string
           email: string
@@ -239,6 +273,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          bank_details?: Json | null
           batch?: string | null
           created_at?: string
           email: string
@@ -252,6 +287,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          bank_details?: Json | null
           batch?: string | null
           created_at?: string
           email?: string
@@ -332,6 +368,36 @@ export type Database = {
           start_time?: string
           subject?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      user_sessions: {
+        Row: {
+          device_info: string | null
+          id: string
+          ip_address: unknown | null
+          is_active: boolean | null
+          last_activity: string | null
+          login_time: string | null
+          user_id: string | null
+        }
+        Insert: {
+          device_info?: string | null
+          id?: string
+          ip_address?: unknown | null
+          is_active?: boolean | null
+          last_activity?: string | null
+          login_time?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          device_info?: string | null
+          id?: string
+          ip_address?: unknown | null
+          is_active?: boolean | null
+          last_activity?: string | null
+          login_time?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
