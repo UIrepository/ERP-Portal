@@ -8,19 +8,29 @@ import { Badge } from '@/components/ui/badge';
 import { Link, ExternalLink, Copy } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
+interface MeetingLink {
+  id: string;
+  subject: string;
+  batch: string;
+  link: string;
+  created_at: string;
+}
+
 export const TeacherMeetingLinks = () => {
   const { profile } = useAuth();
 
   const { data: meetingLinks } = useQuery({
     queryKey: ['teacher-meeting-links'],
-    queryFn: async () => {
-      const { data } = await supabase
+    queryFn: async (): Promise<MeetingLink[]> => {
+      const { data, error } = await (supabase as any)
         .from('meeting_links')
         .select('*')
         .eq('batch', profile?.batch)
         .in('subject', profile?.subjects || [])
         .order('subject');
-      return data || [];
+      
+      if (error) throw error;
+      return (data || []) as MeetingLink[];
     },
     enabled: !!profile?.batch && !!profile?.subjects
   });

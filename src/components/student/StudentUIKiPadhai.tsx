@@ -8,22 +8,34 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Crown, ExternalLink, Lock } from 'lucide-react';
 
+interface UIKiPadhaiContent {
+  id: string;
+  title: string;
+  description?: string;
+  category?: string;
+  link: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 export const StudentUIKiPadhai = () => {
   const { profile } = useAuth();
 
   const { data: premiumContent } = useQuery({
     queryKey: ['student-ui-ki-padhai'],
-    queryFn: async () => {
-      const { data } = await supabase
+    queryFn: async (): Promise<UIKiPadhaiContent[]> => {
+      const { data, error } = await (supabase as any)
         .from('ui_ki_padhai_content')
         .select('*')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
-      return data || [];
+      
+      if (error) throw error;
+      return (data || []) as UIKiPadhaiContent[];
     },
   });
 
-  const handleAccessContent = (content: any) => {
+  const handleAccessContent = (content: UIKiPadhaiContent) => {
     // Check if student has premium access
     if (profile?.premium_access) {
       window.open(content.link, '_blank');
@@ -73,7 +85,9 @@ export const StudentUIKiPadhai = () => {
                         <Lock className="h-4 w-4 text-muted-foreground" />
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground mb-3">{content.description}</p>
+                    {content.description && (
+                      <p className="text-sm text-muted-foreground mb-3">{content.description}</p>
+                    )}
                     <div className="flex gap-2">
                       <Badge variant="secondary">Premium</Badge>
                       {content.category && (
