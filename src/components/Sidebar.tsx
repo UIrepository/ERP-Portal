@@ -1,28 +1,21 @@
 
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import {
-  Home,
-  Calendar,
-  Video,
-  FileText,
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Home, 
+  Calendar, 
+  BookOpen, 
+  Video, 
   MessageSquare,
-  GraduationCap,
-  Plus,
-  Settings,
-  BarChart3,
-  Users,
-  Monitor,
-  Bell,
-  BookOpen,
-  Upload,
-  Link,
   CreditCard,
-  Shield,
-  UserCheck,
-  Layers,
+  Link,
   Crown,
+  Clock,
+  FileText,
+  Target,
+  LogOut
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -31,78 +24,80 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
-  const { profile } = useAuth();
+  const { profile, signOut } = useAuth();
 
-  const studentTabs = [
+  const studentMenuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'schedule', label: 'Class Schedule', icon: Calendar },
-    { id: 'current-class', label: 'Ongoing Class', icon: Video },
-    { id: 'recordings', label: 'Notes & Recordings', icon: FileText },
-    { id: 'dpp', label: 'DPP Section', icon: BookOpen },
+    { id: 'current-class', label: 'Ongoing Class', icon: Clock },
+    { id: 'recordings', label: 'Recordings', icon: Video },
+    { id: 'notes', label: 'Notes', icon: FileText },
+    { id: 'dpp', label: 'DPP Section', icon: Target },
     { id: 'ui-ki-padhai', label: 'UI Ki Padhai', icon: Crown },
-    { id: 'feedback', label: 'Feedback Submission', icon: MessageSquare },
-    { id: 'chat-teacher', label: 'Chat with Teacher', icon: MessageSquare },
-    { id: 'chat-founder', label: 'Chat with Founder', icon: Shield },
+    { id: 'feedback', label: 'Feedback', icon: MessageSquare },
+    { id: 'exams', label: 'Exams', icon: BookOpen },
   ];
 
-  const teacherTabs = [
+  const teacherMenuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
-    { id: 'schedule', label: 'Class Schedule Viewer', icon: Calendar },
-    { id: 'meeting-links', label: 'Universal Meeting Links', icon: Link },
-    { id: 'extra-classes', label: 'Request Extra Class', icon: Plus },
-    { id: 'bank-details', label: 'Bank Details Update', icon: CreditCard },
-    { id: 'feedback', label: 'Feedback Viewer', icon: MessageSquare },
+    { id: 'schedule', label: 'Class Schedule', icon: Calendar },
+    { id: 'meeting-links', label: 'Meeting Links', icon: Link },
+    { id: 'feedback', label: 'Student Feedback', icon: MessageSquare },
+    { id: 'bank-details', label: 'Bank Details', icon: CreditCard },
   ];
 
-  const adminTabs = [
-    { id: 'dashboard', label: 'Dashboard Overview', icon: Home },
-    { id: 'students', label: 'Manage Students', icon: Users },
-    { id: 'teachers', label: 'Manage Teachers', icon: UserCheck },
-    { id: 'batch-allocation', label: 'Batch & Subject Allocation', icon: Layers },
-    { id: 'meeting-manager', label: 'Meeting Link Manager', icon: Link },
-    { id: 'upload-content', label: 'Upload Content', icon: Upload },
-    { id: 'feedback-viewer', label: 'Feedback Viewer', icon: MessageSquare },
-    { id: 'monitoring', label: 'Device & Session Monitoring', icon: Monitor },
-    { id: 'custom-sections', label: 'Custom Section Creator', icon: Plus },
-    { id: 'ui-ki-padhai', label: 'UI Ki Padhai', icon: Crown },
-  ];
-
-  let tabs = studentTabs;
-  if (profile?.role === 'teacher') tabs = teacherTabs;
-  if (profile?.role === 'super_admin') tabs = adminTabs;
+  const menuItems = profile?.role === 'student' ? studentMenuItems : teacherMenuItems;
 
   return (
-    <div className="w-64 bg-sidebar border-r border-sidebar-border h-screen overflow-y-auto">
-      <div className="p-4">
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold text-sidebar-foreground">
-            {profile?.role === 'super_admin' ? '🛡️ Super Admin' : 
-             profile?.role === 'teacher' ? '👨‍🏫 Teacher' : '🎓 Student'}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {profile?.name}
-          </p>
+    <div className="w-64 bg-card border-r border-border h-full flex flex-col">
+      <div className="p-4 border-b border-border">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+            <span className="text-primary-foreground font-bold text-sm">
+              {profile?.name?.charAt(0).toUpperCase()}
+            </span>
+          </div>
+          <div className="flex-1">
+            <h3 className="font-semibold text-sm">{profile?.name}</h3>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge variant="secondary" className="text-xs">
+                {profile?.role}
+              </Badge>
+              {profile?.batch && (
+                <Badge variant="outline" className="text-xs">
+                  {profile?.batch}
+                </Badge>
+              )}
+            </div>
+          </div>
         </div>
-        
-        <nav className="space-y-1">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <Button
-                key={tab.id}
-                variant={activeTab === tab.id ? 'secondary' : 'ghost'}
-                className={cn(
-                  'w-full justify-start text-left',
-                  activeTab === tab.id && 'bg-sidebar-accent text-sidebar-accent-foreground'
-                )}
-                onClick={() => onTabChange(tab.id)}
-              >
-                <Icon className="mr-3 h-4 w-4" />
-                {tab.label}
-              </Button>
-            );
-          })}
-        </nav>
+      </div>
+      
+      <ScrollArea className="flex-1 p-4">
+        <div className="space-y-2">
+          {menuItems.map((item) => (
+            <Button
+              key={item.id}
+              variant={activeTab === item.id ? 'default' : 'ghost'}
+              className="w-full justify-start"
+              onClick={() => onTabChange(item.id)}
+            >
+              <item.icon className="mr-2 h-4 w-4" />
+              {item.label}
+            </Button>
+          ))}
+        </div>
+      </ScrollArea>
+      
+      <div className="p-4 border-t border-border">
+        <Button
+          variant="outline"
+          className="w-full justify-start"
+          onClick={signOut}
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          Sign Out
+        </Button>
       </div>
     </div>
   );

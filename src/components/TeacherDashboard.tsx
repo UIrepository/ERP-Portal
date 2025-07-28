@@ -2,11 +2,10 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { TeacherSchedule } from './teacher/TeacherSchedule';
-import { TeacherExtraClasses } from './teacher/TeacherExtraClasses';
 import { TeacherFeedback } from './teacher/TeacherFeedback';
 import { TeacherBankDetails } from './teacher/TeacherBankDetails';
 import { TeacherMeetingLinks } from './teacher/TeacherMeetingLinks';
-import { Calendar, Plus, MessageSquare, CreditCard, Link } from 'lucide-react';
+import { Calendar, MessageSquare, CreditCard, Link } from 'lucide-react';
 
 interface TeacherDashboardProps {
   activeTab: string;
@@ -31,8 +30,6 @@ export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardPro
         return <TeacherSchedule />;
       case 'meeting-links':
         return <TeacherMeetingLinks />;
-      case 'extra-classes':
-        return <TeacherExtraClasses />;
       case 'feedback':
         return <TeacherFeedback />;
       case 'bank-details':
@@ -70,19 +67,7 @@ export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardPro
               <Link className="h-8 w-8 text-primary" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-muted-foreground">Meeting Links</p>
-                <p className="text-2xl font-bold">Universal Links</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <Plus className="h-8 w-8 text-primary" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Extra Classes</p>
-                <p className="text-2xl font-bold">Request</p>
+                <p className="text-2xl font-bold">Access Links</p>
               </div>
             </div>
           </CardContent>
@@ -95,6 +80,18 @@ export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardPro
               <div className="ml-4">
                 <p className="text-sm font-medium text-muted-foreground">Student Feedback</p>
                 <p className="text-2xl font-bold">Anonymous</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <CreditCard className="h-8 w-8 text-primary" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Bank Details</p>
+                <p className="text-2xl font-bold">Update</p>
               </div>
             </div>
           </CardContent>

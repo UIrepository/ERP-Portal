@@ -4,7 +4,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { AuthPage } from '@/components/AuthPage';
 import { Layout } from '@/components/Layout';
 import { Sidebar } from '@/components/Sidebar';
-import { AdminDashboard } from '@/components/admin/AdminDashboard';
 import { TeacherDashboard } from '@/components/TeacherDashboard';
 import { StudentDashboard } from '@/components/StudentDashboard';
 import { Loader2 } from 'lucide-react';
@@ -27,8 +26,6 @@ const Index = () => {
 
   const renderDashboard = () => {
     switch (profile?.role) {
-      case 'super_admin':
-        return <AdminDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
       case 'teacher':
         return <TeacherDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
       case 'student':
@@ -36,8 +33,8 @@ const Index = () => {
       default:
         return (
           <div className="p-6 text-center">
-            <h1 className="text-2xl font-bold text-destructive">Invalid Role</h1>
-            <p className="text-muted-foreground mt-2">Your account role is not recognized.</p>
+            <h1 className="text-2xl font-bold text-destructive">Access Denied</h1>
+            <p className="text-muted-foreground mt-2">Please contact administrator for access.</p>
           </div>
         );
     }
