@@ -11,6 +11,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MessageSquare, Send, User } from 'lucide-react';
 import { format } from 'date-fns';
 
+interface ChatMessage {
+  id: string;
+  message: string;
+  sender_id: string;
+  receiver_role: string;
+  subject: string;
+  batch: string;
+  sender_name: string;
+  created_at: string;
+}
+
 export const StudentChatTeacher = () => {
   const { profile } = useAuth();
   const [selectedSubject, setSelectedSubject] = useState('');
@@ -34,16 +45,18 @@ export const StudentChatTeacher = () => {
 
   const { data: chatMessages } = useQuery({
     queryKey: ['student-teacher-chat', selectedSubject],
-    queryFn: async () => {
+    queryFn: async (): Promise<ChatMessage[]> => {
       if (!selectedSubject) return [];
       
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('chat_messages')
         .select('*')
         .eq('subject', selectedSubject)
         .eq('batch', profile?.batch)
         .or(`sender_id.eq.${profile?.user_id},receiver_role.eq.student`)
         .order('created_at', { ascending: true });
+      
+      if (error) throw error;
       return data || [];
     },
     enabled: !!selectedSubject && !!profile?.batch
@@ -118,7 +131,6 @@ export const StudentChatTeacher = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {/* Chat Messages */}
               <div className="h-96 overflow-y-auto border rounded-lg p-4 space-y-3">
                 {chatMessages && chatMessages.length > 0 ? (
                   chatMessages.map((msg) => (
@@ -155,7 +167,6 @@ export const StudentChatTeacher = () => {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Message Input */}
               <div className="flex gap-2">
                 <Input
                   value={message}

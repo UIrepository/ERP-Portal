@@ -7,8 +7,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Shield, Send, User, MessageSquare } from 'lucide-react';
+import { Shield, Send, User } from 'lucide-react';
 import { format } from 'date-fns';
+
+interface FounderChatMessage {
+  id: string;
+  message: string;
+  student_id: string;
+  student_name: string;
+  student_batch: string;
+  is_from_student: boolean;
+  created_at: string;
+}
 
 export const StudentChatFounder = () => {
   const { profile } = useAuth();
@@ -18,12 +28,14 @@ export const StudentChatFounder = () => {
 
   const { data: chatMessages } = useQuery({
     queryKey: ['student-founder-chat'],
-    queryFn: async () => {
-      const { data } = await supabase
+    queryFn: async (): Promise<FounderChatMessage[]> => {
+      const { data, error } = await supabase
         .from('founder_chat_messages')
         .select('*')
         .eq('student_id', profile?.user_id)
         .order('created_at', { ascending: true });
+      
+      if (error) throw error;
       return data || [];
     },
     enabled: !!profile?.user_id
@@ -84,7 +96,6 @@ export const StudentChatFounder = () => {
         </CardHeader>
         <CardContent className="p-0">
           <div className="space-y-4 p-4">
-            {/* Chat Messages */}
             <div className="h-96 overflow-y-auto border rounded-lg p-4 space-y-3">
               {chatMessages && chatMessages.length > 0 ? (
                 chatMessages.map((msg) => (
@@ -126,7 +137,6 @@ export const StudentChatFounder = () => {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Message Input */}
             <div className="flex gap-2">
               <Input
                 value={message}
