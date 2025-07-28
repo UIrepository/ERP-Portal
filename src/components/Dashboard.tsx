@@ -1,4 +1,5 @@
 
+import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { AdminDashboard } from './admin/AdminDashboard';
 import { TeacherDashboard } from './TeacherDashboard';
@@ -7,6 +8,7 @@ import { Loader2 } from 'lucide-react';
 
 export const Dashboard = () => {
   const { profile, loading } = useAuth();
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   if (loading) {
     return (
@@ -28,11 +30,11 @@ export const Dashboard = () => {
   // Route to appropriate dashboard based on role
   switch (profile.role) {
     case 'super_admin':
-      return <AdminDashboard />;
+      return <AdminDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
     case 'teacher':
-      return <TeacherDashboard />;
+      return <TeacherDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
     case 'student':
-      return <StudentDashboard />;
+      return <StudentDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
     default:
       return (
         <div className="p-6 text-center">
