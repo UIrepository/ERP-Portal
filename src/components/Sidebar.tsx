@@ -1,3 +1,4 @@
+
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -11,6 +12,9 @@ import {
   Plus,
   Settings,
   BarChart3,
+  Users,
+  Monitor,
+  Bell,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -37,21 +41,17 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     { id: 'schedule', label: 'Schedule', icon: Calendar },
     { id: 'extra-classes', label: 'Extra Classes', icon: Plus },
     { id: 'feedback', label: 'Feedback', icon: MessageSquare },
-    { id: 'notes', label: 'Notes', icon: FileText },
-    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'bank-details', label: 'Bank Details', icon: Settings },
   ];
 
   const adminTabs = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'users', label: 'Users', icon: Users },
+    { id: 'content', label: 'Content', icon: FileText },
     { id: 'schedule', label: 'Schedule', icon: Calendar },
-    { id: 'recordings', label: 'Recordings', icon: Video },
-    { id: 'notes', label: 'Notes', icon: FileText },
-    { id: 'feedback', label: 'Feedback', icon: MessageSquare },
-    { id: 'exams', label: 'Exams', icon: GraduationCap },
-    { id: 'extra-classes', label: 'Extra Classes', icon: Plus },
-    { id: 'users', label: 'Users', icon: Settings },
-    { id: 'chat-logs', label: 'Chat Logs', icon: MessageSquare },
+    { id: 'monitoring', label: 'Monitoring', icon: Monitor },
+    { id: 'notifications', label: 'Notifications', icon: Bell },
+    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
   ];
 
   let tabs = studentTabs;
