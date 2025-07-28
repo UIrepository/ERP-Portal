@@ -1,7 +1,4 @@
 
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
 import { UserManagement } from './UserManagement';
 import { ContentManagement } from './ContentManagement';
@@ -9,11 +6,24 @@ import { ScheduleManagement } from './ScheduleManagement';
 import { MonitoringDashboard } from './MonitoringDashboard';
 import { NotificationCenter } from './NotificationCenter';
 import { AnalyticsDashboard } from './AnalyticsDashboard';
-import { Users, FileText, Calendar, Monitor, Bell, BarChart } from 'lucide-react';
+import { AdminStudentManager } from './AdminStudentManager';
+import { AdminTeacherManager } from './AdminTeacherManager';
+import { AdminBatchAllocation } from './AdminBatchAllocation';
+import { AdminMeetingManager } from './AdminMeetingManager';
+import { AdminContentUpload } from './AdminContentUpload';
+import { AdminFeedbackViewer } from './AdminFeedbackViewer';
+import { AdminCustomSections } from './AdminCustomSections';
+import { AdminUIKiPadhai } from './AdminUIKiPadhai';
+import { Card, CardContent } from '@/components/ui/card';
+import { Users, FileText, Calendar, Monitor, Bell, BarChart, UserCheck, Layers, Link, Upload, MessageSquare, Plus, Crown } from 'lucide-react';
 
-export const AdminDashboard = () => {
+interface AdminDashboardProps {
+  activeTab: string;
+  onTabChange: (tab: string) => void;
+}
+
+export const AdminDashboard = ({ activeTab, onTabChange }: AdminDashboardProps) => {
   const { profile } = useAuth();
-  const [activeTab, setActiveTab] = useState('users');
 
   if (profile?.role !== 'super_admin') {
     return (
@@ -24,67 +34,95 @@ export const AdminDashboard = () => {
     );
   }
 
-  return (
-    <div className="p-6 space-y-6">
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'students':
+        return <AdminStudentManager />;
+      case 'teachers':
+        return <AdminTeacherManager />;
+      case 'batch-allocation':
+        return <AdminBatchAllocation />;
+      case 'meeting-manager':
+        return <AdminMeetingManager />;
+      case 'upload-content':
+        return <AdminContentUpload />;
+      case 'feedback-viewer':
+        return <AdminFeedbackViewer />;
+      case 'monitoring':
+        return <MonitoringDashboard />;
+      case 'custom-sections':
+        return <AdminCustomSections />;
+      case 'ui-ki-padhai':
+        return <AdminUIKiPadhai />;
+      default:
+        return renderDashboardContent();
+    }
+  };
+
+  const renderDashboardContent = () => (
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Super Admin Dashboard</h1>
+        <h1 className="text-3xl font-bold">🛡️ Super Admin Dashboard</h1>
         <div className="text-sm text-muted-foreground">
-          Welcome, {profile?.name}
+          Welcome, {profile?.name} - Full System Control
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="users" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Users
-          </TabsTrigger>
-          <TabsTrigger value="content" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Content
-          </TabsTrigger>
-          <TabsTrigger value="schedule" className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            Schedule
-          </TabsTrigger>
-          <TabsTrigger value="monitoring" className="flex items-center gap-2">
-            <Monitor className="h-4 w-4" />
-            Monitoring
-          </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex items-center gap-2">
-            <Bell className="h-4 w-4" />
-            Notifications
-          </TabsTrigger>
-          <TabsTrigger value="analytics" className="flex items-center gap-2">
-            <BarChart className="h-4 w-4" />
-            Analytics
-          </TabsTrigger>
-        </TabsList>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <Users className="h-8 w-8 text-primary" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Manage Students</p>
+                <p className="text-2xl font-bold">All Access</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <UserCheck className="h-8 w-8 text-primary" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Manage Teachers</p>
+                <p className="text-2xl font-bold">Control</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <Layers className="h-8 w-8 text-primary" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Batch Allocation</p>
+                <p className="text-2xl font-bold">Assign</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <Link className="h-8 w-8 text-primary" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Meeting Links</p>
+                <p className="text-2xl font-bold">Universal</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
 
-        <TabsContent value="users" className="mt-6">
-          <UserManagement />
-        </TabsContent>
-
-        <TabsContent value="content" className="mt-6">
-          <ContentManagement />
-        </TabsContent>
-
-        <TabsContent value="schedule" className="mt-6">
-          <ScheduleManagement />
-        </TabsContent>
-
-        <TabsContent value="monitoring" className="mt-6">
-          <MonitoringDashboard />
-        </TabsContent>
-
-        <TabsContent value="notifications" className="mt-6">
-          <NotificationCenter />
-        </TabsContent>
-
-        <TabsContent value="analytics" className="mt-6">
-          <AnalyticsDashboard />
-        </TabsContent>
-      </Tabs>
+  return (
+    <div className="p-6">
+      {renderTabContent()}
     </div>
   );
 };
