@@ -126,7 +126,7 @@ export const StudentCurrentClass = () => {
                 </Button>
               )}
 
-              {currentClass.type === 'extra' && currentClass.reason && (
+              {currentClass.type === 'extra' && 'reason' in currentClass && currentClass.reason && (
                 <p className="text-sm text-muted-foreground mt-4">
                   Reason: {currentClass.reason}
                 </p>

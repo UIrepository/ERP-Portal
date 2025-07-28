@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -80,7 +79,7 @@ export const StudentRecordings = () => {
           />
         </div>
         
-        <style jsx>{`
+        <style>{`
           .watermark-overlay {
             position: absolute;
             top: 20px;
