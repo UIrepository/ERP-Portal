@@ -10,6 +10,17 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BookOpen, ExternalLink, Search } from 'lucide-react';
 
+interface DPPContent {
+  id: string;
+  title: string;
+  description?: string;
+  subject: string;
+  batch: string;
+  difficulty?: string;
+  link: string;
+  created_at: string;
+}
+
 export const StudentDPP = () => {
   const { profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
@@ -17,14 +28,16 @@ export const StudentDPP = () => {
 
   const { data: dppContent } = useQuery({
     queryKey: ['student-dpp'],
-    queryFn: async () => {
-      const { data } = await supabase
+    queryFn: async (): Promise<DPPContent[]> => {
+      const { data, error } = await (supabase as any)
         .from('dpp_content')
         .select('*')
         .eq('batch', profile?.batch)
         .in('subject', profile?.subjects || [])
         .order('created_at', { ascending: false });
-      return data || [];
+      
+      if (error) throw error;
+      return (data || []) as DPPContent[];
     },
     enabled: !!profile?.batch && !!profile?.subjects
   });
@@ -39,8 +52,7 @@ export const StudentDPP = () => {
     return matchesSearch && matchesSubject;
   });
 
-  const handleOpenDPP = (dpp: any) => {
-    // Open DPP in new tab
+  const handleOpenDPP = (dpp: DPPContent) => {
     window.open(dpp.link, '_blank');
   };
 

@@ -29,21 +29,21 @@ export const StudentChatFounder = () => {
   const { data: chatMessages } = useQuery({
     queryKey: ['student-founder-chat'],
     queryFn: async (): Promise<FounderChatMessage[]> => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('founder_chat_messages')
         .select('*')
         .eq('student_id', profile?.user_id)
         .order('created_at', { ascending: true });
       
       if (error) throw error;
-      return data || [];
+      return (data || []) as FounderChatMessage[];
     },
     enabled: !!profile?.user_id
   });
 
   const sendMessageMutation = useMutation({
     mutationFn: async (messageData: any) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('founder_chat_messages')
         .insert([messageData]);
       

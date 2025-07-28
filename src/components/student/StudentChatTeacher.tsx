@@ -48,7 +48,7 @@ export const StudentChatTeacher = () => {
     queryFn: async (): Promise<ChatMessage[]> => {
       if (!selectedSubject) return [];
       
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('chat_messages')
         .select('*')
         .eq('subject', selectedSubject)
@@ -57,14 +57,14 @@ export const StudentChatTeacher = () => {
         .order('created_at', { ascending: true });
       
       if (error) throw error;
-      return data || [];
+      return (data || []) as ChatMessage[];
     },
     enabled: !!selectedSubject && !!profile?.batch
   });
 
   const sendMessageMutation = useMutation({
     mutationFn: async (messageData: any) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('chat_messages')
         .insert([messageData]);
       
