@@ -8,17 +8,14 @@ import { Users, Monitor, MessageCircle, Activity } from 'lucide-react';
 import { format } from 'date-fns';
 
 export const MonitoringDashboard = () => {
-  const { data: activeSessions = [] } = useQuery({
-    queryKey: ['active-sessions'],
+  const { data: activeUsers = [] } = useQuery({
+    queryKey: ['active-users'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('user_sessions')
-        .select(`
-          *,
-          profiles!inner(name, email, role, batch)
-        `)
+        .from('profiles')
+        .select('*')
         .eq('is_active', true)
-        .order('last_activity', { ascending: false });
+        .order('updated_at', { ascending: false });
       
       if (error) throw error;
       return data || [];
@@ -52,17 +49,36 @@ export const MonitoringDashboard = () => {
     },
   });
 
-  const { data: analyticsEvents = [] } = useQuery({
-    queryKey: ['analytics-events'],
+  const { data: recentActivity = [] } = useQuery({
+    queryKey: ['recent-activity'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('analytics_events')
+      // Get recent notes, recordings, and extra classes as activity
+      const { data: notes } = await supabase
+        .from('notes')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(100);
-      
-      if (error) throw error;
-      return data || [];
+        .limit(20);
+
+      const { data: recordings } = await supabase
+        .from('recordings')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      const { data: extraClasses } = await supabase
+        .from('extra_classes')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      // Combine and sort all activities
+      const activities = [
+        ...(notes || []).map(item => ({ ...item, type: 'note' })),
+        ...(recordings || []).map(item => ({ ...item, type: 'recording' })),
+        ...(extraClasses || []).map(item => ({ ...item, type: 'extra_class' }))
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      return activities.slice(0, 50);
     },
   });
 
@@ -76,8 +92,8 @@ export const MonitoringDashboard = () => {
             <div className="flex items-center">
               <Users className="h-8 w-8 text-primary" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Active Sessions</p>
-                <p className="text-2xl font-bold">{activeSessions.length}</p>
+                <p className="text-sm font-medium text-muted-foreground">Active Users</p>
+                <p className="text-2xl font-bold">{activeUsers.length}</p>
               </div>
             </div>
           </CardContent>
@@ -112,46 +128,48 @@ export const MonitoringDashboard = () => {
             <div className="flex items-center">
               <Activity className="h-8 w-8 text-primary" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Analytics Events</p>
-                <p className="text-2xl font-bold">{analyticsEvents.length}</p>
+                <p className="text-sm font-medium text-muted-foreground">Recent Activity</p>
+                <p className="text-2xl font-bold">{recentActivity.length}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Tabs defaultValue="sessions" className="w-full">
+      <Tabs defaultValue="users" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="sessions">Active Sessions</TabsTrigger>
+          <TabsTrigger value="users">Active Users</TabsTrigger>
           <TabsTrigger value="chat">Chat Logs</TabsTrigger>
           <TabsTrigger value="feedback">Feedback</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="activity">Recent Activity</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="sessions" className="space-y-4">
+        <TabsContent value="users" className="space-y-4">
           <div className="grid gap-4">
-            {activeSessions.map((session) => (
-              <Card key={session.id}>
+            {activeUsers.map((user) => (
+              <Card key={user.id}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-semibold">{session.profiles.name}</h3>
-                      <p className="text-sm text-muted-foreground">{session.profiles.email}</p>
+                      <h3 className="font-semibold">{user.name}</h3>
+                      <p className="text-sm text-muted-foreground">{user.email}</p>
                       <div className="flex gap-2 mt-2">
-                        <Badge variant="outline">{session.profiles.role}</Badge>
-                        <Badge variant="outline">{session.profiles.batch}</Badge>
+                        <Badge variant="outline">{user.role}</Badge>
+                        {user.batch && <Badge variant="outline">{user.batch}</Badge>}
                       </div>
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-medium">
-                        Last Active: {format(new Date(session.last_activity), 'PPp')}
+                        Last Updated: {format(new Date(user.updated_at), 'PPp')}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        IP: {session.ip_address || 'Unknown'}
+                        Status: {user.is_active ? 'Active' : 'Inactive'}
                       </p>
-                      <p className="text-sm text-muted-foreground">
-                        Device: {session.device_info || 'Unknown'}
-                      </p>
+                      {user.subjects && user.subjects.length > 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          Subjects: {user.subjects.join(', ')}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -168,9 +186,9 @@ export const MonitoringDashboard = () => {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="font-medium">Sender: {log.sender_id}</span>
+                        <span className="font-medium">Sender: {log.sender_id || 'Unknown'}</span>
                         <span className="text-muted-foreground">→</span>
-                        <span className="font-medium">Receiver: {log.receiver_id}</span>
+                        <span className="font-medium">Receiver: {log.receiver_id || 'Unknown'}</span>
                       </div>
                       <p className="text-sm mb-2">{log.message}</p>
                       <div className="flex gap-2">
@@ -218,25 +236,28 @@ export const MonitoringDashboard = () => {
           </div>
         </TabsContent>
         
-        <TabsContent value="analytics" className="space-y-4">
+        <TabsContent value="activity" className="space-y-4">
           <div className="grid gap-4">
-            {analyticsEvents.map((event) => (
-              <Card key={event.id}>
+            {recentActivity.map((activity) => (
+              <Card key={activity.id}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-semibold">{event.event_type}</h3>
+                      <h3 className="font-semibold capitalize">{activity.type.replace('_', ' ')}</h3>
                       <p className="text-sm text-muted-foreground">
-                        User: {event.user_id || 'Anonymous'}
+                        {activity.type === 'note' ? activity.title : 
+                         activity.type === 'recording' ? activity.topic : 
+                         activity.type === 'extra_class' ? `${activity.subject} - Extra Class` : 
+                         'Activity'}
                       </p>
                       <div className="flex gap-2 mt-2">
-                        {event.subject && <Badge variant="outline">{event.subject}</Badge>}
-                        {event.batch && <Badge variant="outline">{event.batch}</Badge>}
+                        {activity.subject && <Badge variant="outline">{activity.subject}</Badge>}
+                        {activity.batch && <Badge variant="outline">{activity.batch}</Badge>}
                       </div>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">
-                        {format(new Date(event.created_at), 'PPp')}
+                        {format(new Date(activity.created_at), 'PPp')}
                       </p>
                     </div>
                   </div>

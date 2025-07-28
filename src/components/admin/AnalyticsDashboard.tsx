@@ -15,12 +15,6 @@ export const AnalyticsDashboard = () => {
         .select('role')
         .eq('is_active', true);
 
-      // Get engagement data
-      const { data: sessions } = await supabase
-        .from('user_sessions')
-        .select('*')
-        .eq('is_active', true);
-
       // Get content stats
       const { data: notes } = await supabase
         .from('notes')
@@ -34,37 +28,49 @@ export const AnalyticsDashboard = () => {
         .from('feedback')
         .select('subject, batch');
 
+      const { data: extraClasses } = await supabase
+        .from('extra_classes')
+        .select('subject, batch');
+
       // Process user data by role
       const roleCount = usersByRole?.reduce((acc: any, user: any) => {
         acc[user.role] = (acc[user.role] || 0) + 1;
         return acc;
-      }, {});
+      }, {}) || {};
 
       // Process content by subject
-      const subjectStats = {};
+      const subjectStats: Record<string, any> = {};
+      
       notes?.forEach((note: any) => {
         if (!subjectStats[note.subject]) {
-          subjectStats[note.subject] = { notes: 0, recordings: 0, feedback: 0 };
+          subjectStats[note.subject] = { notes: 0, recordings: 0, feedback: 0, extraClasses: 0 };
         }
         subjectStats[note.subject].notes++;
       });
 
       recordings?.forEach((recording: any) => {
         if (!subjectStats[recording.subject]) {
-          subjectStats[recording.subject] = { notes: 0, recordings: 0, feedback: 0 };
+          subjectStats[recording.subject] = { notes: 0, recordings: 0, feedback: 0, extraClasses: 0 };
         }
         subjectStats[recording.subject].recordings++;
       });
 
       feedback?.forEach((fb: any) => {
         if (!subjectStats[fb.subject]) {
-          subjectStats[fb.subject] = { notes: 0, recordings: 0, feedback: 0 };
+          subjectStats[fb.subject] = { notes: 0, recordings: 0, feedback: 0, extraClasses: 0 };
         }
         subjectStats[fb.subject].feedback++;
       });
 
+      extraClasses?.forEach((ec: any) => {
+        if (!subjectStats[ec.subject]) {
+          subjectStats[ec.subject] = { notes: 0, recordings: 0, feedback: 0, extraClasses: 0 };
+        }
+        subjectStats[ec.subject].extraClasses++;
+      });
+
       return {
-        usersByRole: Object.entries(roleCount || {}).map(([role, count]) => ({
+        usersByRole: Object.entries(roleCount).map(([role, count]) => ({
           role,
           count
         })),
@@ -73,10 +79,10 @@ export const AnalyticsDashboard = () => {
           ...stats
         })),
         totalUsers: usersByRole?.length || 0,
-        totalSessions: sessions?.length || 0,
         totalNotes: notes?.length || 0,
         totalRecordings: recordings?.length || 0,
-        totalFeedback: feedback?.length || 0
+        totalFeedback: feedback?.length || 0,
+        totalExtraClasses: extraClasses?.length || 0
       };
     },
   });
@@ -95,18 +101,6 @@ export const AnalyticsDashboard = () => {
               <div className="ml-4">
                 <p className="text-sm font-medium text-muted-foreground">Total Users</p>
                 <p className="text-2xl font-bold">{analyticsData?.totalUsers || 0}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <Users className="h-8 w-8 text-primary" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Active Sessions</p>
-                <p className="text-2xl font-bold">{analyticsData?.totalSessions || 0}</p>
               </div>
             </div>
           </CardContent>
@@ -143,6 +137,18 @@ export const AnalyticsDashboard = () => {
               <div className="ml-4">
                 <p className="text-sm font-medium text-muted-foreground">Total Feedback</p>
                 <p className="text-2xl font-bold">{analyticsData?.totalFeedback || 0}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <Users className="h-8 w-8 text-primary" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Extra Classes</p>
+                <p className="text-2xl font-bold">{analyticsData?.totalExtraClasses || 0}</p>
               </div>
             </div>
           </CardContent>
@@ -191,6 +197,7 @@ export const AnalyticsDashboard = () => {
                 <Bar dataKey="notes" fill="#0088FE" name="Notes" />
                 <Bar dataKey="recordings" fill="#00C49F" name="Recordings" />
                 <Bar dataKey="feedback" fill="#FFBB28" name="Feedback" />
+                <Bar dataKey="extraClasses" fill="#FF8042" name="Extra Classes" />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
