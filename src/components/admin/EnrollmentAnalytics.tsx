@@ -28,15 +28,15 @@ export const EnrollmentAnalytics = () => {
   });
 
   const { data: options = [], isLoading: isLoadingOptions } = useQuery({
-    queryKey: ['all-options-central'],
-    queryFn: async () => {
-        const { data, error } = await supabase.rpc('get_all_options');
-        if (error) throw error;
-        return data || [];
-    }
+      queryKey: ['all-options-central'],
+      queryFn: async () => {
+          const { data, error } = await supabase.rpc('get_all_options');
+          if (error) throw error;
+          return data || [];
+      }
   });
 
-  const { allBatches, allSubjects, chartData, filteredCount } = useMemo(() => {
+  const analyticsData = useMemo(() => {
     const allBatches = options.filter((o: any) => o.type === 'batch').map((o: any) => o.name).sort();
     const allSubjects = options.filter((o: any) => o.type === 'subject').map((o: any) => o.name).sort();
 
@@ -65,10 +65,11 @@ export const EnrollmentAnalytics = () => {
     });
 
     return {
+      totalStudents: students.length,
+      filteredCount: filteredStudents.length,
+      chartData,
       allBatches,
       allSubjects,
-      chartData,
-      filteredCount: filteredStudents.length
     };
   }, [students, options, selectedBatch, selectedSubject]);
   
@@ -97,7 +98,7 @@ export const EnrollmentAnalytics = () => {
             <CardTitle className="text-base font-medium">Total Students</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-bold">{students.length}</p>
+            <p className="text-4xl font-bold">{analyticsData.totalStudents}</p>
           </CardContent>
         </Card>
         <Card>
@@ -107,7 +108,7 @@ export const EnrollmentAnalytics = () => {
                     <SelectTrigger><SelectValue placeholder="Select Batch" /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">All Batches</SelectItem>
-                        {allBatches.map(batch => (
+                        {analyticsData.allBatches.map(batch => (
                         <SelectItem key={batch} value={batch}>{batch}</SelectItem>
                         ))}
                     </SelectContent>
@@ -121,7 +122,7 @@ export const EnrollmentAnalytics = () => {
                     <SelectTrigger><SelectValue placeholder="Select Subject" /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">All Subjects</SelectItem>
-                        {allSubjects.map(subject => (
+                        {analyticsData.allSubjects.map(subject => (
                         <SelectItem key={subject} value={subject}>{subject}</SelectItem>
                         ))}
                     </SelectContent>
@@ -138,18 +139,18 @@ export const EnrollmentAnalytics = () => {
             Enrollment by Subject Across Batches
           </CardTitle>
           <CardDescription>
-            Showing {filteredCount} students for the current filter.
+            Showing {analyticsData.filteredCount} students for the current filter.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={400}>
-            <BarChart data={chartData}>
+            <BarChart data={analyticsData.chartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" tick={{ fontSize: 12 }} />
               <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
               <Tooltip />
               <Legend />
-              {allSubjects.map((subject, index) => (
+              {analyticsData.allSubjects.map((subject, index) => (
                 (selectedSubject === 'all' || selectedSubject === subject) &&
                 <Bar key={subject} dataKey={subject} stackId="a" fill={`hsl(${index * 40}, 70%, 50%)`} />
               ))}
