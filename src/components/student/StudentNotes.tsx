@@ -35,14 +35,17 @@ export const StudentNotes = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
 
+  const batches = Array.isArray(profile?.batch) ? profile.batch : [profile?.batch].filter(Boolean);
+
   const { data: notes, isLoading } = useQuery({
-    queryKey: ['student-notes'],
+    queryKey: ['student-notes', batches, profile?.subjects],
     queryFn: async () => {
+      if (!batches.length || !profile?.subjects) return [];
       const { data } = await supabase
         .from('notes')
         .select('*')
-        .eq('batch', profile?.batch)
-        .in('subject', profile?.subjects || [])
+        .in('batch', batches)
+        .in('subject', profile.subjects)
         .order('created_at', { ascending: false });
       return data || [];
     },
@@ -67,7 +70,7 @@ export const StudentNotes = () => {
       activity_type: activityType,
       description,
       metadata,
-      batch: profile.batch,
+      batch: batches.length > 0 ? batches[0] : null,
       subject: metadata.subject,
     });
   };
@@ -115,7 +118,7 @@ export const StudentNotes = () => {
           <p className="text-gray-500 mt-1">Download your class notes and materials here.</p>
         </div>
         <div className="flex gap-2">
-          <Badge variant="outline">Batch: {profile?.batch}</Badge>
+          <Badge variant="outline">Batches: {batches.join(', ')}</Badge>
         </div>
       </div>
 
