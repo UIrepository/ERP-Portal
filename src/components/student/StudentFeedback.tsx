@@ -35,6 +35,17 @@ export const StudentFeedback = () => {
     enabled: !!profile?.batch && !!profile?.user_id
   });
 
+  const logActivity = async (activityType: string, description: string, metadata?: any) => {
+    if (!profile?.user_id) return;
+    
+    await supabase.from('student_activities').insert({
+      user_id: profile.user_id,
+      activity_type: activityType,
+      description,
+      metadata
+    });
+  };
+
   const submitFeedbackMutation = useMutation({
     mutationFn: async (feedbackData: any) => {
       const { error } = await supabase
@@ -48,8 +59,15 @@ export const StudentFeedback = () => {
       
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['student-feedback'] });
+      
+      // Log the activity
+      await logActivity('feedback_submit', `Submitted feedback for ${newFeedback.subject}`, {
+        subject: newFeedback.subject,
+        feedbackLength: newFeedback.feedback_text.length
+      });
+      
       setNewFeedback({
         subject: '',
         feedback_text: ''

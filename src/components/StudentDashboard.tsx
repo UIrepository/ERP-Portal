@@ -1,6 +1,6 @@
 
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { StudentSchedule } from './student/StudentSchedule';
 import { StudentCurrentClass } from './student/StudentCurrentClass';
 import { StudentRecordings } from './student/StudentRecordings';
@@ -9,9 +9,11 @@ import { StudentDPP } from './student/StudentDPP';
 import { StudentUIKiPadhai } from './student/StudentUIKiPadhai';
 import { StudentFeedback } from './student/StudentFeedback';
 import { StudentExams } from './student/StudentExams';
-import { Calendar, Clock, Video, FileText, Target, Crown, MessageSquare, BookOpen, TrendingUp, Award, BarChart3, Activity } from 'lucide-react';
+import { FileText, Video, Target, MessageSquare, Calendar, Clock, Crown, BookOpen } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useEffect } from 'react';
+import { format } from 'date-fns';
 
 interface StudentDashboardProps {
   activeTab: string;
@@ -21,13 +23,13 @@ interface StudentDashboardProps {
 export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardProps) => {
   const { profile } = useAuth();
 
-  // Fetch analytics data
-  const { data: analyticsData } = useQuery({
+  // Fetch analytics data with real-time updates
+  const { data: analyticsData, refetch: refetchAnalytics } = useQuery({
     queryKey: ['student-analytics', profile?.user_id],
     queryFn: async () => {
       if (!profile) return null;
 
-      const [notesResult, recordingsResult, feedbackResult] = await Promise.all([
+      const [notesResult, recordingsResult, dppResult, feedbackResult] = await Promise.all([
         supabase
           .from('notes')
           .select('*')
@@ -35,6 +37,11 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
           .in('subject', profile.subjects || []),
         supabase
           .from('recordings')
+          .select('*')
+          .eq('batch', profile.batch)
+          .in('subject', profile.subjects || []),
+        supabase
+          .from('dpp_content')
           .select('*')
           .eq('batch', profile.batch)
           .in('subject', profile.subjects || []),
@@ -48,17 +55,124 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
       return {
         totalNotes: notesResult.data?.length || 0,
         totalRecordings: recordingsResult.data?.length || 0,
+        totalDPP: dppResult.data?.length || 0,
         feedbackSubmitted: feedbackResult.data?.length || 0
       };
     },
     enabled: !!profile
   });
 
+  // Fetch recent activities
+  const { data: recentActivities, refetch: refetchActivities } = useQuery({
+    queryKey: ['student-activities', profile?.user_id],
+    queryFn: async () => {
+      if (!profile?.user_id) return [];
+      
+      const { data } = await supabase
+        .from('student_activities')
+        .select('*')
+        .eq('user_id', profile.user_id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      
+      return data || [];
+    },
+    enabled: !!profile?.user_id
+  });
+
+  // Set up real-time subscriptions
+  useEffect(() => {
+    if (!profile?.user_id) return;
+
+    const activitiesChannel = supabase
+      .channel('student-activities-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'student_activities',
+          filter: `user_id=eq.${profile.user_id}`
+        },
+        () => {
+          refetchActivities();
+        }
+      )
+      .subscribe();
+
+    const analyticsChannel = supabase
+      .channel('analytics-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notes'
+        },
+        () => {
+          refetchAnalytics();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'recordings'
+        },
+        () => {
+          refetchAnalytics();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'dpp_content'
+        },
+        () => {
+          refetchAnalytics();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'feedback'
+        },
+        () => {
+          refetchAnalytics();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(activitiesChannel);
+      supabase.removeChannel(analyticsChannel);
+    };
+  }, [profile?.user_id, refetchActivities, refetchAnalytics]);
+
+  // Function to log activities
+  const logActivity = async (activityType: string, description: string, metadata?: any) => {
+    if (!profile?.user_id) return;
+    
+    await supabase.from('student_activities').insert({
+      user_id: profile.user_id,
+      activity_type: activityType,
+      description,
+      metadata
+    });
+  };
+
   if (profile?.role !== 'student') {
     return (
-      <div className="p-6 text-center">
-        <h1 className="text-2xl font-bold text-destructive">Access Denied</h1>
-        <p className="text-muted-foreground mt-2">You don't have permission to access this page.</p>
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <h1 className="text-2xl font-semibold text-gray-900 mb-2">Access Denied</h1>
+          <p className="text-gray-600">You don't have permission to access this page.</p>
+        </div>
       </div>
     );
   }
@@ -87,147 +201,170 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
   };
 
   const renderDashboardContent = () => (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Student Dashboard</h1>
-        <div className="text-sm text-muted-foreground">
-          Welcome, {profile?.name} | Batch: {profile?.batch} | Subjects: {profile?.subjects?.join(', ')}
+    <div className="min-h-screen bg-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header Section */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-semibold text-gray-900 mb-3">
+            {profile?.name}
+          </h1>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+            <div className="text-gray-600">
+              <span className="font-medium">Batch:</span> {profile?.batch}
+            </div>
+            <div className="text-gray-600">
+              <span className="font-medium">Subjects:</span> {profile?.subjects?.join(', ')}
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Analytics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <TrendingUp className="h-8 w-8 text-green-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Total Notes</p>
-                <p className="text-2xl font-bold">{analyticsData?.totalNotes || 0}</p>
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          <Card className="bg-white border border-gray-200 rounded-2xl shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 mb-1">Notes Downloaded</p>
+                  <p className="text-3xl font-semibold text-gray-900">{analyticsData?.totalNotes || 0}</p>
+                </div>
+                <FileText className="h-8 w-8 text-gray-400" />
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <BarChart3 className="h-8 w-8 text-blue-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Recordings</p>
-                <p className="text-2xl font-bold">{analyticsData?.totalRecordings || 0}</p>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-white border border-gray-200 rounded-2xl shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 mb-1">Recordings Watched</p>
+                  <p className="text-3xl font-semibold text-gray-900">{analyticsData?.totalRecordings || 0}</p>
+                </div>
+                <Video className="h-8 w-8 text-gray-400" />
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <Award className="h-8 w-8 text-yellow-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Feedback Given</p>
-                <p className="text-2xl font-bold">{analyticsData?.feedbackSubmitted || 0}</p>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-white border border-gray-200 rounded-2xl shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 mb-1">DPPs Attempted</p>
+                  <p className="text-3xl font-semibold text-gray-900">{analyticsData?.totalDPP || 0}</p>
+                </div>
+                <Target className="h-8 w-8 text-gray-400" />
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-white border border-gray-200 rounded-2xl shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 mb-1">Feedback Submitted</p>
+                  <p className="text-3xl font-semibold text-gray-900">{analyticsData?.feedbackSubmitted || 0}</p>
+                </div>
+                <MessageSquare className="h-8 w-8 text-gray-400" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-      {/* Quick Access Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onTabChange('schedule')}>
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <Calendar className="h-8 w-8 text-primary" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Class Schedule</p>
-                <p className="text-2xl font-bold">View Classes</p>
+        {/* Quick Access Section */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          <Card 
+            className="bg-white border border-gray-200 rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-shadow duration-200" 
+            onClick={() => {
+              logActivity('navigation', 'Accessed class schedule');
+              onTabChange('schedule');
+            }}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <Calendar className="h-8 w-8 text-gray-400 mr-4" />
+                <div>
+                  <p className="font-medium text-gray-900">Class Schedule</p>
+                  <p className="text-sm text-gray-600">View your classes</p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onTabChange('current-class')}>
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <Clock className="h-8 w-8 text-primary" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Ongoing Class</p>
-                <p className="text-2xl font-bold">Join Now</p>
+            </CardContent>
+          </Card>
+          
+          <Card 
+            className="bg-white border border-gray-200 rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-shadow duration-200" 
+            onClick={() => {
+              logActivity('navigation', 'Joined current class');
+              onTabChange('current-class');
+            }}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <Clock className="h-8 w-8 text-gray-400 mr-4" />
+                <div>
+                  <p className="font-medium text-gray-900">Current Class</p>
+                  <p className="text-sm text-gray-600">Join ongoing class</p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onTabChange('recordings')}>
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <Video className="h-8 w-8 text-primary" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Recordings</p>
-                <p className="text-2xl font-bold">Watch</p>
+            </CardContent>
+          </Card>
+          
+          <Card 
+            className="bg-white border border-gray-200 rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-shadow duration-200" 
+            onClick={() => {
+              logActivity('navigation', 'Accessed recordings');
+              onTabChange('recordings');
+            }}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <Video className="h-8 w-8 text-gray-400 mr-4" />
+                <div>
+                  <p className="font-medium text-gray-900">Recordings</p>
+                  <p className="text-sm text-gray-600">Watch recordings</p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onTabChange('notes')}>
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <FileText className="h-8 w-8 text-primary" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Notes</p>
-                <p className="text-2xl font-bold">Study</p>
+            </CardContent>
+          </Card>
+          
+          <Card 
+            className="bg-white border border-gray-200 rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-shadow duration-200" 
+            onClick={() => {
+              logActivity('navigation', 'Accessed notes');
+              onTabChange('notes');
+            }}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center">
+                <FileText className="h-8 w-8 text-gray-400 mr-4" />
+                <div>
+                  <p className="font-medium text-gray-900">Notes</p>
+                  <p className="text-sm text-gray-600">Download notes</p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onTabChange('dpp')}>
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <Target className="h-8 w-8 text-primary" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">DPP Section</p>
-                <p className="text-2xl font-bold">Practice</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onTabChange('ui-ki-padhai')}>
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <Crown className="h-8 w-8 text-yellow-500" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">UI Ki Padhai</p>
-                <p className="text-2xl font-bold">Premium</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onTabChange('feedback')}>
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <MessageSquare className="h-8 w-8 text-primary" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Feedback</p>
-                <p className="text-2xl font-bold">Submit</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onTabChange('exams')}>
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <BookOpen className="h-8 w-8 text-primary" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Exams</p>
-                <p className="text-2xl font-bold">Upcoming</p>
-              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Activity Section */}
+        <Card className="bg-white border border-gray-200 rounded-2xl shadow-sm">
+          <CardContent className="p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-6">Recent Activity</h2>
+            <div className="space-y-4">
+              {recentActivities && recentActivities.length > 0 ? (
+                recentActivities.map((activity) => (
+                  <div key={activity.id} className="flex items-start gap-4 py-3 border-b border-gray-100 last:border-0">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">{activity.description}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {format(new Date(activity.created_at), 'MMM d, yyyy • h:mm a')}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 text-sm">No recent activity</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -236,7 +373,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
   );
 
   return (
-    <div className="p-6">
+    <div className="min-h-screen bg-white">
       {renderTabContent()}
     </div>
   );

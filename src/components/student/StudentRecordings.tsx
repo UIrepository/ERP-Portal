@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -41,7 +42,25 @@ export const StudentRecordings = () => {
     return matchesSearch && matchesSubject;
   });
 
-  const handleWatchRecording = (recording: any) => {
+  const logActivity = async (activityType: string, description: string, metadata?: any) => {
+    if (!profile?.user_id) return;
+    
+    await supabase.from('student_activities').insert({
+      user_id: profile.user_id,
+      activity_type: activityType,
+      description,
+      metadata
+    });
+  };
+
+  const handleWatchRecording = async (recording: any) => {
+    // Log the activity
+    await logActivity('recording_watch', `Watched ${recording.topic}`, {
+      subject: recording.subject,
+      recordingId: recording.id,
+      topic: recording.topic
+    });
+
     setSelectedRecording(recording);
   };
 

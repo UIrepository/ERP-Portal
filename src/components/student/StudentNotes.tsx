@@ -39,7 +39,25 @@ export const StudentNotes = () => {
     return matchesSearch && matchesSubject;
   });
 
+  const logActivity = async (activityType: string, description: string, metadata?: any) => {
+    if (!profile?.user_id) return;
+    
+    await supabase.from('student_activities').insert({
+      user_id: profile.user_id,
+      activity_type: activityType,
+      description,
+      metadata
+    });
+  };
+
   const handleDownload = async (note: any) => {
+    // Log the activity
+    await logActivity('note_download', `Downloaded ${note.title}`, {
+      subject: note.subject,
+      noteId: note.id,
+      filename: note.filename
+    });
+
     // Add watermark overlay with student name
     const watermarkText = `${profile?.name} - ${profile?.email}`;
     
