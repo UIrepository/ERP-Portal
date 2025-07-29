@@ -38,9 +38,9 @@ export const ScheduleManagement = () => {
   });
 
   const { data: options = [], isLoading: isLoadingOptions } = useQuery({
-    queryKey: ['available-options'],
+    queryKey: ['all-options-central'],
     queryFn: async () => {
-        const { data, error } = await supabase.from('available_options').select('type, name');
+        const { data, error } = await supabase.rpc('get_all_options');
         if (error) throw error;
         return data || [];
     }
@@ -48,8 +48,8 @@ export const ScheduleManagement = () => {
 
   const batchOptions = useMemo(() => {
     return options
-      .filter(o => o.type === 'batch')
-      .map(o => o.name)
+      .filter((o: any) => o.type === 'batch')
+      .map((o: any) => o.name)
       .sort();
   }, [options]);
 
