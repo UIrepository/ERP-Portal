@@ -28,16 +28,17 @@ export const EnrollmentAnalytics = () => {
   });
 
   const { data: options = [], isLoading: isLoadingOptions } = useQuery({
-      queryKey: ['available-options'],
-      queryFn: async () => {
-          const { data } = await supabase.from('available_options').select('type, name');
-          return data || [];
-      }
+    queryKey: ['all-options-central'],
+    queryFn: async () => {
+        const { data, error } = await supabase.rpc('get_all_options');
+        if (error) throw error;
+        return data || [];
+    }
   });
 
   const { allBatches, allSubjects, chartData, filteredCount } = useMemo(() => {
-    const allBatches = options.filter(o => o.type === 'batch').map(o => o.name).sort();
-    const allSubjects = options.filter(o => o.type === 'subject').map(o => o.name).sort();
+    const allBatches = options.filter((o: any) => o.type === 'batch').map((o: any) => o.name).sort();
+    const allSubjects = options.filter((o: any) => o.type === 'subject').map((o: any) => o.name).sort();
 
     let filteredStudents = students;
     if (selectedBatch !== 'all') {
