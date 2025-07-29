@@ -258,10 +258,11 @@ export type Database = {
         }
         Relationships: []
       }
+// ... (other types remain the same)
       profiles: {
         Row: {
           bank_details: Json | null
-          batch: string | null
+          batch: string[] | null // Changed to string[]
           created_at: string
           email: string
           exams: string[] | null
@@ -275,7 +276,7 @@ export type Database = {
         }
         Insert: {
           bank_details?: Json | null
-          batch?: string | null
+          batch?: string[] | null // Changed to string[]
           created_at?: string
           email: string
           exams?: string[] | null
@@ -289,7 +290,7 @@ export type Database = {
         }
         Update: {
           bank_details?: Json | null
-          batch?: string | null
+          batch?: string[] | null // Changed to string[]
           created_at?: string
           email?: string
           exams?: string[] | null
@@ -303,6 +304,7 @@ export type Database = {
         }
         Relationships: []
       }
+// ... (other types remain the same)
       recordings: {
         Row: {
           batch: string
