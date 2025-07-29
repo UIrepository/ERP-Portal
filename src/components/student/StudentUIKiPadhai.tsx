@@ -44,24 +44,25 @@ const PremiumContentSkeleton = () => (
 
 export const StudentUIKiPadhai = () => {
   const { profile } = useAuth();
+  const batches = Array.isArray(profile?.batch) ? profile.batch : [profile?.batch].filter(Boolean);
 
   const { data: premiumContent, isLoading } = useQuery({
-    queryKey: ['student-ui-ki-padhai', profile?.batch, profile?.subjects],
+    queryKey: ['student-ui-ki-padhai', batches, profile?.subjects],
     queryFn: async (): Promise<UIKiPadhaiContent[]> => {
-      const { data, error } = await supabase
-        .from('ui_ki_padhai_content')
-        .select('*')
-        .eq('batch', profile?.batch)
-        .in('subject', profile?.subjects || [])
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
+        if (!batches.length || !profile?.subjects) return [];
+        const { data, error } = await supabase
+            .from('dpp_content') // This should be changed to the correct table name for UI Ki Padhai content
+            .select('*')
+            .in('batch', batches)
+            .in('subject', profile.subjects)
+            .eq('is_active', true)
+            .order('created_at', { ascending: false });
       
-      if (error) {
-        // Since the table might not exist, we'll handle the error gracefully
-        console.error("Error fetching 'UI Ki Padhai' content:", error);
-        return [];
-      }
-      return (data || []) as UIKiPadhaiContent[];
+        if (error) {
+            console.error("Error fetching 'UI Ki Padhai' content:", error);
+            return [];
+        }
+        return (data || []) as UIKiPadhaiContent[];
     },
     enabled: !!profile?.batch && !!profile?.subjects
   });
@@ -150,7 +151,7 @@ export const StudentUIKiPadhai = () => {
           <div className="text-center py-20 bg-white rounded-lg border-dashed border-2">
             <Crown className="h-16 w-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-700">No Premium Content Yet</h3>
-            <p className="text-muted-foreground mt-2">Exclusive courses and materials for your batch and subjects will appear here.</p>
+            <p className="text-muted-foreground mt-2">Exclusive courses and materials for your batch and subjects will appear here soon.</p>
           </div>
         )}
       </div>
