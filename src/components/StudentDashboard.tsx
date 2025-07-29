@@ -1,6 +1,6 @@
 
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StudentSchedule } from './student/StudentSchedule';
 import { StudentCurrentClass } from './student/StudentCurrentClass';
 import { StudentRecordings } from './student/StudentRecordings';
@@ -9,7 +9,9 @@ import { StudentDPP } from './student/StudentDPP';
 import { StudentUIKiPadhai } from './student/StudentUIKiPadhai';
 import { StudentFeedback } from './student/StudentFeedback';
 import { StudentExams } from './student/StudentExams';
-import { Calendar, Clock, Video, FileText, Target, Crown, MessageSquare, BookOpen } from 'lucide-react';
+import { Calendar, Clock, Video, FileText, Target, Crown, MessageSquare, BookOpen, TrendingUp, Award, BarChart3, Activity } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface StudentDashboardProps {
   activeTab: string;
@@ -18,6 +20,45 @@ interface StudentDashboardProps {
 
 export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardProps) => {
   const { profile } = useAuth();
+
+  // Fetch analytics data
+  const { data: analyticsData } = useQuery({
+    queryKey: ['student-analytics', profile?.user_id],
+    queryFn: async () => {
+      if (!profile) return null;
+
+      const [notesResult, recordingsResult, dppResult, feedbackResult] = await Promise.all([
+        supabase
+          .from('notes')
+          .select('*')
+          .eq('batch', profile.batch)
+          .in('subject', profile.subjects || []),
+        supabase
+          .from('recordings')
+          .select('*')
+          .eq('batch', profile.batch)
+          .in('subject', profile.subjects || []),
+        supabase
+          .from('dpp_content')
+          .select('*')
+          .eq('batch', profile.batch)
+          .in('subject', profile.subjects || []),
+        supabase
+          .from('feedback')
+          .select('*')
+          .eq('batch', profile.batch)
+          .eq('submitted_by', profile.user_id)
+      ]);
+
+      return {
+        totalNotes: notesResult.data?.length || 0,
+        totalRecordings: recordingsResult.data?.length || 0,
+        totalDPP: dppResult.data?.length || 0,
+        feedbackSubmitted: feedbackResult.data?.length || 0
+      };
+    },
+    enabled: !!profile
+  });
 
   if (profile?.role !== 'student') {
     return (
@@ -54,14 +95,66 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
   const renderDashboardContent = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">📚 Student Dashboard</h1>
+        <h1 className="text-3xl font-bold">Student Dashboard</h1>
         <div className="text-sm text-muted-foreground">
           Welcome, {profile?.name} | Batch: {profile?.batch} | Subjects: {profile?.subjects?.join(', ')}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Analytics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <TrendingUp className="h-8 w-8 text-green-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Total Notes</p>
+                <p className="text-2xl font-bold">{analyticsData?.totalNotes || 0}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <BarChart3 className="h-8 w-8 text-blue-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Recordings</p>
+                <p className="text-2xl font-bold">{analyticsData?.totalRecordings || 0}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <Activity className="h-8 w-8 text-purple-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">DPP Available</p>
+                <p className="text-2xl font-bold">{analyticsData?.totalDPP || 0}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center">
+              <Award className="h-8 w-8 text-yellow-600" />
+              <div className="ml-4">
+                <p className="text-sm font-medium text-muted-foreground">Feedback Given</p>
+                <p className="text-2xl font-bold">{analyticsData?.feedbackSubmitted || 0}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Quick Access Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onTabChange('schedule')}>
           <CardContent className="p-4">
             <div className="flex items-center">
               <Calendar className="h-8 w-8 text-primary" />
@@ -73,7 +166,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onTabChange('current-class')}>
           <CardContent className="p-4">
             <div className="flex items-center">
               <Clock className="h-8 w-8 text-primary" />
@@ -85,7 +178,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onTabChange('recordings')}>
           <CardContent className="p-4">
             <div className="flex items-center">
               <Video className="h-8 w-8 text-primary" />
@@ -97,7 +190,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onTabChange('notes')}>
           <CardContent className="p-4">
             <div className="flex items-center">
               <FileText className="h-8 w-8 text-primary" />
@@ -109,7 +202,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onTabChange('dpp')}>
           <CardContent className="p-4">
             <div className="flex items-center">
               <Target className="h-8 w-8 text-primary" />
@@ -121,7 +214,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onTabChange('ui-ki-padhai')}>
           <CardContent className="p-4">
             <div className="flex items-center">
               <Crown className="h-8 w-8 text-yellow-500" />
@@ -133,7 +226,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onTabChange('feedback')}>
           <CardContent className="p-4">
             <div className="flex items-center">
               <MessageSquare className="h-8 w-8 text-primary" />
@@ -145,7 +238,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onTabChange('exams')}>
           <CardContent className="p-4">
             <div className="flex items-center">
               <BookOpen className="h-8 w-8 text-primary" />
