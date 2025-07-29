@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { AuthPage } from '@/components/AuthPage';
 import { Layout } from '@/components/Layout';
@@ -10,7 +10,19 @@ import { Loader2 } from 'lucide-react';
 
 const Index = () => {
   const { user, loading, profile } = useAuth();
-  const [activeTab, setActiveTab] = useState('dashboard');
+  
+  const getInitialTab = () => {
+    if (profile?.role === 'super_admin') {
+      return 'enrollment-analytics';
+    }
+    return 'dashboard';
+  };
+  
+  const [activeTab, setActiveTab] = useState(getInitialTab());
+
+  useEffect(() => {
+    setActiveTab(getInitialTab());
+  }, [profile?.role]);
 
   if (loading) {
     return (
