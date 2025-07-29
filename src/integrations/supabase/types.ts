@@ -153,33 +153,46 @@ export type Database = {
         }
         Relationships: []
       }
+// ... (other types)
       feedback: {
         Row: {
           batch: string
+          concept_clarity: number
+          comments: string
           created_at: string
           date: string
-          feedback_text: string
+          dpp_quality: number
           id: string
+          premium_content_usefulness: number
           subject: string
           submitted_by: string | null
+          teacher_quality: number
         }
         Insert: {
           batch: string
+          concept_clarity: number
+          comments: string
           created_at?: string
           date?: string
-          feedback_text: string
+          dpp_quality: number
           id?: string
+          premium_content_usefulness: number
           subject: string
           submitted_by?: string | null
+          teacher_quality: number
         }
         Update: {
           batch?: string
+          concept_clarity?: number
+          comments?: string
           created_at?: string
           date?: string
-          feedback_text?: string
+          dpp_quality?: number
           id?: string
+          premium_content_usefulness?: number
           subject?: string
           submitted_by?: string | null
+          teacher_quality?: number
         }
         Relationships: []
       }
