@@ -77,6 +77,7 @@ export type Database = {
         }
         Relationships: []
       }
+
       exams: {
         Row: {
           batch: string
@@ -398,6 +399,78 @@ export type Database = {
           last_activity?: string | null
           login_time?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      dpp_content: {
+        Row: {
+          batch: string
+          created_at: string
+          id: string
+          subject: string
+          topic: string
+          updated_at: string
+          description?: string | null
+          content?: string | null
+          file_url?: string | null
+        }
+        Insert: {
+          batch: string
+          created_at?: string
+          id?: string
+          subject: string
+          topic: string
+          updated_at?: string
+          description?: string | null
+          content?: string | null
+          file_url?: string | null
+        }
+        Update: {
+          batch?: string
+          created_at?: string
+          id?: string
+          subject?: string
+          topic?: string
+          updated_at?: string
+          description?: string | null
+          content?: string | null
+          file_url?: string | null
+        }
+        Relationships: []
+      }
+      student_activities: {
+        Row: {
+          batch: string
+          created_at: string
+          id: string
+          subject: string
+          updated_at: string
+          user_id: string
+          activity_type: string
+          description?: string | null
+          metadata?: Json | null
+        }
+        Insert: {
+          batch: string
+          created_at?: string
+          id?: string
+          subject: string
+          updated_at?: string
+          user_id: string
+          activity_type: string
+          description?: string | null
+          metadata?: Json | null
+        }
+        Update: {
+          batch?: string
+          created_at?: string
+          id?: string
+          subject?: string
+          updated_at?: string
+          user_id?: string
+          activity_type?: string
+          description?: string | null
+          metadata?: Json | null
         }
         Relationships: []
       }
