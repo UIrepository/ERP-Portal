@@ -7,7 +7,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Users, Loader2 } from 'lucide-react';
 
 interface StudentProfile {
-  batch: string | null;
+  batch: string | string[] | null;
   subjects: string[] | null;
 }
 
@@ -40,6 +40,9 @@ export const EnrollmentAnalytics = () => {
       student.subjects?.forEach(subject => allSubjects.add(subject));
     });
 
+    const sortedBatches = Array.from(allBatches).sort();
+    const sortedSubjects = Array.from(allSubjects).sort();
+
     let filteredStudents = students;
     if (selectedBatch !== 'all') {
       filteredStudents = filteredStudents.filter(s => {
@@ -51,9 +54,9 @@ export const EnrollmentAnalytics = () => {
       filteredStudents = filteredStudents.filter(s => s.subjects?.includes(selectedSubject));
     }
 
-    const chartData = Array.from(allBatches).map(batch => {
+    const chartData = sortedBatches.map(batch => {
       const batchCounts: { name: string; [subject: string]: number } = { name: batch };
-      Array.from(allSubjects).forEach(subject => {
+      sortedSubjects.forEach(subject => {
         batchCounts[subject] = students.filter(
           s => {
             const batches = Array.isArray(s.batch) ? s.batch : [s.batch];
@@ -68,8 +71,8 @@ export const EnrollmentAnalytics = () => {
       totalStudents: students.length,
       filteredCount: filteredStudents.length,
       chartData,
-      allBatches: Array.from(allBatches).sort(),
-      allSubjects: Array.from(allSubjects).sort(),
+      allBatches: sortedBatches,
+      allSubjects: sortedSubjects,
     };
   }, [students, selectedBatch, selectedSubject]);
 
