@@ -13,7 +13,7 @@ import { FileText, Download, Search } from 'lucide-react';
 export const StudentNotes = () => {
   const { profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState<string | undefined>(undefined);
 
   const { data: notes } = useQuery({
     queryKey: ['student-notes'],
@@ -97,12 +97,12 @@ export const StudentNotes = () => {
             className="pl-10"
           />
         </div>
-        <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+        <Select value={selectedSubject} onValueChange={(value) => setSelectedSubject(value === 'all' ? undefined : value)}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="Filter by subject" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Subjects</SelectItem>
+            <SelectItem value="all">All Subjects</SelectItem>
             {profile?.subjects?.map((subject) => (
               <SelectItem key={subject} value={subject}>{subject}</SelectItem>
             ))}
