@@ -15,48 +15,44 @@ export const EnrollmentAnalytics = () => {
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [selectedBatch, setSelectedBatch] = useState<string>('all');
 
-  const { data: students = [], isLoading } = useQuery<StudentProfile[]>({
-    queryKey: ['enrollment-analytics'],
+  const { data: students = [], isLoading: isLoadingStudents } = useQuery<StudentProfile[]>({
+    queryKey: ['enrollment-analytics-students'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
         .select('batch, subjects')
         .eq('role', 'student');
-      
       if (error) throw error;
       return data || [];
     },
   });
 
-  const analyticsData = useMemo(() => {
-    const allBatches = new Set<string>();
-    const allSubjects = new Set<string>();
+  const { data: options = [], isLoading: isLoadingOptions } = useQuery({
+      queryKey: ['available-options'],
+      queryFn: async () => {
+          const { data } = await supabase.from('available_options').select('type, name');
+          return data || [];
+      }
+  });
 
-    students.forEach(student => {
-      const batches = Array.isArray(student.batch) ? student.batch : [student.batch];
-      batches.forEach(batch => {
-        if(batch) allBatches.add(batch);
-      });
-      student.subjects?.forEach(subject => allSubjects.add(subject));
-    });
-
-    const sortedBatches = Array.from(allBatches).sort();
-    const sortedSubjects = Array.from(allSubjects).sort();
+  const { allBatches, allSubjects, chartData, filteredCount } = useMemo(() => {
+    const allBatches = options.filter(o => o.type === 'batch').map(o => o.name).sort();
+    const allSubjects = options.filter(o => o.type === 'subject').map(o => o.name).sort();
 
     let filteredStudents = students;
     if (selectedBatch !== 'all') {
       filteredStudents = filteredStudents.filter(s => {
         const batches = Array.isArray(s.batch) ? s.batch : [s.batch];
-        return batches.includes(selectedBatch)
+        return batches.includes(selectedBatch);
       });
     }
     if (selectedSubject !== 'all') {
       filteredStudents = filteredStudents.filter(s => s.subjects?.includes(selectedSubject));
     }
 
-    const chartData = sortedBatches.map(batch => {
+    const chartData = allBatches.map(batch => {
       const batchCounts: { name: string; [subject: string]: number } = { name: batch };
-      sortedSubjects.forEach(subject => {
+      allSubjects.forEach(subject => {
         batchCounts[subject] = students.filter(
           s => {
             const batches = Array.isArray(s.batch) ? s.batch : [s.batch];
@@ -68,13 +64,14 @@ export const EnrollmentAnalytics = () => {
     });
 
     return {
-      totalStudents: students.length,
-      filteredCount: filteredStudents.length,
+      allBatches,
+      allSubjects,
       chartData,
-      allBatches: sortedBatches,
-      allSubjects: sortedSubjects,
+      filteredCount: filteredStudents.length
     };
-  }, [students, selectedBatch, selectedSubject]);
+  }, [students, options, selectedBatch, selectedSubject]);
+  
+  const isLoading = isLoadingStudents || isLoadingOptions;
 
   if (isLoading) {
     return (
@@ -99,7 +96,7 @@ export const EnrollmentAnalytics = () => {
             <CardTitle className="text-base font-medium">Total Students</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-bold">{analyticsData.totalStudents}</p>
+            <p className="text-4xl font-bold">{students.length}</p>
           </CardContent>
         </Card>
         <Card>
@@ -109,7 +106,7 @@ export const EnrollmentAnalytics = () => {
                     <SelectTrigger><SelectValue placeholder="Select Batch" /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">All Batches</SelectItem>
-                        {analyticsData.allBatches.map(batch => (
+                        {allBatches.map(batch => (
                         <SelectItem key={batch} value={batch}>{batch}</SelectItem>
                         ))}
                     </SelectContent>
@@ -123,7 +120,7 @@ export const EnrollmentAnalytics = () => {
                     <SelectTrigger><SelectValue placeholder="Select Subject" /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">All Subjects</SelectItem>
-                        {analyticsData.allSubjects.map(subject => (
+                        {allSubjects.map(subject => (
                         <SelectItem key={subject} value={subject}>{subject}</SelectItem>
                         ))}
                     </SelectContent>
@@ -140,18 +137,18 @@ export const EnrollmentAnalytics = () => {
             Enrollment by Subject Across Batches
           </CardTitle>
           <CardDescription>
-            Showing {analyticsData.filteredCount} students for the current filter.
+            Showing {filteredCount} students for the current filter.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={400}>
-            <BarChart data={analyticsData.chartData}>
+            <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" tick={{ fontSize: 12 }} />
               <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
               <Tooltip />
               <Legend />
-              {analyticsData.allSubjects.map((subject, index) => (
+              {allSubjects.map((subject, index) => (
                 (selectedSubject === 'all' || selectedSubject === subject) &&
                 <Bar key={subject} dataKey={subject} stackId="a" fill={`hsl(${index * 40}, 70%, 50%)`} />
               ))}
