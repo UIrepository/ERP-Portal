@@ -22,14 +22,45 @@ export const StudentCurrentClass = () => {
   const { data: ongoingClass, isLoading } = useQuery({
     queryKey: ['current-ongoing-class'],
     queryFn: async (): Promise<OngoingClass | null> => {
-      const { data, error } = await supabase
-        .rpc('get_current_ongoing_class', {
-          user_batch: profile?.batch,
-          user_subjects: profile?.subjects || []
-        });
-      
-      if (error) throw error;
-      return data?.[0] || null;
+      if (!profile?.batch || !profile?.subjects) return null;
+
+      // Get current day and time
+      const now = new Date();
+      const currentDay = now.getDay();
+      const currentTime = now.toTimeString().slice(0, 8);
+
+      // Query schedules and meeting_links with proper joins
+      const { data: scheduleData, error: scheduleError } = await supabase
+        .from('schedules')
+        .select(`
+          subject,
+          batch,
+          start_time,
+          end_time,
+          meeting_links!inner (
+            link
+          )
+        `)
+        .eq('batch', profile.batch)
+        .in('subject', profile.subjects)
+        .eq('day_of_week', currentDay)
+        .lte('start_time', currentTime)
+        .gte('end_time', currentTime)
+        .eq('meeting_links.is_active', true)
+        .limit(1);
+
+      if (scheduleError) throw scheduleError;
+
+      if (!scheduleData || scheduleData.length === 0) return null;
+
+      const schedule = scheduleData[0];
+      return {
+        subject: schedule.subject,
+        batch: schedule.batch,
+        start_time: schedule.start_time,
+        end_time: schedule.end_time,
+        meeting_link: (schedule.meeting_links as any)?.link || ''
+      };
     },
     enabled: !!profile?.batch && !!profile?.subjects,
     refetchInterval: 30000
