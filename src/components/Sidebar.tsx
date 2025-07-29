@@ -84,7 +84,21 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
         return 'Portal';
     }
   }
-
+  const formatArrayString = (arr: string | string[] | null | undefined) => {
+    if (!arr) return '';
+    if (Array.isArray(arr)) {
+      return arr.map(item => typeof item === 'string' ? item.replace(/"/g, '') : item).join(', ');
+    }
+    try {
+      const parsed = JSON.parse(arr);
+      if (Array.isArray(parsed)) {
+        return parsed.map(item => typeof item === 'string' ? item.replace(/"/g, '') : item).join(', ');
+      }
+    } catch (e) {
+      return String(arr).replace(/"/g, '').replace(/[\[\]]/g, '');
+    }
+    return String(arr).replace(/"/g, '').replace(/[\[\]]/g, '');
+  };
   return (
     <div className="w-64 bg-white border-r border-gray-200 h-full flex flex-col">
       <div className="p-4 border-b border-gray-200">
@@ -92,6 +106,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
           {getPortalName()}
         </h2>
         <p className="text-sm text-gray-500 mt-1">{profile?.name}</p>
+        {profile?.batch && <p className="text-xs text-gray-500 mt-1">Batch: {formatArrayString(profile.batch)}</p>}
       </div>
       
       <nav className="p-4 space-y-2 flex-grow">
