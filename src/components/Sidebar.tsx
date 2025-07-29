@@ -10,14 +10,9 @@ import {
   Crown, 
   MessageSquare, 
   BookOpen,
-  Users,
-  UserCheck,
-  Layers,
-  Link as LinkIcon,
-  Upload,
-  Plus,
   Monitor,
-  BarChart2
+  BarChart2,
+  Link as LinkIcon
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -48,18 +43,12 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   ];
   
   const adminTabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'students', label: 'Manage Students', icon: Users },
-    { id: 'teachers', label: 'Manage Teachers', icon: UserCheck },
-    { id: 'batch-allocation', label: 'Batch Allocation', icon: Layers },
+    { id: 'enrollment-analytics', label: 'Student Analytics', icon: BarChart2 },
+    { id: 'teacher-analytics', label: 'Teacher Analytics', icon: BarChart2 },
     { id: 'schedules', label: 'Schedules', icon: Calendar },
     { id: 'meeting-manager', label: 'Meeting Links', icon: LinkIcon },
-    { id: 'upload-content', label: 'Upload Content', icon: Upload },
     { id: 'feedback-viewer', label: 'Feedback Viewer', icon: MessageSquare },
     { id: 'monitoring', label: 'Monitoring', icon: Monitor },
-    { id: 'custom-sections', label: 'Custom Sections', icon: Plus },
-    { id: 'ui-ki-padhai', label: 'UI Ki Padhai', icon: Crown },
-    { id: 'enrollment-analytics', label: 'Enrollment Analytics', icon: BarChart2 },
   ];
 
   const getTabs = () => {
