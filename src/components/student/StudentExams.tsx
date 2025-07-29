@@ -1,4 +1,3 @@
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Trophy, ClipboardCheck, BarChart, FileText } from 'lucide-react';
 
