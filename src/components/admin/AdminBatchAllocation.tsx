@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Layers, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -14,10 +12,11 @@ export const AdminBatchAllocation = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [newBatch, setNewBatch] = useState('');
+  const [newBatches, setNewBatches] = useState<string[]>([]);
+  const [batchInput, setBatchInput] = useState('');
   const [newSubjects, setNewSubjects] = useState<string[]>([]);
   const [subjectInput, setSubjectInput] = useState('');
-  
+
   const { data: users } = useQuery({
     queryKey: ['admin-users-allocation'],
     queryFn: async () => {
@@ -43,7 +42,7 @@ export const AdminBatchAllocation = () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users-allocation'] });
       toast({ title: "Success", description: "Batch and subjects updated successfully" });
       setSelectedUser(null);
-      setNewBatch('');
+      setNewBatches([]);
       setNewSubjects([]);
     },
     onError: (error) => {
@@ -52,12 +51,23 @@ export const AdminBatchAllocation = () => {
   });
 
   const handleSave = () => {
-    if (!selectedUser || !newBatch) return;
+    if (!selectedUser) return;
     
     updateAllocationMutation.mutate({
-      batch: newBatch,
+      batch: newBatches,
       subjects: newSubjects,
     });
+  };
+
+  const addBatch = () => {
+    if (batchInput.trim() && !newBatches.includes(batchInput.trim())) {
+      setNewBatches([...newBatches, batchInput.trim()]);
+      setBatchInput('');
+    }
+  };
+
+  const removeBatch = (batchToRemove: string) => {
+    setNewBatches(newBatches.filter(b => b !== batchToRemove));
   };
 
   const addSubject = () => {
@@ -73,7 +83,7 @@ export const AdminBatchAllocation = () => {
 
   const handleUserSelect = (user: any) => {
     setSelectedUser(user);
-    setNewBatch(user.batch || '');
+    setNewBatches(user.batch || []);
     setNewSubjects(user.subjects || []);
   };
 
@@ -105,9 +115,9 @@ export const AdminBatchAllocation = () => {
                   <div>
                     <h4 className="font-medium">{user.name}</h4>
                     <p className="text-sm text-muted-foreground">{user.email}</p>
-                    <div className="flex gap-2 mt-2">
+                    <div className="flex flex-wrap gap-2 mt-2">
                       <Badge variant="outline">{user.role}</Badge>
-                      {user.batch && <Badge variant="secondary">{user.batch}</Badge>}
+                      {user.batch?.map((b: string) => <Badge key={b} variant="secondary">{b}</Badge>)}
                     </div>
                   </div>
                   <div className="text-sm text-muted-foreground">
@@ -130,12 +140,28 @@ export const AdminBatchAllocation = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Batch</label>
-                <Input
-                  value={newBatch}
-                  onChange={(e) => setNewBatch(e.target.value)}
-                  placeholder="e.g., 2024-A, 2024-B"
-                />
+                <label className="block text-sm font-medium mb-1">Batches</label>
+                <div className="flex gap-2 mb-2">
+                  <Input
+                    value={batchInput}
+                    onChange={(e) => setBatchInput(e.target.value)}
+                    placeholder="Enter batch name"
+                    onKeyPress={(e) => e.key === 'Enter' && addBatch()}
+                  />
+                  <Button onClick={addBatch} variant="outline">Add</Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {newBatches.map((batch) => (
+                    <Badge
+                      key={batch}
+                      variant="secondary"
+                      className="cursor-pointer hover:bg-destructive hover:text-destructive-foreground"
+                      onClick={() => removeBatch(batch)}
+                    >
+                      {batch} ×
+                    </Badge>
+                  ))}
+                </div>
               </div>
               
               <div>
@@ -174,8 +200,12 @@ export const AdminBatchAllocation = () => {
                 <h4 className="font-medium mb-2">Current Allocation</h4>
                 <div className="space-y-2">
                   <div>
-                    <span className="text-sm font-medium">Batch: </span>
-                    <span className="text-sm">{selectedUser.batch || 'Not assigned'}</span>
+                    <span className="text-sm font-medium">Batches: </span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {selectedUser.batch?.map((b: string) => (
+                        <Badge key={b} variant="outline" className="text-xs">{b}</Badge>
+                      )) || <span className="text-sm text-muted-foreground">No batches assigned</span>}
+                    </div>
                   </div>
                   <div>
                     <span className="text-sm font-medium">Subjects: </span>
