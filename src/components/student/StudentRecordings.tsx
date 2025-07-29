@@ -32,7 +32,7 @@ export const StudentRecordings = () => {
   });
 
   const filteredRecordings = recordings?.filter(recording => {
-    const matchesSearch = !searchTerm ||
+    const matchesSearch = !searchTerm || 
       recording.topic.toLowerCase().includes(searchTerm.toLowerCase()) ||
       recording.subject.toLowerCase().includes(searchTerm.toLowerCase());
     
@@ -142,12 +142,12 @@ export const StudentRecordings = () => {
             className="pl-10"
           />
         </div>
-        <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+        <Select value={selectedSubject || 'all'} onValueChange={(value) => setSelectedSubject(value === 'all' ? '' : value)}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="Filter by subject" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Subjects</SelectItem>
+            <SelectItem value="all">All Subjects</SelectItem>
             {profile?.subjects?.map((subject) => (
               <SelectItem key={subject} value={subject}>{subject}</SelectItem>
             ))}
