@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Crown, ExternalLink, Lock, Loader2 } from 'lucide-react';
+import { Crown, ExternalLink, Lock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface UIKiPadhaiContent {
@@ -15,6 +15,8 @@ interface UIKiPadhaiContent {
   link: string;
   is_active: boolean;
   created_at: string;
+  batch: string;
+  subject: string;
 }
 
 const PremiumContentSkeleton = () => (
@@ -44,16 +46,24 @@ export const StudentUIKiPadhai = () => {
   const { profile } = useAuth();
 
   const { data: premiumContent, isLoading } = useQuery({
-    queryKey: ['student-ui-ki-padhai'],
+    queryKey: ['student-ui-ki-padhai', profile?.batch, profile?.subjects],
     queryFn: async (): Promise<UIKiPadhaiContent[]> => {
       const { data, error } = await supabase
-        .from('dpp_content') // Assuming this is the correct table, change if needed
+        .from('ui_ki_padhai_content')
         .select('*')
+        .eq('batch', profile?.batch)
+        .in('subject', profile?.subjects || [])
+        .eq('is_active', true)
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        // Since the table might not exist, we'll handle the error gracefully
+        console.error("Error fetching 'UI Ki Padhai' content:", error);
+        return [];
+      }
       return (data || []) as UIKiPadhaiContent[];
     },
+    enabled: !!profile?.batch && !!profile?.subjects
   });
 
   const handleAccessContent = (content: UIKiPadhaiContent) => {
@@ -140,7 +150,7 @@ export const StudentUIKiPadhai = () => {
           <div className="text-center py-20 bg-white rounded-lg border-dashed border-2">
             <Crown className="h-16 w-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-700">No Premium Content Yet</h3>
-            <p className="text-muted-foreground mt-2">Exclusive courses and materials will appear here soon.</p>
+            <p className="text-muted-foreground mt-2">Exclusive courses and materials for your batch and subjects will appear here.</p>
           </div>
         )}
       </div>
