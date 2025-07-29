@@ -44,7 +44,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const teacherTabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'schedule', label: 'Schedule', icon: Calendar },
-    { id: 'meeting-links', label: 'Meeting Links', icon: Video },
+    { id: 'your-classes', label: 'Your Classes', icon: Clock },
     { id: 'feedback', label: 'Feedback', icon: MessageSquare },
   ];
   
