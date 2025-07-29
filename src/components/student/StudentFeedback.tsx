@@ -47,12 +47,13 @@ export const StudentFeedback = () => {
   });
 
   const feedbackTasks = useMemo(() => {
-    if (!profile?.batch || !profile?.subjects) return [];
+    const batches = Array.isArray(profile?.batch) ? profile.batch : [profile?.batch].filter(Boolean);
+    if (!batches.length || !profile?.subjects) return [];
     
     const tasks: { batch: string; subject: string; submitted: boolean }[] = [];
     const submittedSet = new Set(submittedFeedback.map(f => `${f.batch}-${f.subject}`));
 
-    profile.batch.forEach(batch => {
+    batches.forEach(batch => {
       profile.subjects?.forEach(subject => {
         tasks.push({
           batch,
