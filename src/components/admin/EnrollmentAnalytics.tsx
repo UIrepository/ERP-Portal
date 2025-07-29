@@ -1,12 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Users, Loader2 } from 'lucide-react';
 
-// Define a more specific type for student profiles for this component
 interface StudentProfile {
   batch: string | null;
   subjects: string[] | null;
@@ -16,7 +15,6 @@ export const EnrollmentAnalytics = () => {
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [selectedBatch, setSelectedBatch] = useState<string>('all');
 
-  // Fetch all student profiles for analytics
   const { data: students = [], isLoading } = useQuery<StudentProfile[]>({
     queryKey: ['enrollment-analytics'],
     queryFn: async () => {
@@ -30,31 +28,37 @@ export const EnrollmentAnalytics = () => {
     },
   });
 
-  // Memoize processed data to avoid re-computation on every render
   const analyticsData = useMemo(() => {
     const allBatches = new Set<string>();
     const allSubjects = new Set<string>();
 
     students.forEach(student => {
-      if (student.batch) allBatches.add(student.batch);
+      const batches = Array.isArray(student.batch) ? student.batch : [student.batch];
+      batches.forEach(batch => {
+        if(batch) allBatches.add(batch);
+      });
       student.subjects?.forEach(subject => allSubjects.add(subject));
     });
 
-    // Filter students based on selection
     let filteredStudents = students;
     if (selectedBatch !== 'all') {
-      filteredStudents = filteredStudents.filter(s => s.batch === selectedBatch);
+      filteredStudents = filteredStudents.filter(s => {
+        const batches = Array.isArray(s.batch) ? s.batch : [s.batch];
+        return batches.includes(selectedBatch)
+      });
     }
     if (selectedSubject !== 'all') {
       filteredStudents = filteredStudents.filter(s => s.subjects?.includes(selectedSubject));
     }
 
-    // Prepare data for the chart, grouping by batch
     const chartData = Array.from(allBatches).map(batch => {
       const batchCounts: { name: string; [subject: string]: number } = { name: batch };
       Array.from(allSubjects).forEach(subject => {
         batchCounts[subject] = students.filter(
-          s => s.batch === batch && s.subjects?.includes(subject)
+          s => {
+            const batches = Array.isArray(s.batch) ? s.batch : [s.batch];
+            return batches.includes(batch) && s.subjects?.includes(subject)
+          }
         ).length;
       });
       return batchCounts;
@@ -71,69 +75,77 @@ export const EnrollmentAnalytics = () => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
-        <p className="ml-2">Loading analytics...</p>
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Enrollment Analytics</h2>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
+      {/* Header Section */}
+      <div>
+        <h1 className="text-3xl font-bold text-gray-800">Student Enrollment Analytics</h1>
+        <p className="text-gray-500 mt-1">Filter and visualize student enrollment data across batches and subjects.</p>
+      </div>
+
+      {/* Filter and Stats Section */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-base font-medium">Total Students</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{analyticsData.totalStudents}</p>
+            <p className="text-4xl font-bold">{analyticsData.totalStudents}</p>
           </CardContent>
         </Card>
-        <Select value={selectedBatch} onValueChange={setSelectedBatch}>
-          <SelectTrigger><SelectValue placeholder="Filter by Batch" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Batches</SelectItem>
-            {analyticsData.allBatches.map(batch => (
-              <SelectItem key={batch} value={batch}>{batch}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={selectedSubject} onValueChange={setSelectedSubject}>
-          <SelectTrigger><SelectValue placeholder="Filter by Subject" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Subjects</SelectItem>
-            {analyticsData.allSubjects.map(subject => (
-              <SelectItem key={subject} value={subject}>{subject}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Card>
+            <CardHeader><CardTitle className="text-base font-medium">Filter by Batch</CardTitle></CardHeader>
+            <CardContent>
+                <Select value={selectedBatch} onValueChange={setSelectedBatch}>
+                    <SelectTrigger><SelectValue placeholder="Select Batch" /></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Batches</SelectItem>
+                        {analyticsData.allBatches.map(batch => (
+                        <SelectItem key={batch} value={batch}>{batch}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </CardContent>
+        </Card>
+        <Card>
+            <CardHeader><CardTitle className="text-base font-medium">Filter by Subject</CardTitle></CardHeader>
+            <CardContent>
+                <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+                    <SelectTrigger><SelectValue placeholder="Select Subject" /></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Subjects</SelectItem>
+                        {analyticsData.allSubjects.map(subject => (
+                        <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </CardContent>
+        </Card>
       </div>
 
-      <Card>
+      {/* Chart Section */}
+      <Card className="bg-white">
         <CardHeader>
           <CardTitle className="flex items-center text-lg">
-            <Users className="mr-2 h-5 w-5" />
-            Filtered Enrollment Count
+            <BarChart className="mr-2 h-5 w-5" />
+            Enrollment by Subject Across Batches
           </CardTitle>
+          <CardDescription>
+            Showing {analyticsData.filteredCount} students for the current filter.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <p className="text-4xl font-bold">{analyticsData.filteredCount}</p>
-          <p className="text-sm text-muted-foreground">
-            Students in {selectedBatch === 'all' ? 'all batches' : selectedBatch} enrolled in {selectedSubject === 'all' ? 'all subjects' : selectedSubject}.
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle>Enrollment by Subject Across Batches</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={400}>
             <BarChart data={analyticsData.chartData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis allowDecimals={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
               <Tooltip />
               <Legend />
               {analyticsData.allSubjects.map((subject, index) => (
