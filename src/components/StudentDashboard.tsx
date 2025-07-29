@@ -27,7 +27,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
     queryFn: async () => {
       if (!profile) return null;
 
-      const [notesResult, recordingsResult, dppResult, feedbackResult] = await Promise.all([
+      const [notesResult, recordingsResult, feedbackResult] = await Promise.all([
         supabase
           .from('notes')
           .select('*')
@@ -35,11 +35,6 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
           .in('subject', profile.subjects || []),
         supabase
           .from('recordings')
-          .select('*')
-          .eq('batch', profile.batch)
-          .in('subject', profile.subjects || []),
-        supabase
-          .from('dpp_content')
           .select('*')
           .eq('batch', profile.batch)
           .in('subject', profile.subjects || []),
@@ -53,7 +48,6 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
       return {
         totalNotes: notesResult.data?.length || 0,
         totalRecordings: recordingsResult.data?.length || 0,
-        totalDPP: dppResult.data?.length || 0,
         feedbackSubmitted: feedbackResult.data?.length || 0
       };
     },
@@ -102,7 +96,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
       </div>
 
       {/* Analytics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center">
@@ -122,18 +116,6 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
               <div className="ml-4">
                 <p className="text-sm font-medium text-muted-foreground">Recordings</p>
                 <p className="text-2xl font-bold">{analyticsData?.totalRecordings || 0}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <Activity className="h-8 w-8 text-purple-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">DPP Available</p>
-                <p className="text-2xl font-bold">{analyticsData?.totalDPP || 0}</p>
               </div>
             </div>
           </CardContent>
