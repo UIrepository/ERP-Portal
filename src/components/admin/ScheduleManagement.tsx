@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,19 +41,36 @@ export const ScheduleManagement = () => {
       return data || [];
     },
   });
-
-  const { data: extraClasses = [] } = useQuery({
-    queryKey: ['admin-extra-classes'],
+  
+  const { data: profiles = [] } = useQuery({
+    queryKey: ['all-profiles-for-filters'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('extra_classes')
-        .select('*')
-        .order('date', { ascending: true });
-      
-      if (error) throw error;
-      return data || [];
-    },
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('batch, subjects');
+        
+        if (error) throw error;
+        return data || [];
+    }
   });
+
+  const { batchOptions, subjectOptions } = useMemo(() => {
+    const batches = new Set<string>();
+    const subjects = new Set<string>();
+
+    profiles.forEach(p => {
+        const userBatches = Array.isArray(p.batch) ? p.batch : [p.batch];
+        userBatches.forEach(b => {
+            if(b) batches.add(b);
+        });
+        p.subjects?.forEach(s => subjects.add(s));
+    });
+
+    return {
+        batchOptions: Array.from(batches).sort(),
+        subjectOptions: Array.from(subjects).sort(),
+    };
+  }, [profiles]);
 
   const addScheduleMutation = useMutation({
     mutationFn: async (scheduleData: any) => {
@@ -143,8 +160,6 @@ export const ScheduleManagement = () => {
     }
   };
 
-  const subjectOptions = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'English', 'History', 'Computer Science'];
-  const batchOptions = ['2024-A', '2024-B', '2025-A', '2025-B'];
   const dayOptions = [
     { value: 'all', label: 'All Days' },
     { value: '0', label: 'Sunday' },
