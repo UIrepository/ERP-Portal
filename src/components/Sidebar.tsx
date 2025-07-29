@@ -1,4 +1,3 @@
-
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { 
@@ -10,7 +9,15 @@ import {
   Target, 
   Crown, 
   MessageSquare, 
-  BookOpen 
+  BookOpen,
+  Users,
+  UserCheck,
+  Layers,
+  Link as LinkIcon,
+  Upload,
+  Plus,
+  Monitor,
+  BarChart2
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -39,14 +46,55 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     { id: 'meeting-links', label: 'Meeting Links', icon: Video },
     { id: 'feedback', label: 'Feedback', icon: MessageSquare },
   ];
+  
+  const adminTabs = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'students', label: 'Manage Students', icon: Users },
+    { id: 'teachers', label: 'Manage Teachers', icon: UserCheck },
+    { id: 'batch-allocation', label: 'Batch Allocation', icon: Layers },
+    { id: 'schedules', label: 'Schedules', icon: Calendar },
+    { id: 'meeting-manager', label: 'Meeting Links', icon: LinkIcon },
+    { id: 'upload-content', label: 'Upload Content', icon: Upload },
+    { id: 'feedback-viewer', label: 'Feedback Viewer', icon: MessageSquare },
+    { id: 'monitoring', label: 'Monitoring', icon: Monitor },
+    { id: 'custom-sections', label: 'Custom Sections', icon: Plus },
+    { id: 'ui-ki-padhai', label: 'UI Ki Padhai', icon: Crown },
+    { id: 'enrollment-analytics', label: 'Enrollment Analytics', icon: BarChart2 },
+  ];
 
-  const tabs = profile?.role === 'student' ? studentTabs : teacherTabs;
+  const getTabs = () => {
+    switch (profile?.role) {
+      case 'student':
+        return studentTabs;
+      case 'teacher':
+        return teacherTabs;
+      case 'super_admin':
+        return adminTabs;
+      default:
+        return [];
+    }
+  };
+
+  const tabs = getTabs();
+
+  const getPortalName = () => {
+     switch (profile?.role) {
+      case 'student':
+        return 'Student Portal';
+      case 'teacher':
+        return 'Teacher Portal';
+      case 'super_admin':
+        return 'Admin Portal';
+      default:
+        return 'Portal';
+    }
+  }
 
   return (
     <div className="w-64 bg-white border-r border-gray-200 h-full overflow-y-auto">
       <div className="p-4 border-b border-gray-200">
         <h2 className="font-semibold text-gray-800 text-lg">
-          {profile?.role === 'student' ? 'Student Portal' : 'Teacher Portal'}
+          {getPortalName()}
         </h2>
         <p className="text-sm text-gray-500 mt-1">{profile?.name}</p>
       </div>
