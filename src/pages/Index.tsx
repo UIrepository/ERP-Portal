@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { AuthPage } from '@/components/AuthPage';
@@ -6,6 +5,7 @@ import { Layout } from '@/components/Layout';
 import { Sidebar } from '@/components/Sidebar';
 import { TeacherDashboard } from '@/components/TeacherDashboard';
 import { StudentDashboard } from '@/components/StudentDashboard';
+import { AdminDashboard } from '@/components/admin/AdminDashboard';
 import { Loader2 } from 'lucide-react';
 
 const Index = () => {
@@ -30,6 +30,8 @@ const Index = () => {
         return <TeacherDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
       case 'student':
         return <StudentDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
+      case 'super_admin':
+        return <AdminDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
       default:
         return (
           <div className="p-6 text-center">
