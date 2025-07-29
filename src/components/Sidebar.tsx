@@ -114,7 +114,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
 
       <div className="p-4 border-t border-gray-200">
         <Button
-          variant="outline"
+          variant="destructive"
           className="w-full justify-center"
           onClick={signOut}
         >
