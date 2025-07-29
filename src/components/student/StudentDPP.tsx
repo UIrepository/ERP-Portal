@@ -147,7 +147,7 @@ export const StudentDPP = () => {
                   </Button>
                 </CardContent>
               </Card>
-            ))
+            ))}
           </div>
         ) : (
           <div className="text-center py-20 bg-white rounded-lg border-dashed border-2">
