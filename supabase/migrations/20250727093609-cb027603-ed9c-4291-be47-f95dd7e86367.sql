@@ -8,7 +8,7 @@ CREATE TABLE public.profiles (
   user_id UUID NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
-  batch TEXT,
+  batch TEXT[], -- Changed to TEXT[] to support multiple batches
   subjects TEXT[], -- Array of subjects
   exams TEXT[], -- Array of exams
   role user_role NOT NULL DEFAULT 'student',
