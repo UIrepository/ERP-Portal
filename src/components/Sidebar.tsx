@@ -1,21 +1,16 @@
 
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
 import { 
-  Home, 
+  LayoutDashboard, 
   Calendar, 
-  BookOpen, 
+  Clock, 
   Video, 
-  MessageSquare,
-  CreditCard,
-  Link,
-  Crown,
-  Clock,
-  FileText,
-  Target,
-  LogOut
+  FileText, 
+  Target, 
+  Crown, 
+  MessageSquare, 
+  BookOpen 
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -24,10 +19,10 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
-  const { profile, signOut } = useAuth();
+  const { profile } = useAuth();
 
-  const studentMenuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: Home },
+  const studentTabs = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'schedule', label: 'Class Schedule', icon: Calendar },
     { id: 'current-class', label: 'Ongoing Class', icon: Clock },
     { id: 'recordings', label: 'Recordings', icon: Video },
@@ -38,67 +33,41 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     { id: 'exams', label: 'Exams', icon: BookOpen },
   ];
 
-  const teacherMenuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: Home },
-    { id: 'schedule', label: 'Class Schedule', icon: Calendar },
-    { id: 'meeting-links', label: 'Meeting Links', icon: Link },
-    { id: 'feedback', label: 'Student Feedback', icon: MessageSquare },
-    { id: 'bank-details', label: 'Bank Details', icon: CreditCard },
+  const teacherTabs = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'schedule', label: 'Schedule', icon: Calendar },
+    { id: 'meeting-links', label: 'Meeting Links', icon: Video },
+    { id: 'feedback', label: 'Feedback', icon: MessageSquare },
   ];
 
-  const menuItems = profile?.role === 'student' ? studentMenuItems : teacherMenuItems;
+  const tabs = profile?.role === 'student' ? studentTabs : teacherTabs;
 
   return (
-    <div className="w-64 bg-card border-r border-border h-full flex flex-col">
-      <div className="p-4 border-b border-border">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">
-              {profile?.name?.charAt(0).toUpperCase()}
-            </span>
-          </div>
-          <div className="flex-1">
-            <h3 className="font-semibold text-sm">{profile?.name}</h3>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge variant="secondary" className="text-xs">
-                {profile?.role}
-              </Badge>
-              {profile?.batch && (
-                <Badge variant="outline" className="text-xs">
-                  {profile?.batch}
-                </Badge>
-              )}
-            </div>
-          </div>
-        </div>
+    <div className="w-64 bg-white border-r border-gray-200 h-full overflow-y-auto">
+      <div className="p-4 border-b border-gray-200">
+        <h2 className="font-semibold text-gray-800 text-lg">
+          {profile?.role === 'student' ? 'Student Portal' : 'Teacher Portal'}
+        </h2>
+        <p className="text-sm text-gray-500 mt-1">{profile?.name}</p>
       </div>
       
-      <ScrollArea className="flex-1 p-4">
-        <div className="space-y-2">
-          {menuItems.map((item) => (
-            <Button
-              key={item.id}
-              variant={activeTab === item.id ? 'default' : 'ghost'}
-              className="w-full justify-start"
-              onClick={() => onTabChange(item.id)}
-            >
-              <item.icon className="mr-2 h-4 w-4" />
-              {item.label}
-            </Button>
-          ))}
-        </div>
-      </ScrollArea>
-      
-      <div className="p-4 border-t border-border">
-        <Button
-          variant="outline"
-          className="w-full justify-start"
-          onClick={signOut}
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          Sign Out
-        </Button>
-      </div>
+      <nav className="p-4 space-y-2">
+        {tabs.map((tab) => (
+          <Button
+            key={tab.id}
+            variant={activeTab === tab.id ? 'default' : 'ghost'}
+            className={`w-full justify-start ${
+              activeTab === tab.id 
+                ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            }`}
+            onClick={() => onTabChange(tab.id)}
+          >
+            <tab.icon className="mr-3 h-4 w-4" />
+            {tab.label}
+          </Button>
+        ))}
+      </nav>
     </div>
   );
 };

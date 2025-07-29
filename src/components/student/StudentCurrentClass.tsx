@@ -2,196 +2,126 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Video, Clock, Calendar } from 'lucide-react';
+import { ExternalLink, Clock, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
+
+interface OngoingClass {
+  subject: string;
+  batch: string;
+  start_time: string;
+  end_time: string;
+  meeting_link: string;
+}
 
 export const StudentCurrentClass = () => {
   const { profile } = useAuth();
 
-  const { data: todaySchedule } = useQuery({
-    queryKey: ['student-today-schedule'],
-    queryFn: async () => {
-      const today = new Date().getDay();
-      const { data } = await supabase
-        .from('schedules')
-        .select('*')
-        .eq('day_of_week', today)
-        .eq('batch', profile?.batch)
-        .in('subject', profile?.subjects || [])
-        .order('start_time');
-      return data || [];
+  const { data: ongoingClass, isLoading } = useQuery({
+    queryKey: ['current-ongoing-class'],
+    queryFn: async (): Promise<OngoingClass | null> => {
+      const { data, error } = await supabase
+        .rpc('get_current_ongoing_class', {
+          user_batch: profile?.batch,
+          user_subjects: profile?.subjects || []
+        });
+      
+      if (error) throw error;
+      return data?.[0] || null;
     },
-    enabled: !!profile?.batch && !!profile?.subjects
+    enabled: !!profile?.batch && !!profile?.subjects,
+    refetchInterval: 30000
   });
 
-  const { data: todayExtraClasses } = useQuery({
-    queryKey: ['student-today-extra-classes'],
-    queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0];
-      const { data } = await supabase
-        .from('extra_classes')
-        .select('*')
-        .eq('date', today)
-        .eq('batch', profile?.batch)
-        .in('subject', profile?.subjects || [])
-        .order('start_time');
-      return data || [];
-    },
-    enabled: !!profile?.batch && !!profile?.subjects
-  });
-
-  const getCurrentClass = () => {
-    const now = new Date();
-    const currentTime = format(now, 'HH:mm');
-    
-    // Check regular schedule
-    const currentRegular = todaySchedule?.find(schedule => {
-      const startTime = schedule.start_time;
-      const endTime = schedule.end_time;
-      return currentTime >= startTime && currentTime <= endTime;
-    });
-
-    if (currentRegular) return { ...currentRegular, type: 'regular' };
-
-    // Check extra classes
-    const currentExtra = todayExtraClasses?.find(extraClass => {
-      const startTime = extraClass.start_time;
-      const endTime = extraClass.end_time;
-      return currentTime >= startTime && currentTime <= endTime;
-    });
-
-    if (currentExtra) return { ...currentExtra, type: 'extra' };
-
-    return null;
+  const formatTime = (time: string) => {
+    const [hours, minutes] = time.split(':');
+    const date = new Date();
+    date.setHours(parseInt(hours), parseInt(minutes));
+    return format(date, 'h:mm a');
   };
 
-  const getNextClass = () => {
-    const now = new Date();
-    const currentTime = format(now, 'HH:mm');
-    
-    // Combine all classes for today
-    const allClasses = [
-      ...(todaySchedule?.map(s => ({ ...s, type: 'regular' })) || []),
-      ...(todayExtraClasses?.map(e => ({ ...e, type: 'extra' })) || [])
-    ].sort((a, b) => a.start_time.localeCompare(b.start_time));
-
-    return allClasses.find(cls => cls.start_time > currentTime);
-  };
-
-  const currentClass = getCurrentClass();
-  const nextClass = getNextClass();
+  if (isLoading) {
+    return (
+      <div className="p-6 bg-gray-50 min-h-screen">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Current Class</h2>
+    <div className="p-6 bg-gray-50 min-h-screen">
+      <div className="max-w-2xl mx-auto">
+        <div className="text-center mb-8">
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Current Class</h2>
+          <p className="text-gray-600">Join your ongoing class session</p>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Video className="mr-2 h-5 w-5" />
-            Live Class Status
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {currentClass ? (
-            <div className="text-center py-6">
-              <div className="mb-4">
-                <h3 className="text-2xl font-bold text-green-600">{currentClass.subject}</h3>
-                <p className="text-muted-foreground mt-2">
-                  {currentClass.start_time} - {currentClass.end_time}
-                </p>
-                <div className="flex justify-center gap-2 mt-2">
-                  <Badge variant="default">{currentClass.batch}</Badge>
-                  <Badge variant={currentClass.type === 'extra' ? 'secondary' : 'outline'}>
-                    {currentClass.type === 'extra' ? 'Extra Class' : 'Regular Class'}
+        {ongoingClass ? (
+          <Card className="border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
+            <CardContent className="p-8 text-center">
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <div className="w-4 h-4 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-green-800 font-semibold text-lg">Live Class in Progress</span>
+              </div>
+              
+              <h3 className="text-3xl font-bold text-green-900 mb-2">
+                {ongoingClass.subject}
+              </h3>
+              
+              <div className="flex items-center justify-center gap-6 mb-6 text-green-700">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  <span className="font-medium">
+                    {formatTime(ongoingClass.start_time)} - {formatTime(ongoingClass.end_time)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  <Badge variant="outline" className="border-green-300 text-green-800">
+                    {ongoingClass.batch}
                   </Badge>
                 </div>
               </div>
-              
-              <div className="mb-4">
-                <Badge variant="default" className="text-lg px-4 py-2">
-                  <Clock className="mr-2 h-4 w-4" />
-                  Live Now
-                </Badge>
-              </div>
 
-              {currentClass.link && (
-                <Button size="lg" asChild>
-                  <a href={currentClass.link} target="_blank" rel="noopener noreferrer">
-                    Join Class Now
-                  </a>
-                </Button>
-              )}
-
-              {currentClass.type === 'extra' && 'reason' in currentClass && currentClass.reason && (
-                <p className="text-sm text-muted-foreground mt-4">
-                  Reason: {currentClass.reason}
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Video className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-muted-foreground">
-                No class is currently ongoing
-              </h3>
-              
-              {nextClass && (
-                <div className="mt-6 p-4 bg-muted rounded-lg">
-                  <h4 className="font-medium mb-2">Next Class:</h4>
-                  <p className="text-lg font-semibold">{nextClass.subject}</p>
-                  <p className="text-sm text-muted-foreground">
-                    at {nextClass.start_time}
-                  </p>
-                  <div className="flex justify-center gap-2 mt-2">
-                    <Badge variant="outline">{nextClass.batch}</Badge>
-                    <Badge variant={nextClass.type === 'extra' ? 'secondary' : 'outline'}>
-                      {nextClass.type === 'extra' ? 'Extra Class' : 'Regular Class'}
-                    </Badge>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Today's Full Schedule */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Calendar className="mr-2 h-5 w-5" />
-            Today's Full Schedule
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {todaySchedule && todaySchedule.length > 0 ? (
-            <div className="space-y-3">
-              {todaySchedule.map((schedule, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-3 border rounded-lg"
+              {ongoingClass.meeting_link ? (
+                <Button 
+                  onClick={() => window.open(ongoingClass.meeting_link, '_blank')}
+                  className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg"
+                  size="lg"
                 >
-                  <div>
-                    <h4 className="font-medium">{schedule.subject}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {schedule.start_time} - {schedule.end_time}
-                    </p>
-                  </div>
-                  <Badge variant="outline">{schedule.batch}</Badge>
+                  <ExternalLink className="h-5 w-5 mr-2" />
+                  Join Class Now
+                </Button>
+              ) : (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <p className="text-yellow-800">Meeting link not available</p>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-muted-foreground text-center py-4">
-              No regular classes scheduled for today
-            </p>
-          )}
-        </CardContent>
-      </Card>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <div className="mb-6">
+                <Clock className="h-16 w-16 mx-auto text-gray-300" />
+              </div>
+              <h3 className="text-2xl font-semibold text-gray-600 mb-2">
+                No Ongoing Class
+              </h3>
+              <p className="text-gray-500 mb-6">
+                You don't have any classes scheduled right now.
+              </p>
+              <p className="text-sm text-gray-400">
+                Check your schedule for upcoming classes.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 };

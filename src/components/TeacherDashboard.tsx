@@ -2,24 +2,23 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { TeacherSchedule } from './teacher/TeacherSchedule';
-import { TeacherFeedback } from './teacher/TeacherFeedback';
-import { TeacherBankDetails } from './teacher/TeacherBankDetails';
 import { TeacherMeetingLinks } from './teacher/TeacherMeetingLinks';
-import { Calendar, MessageSquare, CreditCard, Link } from 'lucide-react';
+import { TeacherFeedback } from './teacher/TeacherFeedback';
+import { Calendar, Link, MessageSquare } from 'lucide-react';
 
 interface TeacherDashboardProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
 }
 
-export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardProps) => {
+export const TeacherDashboard = ({ activeTab }: TeacherDashboardProps) => {
   const { profile } = useAuth();
 
   if (profile?.role !== 'teacher') {
     return (
       <div className="p-6 text-center">
-        <h1 className="text-2xl font-bold text-destructive">Access Denied</h1>
-        <p className="text-muted-foreground mt-2">You don't have permission to access this page.</p>
+        <h1 className="text-2xl font-bold text-red-600">Access Denied</h1>
+        <p className="text-gray-600 mt-2">You don't have permission to access this page.</p>
       </div>
     );
   }
@@ -32,66 +31,56 @@ export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardPro
         return <TeacherMeetingLinks />;
       case 'feedback':
         return <TeacherFeedback />;
-      case 'bank-details':
-        return <TeacherBankDetails />;
       default:
         return renderDashboardContent();
     }
   };
 
   const renderDashboardContent = () => (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6 bg-gray-50 min-h-screen">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">👨‍🏫 Teacher Dashboard</h1>
-        <div className="text-sm text-muted-foreground">
-          Welcome, {profile?.name} | Batch: {profile?.batch} | Subjects: {profile?.subjects?.join(', ')}
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Teacher Dashboard</h1>
+          <p className="text-gray-600 mt-1">Welcome back, {profile?.name}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-sm text-gray-500">Batch: {profile?.batch}</p>
+          <p className="text-sm text-gray-500">Subjects: {profile?.subjects?.join(', ')}</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardContent className="p-6">
             <div className="flex items-center">
-              <Calendar className="h-8 w-8 text-primary" />
+              <Calendar className="h-8 w-8 text-blue-600" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Class Schedule</p>
-                <p className="text-2xl font-bold">View Classes</p>
+                <p className="text-sm font-medium text-gray-500">Schedule</p>
+                <p className="text-xl font-bold text-gray-900">View Classes</p>
               </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card>
-          <CardContent className="p-4">
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardContent className="p-6">
             <div className="flex items-center">
-              <Link className="h-8 w-8 text-primary" />
+              <Link className="h-8 w-8 text-green-600" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Meeting Links</p>
-                <p className="text-2xl font-bold">Access Links</p>
+                <p className="text-sm font-medium text-gray-500">Meeting Links</p>
+                <p className="text-xl font-bold text-gray-900">Access Links</p>
               </div>
             </div>
           </CardContent>
         </Card>
         
-        <Card>
-          <CardContent className="p-4">
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardContent className="p-6">
             <div className="flex items-center">
-              <MessageSquare className="h-8 w-8 text-primary" />
+              <MessageSquare className="h-8 w-8 text-purple-600" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Student Feedback</p>
-                <p className="text-2xl font-bold">Anonymous</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center">
-              <CreditCard className="h-8 w-8 text-primary" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Bank Details</p>
-                <p className="text-2xl font-bold">Update</p>
+                <p className="text-sm font-medium text-gray-500">Feedback</p>
+                <p className="text-xl font-bold text-gray-900">View Responses</p>
               </div>
             </div>
           </CardContent>
@@ -100,9 +89,5 @@ export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardPro
     </div>
   );
 
-  return (
-    <div className="p-6">
-      {renderTabContent()}
-    </div>
-  );
+  return renderTabContent();
 };
