@@ -1,9 +1,9 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TeacherSchedule } from './teacher/TeacherSchedule';
-import { TeacherMeetingLinks } from './teacher/TeacherMeetingLinks';
 import { TeacherFeedback } from './teacher/TeacherFeedback';
-import { Calendar, Link as LinkIcon, MessageSquare, Clock } from 'lucide-react';
+import { TeacherYourClasses } from './teacher/TeacherYourClasses'; // Updated import
+import { Calendar, MessageSquare, Clock } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -58,8 +58,8 @@ export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardPro
     switch (activeTab) {
       case 'schedule':
         return <TeacherSchedule />;
-      case 'meeting-links':
-        return <TeacherMeetingLinks />;
+      case 'your-classes': // Changed from 'meeting-links'
+        return <TeacherYourClasses />;
       case 'feedback':
         return <TeacherFeedback />;
       default:
@@ -96,16 +96,16 @@ export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardPro
         
         <Card 
             className="bg-white hover:shadow-lg transition-shadow duration-300 cursor-pointer"
-            onClick={() => onTabChange('meeting-links')}
+            onClick={() => onTabChange('your-classes')} // Changed onClick
         >
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
               <div className="bg-green-100 p-3 rounded-full">
-                <LinkIcon className="h-6 w-6 text-green-600" />
+                <Clock className="h-6 w-6 text-green-600" />
               </div>
               <div>
-                <p className="text-lg font-semibold text-gray-800">Meeting Links</p>
-                <p className="text-sm text-gray-500">Access your class links</p>
+                <p className="text-lg font-semibold text-gray-800">Your Classes</p>
+                <p className="text-sm text-gray-500">View upcoming classes</p>
               </div>
             </div>
           </CardContent>
@@ -140,7 +140,7 @@ export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardPro
         <CardContent>
             {todaySchedule && todaySchedule.length > 0 ? (
                 <div className="space-y-4">
-                    {todaySchedule.map(cls => (
+                    {todaySchedule.map((cls: any) => (
                         <div key={cls.id} className="p-3 bg-gray-50 rounded-lg flex items-center justify-between">
                             <div>
                                 <p className="font-semibold">{cls.subject}</p>
