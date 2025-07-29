@@ -47,7 +47,7 @@ export const TeacherAnalytics = () => {
 
     const chartData = Array.from(allBatches).map(batch => {
       const batchCounts: { name: string; [subject: string]: number } = { name: batch };
-      analyticsData.allSubjects.forEach(subject => {
+      Array.from(allSubjects).forEach(subject => {
         batchCounts[subject] = teachers.filter(
           t => t.batch === batch && t.subjects?.includes(subject)
         ).length;
