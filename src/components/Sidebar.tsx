@@ -10,9 +10,15 @@ import {
   Crown, 
   MessageSquare, 
   BookOpen,
+  Users,
+  UserCheck,
+  Layers,
+  Link as LinkIcon,
+  Upload,
+  Plus,
   Monitor,
   BarChart2,
-  Link as LinkIcon
+  LogOut
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -21,7 +27,7 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
-  const { profile } = useAuth();
+  const { profile, signOut } = useAuth();
 
   const studentTabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -80,7 +86,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   }
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 h-full overflow-y-auto">
+    <div className="w-64 bg-white border-r border-gray-200 h-full flex flex-col">
       <div className="p-4 border-b border-gray-200">
         <h2 className="font-semibold text-gray-800 text-lg">
           {getPortalName()}
@@ -88,7 +94,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
         <p className="text-sm text-gray-500 mt-1">{profile?.name}</p>
       </div>
       
-      <nav className="p-4 space-y-2">
+      <nav className="p-4 space-y-2 flex-grow">
         {tabs.map((tab) => (
           <Button
             key={tab.id}
@@ -105,6 +111,17 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
           </Button>
         ))}
       </nav>
+
+      <div className="p-4 border-t border-gray-200">
+        <Button
+          variant="outline"
+          className="w-full justify-center"
+          onClick={signOut}
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
+        </Button>
+      </div>
     </div>
   );
 };
