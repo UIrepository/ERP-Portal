@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,13 +38,14 @@ export const StudentSchedule = () => {
   }, []);
 
   const { data: schedules } = useQuery({
-    queryKey: ['student-schedule'],
+    queryKey: ['student-schedule', profile?.batch],
     queryFn: async (): Promise<Schedule[]> => {
+      if (!profile?.batch?.length || !profile?.subjects?.length) return [];
       const { data, error } = await supabase
         .from('schedules')
         .select('*')
-        .eq('batch', profile?.batch)
-        .in('subject', profile?.subjects || [])
+        .in('batch', profile.batch)
+        .in('subject', profile.subjects)
         .order('day_of_week')
         .order('start_time');
       
@@ -56,16 +56,14 @@ export const StudentSchedule = () => {
   });
 
   const { data: ongoingClass } = useQuery({
-    queryKey: ['ongoing-class'],
+    queryKey: ['ongoing-class', profile?.batch],
     queryFn: async (): Promise<OngoingClass | null> => {
-      if (!profile?.batch || !profile?.subjects) return null;
+      if (!profile?.batch?.length || !profile?.subjects) return null;
 
-      // Get current day and time
       const now = new Date();
       const currentDay = now.getDay();
-      const currentTime = now.toTimeString().slice(0, 8);
+      const currentTimeStr = now.toTimeString().slice(0, 8);
 
-      // Query schedules and meeting_links with proper joins
       const { data: scheduleData, error: scheduleError } = await supabase
         .from('schedules')
         .select(`
@@ -77,11 +75,11 @@ export const StudentSchedule = () => {
             link
           )
         `)
-        .eq('batch', profile.batch)
+        .in('batch', profile.batch)
         .in('subject', profile.subjects)
         .eq('day_of_week', currentDay)
-        .lte('start_time', currentTime)
-        .gte('end_time', currentTime)
+        .lte('start_time', currentTimeStr)
+        .gte('end_time', currentTimeStr)
         .eq('meeting_links.is_active', true)
         .limit(1);
 
