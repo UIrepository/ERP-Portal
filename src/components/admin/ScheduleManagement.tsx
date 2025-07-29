@@ -3,21 +3,21 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 
 const ScheduleSkeleton = () => (
     <div className="space-y-4">
-        {[...Array(2)].map((_, i) => (
+        {[...Array(3)].map((_, i) => (
             <Card key={i}>
                 <CardHeader>
                     <Skeleton className="h-6 w-1/4" />
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-16 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
                 </CardContent>
             </Card>
         ))}
@@ -25,7 +25,6 @@ const ScheduleSkeleton = () => (
 );
 
 export const ScheduleManagement = () => {
-  const [activeTab, setActiveTab] = useState('regular');
   const [selectedBatch, setSelectedBatch] = useState('all');
   const [selectedDay, setSelectedDay] = useState('all');
 
@@ -38,25 +37,21 @@ export const ScheduleManagement = () => {
     },
   });
 
-  const { data: profiles = [], isLoading: isLoadingProfiles } = useQuery({
-    queryKey: ['all-profiles-for-filters'],
+  const { data: options = [], isLoading: isLoadingOptions } = useQuery({
+    queryKey: ['available-options'],
     queryFn: async () => {
-        const { data, error } = await supabase.from('profiles').select('batch');
+        const { data, error } = await supabase.from('available_options').select('type, name');
         if (error) throw error;
         return data || [];
     }
   });
 
   const batchOptions = useMemo(() => {
-    const batches = new Set<string>();
-    profiles.forEach(p => {
-        const userBatches = Array.isArray(p.batch) ? p.batch : [p.batch];
-        userBatches.forEach(b => {
-            if(b) batches.add(b);
-        });
-    });
-    return Array.from(batches).sort();
-  }, [profiles]);
+    return options
+      .filter(o => o.type === 'batch')
+      .map(o => o.name)
+      .sort();
+  }, [options]);
 
   const dayOptions = [
     { value: 'all', label: 'All Days' },
@@ -75,13 +70,14 @@ export const ScheduleManagement = () => {
   );
   
   const formatTime = (time: string) => {
+    if (!time) return 'N/A';
     const [hours, minutes] = time.split(':');
     const date = new Date();
     date.setHours(parseInt(hours), parseInt(minutes));
     return format(date, 'h:mm a');
   };
 
-  const isLoading = isLoadingSchedules || isLoadingProfiles;
+  const isLoading = isLoadingSchedules || isLoadingOptions;
 
   return (
     <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
