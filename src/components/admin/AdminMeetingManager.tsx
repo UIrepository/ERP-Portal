@@ -36,13 +36,12 @@ const LinksSkeleton = () => (
     </div>
 );
 
-
 export const AdminMeetingManager = () => {
   const { toast } = useToast();
   const [selectedBatch, setSelectedBatch] = useState('all');
   const [selectedSubject, setSelectedSubject] = useState('all');
 
-  const { data: meetingLinks = [], isLoading } = useQuery({
+  const { data: meetingLinks = [], isLoading: isLoadingLinks } = useQuery({
     queryKey: ['admin-all-meeting-links'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -52,19 +51,22 @@ export const AdminMeetingManager = () => {
         .order('batch, subject');
       
       if (error) throw error;
-      // Deduplicate to show one universal link per combo
       const uniqueLinks = Array.from(new Map(data.map(item => [`${item.subject}-${item.batch}`, item])).values());
       return (uniqueLinks || []) as MeetingLink[];
     },
   });
+  
+  const { data: options = [], isLoading: isLoadingOptions } = useQuery({
+      queryKey: ['available-options'],
+      queryFn: async () => {
+          const { data } = await supabase.from('available_options').select('type, name');
+          return data || [];
+      }
+  });
 
   const { allBatches, allSubjects, filteredLinks } = useMemo(() => {
-    const allBatches = new Set<string>();
-    const allSubjects = new Set<string>();
-    meetingLinks.forEach(link => {
-      if(link.batch) allBatches.add(link.batch);
-      if(link.subject) allSubjects.add(link.subject);
-    });
+    const allBatches = options.filter(o => o.type === 'batch').map(o => o.name).sort();
+    const allSubjects = options.filter(o => o.type === 'subject').map(o => o.name).sort();
 
     const filtered = meetingLinks.filter(link =>
       (selectedBatch === 'all' || link.batch === selectedBatch) &&
@@ -72,11 +74,11 @@ export const AdminMeetingManager = () => {
     );
     
     return {
-      allBatches: Array.from(allBatches).sort(),
-      allSubjects: Array.from(allSubjects).sort(),
+      allBatches,
+      allSubjects,
       filteredLinks: filtered,
     };
-  }, [meetingLinks, selectedBatch, selectedSubject]);
+  }, [meetingLinks, options, selectedBatch, selectedSubject]);
 
   const handleCopyLink = (link: string) => {
     navigator.clipboard.writeText(link);
@@ -85,6 +87,8 @@ export const AdminMeetingManager = () => {
       description: 'Meeting link has been copied to clipboard',
     });
   };
+  
+  const isLoading = isLoadingLinks || isLoadingOptions;
 
   return (
     <div className="space-y-8 p-6 bg-gray-50/50 min-h-full">
