@@ -46,14 +46,17 @@ export const StudentDPP = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
 
+  const batches = Array.isArray(profile?.batch) ? profile.batch : [profile?.batch].filter(Boolean);
+
   const { data: dppContent, isLoading } = useQuery({
-    queryKey: ['student-dpp'],
+    queryKey: ['student-dpp', batches, profile?.subjects],
     queryFn: async (): Promise<DPPContent[]> => {
+      if (!batches.length || !profile?.subjects) return [];
       const { data, error } = await supabase
         .from('dpp_content')
         .select('*')
-        .eq('batch', profile?.batch)
-        .in('subject', profile?.subjects || [])
+        .in('batch', batches)
+        .in('subject', profile.subjects)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -88,7 +91,7 @@ export const StudentDPP = () => {
           <p className="text-gray-500 mt-1">Daily Practice Problems to sharpen your skills.</p>
         </div>
         <div className="flex gap-2">
-          <Badge variant="outline">Batch: {profile?.batch}</Badge>
+          <Badge variant="outline">Batches: {batches.join(', ')}</Badge>
         </div>
       </div>
 
@@ -147,7 +150,7 @@ export const StudentDPP = () => {
                   </Button>
                 </CardContent>
               </Card>
-            ))}
+            ))
           </div>
         ) : (
           <div className="text-center py-20 bg-white rounded-lg border-dashed border-2">
