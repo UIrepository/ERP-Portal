@@ -19,8 +19,6 @@ interface StudentDashboardProps {
   onTabChange: (tab: string) => void;
 }
 
-// ... (imports remain the same)
-
 export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardProps) => {
   const { profile } = useAuth();
 
@@ -176,7 +174,21 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
       </div>
     );
   }
-
+  const formatArrayString = (arr: string | string[] | null | undefined) => {
+    if (!arr) return '';
+    if (Array.isArray(arr)) {
+      return arr.map(item => typeof item === 'string' ? item.replace(/"/g, '') : item).join(', ');
+    }
+    try {
+      const parsed = JSON.parse(arr);
+      if (Array.isArray(parsed)) {
+        return parsed.map(item => typeof item === 'string' ? item.replace(/"/g, '') : item).join(', ');
+      }
+    } catch (e) {
+      return String(arr).replace(/"/g, '').replace(/[\[\]]/g, '');
+    }
+    return String(arr).replace(/"/g, '').replace(/[\[\]]/g, '');
+  };
   const renderTabContent = () => {
     switch (activeTab) {
       case 'schedule':
@@ -210,10 +222,10 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
           </h1>
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
             <div className="text-gray-600">
-              <span className="font-medium">Batch:</span> {profile?.batch}
+              <span className="font-medium">Batch:</span> {formatArrayString(profile?.batch)}
             </div>
             <div className="text-gray-600">
-              <span className="font-medium">Subjects:</span> {profile?.subjects?.join(', ')}
+              <span className="font-medium">Subjects:</span> {formatArrayString(profile?.subjects)}
             </div>
           </div>
         </div>
