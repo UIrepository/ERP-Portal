@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Layers, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Combobox } from '@/components/ui/combobox'; // This is a custom component for multi-select with creation
+import { Combobox } from '@/components/ui/combobox';
 
 export const AdminBatchAllocation = () => {
   const { toast } = useToast();
@@ -18,42 +18,69 @@ export const AdminBatchAllocation = () => {
 
   const { data: users } = useQuery({ /* ...fetches users... */ });
 
-  // This query now scans ALL profiles to get every unique batch and subject name
+  // This query now just reads the master list, which is auto-populated by the trigger
   const { data: options = [] } = useQuery({
     queryKey: ['available-options'],
     queryFn: async () => {
-      const { data } = await supabase.from('profiles').select('batch, subjects');
-      const batchSet = new Set<string>();
-      const subjectSet = new Set<string>();
-      data?.forEach(profile => {
-        const batches = Array.isArray(profile.batch) ? profile.batch : [profile.batch];
-        batches.forEach(b => { if(b) batchSet.add(b) });
-        profile.subjects?.forEach(s => subjectSet.add(s));
-      });
-      return {
-          batches: Array.from(batchSet).sort(),
-          subjects: Array.from(subjectSet).sort()
-      };
+      const { data } = await supabase.from('available_options').select('type, name');
+      return data || [];
     }
   });
 
-  const updateAllocationMutation = useMutation({ /* ...updates user profiles... */ });
+  const { batchOptions, subjectOptions } = useMemo(() => ({
+    batchOptions: options.filter(o => o.type === 'batch').map(o => o.name),
+    subjectOptions: options.filter(o => o.type === 'subject').map(o => o.name)
+  }), [options]);
 
-  const handleSave = () => { /* ...saves allocation... */ };
-  const handleUserSelect = (user: any) => { /* ...handles user selection... */ };
+  const updateAllocationMutation = useMutation({
+    mutationFn: async (allocationData: { batch: string[], subjects: string[] }) => {
+      const { error } = await supabase
+        .from('profiles')
+        .update(allocationData)
+        .eq('id', selectedUser.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users-allocation'] });
+      // The trigger will have updated the options, so we refetch them
+      queryClient.invalidateQueries({ queryKey: ['available-options'] });
+      toast({ title: "Success", description: "Allocation updated successfully. Any new options are now synced." });
+      setSelectedUser(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: `Failed to update allocation: ${error.message}`, variant: "destructive" });
+    },
+  });
+
+  const handleSave = () => {
+    if (!selectedUser) return;
+    updateAllocationMutation.mutate({
+      batch: selectedBatches,
+      subjects: selectedSubjects,
+    });
+  };
+
+  const handleUserSelect = (user: any) => {
+    setSelectedUser(user);
+    setSelectedBatches(Array.isArray(user.batch) ? user.batch : (user.batch ? [user.batch] : []));
+    setSelectedSubjects(user.subjects || []);
+  };
   
-  // This function is for creating a new batch/subject name if it doesn't exist
-  // It's a placeholder as we're now dynamically getting options from existing profiles
+  // This function now just adds the new temporary value to the state
   const handleCreateOption = (type: 'batch' | 'subject', value: string) => {
-    // In this new model, you create a new batch/subject simply by assigning it to a user.
-    // The next time the page loads, it will appear in the options automatically.
-    toast({ title: "Info", description: `To create a new ${type}, just type it and assign it to a user.` });
-    if (type === 'batch') {
-        if (!selectedBatches.includes(value)) setSelectedBatches([...selectedBatches, value]);
-    } else {
-        if (!selectedSubjects.includes(value)) setSelectedSubjects([...selectedSubjects, value]);
+    const trimmedValue = value.trim();
+    if (trimmedValue) {
+      if (type === 'batch') {
+          if (!selectedBatches.includes(trimmedValue)) setSelectedBatches([...selectedBatches, trimmedValue]);
+      } else {
+          if (!selectedSubjects.includes(trimmedValue)) setSelectedSubjects([...selectedSubjects, trimmedValue]);
+      }
     }
   };
+
+  const getUserBatches = (user: any) => {
+      return Array.isArray(user.batch) ? user.batch : (user.batch ? [user.batch] : []);
+  }
 
   return (
     <div className="space-y-6">
@@ -70,7 +97,7 @@ export const AdminBatchAllocation = () => {
               <div>
                 <label className="block text-sm font-medium mb-2">Batches</label>
                 <Combobox
-                    options={options.batches}
+                    options={batchOptions}
                     selected={selectedBatches}
                     onChange={setSelectedBatches}
                     onCreate={value => handleCreateOption('batch', value)}
@@ -80,7 +107,7 @@ export const AdminBatchAllocation = () => {
               <div>
                 <label className="block text-sm font-medium mb-2">Subjects</label>
                 <Combobox
-                    options={options.subjects}
+                    options={subjectOptions}
                     selected={selectedSubjects}
                     onChange={setSelectedSubjects}
                     onCreate={value => handleCreateOption('subject', value)}
