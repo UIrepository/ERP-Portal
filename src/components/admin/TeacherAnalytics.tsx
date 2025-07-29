@@ -36,7 +36,7 @@ export const TeacherAnalytics = () => {
     }
   });
 
-  const { allBatches, allSubjects, chartData, filteredCount } = useMemo(() => {
+  const analyticsData = useMemo(() => {
     const allBatches = options.filter((o: any) => o.type === 'batch').map((o: any) => o.name).sort();
     const allSubjects = options.filter((o: any) => o.type === 'subject').map((o: any) => o.name).sort();
 
@@ -65,10 +65,11 @@ export const TeacherAnalytics = () => {
     });
 
     return {
+      totalTeachers: teachers.length,
+      filteredCount: filteredTeachers.length,
+      chartData,
       allBatches,
       allSubjects,
-      chartData,
-      filteredCount: filteredTeachers.length,
     };
   }, [teachers, options, selectedBatch, selectedSubject]);
 
@@ -94,7 +95,7 @@ export const TeacherAnalytics = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardHeader><CardTitle className="text-base font-medium">Total Teachers</CardTitle></CardHeader>
-          <CardContent><p className="text-4xl font-bold">{teachers.length}</p></CardContent>
+          <CardContent><p className="text-4xl font-bold">{analyticsData.totalTeachers}</p></CardContent>
         </Card>
         <Card>
             <CardHeader><CardTitle className="text-base font-medium">Filter by Batch</CardTitle></CardHeader>
@@ -103,7 +104,7 @@ export const TeacherAnalytics = () => {
                     <SelectTrigger><SelectValue placeholder="Select Batch" /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">All Batches</SelectItem>
-                        {allBatches.map(batch => (
+                        {analyticsData.allBatches.map(batch => (
                         <SelectItem key={batch} value={batch}>{batch}</SelectItem>
                         ))}
                     </SelectContent>
@@ -117,7 +118,7 @@ export const TeacherAnalytics = () => {
                     <SelectTrigger><SelectValue placeholder="Select Subject" /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">All Subjects</SelectItem>
-                        {allSubjects.map(subject => (
+                        {analyticsData.allSubjects.map(subject => (
                         <SelectItem key={subject} value={subject}>{subject}</SelectItem>
                         ))}
                     </SelectContent>
@@ -134,18 +135,18 @@ export const TeacherAnalytics = () => {
             Teacher Allocation by Subject
           </CardTitle>
           <CardDescription>
-            Showing {filteredCount} teachers for the current filter.
+            Showing {analyticsData.filteredCount} teachers for the current filter.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={400}>
-            <BarChart data={chartData}>
+            <BarChart data={analyticsData.chartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" tick={{ fontSize: 12 }} />
               <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
               <Tooltip />
               <Legend />
-              {allSubjects.map((subject, index) => (
+              {analyticsData.allSubjects.map((subject, index) => (
                 (selectedSubject === 'all' || selectedSubject === subject) &&
                 <Bar key={subject} dataKey={subject} stackId="a" fill={`hsl(${index * 50}, 70%, 50%)`} />
               ))}
