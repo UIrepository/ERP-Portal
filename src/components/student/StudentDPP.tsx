@@ -45,7 +45,7 @@ export const StudentDPP = () => {
   const { profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
-
+  
   const batches = Array.isArray(profile?.batch) ? profile.batch : [profile?.batch].filter(Boolean);
 
   const { data: dppContent, isLoading } = useQuery({
@@ -150,7 +150,7 @@ export const StudentDPP = () => {
                   </Button>
                 </CardContent>
               </Card>
-            ))
+            ))}
           </div>
         ) : (
           <div className="text-center py-20 bg-white rounded-lg border-dashed border-2">
