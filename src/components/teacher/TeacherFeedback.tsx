@@ -1,4 +1,3 @@
-
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -20,7 +19,7 @@ interface Feedback {
 
 export const TeacherFeedback = () => {
   const { profile } = useAuth();
-  const [selectedSubject, setSelectedSubject] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState('all');
 
   const { data: feedback } = useQuery({
     queryKey: ['teacher-feedback'],
@@ -38,9 +37,9 @@ export const TeacherFeedback = () => {
     enabled: !!profile?.batch && !!profile?.subjects
   });
 
-  const filteredFeedback = selectedSubject 
-    ? feedback?.filter(fb => fb.subject === selectedSubject)
-    : feedback;
+  const filteredFeedback = selectedSubject === 'all'
+    ? feedback
+    : feedback?.filter(fb => fb.subject === selectedSubject);
 
   const groupedFeedback = filteredFeedback?.reduce((acc, fb) => {
     if (!acc[fb.subject]) acc[fb.subject] = [];
@@ -66,7 +65,7 @@ export const TeacherFeedback = () => {
             <SelectValue placeholder="Filter by subject" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Subjects</SelectItem>
+            <SelectItem value="all">All Subjects</SelectItem>
             {profile?.subjects?.map((subject) => (
               <SelectItem key={subject} value={subject}>{subject}</SelectItem>
             ))}
@@ -74,7 +73,7 @@ export const TeacherFeedback = () => {
         </Select>
       </div>
 
-      {selectedSubject ? (
+      {selectedSubject !== 'all' ? (
         <div className="space-y-4">
           <h3 className="text-xl font-semibold text-gray-900">{selectedSubject}</h3>
           {groupedFeedback?.[selectedSubject]?.map((fb) => (
