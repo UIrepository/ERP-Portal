@@ -1,139 +1,172 @@
 import { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Link as LinkIcon, Save, Plus } from 'lucide-react';
+import { Link as LinkIcon, ExternalLink, Copy, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
+
+interface MeetingLink {
+  id: string;
+  subject: string;
+  batch: string;
+  link: string;
+}
+
+const LinksSkeleton = () => (
+    <div className="space-y-4">
+        {[...Array(2)].map((_, i) => (
+            <Card key={i} className="p-4">
+                <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                        <Skeleton className="h-8 w-8 rounded-full" />
+                        <Skeleton className="h-5 w-1/3" />
+                    </div>
+                    <Skeleton className="h-4 w-4/5" />
+                    <div className="flex gap-2 justify-end">
+                        <Skeleton className="h-9 w-24" />
+                        <Skeleton className="h-9 w-24" />
+                    </div>
+                </div>
+            </Card>
+        ))}
+    </div>
+);
+
 
 export const AdminMeetingManager = () => {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newLinkData, setNewLinkData] = useState({ batch: '', subject: '', link: '' });
+  const [selectedBatch, setSelectedBatch] = useState('all');
+  const [selectedSubject, setSelectedSubject] = useState('all');
 
-  const { data: profiles = [] } = useQuery({
-    queryKey: ['all-profiles-for-filters'],
+  const { data: meetingLinks = [], isLoading } = useQuery({
+    queryKey: ['admin-all-meeting-links'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('profiles').select('batch, subjects');
-      if (error) throw error;
-      return data || [];
-    }
-  });
-
-  const { batchOptions, subjectOptions } = useMemo(() => {
-    const batches = new Set<string>();
-    const subjects = new Set<string>();
-    profiles.forEach(p => {
-      const userBatches = Array.isArray(p.batch) ? p.batch : [p.batch];
-      userBatches.forEach(b => { if(b) batches.add(b); });
-      p.subjects?.forEach(s => subjects.add(s));
-    });
-    return {
-      batchOptions: Array.from(batches).sort(),
-      subjectOptions: Array.from(subjects).sort(),
-    };
-  }, [profiles]);
-
-  const updateLinksMutation = useMutation({
-    mutationFn: async ({ batch, subject, link }: { batch: string; subject: string; link: string }) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('schedules')
-        .update({ link: link || null })
-        .match({ batch, subject });
+        .select('id, subject, batch, link')
+        .not('link', 'is', null)
+        .order('batch, subject');
       
       if (error) throw error;
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['admin-meeting-schedules'] });
-      toast({ title: "Success", description: `Meeting link for ${variables.subject} (${variables.batch}) has been updated.` });
-      setIsDialogOpen(false);
-      setNewLinkData({ batch: '', subject: '', link: '' });
-    },
-    onError: (error) => {
-      toast({ title: "Error", description: `Failed to update meeting link: ${error.message}`, variant: "destructive" });
+      // Deduplicate to show one universal link per combo
+      const uniqueLinks = Array.from(new Map(data.map(item => [`${item.subject}-${item.batch}`, item])).values());
+      return (uniqueLinks || []) as MeetingLink[];
     },
   });
 
-  const handleSave = () => {
-    if (!newLinkData.batch || !newLinkData.subject) {
-        toast({ title: "Error", description: "Please select both a batch and a subject.", variant: "destructive" });
-        return;
-    }
-    updateLinksMutation.mutate(newLinkData);
+  const { allBatches, allSubjects, filteredLinks } = useMemo(() => {
+    const allBatches = new Set<string>();
+    const allSubjects = new Set<string>();
+    meetingLinks.forEach(link => {
+      if(link.batch) allBatches.add(link.batch);
+      if(link.subject) allSubjects.add(link.subject);
+    });
+
+    const filtered = meetingLinks.filter(link =>
+      (selectedBatch === 'all' || link.batch === selectedBatch) &&
+      (selectedSubject === 'all' || link.subject === selectedSubject)
+    );
+    
+    return {
+      allBatches: Array.from(allBatches).sort(),
+      allSubjects: Array.from(allSubjects).sort(),
+      filteredLinks: filtered,
+    };
+  }, [meetingLinks, selectedBatch, selectedSubject]);
+
+  const handleCopyLink = (link: string) => {
+    navigator.clipboard.writeText(link);
+    toast({
+      title: 'Link Copied',
+      description: 'Meeting link has been copied to clipboard',
+    });
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold flex items-center">
-          <LinkIcon className="mr-2 h-6 w-6" />
-          Universal Meeting Link Manager
-        </h2>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add / Update Link
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add or Update a Universal Meeting Link</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-                <div>
-                    <label className="text-sm font-medium">Batch</label>
-                    <Select value={newLinkData.batch} onValueChange={(value) => setNewLinkData(prev => ({...prev, batch: value}))}>
-                        <SelectTrigger><SelectValue placeholder="Select a batch..." /></SelectTrigger>
-                        <SelectContent>
-                            {batchOptions.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div>
-                    <label className="text-sm font-medium">Subject</label>
-                    <Select value={newLinkData.subject} onValueChange={(value) => setNewLinkData(prev => ({...prev, subject: value}))}>
-                        <SelectTrigger><SelectValue placeholder="Select a subject..." /></SelectTrigger>
-                        <SelectContent>
-                            {subjectOptions.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div>
-                    <label className="text-sm font-medium">Meeting Link</label>
-                    <Input 
-                        value={newLinkData.link}
-                        onChange={(e) => setNewLinkData(prev => ({...prev, link: e.target.value}))}
-                        placeholder="https://meet.google.com/... (leave blank to remove)"
-                    />
-                </div>
-            </div>
-            <DialogFooter>
-                <Button variant="ghost" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleSave}><Save className="mr-2 h-4 w-4" />Save Link</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+    <div className="space-y-8 p-6 bg-gray-50/50 min-h-full">
+      {/* Header Section */}
+      <div>
+          <h1 className="text-3xl font-bold text-gray-800 flex items-center">
+            <LinkIcon className="mr-3 h-8 w-8 text-primary" />
+            Meeting Links Overview
+          </h1>
+          <p className="text-gray-500 mt-1">View all universal meeting links currently set in the system.</p>
+        </div>
+
+      {/* Filter Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Select value={selectedBatch} onValueChange={setSelectedBatch}>
+            <SelectTrigger><SelectValue placeholder="Filter by Batch" /></SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">All Batches</SelectItem>
+                {allBatches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+            </SelectContent>
+        </Select>
+        <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+            <SelectTrigger><SelectValue placeholder="Filter by Subject" /></SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">All Subjects</SelectItem>
+                {allSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+        </Select>
       </div>
-      <Card>
-        <CardHeader>
-            <CardTitle>Current Links</CardTitle>
-            <p className="text-sm text-muted-foreground">
-                This is a view of current schedules that have links. Use the button above to manage links for any combination.
-            </p>
-        </CardHeader>
-        <CardContent>
-            {/* The existing view of schedules can remain here as a reference if you wish */}
-            <div className="text-center py-8 text-muted-foreground">
-                <p>Use the "Add / Update Link" button to manage universal meeting links.</p>
+
+      {/* Links List */}
+      <div className="space-y-4">
+        {isLoading ? (
+            <LinksSkeleton />
+        ) : filteredLinks.length > 0 ? (
+          filteredLinks.map((meeting) => (
+            <Card key={meeting.id} className="bg-white">
+              <CardContent className="p-5 flex flex-col md:flex-row md:items-center md:justify-between">
+                <div className="flex-grow mb-4 md:mb-0">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-primary/10 p-2 rounded-full">
+                      <LinkIcon className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-gray-800">{meeting.subject}</h3>
+                        <Badge variant="secondary" className="mt-1">{meeting.batch}</Badge>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-3 truncate pl-11">
+                    {meeting.link}
+                  </p>
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleCopyLink(meeting.link)}
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => window.open(meeting.link, '_blank')}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Open Link
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+            <div className="text-center py-20 bg-white rounded-lg border-dashed border-2">
+                <Search className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-700">No Meeting Links Found</h3>
+                <p className="text-muted-foreground mt-2">
+                  There are no links matching your current filters.
+                </p>
             </div>
-        </CardContent>
-      </Card>
+        )}
+      </div>
     </div>
   );
 };
