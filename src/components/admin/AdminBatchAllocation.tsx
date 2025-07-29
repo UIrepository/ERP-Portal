@@ -83,8 +83,13 @@ export const AdminBatchAllocation = () => {
 
   const handleUserSelect = (user: any) => {
     setSelectedUser(user);
-    setNewBatches(user.batch || []);
+    const userBatches = Array.isArray(user.batch) ? user.batch : (user.batch ? [user.batch] : []);
+    setNewBatches(userBatches);
     setNewSubjects(user.subjects || []);
+  };
+
+  const getUserBatches = (user: any) => {
+    return Array.isArray(user.batch) ? user.batch : (user.batch ? [user.batch] : []);
   };
 
   return (
@@ -117,7 +122,7 @@ export const AdminBatchAllocation = () => {
                     <p className="text-sm text-muted-foreground">{user.email}</p>
                     <div className="flex flex-wrap gap-2 mt-2">
                       <Badge variant="outline">{user.role}</Badge>
-                      {user.batch?.map((b: string) => <Badge key={b} variant="secondary">{b}</Badge>)}
+                      {getUserBatches(user).map((b: string) => <Badge key={b} variant="secondary">{b}</Badge>)}
                     </div>
                   </div>
                   <div className="text-sm text-muted-foreground">
@@ -202,9 +207,10 @@ export const AdminBatchAllocation = () => {
                   <div>
                     <span className="text-sm font-medium">Batches: </span>
                     <div className="flex flex-wrap gap-1 mt-1">
-                      {selectedUser.batch?.map((b: string) => (
+                      {getUserBatches(selectedUser).map((b: string) => (
                         <Badge key={b} variant="outline" className="text-xs">{b}</Badge>
-                      )) || <span className="text-sm text-muted-foreground">No batches assigned</span>}
+                      )) }
+                      {getUserBatches(selectedUser).length === 0 && <span className="text-sm text-muted-foreground">No batches assigned</span>}
                     </div>
                   </div>
                   <div>
@@ -213,6 +219,7 @@ export const AdminBatchAllocation = () => {
                       {selectedUser.subjects?.map((subject: string) => (
                         <Badge key={subject} variant="outline" className="text-xs">{subject}</Badge>
                       )) || <span className="text-sm text-muted-foreground">No subjects assigned</span>}
+                       {selectedUser.subjects?.length === 0 && <span className="text-sm text-muted-foreground">No subjects assigned</span>}
                     </div>
                   </div>
                 </div>
