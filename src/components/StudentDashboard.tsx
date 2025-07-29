@@ -19,10 +19,11 @@ interface StudentDashboardProps {
   onTabChange: (tab: string) => void;
 }
 
+// ... (imports remain the same)
+
 export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardProps) => {
   const { profile } = useAuth();
 
-  // Fetch analytics data with real-time updates
   const { data: analyticsData, refetch: refetchAnalytics } = useQuery({
     queryKey: ['student-analytics', profile?.user_id],
     queryFn: async () => {
@@ -32,7 +33,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
         supabase
           .from('notes')
           .select('*')
-          .eq('batch', profile.batch)
+          .in('batch', profile.batch || [])
           .in('subject', profile.subjects || []),
         supabase
           .from('recordings')
