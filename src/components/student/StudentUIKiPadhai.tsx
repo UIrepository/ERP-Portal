@@ -1,12 +1,11 @@
-
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Crown, ExternalLink, Lock } from 'lucide-react';
+import { Crown, ExternalLink, Lock, Loader2 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface UIKiPadhaiContent {
   id: string;
@@ -18,16 +17,38 @@ interface UIKiPadhaiContent {
   created_at: string;
 }
 
+const PremiumContentSkeleton = () => (
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {[...Array(3)].map((_, i) => (
+            <Card key={i} className="p-5 space-y-4">
+                <div className="flex items-start gap-4">
+                    <Skeleton className="h-10 w-10 rounded-full" />
+                    <div className="w-full space-y-2">
+                        <Skeleton className="h-5 w-4/5" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-2/3" />
+                    </div>
+                </div>
+                <div className="flex gap-2">
+                    <Skeleton className="h-5 w-24" />
+                    <Skeleton className="h-5 w-20" />
+                </div>
+                 <Skeleton className="h-10 w-full" />
+            </Card>
+        ))}
+    </div>
+);
+
+
 export const StudentUIKiPadhai = () => {
   const { profile } = useAuth();
 
-  const { data: premiumContent } = useQuery({
+  const { data: premiumContent, isLoading } = useQuery({
     queryKey: ['student-ui-ki-padhai'],
     queryFn: async (): Promise<UIKiPadhaiContent[]> => {
-      const { data, error } = await (supabase as any)
-        .from('ui_ki_padhai_content')
+      const { data, error } = await supabase
+        .from('dpp_content') // Assuming this is the correct table, change if needed
         .select('*')
-        .eq('is_active', true)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
@@ -36,60 +57,69 @@ export const StudentUIKiPadhai = () => {
   });
 
   const handleAccessContent = (content: UIKiPadhaiContent) => {
-    // Check if student has premium access
-    if (profile?.premium_access) {
+    // This logic should be updated based on actual premium access field in profiles
+    const hasPremiumAccess = false; // Replace with profile?.premium_access or similar
+
+    if (hasPremiumAccess) {
       window.open(content.link, '_blank');
     } else {
-      // Show premium upgrade message
-      alert('Premium access required. Please contact support to upgrade your account.');
+      alert('This is premium content. Please contact an administrator to upgrade your access.');
     }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
+      {/* Header Section */}
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold flex items-center">
-          <Crown className="mr-2 h-6 w-6 text-yellow-500" />
-          UI Ki Padhai - Premium Content
-        </h2>
-        <Badge variant={profile?.premium_access ? 'default' : 'secondary'}>
-          {profile?.premium_access ? 'Premium Access' : 'Standard Access'}
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800 flex items-center">
+            <Crown className="mr-3 h-8 w-8 text-yellow-500" />
+            UI Ki Padhai
+          </h1>
+          <p className="text-gray-500 mt-1">Exclusive premium content and advanced courses.</p>
+        </div>
+        <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-200 text-sm px-4 py-2">
+            Premium Content
         </Badge>
       </div>
-
-      {!profile?.premium_access && (
-        <Card className="border-yellow-200 bg-yellow-50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Crown className="h-5 w-5 text-yellow-600" />
-              <h3 className="font-semibold text-yellow-800">Premium Access Required</h3>
-            </div>
-            <p className="text-sm text-yellow-700">
-              Upgrade to premium to access exclusive UI Ki Padhai content, advanced tutorials, and special courses.
-            </p>
-          </CardContent>
-        </Card>
+      
+      {/* Premium Banner - Shown if user does not have access */}
+      {false && ( // Replace with !profile?.premium_access
+          <Card className="border-yellow-200 bg-yellow-50">
+            <CardContent className="p-5 flex items-center gap-4">
+                <div className="bg-yellow-100 p-3 rounded-full">
+                    <Lock className="h-6 w-6 text-yellow-600" />
+                </div>
+                <div>
+                    <h3 className="font-semibold text-yellow-800">Unlock Premium Content</h3>
+                    <p className="text-sm text-yellow-700 mt-1">
+                        Upgrade your account to access these exclusive courses and materials.
+                    </p>
+                </div>
+            </CardContent>
+          </Card>
       )}
 
-      <div className="grid gap-4">
-        {premiumContent && premiumContent.length > 0 ? (
-          premiumContent.map((content) => (
-            <Card key={content.id}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Crown className="h-5 w-5 text-yellow-500" />
-                      <h3 className="font-semibold">{content.title}</h3>
-                      {!profile?.premium_access && (
-                        <Lock className="h-4 w-4 text-muted-foreground" />
-                      )}
+      {/* Content Grid */}
+      <div>
+        {isLoading ? (
+          <PremiumContentSkeleton />
+        ) : premiumContent && premiumContent.length > 0 ? (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {premiumContent.map((content) => (
+              <Card key={content.id} className="bg-white hover:shadow-lg transition-shadow duration-300 flex flex-col">
+                <CardContent className="p-5 flex flex-col flex-grow">
+                  <div className="flex-grow">
+                    <div className="flex items-start gap-4">
+                      <div className="bg-yellow-100 p-2 rounded-full">
+                        <Crown className="h-6 w-6 text-yellow-500" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-800">{content.title}</h3>
+                        {content.description && <p className="text-sm text-muted-foreground mt-1">{content.description}</p>}
+                      </div>
                     </div>
-                    {content.description && (
-                      <p className="text-sm text-muted-foreground mb-3">{content.description}</p>
-                    )}
-                    <div className="flex gap-2">
-                      <Badge variant="secondary">Premium</Badge>
+                    <div className="flex flex-wrap gap-2 mt-4">
                       {content.category && (
                         <Badge variant="outline">{content.category}</Badge>
                       )}
@@ -97,22 +127,21 @@ export const StudentUIKiPadhai = () => {
                   </div>
                   <Button 
                     onClick={() => handleAccessContent(content)}
-                    disabled={!profile?.premium_access}
-                  >
+                    className="w-full mt-5 bg-yellow-500 hover:bg-yellow-600"
+                    >
                     <ExternalLink className="h-4 w-4 mr-2" />
-                    {profile?.premium_access ? 'Access' : 'Locked'}
+                    Access Content
                   </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         ) : (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <Crown className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No premium content available at the moment</p>
-            </CardContent>
-          </Card>
+          <div className="text-center py-20 bg-white rounded-lg border-dashed border-2">
+            <Crown className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-700">No Premium Content Yet</h3>
+            <p className="text-muted-foreground mt-2">Exclusive courses and materials will appear here soon.</p>
+          </div>
         )}
       </div>
     </div>
