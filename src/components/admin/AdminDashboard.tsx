@@ -18,7 +18,7 @@ export const AdminDashboard = ({ activeTab, onTabChange }: AdminDashboardProps) 
     return (
       <div className="p-6 text-center">
         <h1 className="text-2xl font-bold text-destructive">Access Denied</h1>
-        <p className="text-muted-foreground mt-2">You don't have permission to access this page.</p>
+        <p className="text-muted-foreground mt-2">Please contact administrator for access.</p>
       </div>
     );
   }
