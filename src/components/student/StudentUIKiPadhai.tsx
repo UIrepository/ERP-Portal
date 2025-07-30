@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Crown, ExternalLink, Lock, Search } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Input } from '@/components/ui/input'; // Added Input import
+import { Input } from '@/components/ui/input';
 
 interface UIKiPadhaiContent {
   id: string;
@@ -124,7 +124,7 @@ export const StudentUIKiPadhai = () => {
                 (selectedBatchFilter === 'all' || enrollment.batch_name === selectedBatchFilter) &&
                 (selectedSubjectFilter === 'all' || enrollment.subject_name === selectedSubjectFilter)
             )
-            .map(enrollment => `(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
+            .map(enrollment => `and(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
 
         if (combinationFilters.length > 0) {
             query = query.or(combinationFilters.join(','));
@@ -138,7 +138,7 @@ export const StudentUIKiPadhai = () => {
       
         if (error) {
             console.error("Error fetching 'UI Ki Padhai' content:", error);
-            return [];
+            throw error;
         }
         return (data || []) as UIKiPadhaiContent[];
     },
