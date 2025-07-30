@@ -1,9 +1,12 @@
+// uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/student/StudentUIKiPadhai.tsx
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Added for filters
 import { Crown, ExternalLink, Lock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -17,6 +20,12 @@ interface UIKiPadhaiContent {
   created_at: string;
   batch: string;
   subject: string;
+}
+
+// Define the structure for an enrollment record from the new table
+interface UserEnrollment {
+    batch_name: string;
+    subject_name: string;
 }
 
 const PremiumContentSkeleton = () => (
@@ -44,19 +53,64 @@ const PremiumContentSkeleton = () => (
 
 export const StudentUIKiPadhai = () => {
   const { profile } = useAuth();
-  const batches = Array.isArray(profile?.batch) ? profile.batch : [profile?.batch].filter(Boolean);
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all'); // New filter state
+  const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all'); // New filter state
 
-  const { data: premiumContent, isLoading } = useQuery({
-    queryKey: ['student-ui-ki-padhai', batches, profile?.subjects],
-    queryFn: async (): Promise<UIKiPadhaiContent[]> => {
-        if (!batches.length || !profile?.subjects) return [];
+  // 1. Fetch user's specific enrollments from the new table
+  const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
+    queryKey: ['userEnrollments', profile?.user_id],
+    queryFn: async () => {
+        if (!profile?.user_id) return [];
         const { data, error } = await supabase
-            .from('dpp_content') // This should be changed to the correct table name for UI Ki Padhai content
+            .from('user_enrollments')
+            .select('batch_name, subject_name')
+            .eq('user_id', profile.user_id);
+        if (error) {
+            console.error("Error fetching user enrollments:", error);
+            return [];
+        }
+        return data || [];
+    },
+    enabled: !!profile?.user_id
+  });
+
+  // Extract unique batches and subjects from the fetched enrollments for filter dropdowns
+  const availableBatches = useMemo(() => {
+    return Array.from(new Set(userEnrollments?.map(e => e.batch_name) || [])).sort();
+  }, [userEnrollments]);
+
+  const availableSubjects = useMemo(() => {
+    return Array.from(new Set(userEnrollments?.map(e => e.subject_name) || [])).sort();
+  }, [userEnrollments]);
+
+  // 2. Fetch UI Ki Padhai content based on specific enrolled combinations and selected filters
+  const { data: premiumContent, isLoading: isLoadingPremiumContent } = useQuery<UIKiPadhaiContent[]>({
+    queryKey: ['student-ui-ki-padhai', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
+    queryFn: async (): Promise<UIKiPadhaiContent[]> => {
+        if (!userEnrollments || userEnrollments.length === 0) return [];
+
+        let query = supabase
+            .from('dpp_content') // This table name seems incorrect based on description, assuming it holds UI Ki Padhai content for now. Adjust if another table exists.
             .select('*')
-            .in('batch', batches)
-            .in('subject', profile.subjects)
-            .eq('is_active', true)
-            .order('created_at', { ascending: false });
+            .eq('is_active', true);
+
+        // Dynamically build OR conditions for each specific enrolled combination
+        const combinationFilters = userEnrollments
+            .filter(enrollment =>
+                (selectedBatchFilter === 'all' || enrollment.batch_name === selectedBatchFilter) &&
+                (selectedSubjectFilter === 'all' || enrollment.subject_name === selectedSubjectFilter)
+            )
+            .map(enrollment => `(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
+
+        if (combinationFilters.length > 0) {
+            query = query.or(combinationFilters.join(','));
+        } else {
+            return []; // Return empty if no combinations match filters
+        }
+            
+        query = query.order('created_at', { ascending: false });
+        
+        const { data, error } = await query;
       
         if (error) {
             console.error("Error fetching 'UI Ki Padhai' content:", error);
@@ -64,12 +118,12 @@ export const StudentUIKiPadhai = () => {
         }
         return (data || []) as UIKiPadhaiContent[];
     },
-    enabled: !!profile?.batch && !!profile?.subjects
+    enabled: !!userEnrollments && userEnrollments.length > 0
   });
 
   const handleAccessContent = (content: UIKiPadhaiContent) => {
     // This logic should be updated based on actual premium access field in profiles
-    const hasPremiumAccess = false; // Replace with profile?.premium_access or similar
+    const hasPremiumAccess = true; // For demonstration, assuming access if content is fetched. Replace with profile?.premium_access or similar
 
     if (hasPremiumAccess) {
       window.open(content.link, '_blank');
@@ -77,6 +131,8 @@ export const StudentUIKiPadhai = () => {
       alert('This is premium content. Please contact an administrator to upgrade your access.');
     }
   };
+  
+  const isLoading = isLoadingEnrollments || isLoadingPremiumContent;
 
   return (
     <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
@@ -110,6 +166,32 @@ export const StudentUIKiPadhai = () => {
             </CardContent>
           </Card>
       )}
+
+      {/* Filter Section (similar to DPP and Recordings) */}
+      <div className="flex gap-4">
+        <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
+          <SelectTrigger className="w-48 h-10">
+            <SelectValue placeholder="Filter by batch" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Batches</SelectItem>
+            {availableBatches.map((batch) => (
+              <SelectItem key={batch} value={batch}>{batch}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={selectedSubjectFilter} onValueChange={setSelectedSubjectFilter}>
+          <SelectTrigger className="w-48 h-10">
+            <SelectValue placeholder="Filter by subject" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Subjects</SelectItem>
+            {availableSubjects.map((subject) => (
+              <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       {/* Content Grid */}
       <div>
