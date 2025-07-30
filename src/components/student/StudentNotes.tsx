@@ -1,6 +1,6 @@
 // uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/student/StudentNotes.tsx
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query'; // Corrected import
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -30,17 +30,17 @@ interface UserEnrollment {
 const NotesSkeleton = () => (
   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
     {[...Array(3)].map((_, i) => (
-      <Card key={i} className="p-4">
-        <div className="flex justify-between items-center">
-          <div className="space-y-3 flex-grow">
-            <Skeleton className="h-5 w-3/4" />
+      <Card key={i} className="p-4 space-y-3">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-8 w-8 rounded-full" />
+          <div className="w-full space-y-2">
+            <Skeleton className="h-4 w-3/4" />
             <Skeleton className="h-3 w-1/2" />
-            <div className="flex gap-2">
-              <Skeleton className="h-5 w-20" />
-              <Skeleton className="h-5 w-20" />
-            </div>
           </div>
-          <Skeleton className="h-10 w-28" />
+        </div>
+        <div className="flex gap-2">
+          <Skeleton className="h-5 w-20" />
+          <Skeleton className="h-5 w-20" />
         </div>
       </Card>
     ))}
@@ -53,7 +53,6 @@ export const StudentNotes = () => {
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
   const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
 
-  // 1. Fetch user's specific enrollments from the new table
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['userEnrollments', profile?.user_id],
     queryFn: async () => {
@@ -71,16 +70,42 @@ export const StudentNotes = () => {
     enabled: !!profile?.user_id
   });
 
-  // Extract unique batches and subjects from the fetched enrollments for filter dropdowns
-  const availableBatches = useMemo(() => {
-    return Array.from(new Set(userEnrollments?.map(e => e.batch_name) || [])).sort();
-  }, [userEnrollments]);
+  // Derived state for filter options, implementing cascading logic
+  const displayedBatches = useMemo(() => {
+    if (!userEnrollments) return [];
+    if (selectedSubjectFilter === 'all') {
+      return Array.from(new Set(userEnrollments.map(e => e.batch_name))).sort();
+    } else {
+      return Array.from(new Set(
+        userEnrollments
+          .filter(e => e.subject_name === selectedSubjectFilter)
+          .map(e => e.batch_name)
+      )).sort();
+    }
+  }, [userEnrollments, selectedSubjectFilter]);
 
-  const availableSubjects = useMemo(() => {
-    return Array.from(new Set(userEnrollments?.map(e => e.subject_name) || [])).sort();
-  }, [userEnrollments]);
+  const displayedSubjects = useMemo(() => {
+    if (!userEnrollments) return [];
+    // If a specific batch is selected, only show subjects associated with that batch
+    if (selectedBatchFilter !== 'all') {
+      return Array.from(new Set(
+        userEnrollments
+          .filter(e => e.batch_name === selectedBatchFilter)
+          .map(e => e.subject_name)
+      )).sort();
+    }
+    // Otherwise (if 'All Batches' is selected), show all subjects available across all enrollments
+    return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
+  }, [userEnrollments, selectedBatchFilter]);
 
-  // 2. Fetch Notes content based on specific enrolled combinations and selected filters
+  // Ensure selected filters are still valid when options change
+  if (selectedBatchFilter !== 'all' && !displayedBatches.includes(selectedBatchFilter)) {
+      setSelectedBatchFilter('all');
+  }
+  if (selectedSubjectFilter !== 'all' && !displayedSubjects.includes(selectedSubjectFilter)) {
+      setSelectedSubjectFilter('all');
+  }
+
   const { data: notes, isLoading: isLoadingNotesContent } = useQuery<NotesContent[]>({
     queryKey: ['student-notes', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
     queryFn: async (): Promise<NotesContent[]> => {
@@ -88,7 +113,6 @@ export const StudentNotes = () => {
 
         let query = supabase.from('notes').select('*');
 
-        // Dynamically build OR conditions for each specific enrolled combination
         const combinationFilters = userEnrollments
             .filter(enrollment =>
                 (selectedBatchFilter === 'all' || enrollment.batch_name === selectedBatchFilter) &&
@@ -112,7 +136,7 @@ export const StudentNotes = () => {
         }
         return (data || []) as NotesContent[];
     },
-    enabled: !!userEnrollments && userEnrollments.length > 0 // Only run if enrollments are loaded and exist
+    enabled: !!userEnrollments && userEnrollments.length > 0
   });
 
   // Client-side filtering only for search term
@@ -127,12 +151,13 @@ export const StudentNotes = () => {
   const logActivity = async (activityType: string, description: string, metadata?: any) => {
     if (!profile?.user_id) return;
     
+    const availableBatchesForLog = Array.from(new Set(userEnrollments?.map(e => e.batch_name) || []));
     await supabase.from('student_activities').insert({
       user_id: profile.user_id,
       activity_type: activityType,
       description,
       metadata,
-      batch: availableBatches.length > 0 ? availableBatches[0] : null,
+      batch: availableBatchesForLog.length > 0 ? availableBatchesForLog[0] : null,
       subject: metadata.subject,
     });
   };
@@ -185,7 +210,8 @@ export const StudentNotes = () => {
           <p className="text-gray-500 mt-1">Download your class notes and materials here.</p>
         </div>
         <div className="flex gap-2">
-          <Badge variant="outline">Batches: {availableBatches.join(', ')}</Badge>
+          {/* Display all enrolled batches */}
+          {displayedBatches.map(b => <Badge key={b} variant="outline">{b}</Badge>)}
         </div>
       </div>
 
@@ -206,18 +232,22 @@ export const StudentNotes = () => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Batches</SelectItem>
-            {availableBatches.map((batch) => (
+            {displayedBatches.map((batch) => (
               <SelectItem key={batch} value={batch}>{batch}</SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Select value={selectedSubjectFilter} onValueChange={setSelectedSubjectFilter}>
+        <Select
+          value={selectedSubjectFilter}
+          onValueChange={setSelectedSubjectFilter}
+          disabled={selectedBatchFilter === 'all'} // Subject filter disabled if 'All Batches' is selected
+        >
           <SelectTrigger className="w-48 h-10">
             <SelectValue placeholder="Filter by subject" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Subjects</SelectItem>
-            {availableSubjects.map((subject) => (
+            {displayedSubjects.map((subject) => (
               <SelectItem key={subject} value={subject}>{subject}</SelectItem>
             ))}
           </SelectContent>
