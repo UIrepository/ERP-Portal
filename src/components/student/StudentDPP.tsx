@@ -19,7 +19,7 @@ interface DPPContent {
   batch: string;
   difficulty?: string;
   link: string;
-  is_active: boolean;
+  is_active: boolean; // Assuming this column now exists in dpp_content
   created_at: string;
 }
 
@@ -87,7 +87,6 @@ export const StudentDPP = () => {
 
   const displayedSubjects = useMemo(() => {
     if (!userEnrollments) return [];
-    // If a specific batch is selected, only show subjects associated with that batch
     if (selectedBatchFilter !== 'all') {
       return Array.from(new Set(
         userEnrollments
@@ -95,7 +94,6 @@ export const StudentDPP = () => {
           .map(e => e.subject_name)
       )).sort();
     }
-    // Otherwise (if 'All Batches' is selected), show all subjects available across all enrollments
     return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
   }, [userEnrollments, selectedBatchFilter]);
 
@@ -112,7 +110,8 @@ export const StudentDPP = () => {
     queryFn: async (): Promise<DPPContent[]> => {
         if (!userEnrollments || userEnrollments.length === 0) return [];
 
-        let query = supabase.from('dpp_content').select('*');
+        let query = supabase.from('dpp_content').select('*')
+                            .eq('is_active', true); // Filter by is_active
 
         const combinationFilters = userEnrollments
             .filter(enrollment =>
@@ -124,7 +123,7 @@ export const StudentDPP = () => {
         if (combinationFilters.length > 0) {
             query = query.or(combinationFilters.join(','));
         } else {
-            return []; // Return empty if no combinations match filters
+            return [];
         }
         
         query = query.order('created_at', { ascending: false });
