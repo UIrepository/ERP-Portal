@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, parse, isWithinInterval, isAfter, startOfWeek, addDays, set } from 'date-fns';
+import { format, parse, isWithinInterval, isAfter, isBefore, getDay, set } from 'date-fns';
 import { ExternalLink, Clock, Calendar, Video } from 'lucide-react';
 
 interface Schedule {
@@ -19,7 +19,7 @@ interface Schedule {
 }
 
 // A single card representing a class meeting
-const MeetingCard = ({ schedule, day }: { schedule: Schedule; day: string }) => (
+const MeetingCard = ({ schedule }: { schedule: Schedule }) => (
   <Card className="bg-white hover:shadow-md transition-shadow">
     <CardContent className="p-4 flex items-center justify-between">
       <div>
@@ -29,7 +29,6 @@ const MeetingCard = ({ schedule, day }: { schedule: Schedule; day: string }) => 
             {schedule.batch}
           </Badge>
           |
-          <Calendar className="h-3 w-3 mx-2" /> {day} |
           <Clock className="h-3 w-3 mx-2" />
           {format(parse(schedule.start_time, 'HH:mm:ss', new Date()), 'h:mm a')}
         </div>
@@ -45,41 +44,32 @@ const MeetingCard = ({ schedule, day }: { schedule: Schedule; day: string }) => 
 );
 
 // A list container for a specific category of meetings
-const MeetingList = ({ title, schedules, now }: { title: string; schedules: Schedule[]; now: Date }) => {
-    const getScheduleDateTime = (s: Schedule) => {
-        const weekStart = startOfWeek(now, { weekStartsOn: 0 });
-        const scheduleDate = addDays(weekStart, s.day_of_week);
-        const startTime = parse(s.start_time, 'HH:mm:ss', new Date());
-        return set(scheduleDate, { hours: startTime.getHours(), minutes: startTime.getMinutes() });
-    };
-
-    const sortedSchedules = useMemo(() => {
-        return [...schedules].sort((a, b) => {
-            const dateA = getScheduleDateTime(a);
-            const dateB = getScheduleDateTime(b);
-            return title === 'Upcoming' ? dateA.getTime() - dateB.getTime() : dateB.getTime() - dateA.getTime();
-        });
-    }, [schedules, now, title]);
+const MeetingList = ({ title, schedules }: { title: string; schedules: Schedule[] }) => {
+  const sortedSchedules = useMemo(() => {
+    return [...schedules].sort((a, b) => {
+      const timeA = parse(a.start_time, 'HH:mm:ss', new Date()).getTime();
+      const timeB = parse(b.start_time, 'HH:mm:ss', new Date()).getTime();
+      // For upcoming, sort from nearest to furthest. For past, sort from most recent to oldest.
+      return title === 'Upcoming (Today)' ? timeA - timeB : timeB - timeA;
+    });
+  }, [schedules, title]);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center">
           {title === 'Ongoing' && <Video className="h-5 w-5 mr-2 text-green-500" />}
-          {title === 'Upcoming' && <Calendar className="h-5 w-5 mr-2 text-blue-500" />}
-          {title === 'Past' && <Clock className="h-5 w-5 mr-2 text-gray-500" />}
+          {title === 'Upcoming (Today)' && <Calendar className="h-5 w-5 mr-2 text-blue-500" />}
+          {title === 'Past (Today)' && <Clock className="h-5 w-5 mr-2 text-gray-500" />}
           {title}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 h-[60vh] overflow-y-auto p-4">
         {sortedSchedules.length > 0 ? (
-          sortedSchedules.map(schedule => {
-            const dayName = format(addDays(startOfWeek(now, { weekStartsOn: 0 }), schedule.day_of_week), 'EEEE');
-            return <MeetingCard key={schedule.id} schedule={schedule} day={dayName} />;
-          })
+          sortedSchedules.map(schedule => <MeetingCard key={schedule.id} schedule={schedule} />)
         ) : (
           <div className="flex items-center justify-center h-full">
-            <p className="text-sm text-muted-foreground text-center py-4">No {title.toLowerCase()} classes for this week.</p>
+            <p className="text-sm text-muted-foreground text-center py-4">No {title.split(' ')[0].toLowerCase()} classes today.</p>
           </div>
         )}
       </CardContent>
@@ -105,14 +95,12 @@ export const AdminMeetingManager = () => {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'schedules' },
-        (payload) => {
-          // When a change occurs, invalidate the query to refetch data
+        () => {
           queryClient.invalidateQueries({ queryKey: ['all-meeting-links'] });
         }
       )
       .subscribe();
 
-    // Cleanup subscription on component unmount
     return () => {
       supabase.removeChannel(channel);
     };
@@ -128,20 +116,21 @@ export const AdminMeetingManager = () => {
     },
   });
 
-  // Categorize schedules into ongoing, upcoming, and past
+  // Categorize today's schedules into ongoing, upcoming, and past
   const categorizedSchedules = useMemo(() => {
-    const weekStart = startOfWeek(now, { weekStartsOn: 0 }); // Week starts on Sunday
+    const todayDay = getDay(now);
     const ongoing: Schedule[] = [];
     const upcoming: Schedule[] = [];
     const past: Schedule[] = [];
 
-    schedules.forEach(schedule => {
-      const scheduleDay = addDays(weekStart, schedule.day_of_week);
+    const todaySchedules = schedules.filter(schedule => schedule.day_of_week === todayDay);
+
+    todaySchedules.forEach(schedule => {
       const startTime = parse(schedule.start_time, 'HH:mm:ss', new Date());
       const endTime = parse(schedule.end_time, 'HH:mm:ss', new Date());
 
-      const classStartDateTime = set(scheduleDay, { hours: startTime.getHours(), minutes: startTime.getMinutes() });
-      const classEndDateTime = set(scheduleDay, { hours: endTime.getHours(), minutes: endTime.getMinutes() });
+      const classStartDateTime = set(now, { hours: startTime.getHours(), minutes: startTime.getMinutes() });
+      const classEndDateTime = set(now, { hours: endTime.getHours(), minutes: endTime.getMinutes() });
 
       if (isWithinInterval(now, { start: classStartDateTime, end: classEndDateTime })) {
         ongoing.push(schedule);
@@ -158,7 +147,7 @@ export const AdminMeetingManager = () => {
   if (isLoading) {
     return (
       <div className="p-6 space-y-6">
-        <Skeleton className="h-8 w-1/trd" />
+        <Skeleton className="h-8 w-1/3" />
         <div className="grid md:grid-cols-3 gap-6">
           <Skeleton className="h-96" />
           <Skeleton className="h-96" />
@@ -171,14 +160,16 @@ export const AdminMeetingManager = () => {
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="mb-6">
-        <h2 className="text-3xl font-bold text-gray-900">Class Meeting Links</h2>
-        <p className="text-gray-600 mt-1">All scheduled meetings, sorted by their current status for the week.</p>
+        <h2 className="text-3xl font-bold text-gray-900">Today's Meeting Links</h2>
+        <p className="text-gray-600 mt-1">
+          A real-time overview of all scheduled meetings for today, {format(now, 'PPPP')}.
+        </p>
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
-        <MeetingList title="Ongoing" schedules={categorizedSchedules.ongoing} now={now} />
-        <MeetingList title="Upcoming" schedules={categorizedSchedules.upcoming} now={now} />
-        <MeetingList title="Past" schedules={categorizedSchedules.past} now={now} />
+        <MeetingList title="Ongoing" schedules={categorizedSchedules.ongoing} />
+        <MeetingList title="Upcoming (Today)" schedules={categorizedSchedules.upcoming} />
+        <MeetingList title="Past (Today)" schedules={categorizedSchedules.past} />
       </div>
     </div>
   );
