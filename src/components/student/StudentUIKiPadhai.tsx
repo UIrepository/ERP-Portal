@@ -87,30 +87,46 @@ export const StudentUIKiPadhai = () => {
     queryKey: ['student-ui-ki-padhai', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
     queryFn: async (): Promise<UIKiPadhaiContent[]> => {
         if (!userEnrollments || userEnrollments.length === 0) return [];
-        let query = supabase.from('ui_ki_padhai_content').select('id, title, description, category, link, is_active, created_at, batch, subject').eq('is_active', true);
-
-        const combinationFilters = userEnrollments
-            .filter(enrollment =>
-                (selectedBatchFilter === 'all' || enrollment.batch_name === selectedBatchFilter) &&
-                (selectedSubjectFilter === 'all' || enrollment.subject_name === selectedSubjectFilter)
-            )
-            .map(enrollment => `and(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
-
-        if (combinationFilters.length > 0) {
-            query = query.or(combinationFilters.join(','));
-        } else {
-            return [];
-        }
-            
-        query = query.order('created_at', { ascending: false });
         
-        const { data, error } = await query;
-      
+        const { data, error } = await supabase
+            .from('ui_ki_padhai_content')
+            .select('id, title, description, category, link, is_active, created_at, batch, subject')
+            .eq('is_active', true)
+            .order('created_at', { ascending: false });
+
         if (error) {
             console.error("Error fetching 'UI Ki Padhai' content:", error);
             throw error;
         }
-        return (data || []) as UIKiPadhaiContent[];
+
+        if (!data) return [];
+
+        // Filter content based on user enrollments and selected filters
+        const filteredContent = data.filter(content => {
+            if (!content.batch || !content.subject) return false;
+            
+            // Check if user is enrolled in this batch/subject combination
+            const isEnrolled = userEnrollments.some(enrollment =>
+                enrollment.batch_name === content.batch &&
+                enrollment.subject_name === content.subject
+            );
+
+            if (!isEnrolled) return false;
+
+            // Apply batch filter
+            if (selectedBatchFilter !== 'all' && content.batch !== selectedBatchFilter) {
+                return false;
+            }
+
+            // Apply subject filter
+            if (selectedSubjectFilter !== 'all' && content.subject !== selectedSubjectFilter) {
+                return false;
+            }
+
+            return true;
+        });
+
+        return filteredContent as UIKiPadhaiContent[];
     },
     enabled: !!userEnrollments && userEnrollments.length > 0
   });
