@@ -16,7 +16,7 @@ export const Layout = ({ children }: LayoutProps) => {
       <header className="border-b bg-card">
         <div className="flex h-16 items-center justify-between px-6">
           <div className="flex items-center space-x-4">
-            <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-16 w-auto" />
+            <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-12 w-auto" />
           </div>
           
           <div className="flex items-center space-x-4">

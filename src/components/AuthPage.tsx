@@ -63,7 +63,7 @@ export const AuthPage = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="flex justify-center">
-            <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-28 w-auto" />
+            <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-16 w-auto" />
           </CardTitle>
           <CardDescription>ERP Portal Login</CardDescription>
         </CardHeader>
