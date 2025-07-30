@@ -52,7 +52,6 @@ export const StudentRecordings = () => {
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState('all');
   const [selectedBatchFilter, setSelectedBatchFilter] = useState('all');
 
-  // 1. Fetch user's specific enrollments from the new table
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['userEnrollments', profile?.user_id],
     queryFn: async () => {
@@ -70,16 +69,42 @@ export const StudentRecordings = () => {
     enabled: !!profile?.user_id
   });
 
-  // Extract unique batches and subjects from the fetched enrollments for filter dropdowns
-  const availableBatches = useMemo(() => {
-    return Array.from(new Set(userEnrollments?.map(e => e.batch_name) || [])).sort();
-  }, [userEnrollments]);
+  // Derived state for filter options, implementing cascading logic
+  const displayedBatches = useMemo(() => {
+    if (!userEnrollments) return [];
+    if (selectedSubjectFilter === 'all') {
+      return Array.from(new Set(userEnrollments.map(e => e.batch_name))).sort();
+    } else {
+      return Array.from(new Set(
+        userEnrollments
+          .filter(e => e.subject_name === selectedSubjectFilter)
+          .map(e => e.batch_name)
+      )).sort();
+    }
+  }, [userEnrollments, selectedSubjectFilter]);
 
-  const availableSubjects = useMemo(() => {
-    return Array.from(new Set(userEnrollments?.map(e => e.subject_name) || [])).sort();
-  }, [userEnrollments]);
+  const displayedSubjects = useMemo(() => {
+    if (!userEnrollments) return [];
+    // If a specific batch is selected, only show subjects associated with that batch
+    if (selectedBatchFilter !== 'all') {
+      return Array.from(new Set(
+        userEnrollments
+          .filter(e => e.batch_name === selectedBatchFilter)
+          .map(e => e.subject_name)
+      )).sort();
+    }
+    // Otherwise (if 'All Batches' is selected), show all subjects available across all enrollments
+    return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
+  }, [userEnrollments, selectedBatchFilter]);
 
-  // 2. Fetch Recording content based on specific enrolled combinations and selected filters
+  // Ensure selected filters are still valid when options change
+  if (selectedBatchFilter !== 'all' && !displayedBatches.includes(selectedBatchFilter)) {
+      setSelectedBatchFilter('all');
+  }
+  if (selectedSubjectFilter !== 'all' && !displayedSubjects.includes(selectedSubjectFilter)) {
+      setSelectedSubjectFilter('all');
+  }
+
   const { data: recordings, isLoading: isLoadingRecordingsContent } = useQuery<RecordingContent[]>({
     queryKey: ['student-recordings', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
     queryFn: async (): Promise<RecordingContent[]> => {
@@ -87,7 +112,6 @@ export const StudentRecordings = () => {
 
         let query = supabase.from('recordings').select('*');
 
-        // Dynamically build OR conditions for each specific enrolled combination
         const combinationFilters = userEnrollments
             .filter(enrollment =>
                 (selectedBatchFilter === 'all' || enrollment.batch_name === selectedBatchFilter) &&
@@ -111,7 +135,7 @@ export const StudentRecordings = () => {
         }
         return (data || []) as RecordingContent[];
     },
-    enabled: !!userEnrollments && userEnrollments.length > 0 // Only run if enrollments are loaded and exist
+    enabled: !!userEnrollments && userEnrollments.length > 0
   });
 
   const filteredRecordings = recordings?.filter(recording => {
@@ -125,12 +149,13 @@ export const StudentRecordings = () => {
   const logActivity = async (activityType: string, description: string, metadata?: any) => {
     if (!profile?.user_id) return;
     
+    const availableBatchesForLog = Array.from(new Set(userEnrollments?.map(e => e.batch_name) || []));
     await supabase.from('student_activities').insert({
       user_id: profile.user_id,
       activity_type: activityType,
       description,
       metadata,
-      batch: availableBatches.length > 0 ? availableBatches[0] : null, // Use availableBatches
+      batch: availableBatchesForLog.length > 0 ? availableBatchesForLog[0] : null,
       subject: metadata.subject,
     });
   };
@@ -172,7 +197,8 @@ export const StudentRecordings = () => {
           <p className="text-gray-500 mt-1">Review past lectures and catch up on missed classes.</p>
         </div>
         <div className="flex gap-2">
-          <Badge variant="outline">Batches: {availableBatches.join(', ')}</Badge>
+          {/* Display all enrolled batches */}
+          {displayedBatches.map(b => <Badge key={b} variant="outline">{b}</Badge>)}
         </div>
       </div>
 
@@ -193,18 +219,22 @@ export const StudentRecordings = () => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Batches</SelectItem>
-            {availableBatches.map((batch) => (
+            {displayedBatches.map((batch) => (
               <SelectItem key={batch} value={batch}>{batch}</SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Select value={selectedSubjectFilter} onValueChange={setSelectedSubjectFilter}>
+        <Select
+          value={selectedSubjectFilter}
+          onValueChange={setSelectedSubjectFilter}
+          disabled={selectedBatchFilter === 'all'} // Subject filter disabled if 'All Batches' is selected
+        >
           <SelectTrigger className="w-48 h-10">
             <SelectValue placeholder="Filter by subject" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Subjects</SelectItem>
-            {availableSubjects.map((subject) => (
+            {displayedSubjects.map((subject) => (
               <SelectItem key={subject} value={subject}>{subject}</SelectItem>
             ))}
           </SelectContent>
@@ -219,36 +249,45 @@ export const StudentRecordings = () => {
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredRecordings.map((recording) => (
               <Dialog key={recording.id}>
-                <Card className="bg-white hover:shadow-lg transition-shadow duration-300 flex flex-col group">
-                  <div className="relative">
-                    <div className="aspect-video bg-gray-200 rounded-t-lg flex items-center justify-center">
-                      <Video className="h-12 w-12 text-gray-300" />
-                    </div>
-                    <DialogTrigger asChild>
-                      <Button 
-                        onClick={() => handleWatchRecording(recording)}
-                        className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                      >
-                        <Play className="h-8 w-8 text-white" />
-                      </Button>
-                    </DialogTrigger>
-                  </div>
-
-                  <CardContent className="p-4 flex flex-col flex-grow">
+                <Card className="bg-white hover:shadow-lg transition-shadow duration-300">
+                  <CardContent className="p-5 flex flex-col h-full">
                     <div className="flex-grow">
-                      <h3 className="font-semibold text-gray-800 truncate">{recording.topic}</h3>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {format(new Date(recording.date), 'PPP')}
-                      </p>
-                      <div className="flex gap-2 mt-3">
-                        <Badge variant="outline">{recording.subject}</Badge>
-                        <Badge variant="secondary">{recording.batch}</Badge>
+                      <div className="flex items-start gap-4">
+                        <div className="bg-primary/10 p-2 rounded-full">
+                          <Video className="h-6 w-6 text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-gray-800 truncate">{recording.topic}</h3>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {format(new Date(recording.date), 'PPP')}
+                          </p>
+                          <div className="flex gap-2 mt-3">
+                            <Badge variant="outline">{recording.subject}</Badge>
+                            <Badge variant="secondary">{recording.batch}</Badge>
+                          </div>
+                        </div>
                       </div>
                     </div>
+                    <Button onClick={() => handleWatchRecording(recording)} className="w-full mt-5">
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Watch Recording
+                    </Button>
                   </CardContent>
                 </Card>
                 <DialogContent className="max-w-4xl p-0 border-0">
-                  <WatermarkedPlayer recording={recording} />
+                  {/* WatermarkedPlayer component definition */}
+                  <div className="relative aspect-video">
+                      <iframe
+                      src={recording.embed_link}
+                      className="absolute top-0 left-0 w-full h-full rounded-lg"
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      />
+                      <div className="absolute top-2 right-2 bg-black/30 text-white/80 text-xs px-2 py-1 rounded pointer-events-none backdrop-blur-sm">
+                      {profile?.name} - {profile?.email}
+                      </div>
+                  </div>
                 </DialogContent>
               </Dialog>
             ))}
