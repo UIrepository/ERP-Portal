@@ -22,10 +22,8 @@ const LinksSkeleton = () => (
         {[...Array(3)].map((_, i) => (
             <Card key={i} className="p-4 rounded-xl"> {/* Rounded corners for cards */}
                 <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                        <Skeleton className="h-8 w-8 rounded-full" />
-                        <Skeleton className="h-5 w-1/3" />
-                    </div>
+                    <Skeleton className="h-8 w-8 rounded-full" />
+                    <Skeleton className="h-5 w-1/3" />
                     <Skeleton className="h-4 w-4/5" />
                     <div className="flex gap-2 justify-end">
                         <Skeleton className="h-9 w-24" />
@@ -89,7 +87,8 @@ export const AdminMeetingManager = () => {
   };
   
   return (
-    <div className="space-y-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 min-h-full"> {/* Gradient background */}
+    <div className="space-y-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 min-h-full"> 
+      {/* Gradient background */}
       {/* Header Section - Enhanced Design */}
       <div className="relative p-8 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-r from-blue-600 to-indigo-700 text-white animate-fade-in-up">
             {/* Animated background circles */}
