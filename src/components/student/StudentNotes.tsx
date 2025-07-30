@@ -1,6 +1,6 @@
-// uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/student/StudentNotes.tsx
-import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+
+import { useState, useMemo, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -49,6 +49,7 @@ const NotesSkeleton = () => (
 
 export const StudentNotes = () => {
   const { profile } = useAuth();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
   const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
@@ -86,7 +87,6 @@ export const StudentNotes = () => {
 
   const displayedSubjects = useMemo(() => {
     if (!userEnrollments) return [];
-    // If a specific batch is selected, only show subjects associated with that batch
     if (selectedBatchFilter !== 'all') {
       return Array.from(new Set(
         userEnrollments
@@ -94,7 +94,6 @@ export const StudentNotes = () => {
           .map(e => e.subject_name)
       )).sort();
     }
-    // Otherwise (if 'All Batches' is selected), show all subjects available across all enrollments
     return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
   }, [userEnrollments, selectedBatchFilter]);
 
@@ -113,18 +112,17 @@ export const StudentNotes = () => {
 
         let query = supabase.from('notes').select('*');
 
-        // Changed to use and() within the combination filters to fix PGRST100 error
         const combinationFilters = userEnrollments
             .filter(enrollment =>
                 (selectedBatchFilter === 'all' || enrollment.batch_name === selectedBatchFilter) &&
                 (selectedSubjectFilter === 'all' || enrollment.subject_name === selectedSubjectFilter)
             )
-            .map(enrollment => `and(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`); // FIX APPLIED HERE
+            .map(enrollment => `and(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
 
         if (combinationFilters.length > 0) {
             query = query.or(combinationFilters.join(','));
         } else {
-            return []; // Return empty if no combinations match filters
+            return [];
         }
         
         query = query.order('created_at', { ascending: false });
@@ -139,6 +137,44 @@ export const StudentNotes = () => {
     },
     enabled: !!userEnrollments && userEnrollments.length > 0
   });
+
+  // Set up real-time subscriptions for notes data
+  useEffect(() => {
+    if (!profile?.user_id) return;
+
+    const notesChannel = supabase
+      .channel('notes-realtime-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notes'
+        },
+        () => {
+          console.log('Real-time update: notes changed');
+          queryClient.invalidateQueries({ queryKey: ['student-notes'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_enrollments',
+          filter: `user_id=eq.${profile.user_id}`
+        },
+        () => {
+          console.log('Real-time update: user_enrollments changed');
+          queryClient.invalidateQueries({ queryKey: ['userEnrollments'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(notesChannel);
+    };
+  }, [profile?.user_id, queryClient]);
 
   // Client-side filtering only for search term
   const filteredNotes = notes?.filter(note => {
@@ -211,7 +247,6 @@ export const StudentNotes = () => {
           <p className="text-gray-500 mt-1">Download your class notes and materials here.</p>
         </div>
         <div className="flex gap-2">
-          {/* Display all enrolled batches */}
           {displayedBatches.map(b => <Badge key={b} variant="outline">{b}</Badge>)}
         </div>
       </div>
@@ -241,7 +276,7 @@ export const StudentNotes = () => {
         <Select
           value={selectedSubjectFilter}
           onValueChange={setSelectedSubjectFilter}
-          disabled={selectedBatchFilter === 'all'} // Subject filter disabled if 'All Batches' is selected
+          disabled={selectedBatchFilter === 'all'}
         >
           <SelectTrigger className="w-48 h-10">
             <SelectValue placeholder="Filter by subject" />

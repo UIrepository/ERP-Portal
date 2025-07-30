@@ -1,4 +1,4 @@
-// uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/StudentDashboard.tsx
+
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { StudentSchedule } from './student/StudentSchedule';
@@ -10,11 +10,11 @@ import { StudentUIKiPadhai } from './student/StudentUIKiPadhai';
 import { StudentFeedback } from './student/StudentFeedback';
 import { StudentExams } from './student/StudentExams';
 import { FileText, Video, Target, MessageSquare, Calendar, Clock, Crown, BookOpen } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
-import { Skeleton } from '@/components/ui/skeleton'; // Ensure Skeleton is imported
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface StudentDashboardProps {
   activeTab: string;
@@ -28,6 +28,7 @@ interface UserEnrollment {
 
 export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardProps) => {
   const { profile } = useAuth();
+  const queryClient = useQueryClient();
 
   // Fetch user's specific enrollments for dashboard display AND analytics filtering
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
@@ -56,13 +57,11 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
     return Array.from(new Set(userEnrollments?.map(e => e.subject_name) || [])).sort();
   }, [userEnrollments]);
 
-
   // Analytics queries updated to use userEnrollments
   const { data: analyticsData, refetch: refetchAnalytics, isLoading: isLoadingAnalytics } = useQuery({
-    queryKey: ['student-analytics', profile?.user_id, userEnrollments], // Add userEnrollments to queryKey
+    queryKey: ['student-analytics', profile?.user_id, userEnrollments],
     queryFn: async () => {
       if (!profile?.user_id || !userEnrollments || userEnrollments.length === 0) {
-        // If no enrollments, return 0 for all analytics
         return { totalNotes: 0, totalRecordings: 0, totalDPP: 0, feedbackSubmitted: 0 };
       }
 
@@ -75,8 +74,8 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
       const fetchCount = async (tableName: string) => {
         const { count, error } = await supabase
           .from(tableName)
-          .select('*', { count: 'exact', head: true }) // Request only count
-          .or(combinationsFilterString); // Apply the combined filter
+          .select('*', { count: 'exact', head: true })
+          .or(combinationsFilterString);
 
         if (error) {
           console.error(`Error fetching count for ${tableName}:`, error);
@@ -110,7 +109,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
         feedbackSubmitted: feedbackCount || 0
       };
     },
-    enabled: !!profile?.user_id && !isLoadingEnrollments && userEnrollments.length > 0, // Only enabled when enrollments are loaded and exist
+    enabled: !!profile?.user_id && !isLoadingEnrollments && userEnrollments.length > 0,
   });
 
   // Fetch recent activities
@@ -131,12 +130,26 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
     enabled: !!profile?.user_id
   });
 
-  // Set up real-time subscriptions
+  // Set up real-time subscriptions for dashboard data
   useEffect(() => {
     if (!profile?.user_id) return;
 
-    const activitiesChannel = supabase
-      .channel('student-activities-changes')
+    const dashboardChannel = supabase
+      .channel('dashboard-realtime-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_enrollments',
+          filter: `user_id=eq.${profile.user_id}`
+        },
+        () => {
+          console.log('Real-time update: user_enrollments changed');
+          queryClient.invalidateQueries({ queryKey: ['dashboardUserEnrollments'] });
+          queryClient.invalidateQueries({ queryKey: ['student-analytics'] });
+        }
+      )
       .on(
         'postgres_changes',
         {
@@ -146,13 +159,10 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
           filter: `user_id=eq.${profile.user_id}`
         },
         () => {
+          console.log('Real-time update: student_activities changed');
           refetchActivities();
         }
       )
-      .subscribe();
-
-    const analyticsChannel = supabase
-      .channel('analytics-changes')
       .on(
         'postgres_changes',
         {
@@ -161,6 +171,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
           table: 'notes'
         },
         () => {
+          console.log('Real-time update: notes changed');
           refetchAnalytics();
         }
       )
@@ -172,6 +183,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
           table: 'recordings'
         },
         () => {
+          console.log('Real-time update: recordings changed');
           refetchAnalytics();
         }
       )
@@ -183,6 +195,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
           table: 'dpp_content'
         },
         () => {
+          console.log('Real-time update: dpp_content changed');
           refetchAnalytics();
         }
       )
@@ -191,19 +204,33 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
         {
           event: '*',
           schema: 'public',
-          table: 'feedback'
+          table: 'feedback',
+          filter: `submitted_by=eq.${profile.user_id}`
         },
         () => {
+          console.log('Real-time update: feedback changed');
           refetchAnalytics();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'profiles',
+          filter: `user_id=eq.${profile.user_id}`
+        },
+        () => {
+          console.log('Real-time update: profiles changed');
+          queryClient.invalidateQueries({ queryKey: ['dashboardUserEnrollments'] });
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(activitiesChannel);
-      supabase.removeChannel(analyticsChannel);
+      supabase.removeChannel(dashboardChannel);
     };
-  }, [profile?.user_id, refetchActivities, refetchAnalytics]);
+  }, [profile?.user_id, refetchActivities, refetchAnalytics, queryClient]);
 
   // Function to log activities
   const logActivity = async (activityType: string, description: string, metadata?: any) => {

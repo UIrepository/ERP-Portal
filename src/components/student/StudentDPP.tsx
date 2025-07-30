@@ -1,26 +1,26 @@
-// uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/student/StudentDPP.tsx
-import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+
+import { useState, useMemo, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { BookOpen, ExternalLink, Search, Target } from 'lucide-react';
+import { Target, ExternalLink, Search } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
 
 interface DPPContent {
   id: string;
   title: string;
   description?: string;
-  subject: string;
-  batch: string;
   difficulty?: string;
   link: string;
-  is_active: boolean; // Assuming this column now exists in dpp_content
+  is_active: boolean;
   created_at: string;
+  batch: string;
+  subject: string;
 }
 
 interface UserEnrollment {
@@ -29,31 +29,33 @@ interface UserEnrollment {
 }
 
 const DPPSkeleton = () => (
-  <div className="space-y-4">
-    {[...Array(3)].map((_, i) => (
-      <Card key={i} className="p-4">
-        <div className="flex justify-between items-center">
-          <div className="space-y-3 flex-grow">
-            <Skeleton className="h-5 w-3/5" />
-            <Skeleton className="h-4 w-4/5" />
-            <div className="flex gap-2">
-              <Skeleton className="h-5 w-20" />
-              <Skeleton className="h-5 w-20" />
-            </div>
-          </div>
-          <Skeleton className="h-10 w-28" />
-        </div>
-      </Card>
-    ))}
-  </div>
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {[...Array(3)].map((_, i) => (
+            <Card key={i} className="p-5 space-y-4">
+                <div className="flex items-start gap-4">
+                    <Skeleton className="h-10 w-10 rounded-full" />
+                    <div className="w-full space-y-2">
+                        <Skeleton className="h-5 w-4/5" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-2/3" />
+                    </div>
+                </div>
+                <div className="flex gap-2">
+                    <Skeleton className="h-5 w-24" />
+                    <Skeleton className="h-5 w-20" />
+                </div>
+                <Skeleton className="h-10 w-full" />
+            </Card>
+        ))}
+    </div>
 );
 
 export const StudentDPP = () => {
   const { profile } = useAuth();
-  const [searchTerm, setSearchTerm] = useState('');
+  const queryClient = useQueryClient();
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
   const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
-  
+
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['userEnrollments', profile?.user_id],
     queryFn: async () => {
@@ -107,7 +109,7 @@ export const StudentDPP = () => {
       setSelectedSubjectFilter('all');
   }
 
-  const { data: dppContent, isLoading: isLoadingDppContent } = useQuery<DPPContent[]>({
+  const { data: dppContent, isLoading: isLoadingDPPContent } = useQuery<DPPContent[]>({
     queryKey: ['student-dpp', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
     queryFn: async (): Promise<DPPContent[]> => {
         if (!userEnrollments || userEnrollments.length === 0) return [];
@@ -127,9 +129,9 @@ export const StudentDPP = () => {
         } else {
             return [];
         }
-        
+            
         query = query.order('created_at', { ascending: false });
-
+        
         const { data, error } = await query;
       
         if (error) {
@@ -141,117 +143,156 @@ export const StudentDPP = () => {
     enabled: !!userEnrollments && userEnrollments.length > 0
   });
 
-  // Client-side filtering only for search term
-  const filteredDPP = dppContent?.filter(dpp => {
-    const matchesSearch = !searchTerm || 
-      dpp.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      dpp.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    return matchesSearch;
-  });
+  // Set up real-time subscriptions for DPP data
+  useEffect(() => {
+    if (!profile?.user_id) return;
 
-  const handleOpenDPP = (dpp: DPPContent) => {
+    const dppChannel = supabase
+      .channel('dpp-realtime-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'dpp_content'
+        },
+        () => {
+          console.log('Real-time update: dpp_content changed');
+          queryClient.invalidateQueries({ queryKey: ['student-dpp'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_enrollments',
+          filter: `user_id=eq.${profile.user_id}`
+        },
+        () => {
+          console.log('Real-time update: user_enrollments changed');
+          queryClient.invalidateQueries({ queryKey: ['userEnrollments'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(dppChannel);
+    };
+  }, [profile?.user_id, queryClient]);
+
+  const handleAccessDPP = (dpp: DPPContent) => {
     window.open(dpp.link, '_blank');
   };
-
-  const isLoading = isLoadingEnrollments || isLoadingDppContent;
+  
+  const isLoading = isLoadingEnrollments || isLoadingDPPContent;
 
   return (
-    <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
-      {/* Header Section */}
-      <div className="flex items-center justify-between">
+    <div className="p-6 bg-gradient-to-br from-green-50 to-blue-50 min-h-full flex flex-col justify-center items-center">
+      <div className="max-w-4xl mx-auto w-full text-center">
+        
+        {/* Header Section */}
+        <div className="relative p-8 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-r from-green-500 to-blue-500 text-white mb-10">
+            <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/10 rounded-full"></div>
+            <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-white/10 rounded-full"></div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white/10 rounded-full"></div>
+
+            <div className="relative z-10">
+                <div className="flex items-center justify-center mb-4">
+                    <Target className="h-16 w-16 text-green-100 drop-shadow-md" />
+                </div>
+                <h1 className="text-4xl md:text-5xl font-bold mb-2 tracking-tight drop-shadow-lg">
+                    DPP Section
+                </h1>
+                <p className="text-xl md:text-2xl text-green-100 drop-shadow-sm font-semibold">
+                    Daily Practice Problems & Assignments
+                </p>
+            </div>
+        </div>
+
+        {/* Filters and Search Section */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="relative flex-1 col-span-full md:col-span-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search DPP content..."
+              className="pl-10 h-10 bg-white shadow-sm"
+            />
+          </div>
+          <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
+            <SelectTrigger className="w-full h-10 bg-white shadow-sm">
+              <SelectValue placeholder="Filter by batch" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Batches</SelectItem>
+              {displayedBatches.map((batch) => (
+                <SelectItem key={batch} value={batch}>{batch}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={selectedSubjectFilter}
+            onValueChange={setSelectedSubjectFilter}
+            disabled={selectedBatchFilter === 'all'}
+          >
+            <SelectTrigger className="w-full h-10">
+              <SelectValue placeholder="Filter by subject" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Subjects</SelectItem>
+              {displayedSubjects.map((subject) => (
+                <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Content Grid */}
         <div>
-          <h1 className="text-3xl font-bold text-gray-800 flex items-center">
-            <Target className="mr-3 h-8 w-8 text-primary" />
-            DPP Section
-          </h1>
-          <p className="text-gray-500 mt-1">Daily Practice Problems to sharpen your skills.</p>
-        </div>
-        <div className="flex gap-2">
-          {/* Display all enrolled batches as informational badges */}
-          {displayedBatches.map(b => <Badge key={b} variant="outline">{b}</Badge>)}
-        </div>
-      </div>
-
-      {/* Filter and Search Section */}
-      <div className="flex gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search DPP by title or description..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 h-10"
-          />
-        </div>
-        <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
-          <SelectTrigger className="w-48 h-10">
-            <SelectValue placeholder="Filter by batch" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Batches</SelectItem>
-            {displayedBatches.map((batch) => (
-              <SelectItem key={batch} value={batch}>{batch}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={selectedSubjectFilter}
-          onValueChange={setSelectedSubjectFilter}
-          disabled={selectedBatchFilter === 'all'} // Subject filter disabled if 'All Batches' is selected
-        >
-          <SelectTrigger className="w-48 h-10">
-            <SelectValue placeholder="Filter by subject" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Subjects</SelectItem>
-            {displayedSubjects.map((subject) => (
-              <SelectItem key={subject} value={subject}>{subject}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* DPP List */}
-      <div>
-        {isLoading ? (
-          <DPPSkeleton />
-        ) : filteredDPP && filteredDPP.length > 0 ? (
-          <div className="space-y-4">
-            {filteredDPP.map((dpp) => (
-              <Card key={dpp.id} className="bg-white hover:shadow-md transition-shadow duration-300">
-                <CardContent className="p-5 flex justify-between items-center">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                       <BookOpen className="h-5 w-5 text-primary" />
-                      <h3 className="font-semibold text-gray-800">{dpp.title}</h3>
+          {isLoading ? (
+            <DPPSkeleton />
+          ) : dppContent && dppContent.length > 0 ? (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {dppContent.map((dpp) => (
+                <Card key={dpp.id} className="bg-white hover:shadow-lg transition-shadow duration-300 flex flex-col rounded-xl overflow-hidden">
+                  <CardContent className="p-5 flex flex-col flex-grow">
+                    <div className="flex-grow">
+                      <div className="flex items-start gap-4 mb-3">
+                        <div className="bg-green-100 p-2 rounded-full flex-shrink-0">
+                          <Target className="h-6 w-6 text-green-500" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg text-gray-800 leading-tight">{dpp.title}</h3>
+                          {dpp.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{dpp.description}</p>}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        <Badge variant="outline">{dpp.subject}</Badge>
+                        <Badge variant="secondary">{dpp.batch}</Badge>
+                        {dpp.difficulty && (
+                          <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">{dpp.difficulty}</Badge>
+                        )}
+                      </div>
                     </div>
-                    {dpp.description && (
-                      <p className="text-sm text-muted-foreground mb-3 pl-8">{dpp.description}</p>
-                    )}
-                    <div className="flex gap-2 pl-8">
-                      <Badge variant="outline">{dpp.subject}</Badge>
-                      <Badge variant="secondary">{dpp.batch}</Badge>
-                      {dpp.difficulty && (
-                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">{dpp.difficulty}</Badge>
-                      )}
-                    </div>
-                  </div>
-                  <Button onClick={() => handleOpenDPP(dpp)}>
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Open DPP
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-20 bg-white rounded-lg border-dashed border-2">
-            <Target className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-700">No DPPs Available</h3>
-            <p className="text-muted-foreground mt-2">New practice problems will be added soon. Keep an eye out!</p>
-          </div>
-        )}
+                    <Button 
+                      onClick={() => handleAccessDPP(dpp)}
+                      className="w-full mt-5 bg-green-600 hover:bg-green-700 text-white font-semibold transition-all transform hover:scale-[1.01] active:scale-95"
+                      >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Start DPP
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card className="text-center py-20 bg-white rounded-lg border-dashed border-2 shadow-sm">
+              <Target className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-700">No DPP Content Yet</h3>
+              <p className="text-muted-foreground mt-2">Daily practice problems for your batch and subjects will appear here soon.</p>
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   );

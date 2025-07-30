@@ -1,6 +1,6 @@
-// uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/student/StudentUIKiPadhai.tsx
-import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+
+import { useState, useMemo, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -50,9 +50,9 @@ const PremiumContentSkeleton = () => (
     </div>
 );
 
-
 export const StudentUIKiPadhai = () => {
   const { profile } = useAuth();
+  const queryClient = useQueryClient();
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
   const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
 
@@ -89,7 +89,6 @@ export const StudentUIKiPadhai = () => {
 
   const displayedSubjects = useMemo(() => {
     if (!userEnrollments) return [];
-    // If a specific batch is selected, only show subjects associated with that batch
     if (selectedBatchFilter !== 'all') {
       return Array.from(new Set(
         userEnrollments
@@ -97,7 +96,6 @@ export const StudentUIKiPadhai = () => {
           .map(e => e.subject_name)
       )).sort();
     }
-    // Otherwise (if 'All Batches' is selected), show all subjects available across all enrollments
     return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
   }, [userEnrollments, selectedBatchFilter]);
 
@@ -115,7 +113,7 @@ export const StudentUIKiPadhai = () => {
         if (!userEnrollments || userEnrollments.length === 0) return [];
 
         let query = supabase
-            .from('dpp_content') // Assuming 'dpp_content' also holds UI Ki Padhai content based on previous context. Adjust table if 'ui_ki_padhai_content' exists.
+            .from('dpp_content')
             .select('*')
             .eq('is_active', true);
 
@@ -145,10 +143,46 @@ export const StudentUIKiPadhai = () => {
     enabled: !!userEnrollments && userEnrollments.length > 0
   });
 
-  const handleAccessContent = (content: UIKiPadhaiContent) => {
-    // This logic should be updated based on actual premium access field in profiles or user_enrollments if specific tiers exist
-    const hasPremiumAccess = true; // For demonstration, assuming access if content is fetched. Replace with actual logic.
+  // Set up real-time subscriptions for UI Ki Padhai data
+  useEffect(() => {
+    if (!profile?.user_id) return;
 
+    const uiKiPadhaiChannel = supabase
+      .channel('ui-ki-padhai-realtime-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'dpp_content'
+        },
+        () => {
+          console.log('Real-time update: dpp_content changed');
+          queryClient.invalidateQueries({ queryKey: ['student-ui-ki-padhai'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_enrollments',
+          filter: `user_id=eq.${profile.user_id}`
+        },
+        () => {
+          console.log('Real-time update: user_enrollments changed');
+          queryClient.invalidateQueries({ queryKey: ['userEnrollments'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(uiKiPadhaiChannel);
+    };
+  }, [profile?.user_id, queryClient]);
+
+  const handleAccessContent = (content: UIKiPadhaiContent) => {
+    const hasPremiumAccess = true; // For demonstration, assuming access if content is fetched
     if (hasPremiumAccess) {
       window.open(content.link, '_blank');
     } else {
@@ -164,7 +198,6 @@ export const StudentUIKiPadhai = () => {
         
         {/* Header Section - Enhanced */}
         <div className="relative p-8 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-r from-yellow-500 to-orange-500 text-white mb-10 animate-fade-in-up">
-            {/* Background elements like Exams page */}
             <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/10 rounded-full animate-pulse-slow"></div>
             <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-white/10 rounded-full animate-pulse-slow animation-delay-500"></div>
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white/10 rounded-full animate-pulse-slow animation-delay-1000"></div>
@@ -208,7 +241,7 @@ export const StudentUIKiPadhai = () => {
           <Select
             value={selectedSubjectFilter}
             onValueChange={setSelectedSubjectFilter}
-            disabled={selectedBatchFilter === 'all'} // Subject filter disabled if 'All Batches' is selected
+            disabled={selectedBatchFilter === 'all'}
           >
             <SelectTrigger className="w-full h-10">
               <SelectValue placeholder="Filter by subject" />

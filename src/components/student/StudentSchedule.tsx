@@ -1,6 +1,6 @@
-// uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/student/StudentSchedule.tsx
+
 import { useState, useEffect, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,8 +18,7 @@ interface Schedule {
   day_of_week: number;
   start_time: string;
   end_time: string;
-  link?: string; // Schedule might have its own link
-  // meeting_link_url?: string; // Removed as RPC is no longer used for this component
+  link?: string;
 }
 
 interface UserEnrollment {
@@ -52,6 +51,7 @@ const ScheduleSkeleton = () => (
 
 export const StudentSchedule = () => {
   const { profile } = useAuth();
+  const queryClient = useQueryClient();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
 
@@ -78,12 +78,12 @@ export const StudentSchedule = () => {
     enabled: !!profile?.user_id
   });
 
-  // Available batches for the filter dropdown (all batches user is enrolled in)
+  // Available batches for the filter dropdown
   const availableBatches = useMemo(() => {
     return Array.from(new Set(userEnrollments?.map(e => e.batch_name) || [])).sort();
   }, [userEnrollments]);
 
-  // Reset selected batch filter if it becomes invalid (e.g., after enrollments load or change)
+  // Reset selected batch filter if it becomes invalid
   if (selectedBatchFilter !== 'all' && !availableBatches.includes(selectedBatchFilter)) {
       setSelectedBatchFilter('all');
   }
@@ -96,20 +96,15 @@ export const StudentSchedule = () => {
 
         let query = supabase.from('schedules').select('*');
 
-        // Determine which batches to filter by
         let batchesToFilter = selectedBatchFilter === 'all'
-            ? Array.from(new Set(userEnrollments.map(e => e.batch_name))) // If 'All Batches', use all enrolled batches
-            : [selectedBatchFilter]; // Otherwise, use the single selected batch
+            ? Array.from(new Set(userEnrollments.map(e => e.batch_name)))
+            : [selectedBatchFilter];
 
         if (batchesToFilter.length === 0) {
-          // If after filtering, there are no batches to query for, return empty
           return [];
         }
 
-        // Apply the filter for batch names using .in()
         query = query.in('batch', batchesToFilter);
-        
-        // Add additional ordering
         query = query.order('day_of_week').order('start_time');
 
         const { data, error } = await query;
@@ -120,8 +115,58 @@ export const StudentSchedule = () => {
         }
         return data || [];
     },
-    enabled: !!userEnrollments && userEnrollments.length > 0 // Enable only if enrollments are loaded and exist
+    enabled: !!userEnrollments && userEnrollments.length > 0
   });
+
+  // Set up real-time subscriptions for schedule data
+  useEffect(() => {
+    if (!profile?.user_id) return;
+
+    const scheduleChannel = supabase
+      .channel('schedule-realtime-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'schedules'
+        },
+        () => {
+          console.log('Real-time update: schedules changed');
+          queryClient.invalidateQueries({ queryKey: ['student-schedule-direct'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'meeting_links'
+        },
+        () => {
+          console.log('Real-time update: meeting_links changed');
+          queryClient.invalidateQueries({ queryKey: ['student-schedule-direct'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_enrollments',
+          filter: `user_id=eq.${profile.user_id}`
+        },
+        () => {
+          console.log('Real-time update: user_enrollments changed');
+          queryClient.invalidateQueries({ queryKey: ['userEnrollments'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(scheduleChannel);
+    };
+  }, [profile?.user_id, queryClient]);
 
   const isLoading = isLoadingEnrollments || isLoadingSchedules;
 
@@ -229,7 +274,7 @@ export const StudentSchedule = () => {
                             {schedule.batch}
                           </Badge>
                         </div>
-                        {schedule.link && ( // Display Join Class button if link exists on schedule table
+                        {schedule.link && (
                           <Button size="sm" asChild>
                             <a href={schedule.link} target="_blank" rel="noopener noreferrer">
                               <ExternalLink className="h-4 w-4 mr-1" /> Join

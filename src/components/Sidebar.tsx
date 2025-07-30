@@ -1,9 +1,9 @@
 // uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/Sidebar.tsx
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { useQuery } from '@tanstack/react-query'; // Added for useQuery
-import { supabase } from '@/integrations/supabase/client'; // Added for supabase client
-import { useMemo } from 'react'; // Added useMemo
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useMemo, useEffect } from 'react';
 import {
   LayoutDashboard,
   Calendar,
@@ -30,7 +30,7 @@ interface SidebarProps {
   onTabChange: (tab: string) => void;
 }
 
-// Define the structure for an enrollment record from the new table
+// Define the structure for an enrollment record from the user_enrollments table
 interface UserEnrollment {
     batch_name: string;
     subject_name: string;
@@ -38,6 +38,7 @@ interface UserEnrollment {
 
 export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const { profile, signOut } = useAuth();
+  const queryClient = useQueryClient();
 
   // Fetch user's specific enrollments for sidebar display
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
@@ -65,6 +66,45 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const availableSubjects = useMemo(() => {
     return Array.from(new Set(userEnrollments?.map(e => e.subject_name) || [])).sort();
   }, [userEnrollments]);
+
+  // Set up real-time subscriptions for sidebar data
+  useEffect(() => {
+    if (!profile?.user_id) return;
+
+    const channel = supabase
+      .channel('sidebar-realtime-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_enrollments',
+          filter: `user_id=eq.${profile.user_id}`
+        },
+        () => {
+          console.log('Real-time update: user_enrollments changed');
+          queryClient.invalidateQueries({ queryKey: ['sidebarUserEnrollments'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'profiles',
+          filter: `user_id=eq.${profile.user_id}`
+        },
+        () => {
+          console.log('Real-time update: profiles changed');
+          queryClient.invalidateQueries({ queryKey: ['sidebarUserEnrollments'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.user_id, queryClient]);
 
   const studentTabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -121,10 +161,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
         return 'Portal';
     }
   }
-  // The formatArrayString function is no longer strictly needed for profile.batch/subjects
-  // if they are removed from the profiles table and all data comes from user_enrollments.
-  // However, it's kept here for robustness in case profile.batch/subjects still exist
-  // for other roles or legacy data.
+
   const formatArrayString = (arr: string | string[] | null | undefined) => {
     if (!arr) return '';
 

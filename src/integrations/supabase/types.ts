@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          ip_address: unknown | null
+          resource_id: string | null
+          resource_type: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: unknown | null
+          resource_id?: string | null
+          resource_type?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: unknown | null
+          resource_id?: string | null
+          resource_type?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       analytics_events: {
         Row: {
           batch: string | null
@@ -47,6 +91,27 @@ export type Database = {
         }
         Relationships: []
       }
+      available_options: {
+        Row: {
+          created_at: string
+          id: number
+          name: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          name: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          name?: string
+          type?: string
+        }
+        Relationships: []
+      }
       chat_logs: {
         Row: {
           batch: string
@@ -77,7 +142,78 @@ export type Database = {
         }
         Relationships: []
       }
-
+      chat_messages: {
+        Row: {
+          batch: string
+          created_at: string
+          id: string
+          message: string
+          receiver_role: string
+          sender_id: string
+          sender_name: string
+          subject: string
+        }
+        Insert: {
+          batch: string
+          created_at?: string
+          id?: string
+          message: string
+          receiver_role: string
+          sender_id: string
+          sender_name: string
+          subject: string
+        }
+        Update: {
+          batch?: string
+          created_at?: string
+          id?: string
+          message?: string
+          receiver_role?: string
+          sender_id?: string
+          sender_name?: string
+          subject?: string
+        }
+        Relationships: []
+      }
+      dpp_content: {
+        Row: {
+          batch: string
+          created_at: string | null
+          description: string | null
+          difficulty: string | null
+          id: string
+          is_active: boolean
+          link: string
+          subject: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          batch: string
+          created_at?: string | null
+          description?: string | null
+          difficulty?: string | null
+          id?: string
+          is_active?: boolean
+          link: string
+          subject: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          batch?: string
+          created_at?: string | null
+          description?: string | null
+          difficulty?: string | null
+          id?: string
+          is_active?: boolean
+          link?: string
+          subject?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       exams: {
         Row: {
           batch: string
@@ -153,12 +289,11 @@ export type Database = {
         }
         Relationships: []
       }
-// ... (other types)
       feedback: {
         Row: {
           batch: string
-          concept_clarity: number
           comments: string
+          concept_clarity: number
           created_at: string
           date: string
           dpp_quality: number
@@ -170,8 +305,8 @@ export type Database = {
         }
         Insert: {
           batch: string
-          concept_clarity: number
           comments: string
+          concept_clarity: number
           created_at?: string
           date?: string
           dpp_quality: number
@@ -183,8 +318,8 @@ export type Database = {
         }
         Update: {
           batch?: string
-          concept_clarity?: number
           comments?: string
+          concept_clarity?: number
           created_at?: string
           date?: string
           dpp_quality?: number
@@ -193,6 +328,63 @@ export type Database = {
           subject?: string
           submitted_by?: string | null
           teacher_quality?: number
+        }
+        Relationships: []
+      }
+      founder_chat_messages: {
+        Row: {
+          created_at: string
+          id: string
+          is_from_student: boolean
+          message: string
+          student_batch: string
+          student_id: string
+          student_name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_from_student?: boolean
+          message: string
+          student_batch: string
+          student_id: string
+          student_name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_from_student?: boolean
+          message?: string
+          student_batch?: string
+          student_id?: string
+          student_name?: string
+        }
+        Relationships: []
+      }
+      meeting_links: {
+        Row: {
+          batch: string
+          created_at: string | null
+          is_active: boolean
+          link: string
+          subject: string
+          updated_at: string | null
+        }
+        Insert: {
+          batch: string
+          created_at?: string | null
+          is_active?: boolean
+          link: string
+          subject: string
+          updated_at?: string | null
+        }
+        Update: {
+          batch?: string
+          created_at?: string | null
+          is_active?: boolean
+          link?: string
+          subject?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -271,17 +463,17 @@ export type Database = {
         }
         Relationships: []
       }
-// ... (other types remain the same)
       profiles: {
         Row: {
           bank_details: Json | null
-          batch: string[] | null // Changed to string[]
+          batch: string[] | null
           created_at: string
           email: string
           exams: string[] | null
           id: string
           is_active: boolean
           name: string
+          premium_access: boolean | null
           role: Database["public"]["Enums"]["user_role"]
           subjects: string[] | null
           updated_at: string
@@ -289,13 +481,14 @@ export type Database = {
         }
         Insert: {
           bank_details?: Json | null
-          batch?: string[] | null // Changed to string[]
+          batch?: string[] | null
           created_at?: string
           email: string
           exams?: string[] | null
           id?: string
           is_active?: boolean
           name: string
+          premium_access?: boolean | null
           role?: Database["public"]["Enums"]["user_role"]
           subjects?: string[] | null
           updated_at?: string
@@ -303,13 +496,14 @@ export type Database = {
         }
         Update: {
           bank_details?: Json | null
-          batch?: string[] | null // Changed to string[]
+          batch?: string[] | null
           created_at?: string
           email?: string
           exams?: string[] | null
           id?: string
           is_active?: boolean
           name?: string
+          premium_access?: boolean | null
           role?: Database["public"]["Enums"]["user_role"]
           subjects?: string[] | null
           updated_at?: string
@@ -317,7 +511,6 @@ export type Database = {
         }
         Relationships: []
       }
-// ... (other types remain the same)
       recordings: {
         Row: {
           batch: string
@@ -385,6 +578,101 @@ export type Database = {
           subject?: string
           updated_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "fk_schedule_meeting_link"
+            columns: ["link"]
+            isOneToOne: false
+            referencedRelation: "meeting_links"
+            referencedColumns: ["link"]
+          },
+        ]
+      }
+      student_activities: {
+        Row: {
+          activity_type: string
+          created_at: string
+          description: string
+          id: string
+          metadata: Json | null
+          user_id: string
+        }
+        Insert: {
+          activity_type: string
+          created_at?: string
+          description: string
+          id?: string
+          metadata?: Json | null
+          user_id: string
+        }
+        Update: {
+          activity_type?: string
+          created_at?: string
+          description?: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ui_ki_padhai_content: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          link: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          link: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          link?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      user_enrollments: {
+        Row: {
+          batch_name: string
+          created_at: string
+          email: string | null
+          id: string
+          subject_name: string
+          user_id: string
+        }
+        Insert: {
+          batch_name: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          subject_name: string
+          user_id: string
+        }
+        Update: {
+          batch_name?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          subject_name?: string
+          user_id?: string
+        }
         Relationships: []
       }
       user_sessions: {
@@ -417,83 +705,28 @@ export type Database = {
         }
         Relationships: []
       }
-      dpp_content: {
-        Row: {
-          batch: string
-          created_at: string
-          id: string
-          subject: string
-          topic: string
-          updated_at: string
-          description?: string | null
-          content?: string | null
-          file_url?: string | null
-        }
-        Insert: {
-          batch: string
-          created_at?: string
-          id?: string
-          subject: string
-          topic: string
-          updated_at?: string
-          description?: string | null
-          content?: string | null
-          file_url?: string | null
-        }
-        Update: {
-          batch?: string
-          created_at?: string
-          id?: string
-          subject?: string
-          topic?: string
-          updated_at?: string
-          description?: string | null
-          content?: string | null
-          file_url?: string | null
-        }
-        Relationships: []
-      }
-      student_activities: {
-        Row: {
-          batch: string
-          created_at: string
-          id: string
-          subject: string
-          updated_at: string
-          user_id: string
-          activity_type: string
-          description?: string | null
-          metadata?: Json | null
-        }
-        Insert: {
-          batch: string
-          created_at?: string
-          id?: string
-          subject: string
-          updated_at?: string
-          user_id: string
-          activity_type: string
-          description?: string | null
-          metadata?: Json | null
-        }
-        Update: {
-          batch?: string
-          created_at?: string
-          id?: string
-          subject?: string
-          updated_at?: string
-          user_id?: string
-          activity_type?: string
-          description?: string | null
-          metadata?: Json | null
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      get_all_options: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          type: string
+          name: string
+        }[]
+      }
+      get_current_ongoing_class: {
+        Args: { user_batch: string; user_subjects: string[] }
+        Returns: {
+          subject: string
+          batch: string
+          start_time: string
+          end_time: string
+          meeting_link: string
+        }[]
+      }
       get_current_user_batch: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -505,6 +738,34 @@ export type Database = {
       get_current_user_subjects: {
         Args: Record<PropertyKey, never>
         Returns: string[]
+      }
+      get_schedules_with_links_filtered_by_enrollment: {
+        Args: {
+          p_user_id: string
+          p_day_of_week?: number
+          p_current_time?: string
+          p_is_active_link?: boolean
+        }
+        Returns: {
+          id: string
+          subject: string
+          batch: string
+          day_of_week: number
+          start_time: string
+          end_time: string
+          link: string
+          created_at: string
+          updated_at: string
+          meeting_link_url: string
+        }[]
+      }
+      update_profile_allotment: {
+        Args: {
+          p_user_email: string
+          p_new_batches: string[]
+          p_new_subjects: string[]
+        }
+        Returns: undefined
       }
     }
     Enums: {
