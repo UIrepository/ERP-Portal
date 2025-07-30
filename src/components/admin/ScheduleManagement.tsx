@@ -1,117 +1,59 @@
 import { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
-import { CalendarPlus, Trash2, Edit, Clock } from 'lucide-react';
-import { format } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { format, getDay } from 'date-fns';
+import { Clock } from 'lucide-react';
 
-const DAYS_OF_WEEK = [
-  { id: 1, name: 'Monday' },
-  { id: 2, name: 'Tuesday' },
-  { id: 3, name: 'Wednesday' },
-  { id: 4, name: 'Thursday' },
-  { id: 5, name: 'Friday' },
-  { id: 6, name: 'Saturday' },
-  { id: 0, name: 'Sunday' },
-];
+interface Schedule {
+  id: string;
+  subject: string;
+  batch: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+}
+
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const ScheduleSkeleton = () => (
+    <div className="space-y-6">
+        {[...Array(3)].map((_, i) => (
+            <Card key={i}>
+                <CardHeader>
+                    <Skeleton className="h-6 w-1/3" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                     <Skeleton className="h-24 w-full" />
+                </CardContent>
+            </Card>
+        ))}
+    </div>
+);
 
 export const ScheduleManagement = () => {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingSchedule, setEditingSchedule] = useState<any>(null);
+  const [currentTime] = useState(new Date());
 
-  const { data: schedules = [], isLoading: isLoadingSchedules } = useQuery<any[]>({
-    queryKey: ['schedules'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('schedules').select('*').order('day_of_week').order('start_time');
-      if (error) throw new Error(error.message);
-      return data;
-    },
-  });
-
-  const { data: options = [] } = useQuery({
-    queryKey: ['available-options-schedule'],
-    queryFn: async () => {
-        const { data } = await supabase.rpc('get_all_options');
+  const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
+    queryKey: ['admin-all-schedules'],
+    queryFn: async (): Promise<Schedule[]> => {
+        const { data, error } = await supabase.from('schedules').select('*').order('day_of_week').order('start_time');
+        if (error) {
+            console.error("Error fetching all schedules:", error);
+            throw error;
+        }
         return data || [];
-    }
-  });
-
-  const { batchOptions, subjectOptions } = useMemo(() => ({
-    batchOptions: options.filter((o: any) => o.type === 'batch').map((o: any) => o.name),
-    subjectOptions: options.filter((o: any) => o.type === 'subject').map((o: any) => o.name)
-  }), [options]);
-
-  const scheduleMutation = useMutation({
-    mutationFn: async (newSchedule: any) => {
-      const { id, ...scheduleData } = newSchedule;
-      let response;
-      if (id) {
-        response = await supabase.from('schedules').update(scheduleData).eq('id', id).select();
-      } else {
-        response = await supabase.from('schedules').insert(scheduleData).select();
-      }
-      const { data, error } = response;
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['schedules'] });
-      toast({ title: 'Success', description: `Schedule ${editingSchedule ? 'updated' : 'created'} successfully.` });
-      setIsDialogOpen(false);
-      setEditingSchedule(null);
-    },
-    onError: (error: any) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     },
   });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('schedules').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['schedules'] });
-      toast({ title: 'Success', description: 'Schedule deleted successfully.' });
-    },
-    onError: (error: any) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const data = Object.fromEntries(formData.entries());
-    const scheduleData = {
-      ...data,
-      day_of_week: Number(data.day_of_week),
-      id: editingSchedule?.id,
-    };
-    scheduleMutation.mutate(scheduleData);
-  };
   
-  const handleEditClick = (schedule: any) => {
-    setEditingSchedule(schedule);
-    setIsDialogOpen(true);
-  };
-
-  const groupedSchedules = useMemo(() => {
-    return schedules.reduce((acc, schedule) => {
-      const dayName = DAYS_OF_WEEK.find(d => d.id === schedule.day_of_week)?.name || 'Unknown Day';
-      if (!acc[dayName]) {
-        acc[dayName] = [];
-      }
-      acc[dayName].push(schedule);
-      return acc;
-    }, {} as Record<string, any[]>);
+  const timeSlots = useMemo(() => {
+    const slots = new Set<string>();
+    schedules?.forEach(s => {
+        slots.add(s.start_time);
+    });
+    return Array.from(slots).sort();
   }, [schedules]);
 
   const formatTime = (time: string) => {
@@ -121,103 +63,51 @@ export const ScheduleManagement = () => {
     return format(date, 'h:mm a');
   };
 
-  return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Manage Schedules</h1>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => setEditingSchedule(null)}>
-              <CalendarPlus className="mr-2 h-4 w-4" /> Create Schedule
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingSchedule ? 'Edit' : 'Create'} Schedule</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label>Batch</label>
-                <Select name="batch" defaultValue={editingSchedule?.batch}>
-                  <SelectTrigger><SelectValue placeholder="Select a batch" /></SelectTrigger>
-                  <SelectContent>
-                    {batchOptions.map((batch: string) => <SelectItem key={batch} value={batch}>{batch}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label>Subject</label>
-                <Select name="subject" defaultValue={editingSchedule?.subject}>
-                  <SelectTrigger><SelectValue placeholder="Select a subject" /></SelectTrigger>
-                  <SelectContent>
-                    {subjectOptions.map((subject: string) => <SelectItem key={subject} value={subject}>{subject}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label>Day of the Week</label>
-                <Select name="day_of_week" defaultValue={String(editingSchedule?.day_of_week)}>
-                  <SelectTrigger><SelectValue placeholder="Select a day" /></SelectTrigger>
-                  <SelectContent>
-                    {DAYS_OF_WEEK.map(day => <SelectItem key={day.id} value={String(day.id)}>{day.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label>Start Time</label>
-                  <Input name="start_time" type="time" defaultValue={editingSchedule?.start_time} />
-                </div>
-                <div>
-                  <label>End Time</label>
-                  <Input name="end_time" type="time" defaultValue={editingSchedule?.end_time} />
-                </div>
-              </div>
-              <div>
-                <label>Meeting Link</label>
-                <Input name="link" placeholder="https://zoom.us/j/..." defaultValue={editingSchedule?.link} />
-              </div>
-              <Button type="submit" disabled={scheduleMutation.isPending}>
-                {editingSchedule ? 'Update' : 'Create'} Schedule
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+  const today = getDay(currentTime);
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {isLoadingSchedules ? (
-          <p>Loading schedules...</p>
-        ) : (
-          Object.entries(groupedSchedules).map(([day, daySchedules]) => (
-            <Card key={day}>
-              <CardHeader>
-                <CardTitle>{day}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {daySchedules.map(schedule => (
-                  <div key={schedule.id} className="p-3 rounded-md border bg-muted/20">
-                    <div className="font-bold">{schedule.subject}</div>
-                    <div className="text-sm text-muted-foreground">{schedule.batch}</div>
-                    <div className="flex items-center text-sm mt-2">
-                        <Clock className="h-4 w-4 mr-2" />
-                        {formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}
-                    </div>
-                    <div className="flex justify-end gap-2 mt-2">
-                      <Button variant="outline" size="icon" onClick={() => handleEditClick(schedule)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="destructive" size="icon" onClick={() => deleteMutation.mutate(schedule.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          ))
-        )}
+  return (
+    <div className="p-6 bg-gray-50 min-h-screen">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-900">Full Class Schedule</h2>
+          <p className="text-gray-600 mt-1">A complete overview of all scheduled classes.</p>
+        </div>
       </div>
+        
+      {isLoadingSchedules ? <ScheduleSkeleton /> : (
+      <div className="bg-white p-4 rounded-2xl shadow-lg">
+          <div className="grid grid-cols-8">
+              <div className="text-center font-semibold text-gray-500 py-2">Time</div>
+              {DAYS.map((day, index) => (
+                  <div key={day} className={`text-center font-semibold py-2 ${index === today ? 'text-primary' : 'text-gray-500'}`}>
+                      {day}
+                  </div>
+              ))}
+          </div>
+          <div className="relative">
+              {timeSlots.map(time => (
+                  <div key={time} className="grid grid-cols-8 border-t">
+                      <div className="text-center text-sm font-medium text-gray-700 py-4 px-2 border-r">{formatTime(time)}</div>
+                      {DAYS.map((day, dayIndex) => {
+                          const classInfo = schedules?.filter(s => s.day_of_week === dayIndex && s.start_time === time);
+                          return (
+                              <div key={`${day}-${time}`} className={`p-2 border-r last:border-r-0 ${dayIndex === today ? 'bg-blue-50' : ''}`}>
+                                  {classInfo && classInfo.length > 0 && classInfo.map(info => (
+                                      <Card key={info.id} className="bg-white shadow-md hover:shadow-lg transition-shadow mb-2">
+                                          <CardContent className="p-3">
+                                              <p className="font-bold text-gray-800 text-sm">{info.subject}</p>
+                                              <Badge variant="secondary" className="mt-1">{info.batch}</Badge>
+                                          </CardContent>
+                                      </Card>
+                                  ))}
+                              </div>
+                          );
+                      })}
+                  </div>
+              ))}
+          </div>
+      </div>
+      )}
     </div>
   );
 };
