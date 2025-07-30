@@ -1,6 +1,6 @@
 // uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/student/StudentNotes.tsx
 import { useState, useMemo } from 'react';
-import { useQuery } => '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query'; // Corrected import
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -30,17 +30,17 @@ interface UserEnrollment {
 const NotesSkeleton = () => (
   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
     {[...Array(3)].map((_, i) => (
-      <Card key={i} className="p-4 space-y-3">
-        <div className="flex items-center gap-3">
-          <Skeleton className="h-8 w-8 rounded-full" />
-          <div className="w-full space-y-2">
-            <Skeleton className="h-4 w-3/4" />
+      <Card key={i} className="p-4">
+        <div className="flex justify-between items-center">
+          <div className="space-y-3 flex-grow">
+            <Skeleton className="h-5 w-3/4" />
             <Skeleton className="h-3 w-1/2" />
+            <div className="flex gap-2">
+              <Skeleton className="h-5 w-20" />
+              <Skeleton className="h-5 w-20" />
+            </div>
           </div>
-        </div>
-        <div className="flex gap-2">
-          <Skeleton className="h-5 w-20" />
-          <Skeleton className="h-5 w-20" />
+          <Skeleton className="h-10 w-28" />
         </div>
       </Card>
     ))}
@@ -153,7 +153,7 @@ export const StudentNotes = () => {
     watermarkDiv.style.color = 'rgba(0, 0, 0, 0.1)';
     watermarkDiv.style.fontSize = '4vw';
     watermarkDiv.style.fontWeight = 'bold';
-    waterarkDiv.style.pointerEvents = 'none';
+    watermarkDiv.style.pointerEvents = 'none';
     watermarkDiv.style.textAlign = 'center';
     watermarkDiv.style.zIndex = '9999';
     watermarkDiv.textContent = watermarkText;
