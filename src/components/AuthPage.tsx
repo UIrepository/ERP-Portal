@@ -6,19 +6,13 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Sun, Moon } from 'lucide-react';
-import { useTheme } from 'next-themes';
+import { Loader2 } from 'lucide-react';
 
 export const AuthPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [signupForm, setSignupForm] = useState({ email: '', password: '', name: '' });
   const { signIn, signUp } = useAuth();
-  const { theme, setTheme } = useTheme();
-
-  const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,19 +60,11 @@ export const AuthPage = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="absolute top-4 right-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleTheme}
-        >
-          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        </Button>
-      </div>
-      
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold text-primary">Unknown IITians</CardTitle>
+          <CardTitle className="flex justify-center">
+            <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-16 w-auto" />
+          </CardTitle>
           <CardDescription>ERP Portal Login</CardDescription>
         </CardHeader>
         <CardContent>
