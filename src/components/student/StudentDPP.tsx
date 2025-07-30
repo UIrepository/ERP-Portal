@@ -23,7 +23,6 @@ interface DPPContent {
   created_at: string;
 }
 
-// Define the structure for an enrollment record from the new table
 interface UserEnrollment {
     batch_name: string;
     subject_name: string;
@@ -55,7 +54,6 @@ export const StudentDPP = () => {
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
   const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
   
-  // 1. Fetch user's specific enrollments from the new table
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['userEnrollments', profile?.user_id],
     queryFn: async () => {
@@ -89,22 +87,26 @@ export const StudentDPP = () => {
 
   const displayedSubjects = useMemo(() => {
     if (!userEnrollments) return [];
-    if (selectedBatchFilter === 'all') {
-      return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
-    } else {
+    // If a specific batch is selected, only show subjects associated with that batch
+    if (selectedBatchFilter !== 'all') {
       return Array.from(new Set(
         userEnrollments
           .filter(e => e.batch_name === selectedBatchFilter)
           .map(e => e.subject_name)
       )).sort();
     }
+    // Otherwise (if 'All Batches' is selected), show all subjects available across all enrollments
+    return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
   }, [userEnrollments, selectedBatchFilter]);
 
   // Ensure selected filters are still valid when options change
-  // This will reset filters if the previously selected option is no longer available
+  // If the previously selected batch is no longer available, reset batch filter
   if (selectedBatchFilter !== 'all' && !displayedBatches.includes(selectedBatchFilter)) {
       setSelectedBatchFilter('all');
   }
+  // If a specific batch is selected, and the subject filter is not 'all'
+  // AND the currently selected subject is not in the newly filtered displayedSubjects, reset it.
+  // This handles the cascading reset for subjects when batch changes.
   if (selectedSubjectFilter !== 'all' && !displayedSubjects.includes(selectedSubjectFilter)) {
       setSelectedSubjectFilter('all');
   }
@@ -118,7 +120,6 @@ export const StudentDPP = () => {
 
         let query = supabase.from('dpp_content').select('*');
 
-        // Dynamically build OR conditions for each specific enrolled combination
         const combinationFilters = userEnrollments
             .filter(enrollment =>
                 (selectedBatchFilter === 'all' || enrollment.batch_name === selectedBatchFilter) &&
@@ -202,7 +203,11 @@ export const StudentDPP = () => {
           </SelectContent>
         </Select>
         {/* Existing Select for Subject filter */}
-        <Select value={selectedSubjectFilter} onValueChange={setSelectedSubjectFilter}>
+        <Select
+          value={selectedSubjectFilter}
+          onValueChange={setSelectedSubjectFilter}
+          disabled={selectedBatchFilter === 'all'} // Subject filter disabled if 'All Batches' is selected
+        >
           <SelectTrigger className="w-48 h-10">
             <SelectValue placeholder="Filter by subject" />
           </SelectTrigger>
