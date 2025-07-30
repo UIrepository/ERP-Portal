@@ -7,14 +7,29 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
-import { MessageSquare, Send, CheckCircle, Star } from 'lucide-react';
+import { MessageSquare, Send, CheckCircle, Star, Sparkles } from 'lucide-react'; // Added Sparkles
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton'; // Added Skeleton
 
 // Define the structure for an enrollment record from the new table
 interface UserEnrollment {
     batch_name: string;
     subject_name: string;
 }
+
+const FeedbackTaskSkeleton = () => (
+    <div className="space-y-4">
+        {[...Array(3)].map((_, i) => (
+            <div key={i} className="p-4 border rounded-lg flex items-center justify-between bg-white">
+                <div>
+                    <Skeleton className="h-5 w-32 mb-1" />
+                    <Skeleton className="h-4 w-24" />
+                </div>
+                <Skeleton className="h-9 w-28" />
+            </div>
+        ))}
+    </div>
+);
 
 const StarRating = ({ rating, setRating }: { rating: number, setRating: (rating: number) => void }) => (
   <div className="flex gap-1">
@@ -41,7 +56,7 @@ export const StudentFeedback = () => {
   });
   const [comments, setComments] = useState('');
 
-  // 1. Fetch user's specific enrollments from the new table
+  // Fetch user's specific enrollments from the new table
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['userEnrollments', profile?.user_id],
     queryFn: async () => {
@@ -61,15 +76,26 @@ export const StudentFeedback = () => {
 
   // Fetch already submitted feedback to mark tasks as completed
   const { data: submittedFeedback = [], isLoading: isLoadingSubmittedFeedback } = useQuery({
-    queryKey: ['student-submitted-feedback', profile?.user_id],
+    queryKey: ['student-submitted-feedback', profile?.user_id, userEnrollments], // Add userEnrollments to dependency
     queryFn: async () => {
-      const { data } = await supabase
+      if (!profile?.user_id || !userEnrollments || userEnrollments.length === 0) return [];
+      
+      // Fetch feedback only for combinations the user is enrolled in
+      const combinations = userEnrollments.map(e => `(batch.eq.${e.batch_name},subject.eq.${e.subject_name})`).join(',');
+
+      const { data, error } = await supabase
         .from('feedback')
         .select('batch, subject')
-        .eq('submitted_by', profile?.user_id);
+        .eq('submitted_by', profile?.user_id)
+        .or(combinations); // Filter by user's specific enrolled combinations
+
+      if (error) {
+        console.error("Error fetching submitted feedback:", error);
+        return [];
+      }
       return data || [];
     },
-    enabled: !!profile?.user_id,
+    enabled: !!profile?.user_id && !!userEnrollments && userEnrollments.length > 0, // Enable when user and enrollments are loaded
   });
 
   // Generate feedback tasks based on userEnrollments
@@ -86,7 +112,7 @@ export const StudentFeedback = () => {
             submitted: submittedSet.has(`${enrollment.batch_name}-${enrollment.subject_name}`),
         });
     });
-    return tasks;
+    return tasks.sort((a,b) => a.subject.localeCompare(b.subject) || a.batch.localeCompare(b.batch));
   }, [userEnrollments, submittedFeedback]);
 
   const submitFeedbackMutation = useMutation({
@@ -100,7 +126,7 @@ export const StudentFeedback = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-submitted-feedback'] });
-      toast({ title: 'Success', description: 'Thank you for your valuable feedback!' });
+      toast({ title: 'Success', description: 'Thank you for your valuable feedback!', variant: "success" }); // Added success variant
       setIsDialogOpen(false);
       resetForm();
     },
@@ -141,68 +167,98 @@ export const StudentFeedback = () => {
 
   const isLoading = isLoadingEnrollments || isLoadingSubmittedFeedback;
 
-  if (isLoading) {
-    return (
-        <div className="flex items-center justify-center h-64 bg-gray-50/50">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-        </div>
-    );
-  }
-
   return (
-    <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 flex items-center">
-            <MessageSquare className="mr-3 h-8 w-8 text-primary" />
-            Submit Feedback
-          </h1>
-          <p className="text-gray-500 mt-1">Your feedback helps us improve. Please submit for each of your courses.</p>
-        </div>
-      </div>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>Your Feedback Tasks</CardTitle>
-          <CardDescription>Submit feedback for each of your enrolled batch and subject combinations.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {feedbackTasks.length > 0 ? (
-            feedbackTasks.map((task, index) => (
-              <div key={index} className={`p-4 border rounded-lg flex items-center justify-between ${task.submitted ? 'bg-green-50 border-green-200' : 'bg-white'}`}>
-                <div>
-                  <p className="font-semibold">{task.subject}</p>
-                  <p className="text-sm text-muted-foreground">Batch: {task.batch}</p>
+    <div className="p-6 bg-gradient-to-br from-purple-50 to-indigo-50 min-h-full flex flex-col justify-center items-center">
+      <div className="max-w-4xl mx-auto w-full text-center">
+        
+        {/* Header Section - Premium Design */}
+        <div className="relative p-8 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white mb-10 animate-fade-in-up">
+            {/* Animated background circles */}
+            <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/10 rounded-full animate-pulse-slow"></div>
+            <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-white/10 rounded-full animate-pulse-slow animation-delay-500"></div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white/10 rounded-full animate-pulse-slow animation-delay-1000"></div>
+
+            <div className="relative z-10">
+                <div className="flex items-center justify-center mb-4">
+                    <MessageSquare className="h-16 w-16 text-purple-100 drop-shadow-md" />
                 </div>
-                {task.submitted ? (
-                  <div className="flex items-center gap-2 text-green-600">
-                    <CheckCircle className="h-5 w-5" />
-                    <span>Completed</span>
-                  </div>
-                ) : (
-                  <Button onClick={() => handleOpenDialog(task)}>Give Feedback</Button>
-                )}
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <MessageSquare className="h-12 w-12 mx-auto mb-4" />
-              <p>No feedback tasks found for your enrollments.</p>
-              <p className="text-sm mt-2">Ensure you are enrolled in batches and subjects via Admin.</p>
+                <h1 className="text-4xl md:text-5xl font-bold mb-2 tracking-tight drop-shadow-lg">
+                    Your Voice Matters
+                </h1>
+                <p className="text-xl md:text-2xl text-purple-100 drop-shadow-sm font-semibold">
+                    Help us improve by sharing your valuable feedback.
+                </p>
+                <Badge variant="secondary" className="mt-5 bg-purple-100 text-purple-800 border-purple-200 text-base px-5 py-2 font-semibold shadow-md">
+                    Anonymous & Impactful
+                </Badge>
             </div>
-          )}
-        </CardContent>
-      </Card>
+        </div>
+
+        {/* Feedback Tasks List */}
+        <Card className="bg-white rounded-2xl shadow-xl animate-fade-in-up animation-delay-200">
+          <CardHeader className="text-center p-6 border-b">
+            <CardTitle className="text-2xl font-bold text-gray-800">Your Feedback Tasks</CardTitle>
+            <CardDescription className="text-base text-gray-600">
+              Submit feedback for each of your enrolled courses.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-6 space-y-4">
+            {isLoading ? (
+                <FeedbackTaskSkeleton />
+            ) : feedbackTasks.length > 0 ? (
+                feedbackTasks.map((task, index) => (
+                <div 
+                    key={index} 
+                    className={`p-4 border rounded-lg flex items-center justify-between transition-all duration-300 ${
+                        task.submitted 
+                        ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 shadow-sm' 
+                        : 'bg-white hover:bg-gray-50 hover:shadow-md'
+                    }`}
+                >
+                    <div>
+                        <p className="font-semibold text-gray-800">{task.subject}</p>
+                        <p className="text-sm text-muted-foreground">Batch: {task.batch}</p>
+                    </div>
+                    {task.submitted ? (
+                    <div className="flex items-center gap-2 text-green-600 font-medium">
+                        <CheckCircle className="h-5 w-5 fill-green-500 text-white" /> {/* Filled icon */}
+                        <span>Feedback Submitted</span>
+                    </div>
+                    ) : (
+                    <Button 
+                        onClick={() => handleOpenDialog(task)} 
+                        className="bg-primary hover:bg-primary/90 transition-all transform hover:scale-105 active:scale-95"
+                    >
+                        <Send className="mr-2 h-4 w-4" /> Give Feedback
+                    </Button>
+                    )}
+                </div>
+                ))
+            ) : (
+                <div className="text-center py-8 text-gray-500">
+                    <MessageSquare className="h-16 w-16 mx-auto mb-4 text-gray-300" /> {/* Larger icon */}
+                    <p className="text-xl font-semibold mb-2">No Feedback Tasks Found</p>
+                    <p className="text-muted-foreground mt-2 max-w-sm mx-auto">
+                        It looks like you are not enrolled in any batches or subjects yet. Please contact your administrator for enrollment.
+                    </p>
+                </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
       
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
-            <DialogTitle>Feedback for {selectedFeedbackTask?.subject} ({selectedFeedbackTask?.batch})</DialogTitle>
+            <DialogTitle className="text-2xl font-bold">Feedback for {selectedFeedbackTask?.subject} ({selectedFeedbackTask?.batch})</DialogTitle>
+            <CardDescription>Your insights are highly valued and will help us improve.</CardDescription>
           </DialogHeader>
           <div className="space-y-6 py-4">
             {questions.map(({ key, text }) => (
               <div key={key}>
-                <label className="font-medium">{text}</label>
+                <label className="font-medium flex items-center gap-2 mb-2">
+                    <Sparkles className="h-4 w-4 text-yellow-500" /> {text}
+                </label>
                 <div className="mt-2">
                   <StarRating 
                     rating={ratings[key as keyof typeof ratings]} 
@@ -212,19 +268,23 @@ export const StudentFeedback = () => {
               </div>
             ))}
             <div>
-              <label className="font-medium">Additional Comments (Mandatory)</label>
+              <label className="font-medium flex items-center gap-2 mb-2">
+                <MessageSquare className="h-4 w-4 text-primary" /> Additional Comments (Mandatory)
+              </label>
               <Textarea 
-                className="mt-2"
+                className="mt-2 bg-gray-50 border-gray-200 focus-visible:ring-primary/50" // Improved styling
                 rows={4}
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
-                placeholder="Share more details..."
+                placeholder="Share more details about your experience, suggestions, or concerns..."
               />
             </div>
           </div>
-          <DialogFooter>
-            <DialogClose asChild><Button variant="ghost" onClick={resetForm}>Cancel</Button></DialogClose>
-            <Button onClick={handleSubmit}><Send className="mr-2 h-4 w-4"/>Submit Feedback</Button>
+          <DialogFooter className="flex-col sm:flex-row">
+            <DialogClose asChild>
+                <Button variant="outline" onClick={resetForm} className="w-full sm:w-auto">Cancel</Button>
+            </DialogClose>
+            <Button onClick={handleSubmit} className="w-full sm:w-auto bg-primary hover:bg-primary/90"><Send className="mr-2 h-4 w-4"/>Submit Feedback</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
