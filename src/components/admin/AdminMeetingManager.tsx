@@ -43,7 +43,7 @@ export const AdminMeetingManager = () => {
   // Set up real-time subscription to the schedules table
   useEffect(() => {
     const channel = supabase
-      .channel('realtime-meeting-links-all')
+      .channel('realtime-meeting-links-final')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'schedules' },
@@ -67,10 +67,14 @@ export const AdminMeetingManager = () => {
       const { data, error } = await supabase
         .from('schedules')
         .select('id, subject, batch, link')
-        .not('link', 'is', null)
+        .not('link', 'is', null) // Only get rows where a link exists
         .order('batch, subject');
       
-      if (error) throw error;
+      if (error) {
+        // This will show the actual database error in the console
+        console.error("Error fetching meeting links:", error);
+        throw error;
+      };
       return data || [];
     },
   });
@@ -91,7 +95,7 @@ export const AdminMeetingManager = () => {
             <LinkIcon className="mr-3 h-8 w-8 text-primary" />
             All Meeting Links
           </h1>
-          <p className="text-gray-500 mt-1">A complete, real-time list of all class meeting links.</p>
+          <p className="text-gray-500 mt-1">A complete, real-time list of all class meeting links from the schedules table.</p>
       </div>
 
       {/* Links List */}
@@ -140,8 +144,8 @@ export const AdminMeetingManager = () => {
             <div className="text-center py-20 bg-white rounded-lg border-dashed border-2">
                 <Search className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-700">No Meeting Links Found</h3>
-                <p className="text-muted-foreground mt-2">
-                  There are no meeting links currently set in the schedules table.
+                <p className="text-muted-foreground mt-2 max-w-md mx-auto">
+                  Either no links exist in the 'schedules' table, or the admin role lacks permission to view them. Please see the next step to fix permissions.
                 </p>
             </div>
         )}
