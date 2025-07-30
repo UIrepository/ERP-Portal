@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Video, Play, Search } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { format }s from 'date-fns';
+import { format } from 'date-fns'; // Corrected import: removed 's'
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface RecordingContent {
@@ -112,13 +112,12 @@ export const StudentRecordings = () => {
 
         let query = supabase.from('recordings').select('*');
 
-        // Changed to use and() within the combination filters to fix PGRST100 error
         const combinationFilters = userEnrollments
             .filter(enrollment =>
                 (selectedBatchFilter === 'all' || enrollment.batch_name === selectedBatchFilter) &&
                 (selectedSubjectFilter === 'all' || enrollment.subject_name === selectedSubjectFilter)
             )
-            .map(enrollment => `and(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`); // FIX APPLIED HERE
+            .map(enrollment => `and(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
 
         if (combinationFilters.length > 0) {
             query = query.or(combinationFilters.join(','));
