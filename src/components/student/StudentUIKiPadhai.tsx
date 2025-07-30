@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -68,32 +68,19 @@ export const StudentUIKiPadhai = () => {
 
   const displayedBatches = useMemo(() => {
     if (!userEnrollments) return [];
-    if (selectedSubjectFilter === 'all') {
-      return Array.from(new Set(userEnrollments.map(e => e.batch_name))).sort();
-    } else {
-      return Array.from(new Set(userEnrollments.filter(e => e.subject_name === selectedSubjectFilter).map(e => e.batch_name))).sort();
-    }
-  }, [userEnrollments, selectedSubjectFilter]);
+    return Array.from(new Set(userEnrollments.map(e => e.batch_name))).sort();
+  }, [userEnrollments]);
 
   const displayedSubjects = useMemo(() => {
-    if (!userEnrollments) return [];
-    if (selectedBatchFilter !== 'all') {
-      return Array.from(new Set(userEnrollments.filter(e => e.batch_name === selectedBatchFilter).map(e => e.subject_name))).sort();
-    }
-    return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
+    if (!userEnrollments || selectedBatchFilter === 'all') return [];
+    return Array.from(new Set(userEnrollments.filter(e => e.batch_name === selectedBatchFilter).map(e => e.subject_name))).sort();
   }, [userEnrollments, selectedBatchFilter]);
 
   useEffect(() => {
-    if (selectedBatchFilter !== 'all' && !displayedBatches.includes(selectedBatchFilter)) {
-        setSelectedBatchFilter('all');
-    }
-  }, [selectedBatchFilter, displayedBatches]);
-
-  useEffect(() => {
-    if (selectedSubjectFilter !== 'all' && !displayedSubjects.includes(selectedSubjectFilter)) {
+    if (selectedBatchFilter === 'all') {
         setSelectedSubjectFilter('all');
     }
-  }, [selectedSubjectFilter, displayedSubjects]);
+  }, [selectedBatchFilter]);
 
   const { data: premiumContent, isLoading: isLoadingPremiumContent } = useQuery<UIKiPadhaiContent[]>({
     queryKey: ['student-ui-ki-padhai', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
@@ -165,16 +152,16 @@ export const StudentUIKiPadhai = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <div className="relative flex-1 col-span-full md:col-span-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search content..."
-              className="w-full pl-12 h-12 text-lg bg-white shadow-lg rounded-full"
+              className="pl-10 h-10"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
-            <SelectTrigger className="w-full h-12 text-lg bg-white shadow-lg rounded-full">
+            <SelectTrigger className="w-full h-10">
               <SelectValue placeholder="Filter by batch" />
             </SelectTrigger>
             <SelectContent>
@@ -187,13 +174,14 @@ export const StudentUIKiPadhai = () => {
           <Select
             value={selectedSubjectFilter}
             onValueChange={setSelectedSubjectFilter}
+            disabled={selectedBatchFilter === 'all'}
           >
-            <SelectTrigger className="w-full h-12 text-lg bg-white shadow-lg rounded-full">
+            <SelectTrigger className="w-full h-10">
               <SelectValue placeholder="Filter by subject" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Subjects</SelectItem>
-              {displayedSubjects.map((subject) => (
+              {displayedSubjects?.map((subject) => (
                 <SelectItem key={subject} value={subject}>{subject}</SelectItem>
               ))}
             </SelectContent>
