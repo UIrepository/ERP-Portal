@@ -18,8 +18,6 @@ interface Schedule {
   link: string;
 }
 
-const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
 const MeetingCard = ({ schedule }: { schedule: Schedule }) => (
     <Card className="bg-white hover:shadow-md transition-shadow">
         <CardContent className="p-4 flex items-center justify-between">
