@@ -9,10 +9,13 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface MeetingLink {
-  id: string;
+  // Using 'link' as the key assuming your 'links' table uses it as a unique identifier.
+  // If your 'links' table DOES have a UUID 'id' column, revert this to 'id: string;'
+  // and ensure the select query below also includes 'id'.
+  link: string;
   subject: string;
   batch: string;
-  link: string;
+  is_active: boolean; // Add is_active if it exists in your 'links' table
 }
 
 const LinksSkeleton = () => (
@@ -40,13 +43,13 @@ export const AdminMeetingManager = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Set up real-time subscription to the meeting_links table
+  // Set up real-time subscription to the 'links' table
   useEffect(() => {
     const channel = supabase
       .channel('realtime-meeting-links-from-correct-table')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'meeting_links' },
+        { event: '*', schema: 'public', table: 'links' }, // Changed table name to 'links'
         (payload) => {
           queryClient.invalidateQueries({ queryKey: ['admin-meeting-links-from-table'] });
         }
@@ -58,20 +61,26 @@ export const AdminMeetingManager = () => {
     };
   }, [queryClient]);
 
-  // Fetch all links from the meeting_links table
+  // Fetch all links from the 'links' table
   const { data: meetingLinks = [], isLoading } = useQuery<MeetingLink[]>({
     queryKey: ['admin-meeting-links-from-table'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('meeting_links')
-        .select('id, subject, batch, link')
+        .from('links') // Changed table name to 'links'
+        // Select 'link' as the primary identifier if 'id' is not present in your 'links' table.
+        // If your 'links' table DOES have a UUID 'id' column, change this to .select('id, subject, batch, link')
+        .select('link, subject, batch')
         .order('batch, subject');
       
       if (error) {
-        console.error("Error fetching from meeting_links table:", error);
+        console.error("Error fetching from links table:", error);
         throw error;
       };
-      return data || [];
+      // Map data to ensure 'link' is used as the primary key for the component
+      return (data || []).map(item => ({
+        ...item,
+        link: item.link // Ensure 'link' property is present and used as the unique key
+      })) as MeetingLink[];
     },
   });
 
@@ -91,7 +100,7 @@ export const AdminMeetingManager = () => {
             <LinkIcon className="mr-3 h-8 w-8 text-primary" />
             All Meeting Links
           </h1>
-          <p className="text-gray-500 mt-1">A real-time list of all links from the meeting_links table.</p>
+          <p className="text-gray-500 mt-1">A real-time list of all links from the links table.</p>
       </div>
 
       {/* Links List */}
@@ -100,7 +109,7 @@ export const AdminMeetingManager = () => {
             <LinksSkeleton />
         ) : meetingLinks.length > 0 ? (
           meetingLinks.map((meeting) => (
-            <Card key={meeting.id} className="bg-white">
+            <Card key={meeting.link} className="bg-white"> {/* Using meeting.link as key */}
               <CardContent className="p-5 flex flex-col md:flex-row md:items-center md:justify-between">
                 <div className="flex-grow mb-4 md:mb-0">
                   <div className="flex items-center gap-3">
@@ -141,7 +150,7 @@ export const AdminMeetingManager = () => {
                 <Search className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-700">No Meeting Links Found</h3>
                 <p className="text-muted-foreground mt-2 max-w-md mx-auto">
-                  Either no links exist in the 'meeting_links' table, or the admin role lacks permission to view them. Please check the security policy.
+                  Either no links exist in the 'links' table, or the admin role lacks permission to view them. Please check the security policy.
                 </p>
             </div>
         )}
