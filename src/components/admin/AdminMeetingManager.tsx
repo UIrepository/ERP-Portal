@@ -9,13 +9,11 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface MeetingLink {
-  // Using 'link' as the key assuming your 'links' table uses it as a unique identifier.
-  // If your 'links' table DOES have a UUID 'id' column, revert this to 'id: string;'
-  // and ensure the select query below also includes 'id'.
+  // Using 'link' as the unique identifier for rendering and fetching.
+  // This matches your confirmed table structure.
   link: string;
   subject: string;
   batch: string;
-  is_active: boolean; // Add is_active if it exists in your 'links' table
 }
 
 const LinksSkeleton = () => (
@@ -43,14 +41,15 @@ export const AdminMeetingManager = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Set up real-time subscription to the 'links' table
+  // Set up real-time subscription to the 'meeting_links' table
   useEffect(() => {
     const channel = supabase
-      .channel('realtime-meeting-links-from-correct-table')
+      .channel('realtime-meeting-links-admin')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'links' }, // Changed table name to 'links'
+        { event: '*', schema: 'public', table: 'meeting_links' }, // Subscribing to 'meeting_links'
         (payload) => {
+          console.log(`Real-time update from meeting_links: ${payload.eventType}`);
           queryClient.invalidateQueries({ queryKey: ['admin-meeting-links-from-table'] });
         }
       )
@@ -61,26 +60,22 @@ export const AdminMeetingManager = () => {
     };
   }, [queryClient]);
 
-  // Fetch all links from the 'links' table
+  // Fetch all links from the 'meeting_links' table
   const { data: meetingLinks = [], isLoading } = useQuery<MeetingLink[]>({
     queryKey: ['admin-meeting-links-from-table'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('links') // Changed table name to 'links'
-        // Select 'link' as the primary identifier if 'id' is not present in your 'links' table.
-        // If your 'links' table DOES have a UUID 'id' column, change this to .select('id, subject, batch, link')
-        .select('link, subject, batch')
+        .from('meeting_links') // Querying 'meeting_links' table
+        // Select ONLY the columns you confirmed are present
+        .select('link, subject, batch') 
         .order('batch, subject');
       
       if (error) {
-        console.error("Error fetching from links table:", error);
+        console.error("Error fetching from meeting_links table:", error);
         throw error;
       };
-      // Map data to ensure 'link' is used as the primary key for the component
-      return (data || []).map(item => ({
-        ...item,
-        link: item.link // Ensure 'link' property is present and used as the unique key
-      })) as MeetingLink[];
+      // Map data to ensure 'link' is used as the primary key for the component's interface
+      return (data || []) as MeetingLink[];
     },
   });
 
@@ -98,9 +93,9 @@ export const AdminMeetingManager = () => {
       <div>
           <h1 className="text-3xl font-bold text-gray-800 flex items-center">
             <LinkIcon className="mr-3 h-8 w-8 text-primary" />
-            All Meeting Links
+            All Meeting Links (meeting_links table) {/* Indicate which table is being used */}
           </h1>
-          <p className="text-gray-500 mt-1">A real-time list of all links from the links table.</p>
+          <p className="text-gray-500 mt-1">A real-time list of all links.</p>
       </div>
 
       {/* Links List */}
@@ -109,7 +104,7 @@ export const AdminMeetingManager = () => {
             <LinksSkeleton />
         ) : meetingLinks.length > 0 ? (
           meetingLinks.map((meeting) => (
-            <Card key={meeting.link} className="bg-white"> {/* Using meeting.link as key */}
+            <Card key={meeting.link} className="bg-white hover:shadow-lg transition-shadow duration-300"> {/* Using meeting.link as key */}
               <CardContent className="p-5 flex flex-col md:flex-row md:items-center md:justify-between">
                 <div className="flex-grow mb-4 md:mb-0">
                   <div className="flex items-center gap-3">
@@ -150,7 +145,7 @@ export const AdminMeetingManager = () => {
                 <Search className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-700">No Meeting Links Found</h3>
                 <p className="text-muted-foreground mt-2 max-w-md mx-auto">
-                  Either no links exist in the 'links' table, or the admin role lacks permission to view them. Please check the security policy.
+                  No links available in the 'meeting_links' table, or the admin role lacks permission to view them. Please check the security policy.
                 </p>
             </div>
         )}
