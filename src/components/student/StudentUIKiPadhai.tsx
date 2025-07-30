@@ -194,35 +194,41 @@ export const StudentUIKiPadhai = () => {
   const isLoading = isLoadingEnrollments || isLoadingPremiumContent;
 
   return (
-    <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
-      {/* Header Section */}
-      <div className="flex items-center justify-between">
-          <div>
-              <h1 className="text-3xl font-bold text-gray-800 flex items-center">
-                  <Crown className="mr-3 h-8 w-8 text-primary" />
-                  UI Ki Padhai
-              </h1>
-              <p className="text-gray-500 mt-1">Exclusive Premium Content & Advanced Courses.</p>
-          </div>
-          <div className="flex gap-2">
-              {displayedBatches.map(b => <Badge key={b} variant="outline">{b}</Badge>)}
-          </div>
-      </div>
+    <div className="p-6 bg-gradient-to-br from-yellow-50 to-orange-50 min-h-full flex flex-col items-center">
+      <div className="max-w-4xl mx-auto w-full">
+        
+        {/* Header Section - Premium Design */}
+        <div className="relative p-8 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-r from-yellow-500 to-orange-500 text-white mb-10 text-center animate-fade-in-up">
+            <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/10 rounded-full animate-pulse-slow"></div>
+            <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-white/10 rounded-full animate-pulse-slow animation-delay-500"></div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white/10 rounded-full animate-pulse-slow animation-delay-1000"></div>
 
+            <div className="relative z-10">
+                <div className="flex items-center justify-center mb-4">
+                    <Crown className="h-16 w-16 text-yellow-100 drop-shadow-md" />
+                </div>
+                <h1 className="text-4xl md:text-5xl font-bold mb-2 tracking-tight drop-shadow-lg">
+                    UI Ki Padhai
+                </h1>
+                <p className="text-xl md:text-2xl text-yellow-100 drop-shadow-sm font-semibold">
+                    Exclusive Premium Content & Advanced Courses
+                </p>
+            </div>
+        </div>
 
-      {/* Filters and Search Section */}
-      <div className="flex gap-4">
-          <div className="relative flex-1">
+        {/* Filters and Search Section */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="relative flex-1 col-span-full md:col-span-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search premium content..."
-              className="pl-10 h-10"
+              className="pl-10 h-10 bg-white shadow-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
-            <SelectTrigger className="w-48 h-10">
+            <SelectTrigger className="w-full h-10 bg-white shadow-sm">
               <SelectValue placeholder="Filter by batch" />
             </SelectTrigger>
             <SelectContent>
@@ -236,7 +242,7 @@ export const StudentUIKiPadhai = () => {
             value={selectedSubjectFilter}
             onValueChange={setSelectedSubjectFilter}
           >
-            <SelectTrigger className="w-48 h-10">
+            <SelectTrigger className="w-full h-10 bg-white shadow-sm">
               <SelectValue placeholder="Filter by subject" />
             </SelectTrigger>
             <SelectContent>
@@ -246,10 +252,10 @@ export const StudentUIKiPadhai = () => {
               ))}
             </SelectContent>
           </Select>
-      </div>
+        </div>
 
-      {/* Content List */}
-      <div className="space-y-4">
+        {/* Content List */}
+        <div className="space-y-4">
           {isLoading ? (
             <PremiumContentSkeleton />
           ) : filteredContent && filteredContent.length > 0 ? (
@@ -258,15 +264,15 @@ export const StudentUIKiPadhai = () => {
                     <CardContent className="p-5 flex flex-col md:flex-row md:items-center md:justify-between">
                         <div className="flex-grow mb-4 md:mb-0">
                             <div className="flex items-center gap-3">
-                                <div className="bg-primary/10 p-2 rounded-full">
-                                    <Crown className="h-5 w-5 text-primary" />
+                                <div className="bg-yellow-100 p-2 rounded-full flex-shrink-0">
+                                    <Crown className="h-6 w-6 text-yellow-500" />
                                 </div>
                                 <div>
                                     <h3 className="font-semibold text-gray-800">{content.title}</h3>
                                     <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{content.description}</p>
                                 </div>
                             </div>
-                            <div className="flex flex-wrap gap-2 mt-3 pl-11">
+                            <div className="flex flex-wrap gap-2 mt-3 pl-12">
                                 <Badge variant="outline">{content.subject}</Badge>
                                 <Badge variant="secondary">{content.batch}</Badge>
                                 {content.category && (
@@ -277,6 +283,7 @@ export const StudentUIKiPadhai = () => {
                         <div className="flex gap-2 justify-end">
                             <Button 
                                 onClick={() => handleAccessContent(content)}
+                                className="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold"
                             >
                                 <ExternalLink className="h-4 w-4 mr-2" />
                                 Access Content
@@ -286,12 +293,13 @@ export const StudentUIKiPadhai = () => {
                 </Card>
             ))
           ) : (
-            <div className="text-center py-20 bg-white rounded-lg border-dashed border-2">
+            <div className="text-center py-20 bg-white rounded-lg border-dashed border-2 shadow-sm">
               <Crown className="h-16 w-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-gray-700">No Premium Content Yet</h3>
               <p className="text-muted-foreground mt-2">Exclusive courses and materials for your batch and subjects will appear here soon.</p>
             </div>
           )}
+        </div>
       </div>
     </div>
   );
