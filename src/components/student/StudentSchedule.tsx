@@ -103,7 +103,7 @@ export const StudentSchedule = () => {
         }
 
         query = query.in('batch', batchesToFilter);
-        query = query.order('day_of_week').order('start_time');
+        query = query.order('date', { nullsFirst: true }).order('day_of_week').order('start_time');
 
         const { data, error } = await query;
       
@@ -118,12 +118,15 @@ export const StudentSchedule = () => {
 
   const isLoading = isLoadingEnrollments || isLoadingSchedules;
 
-  const groupedSchedules = schedules?.reduce((acc, schedule) => {
-    const day = schedule.date ? format(new Date(schedule.date), 'eeee, MMMM do') : DAYS[schedule.day_of_week];
-    if (!acc[day]) acc[day] = [];
-    acc[day].push(schedule);
-    return acc;
-  }, {} as Record<string, Schedule[]>);
+  const groupedSchedules = useMemo(() => {
+    if (!schedules) return {};
+    return schedules.reduce((acc, schedule) => {
+      const day = schedule.date ? format(new Date(`${schedule.date}T00:00:00`), 'eeee, MMMM do') : DAYS[schedule.day_of_week];
+      if (!acc[day]) acc[day] = [];
+      acc[day].push(schedule);
+      return acc;
+    }, {} as Record<string, Schedule[]>);
+  }, [schedules]);
 
   const orderedDays = useMemo(() => {
       if (!groupedSchedules) return [];
@@ -133,7 +136,8 @@ export const StudentSchedule = () => {
           if (aIsDay && !bIsDay) return -1;
           if (!aIsDay && bIsDay) return 1;
           if (aIsDay && bIsDay) return DAYS.indexOf(a) - DAYS.indexOf(b);
-          return new Date(a).getTime() - new Date(b).getTime();
+          // For date-based keys, sort them chronologically
+          return new Date(a.split(', ')[1]).getTime() - new Date(b.split(', ')[1]).getTime();
       });
   }, [groupedSchedules]);
 
@@ -144,15 +148,20 @@ export const StudentSchedule = () => {
     return format(date, 'h:mm a');
   };
   
-  const isCurrentTime = (dayIndex: number, startTime: string, endTime: string) => {
+  const isCurrentTime = (schedule: Schedule) => {
     const now = new Date();
-    const currentDay = now.getDay();
+    if (schedule.date && format(new Date(schedule.date), 'yyyy-MM-dd') !== format(now, 'yyyy-MM-dd')) {
+        return false;
+    }
+    if (!schedule.date && schedule.day_of_week !== now.getDay()) {
+        return false;
+    }
     const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
-    const [startHour, startMin] = startTime.split(':').map(Number);
-    const [endHour, endMin] = endTime.split(':').map(Number);
+    const [startHour, startMin] = schedule.start_time.split(':').map(Number);
+    const [endHour, endMin] = schedule.end_time.split(':').map(Number);
     const startTimeMinutes = startHour * 60 + startMin;
     const endTimeMinutes = endHour * 60 + endMin;
-    return dayIndex === currentDay && currentTimeMinutes >= startTimeMinutes && currentTimeMinutes <= endTimeMinutes;
+    return currentTimeMinutes >= startTimeMinutes && currentTimeMinutes <= endTimeMinutes;
   };
 
   return (
@@ -198,7 +207,7 @@ export const StudentSchedule = () => {
                   {groupedSchedules[day].map((schedule) => (
                     <div 
                       key={schedule.id} 
-                      className={`p-4 border-b last:border-b-0 transition-colors ${ isCurrentTime(schedule.day_of_week, schedule.start_time, schedule.end_time) && !schedule.date ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50' }`}
+                      className={`p-4 border-b last:border-b-0 transition-colors ${ isCurrentTime(schedule) ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50' }`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -209,7 +218,7 @@ export const StudentSchedule = () => {
                                 {formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}
                               </span>
                             </div>
-                            {isCurrentTime(schedule.day_of_week, schedule.start_time, schedule.end_time) && !schedule.date && <Badge variant="default" className="bg-blue-600">Live</Badge>}
+                            {isCurrentTime(schedule) && <Badge variant="default" className="bg-blue-600">Live</Badge>}
                           </div>
                           <h4 className="text-lg font-semibold text-gray-900 mt-1">{schedule.subject}</h4>
                           <Badge variant="outline" className="mt-2">{schedule.batch}</Badge>
