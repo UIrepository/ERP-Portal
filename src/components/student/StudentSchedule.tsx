@@ -1,12 +1,15 @@
-import { useState, useEffect } from 'react';
+// uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/student/StudentSchedule.tsx
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Added for filters
 import { Calendar, Clock, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
+import { Skeleton } from '@/components/ui/skeleton'; // Added for loading state
 
 interface Schedule {
   id: string;
@@ -26,45 +29,118 @@ interface OngoingClass {
   meeting_link: string;
 }
 
+// Define the structure for an enrollment record from the new table
+interface UserEnrollment {
+    batch_name: string;
+    subject_name: string;
+}
+
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const ScheduleSkeleton = () => (
+    <div className="space-y-6">
+        {[...Array(3)].map((_, i) => (
+            <Card key={i}>
+                <CardHeader>
+                    <Skeleton className="h-6 w-1/3" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex justify-between items-center">
+                        <div className="space-y-2">
+                            <Skeleton className="h-4 w-48" />
+                            <Skeleton className="h-5 w-32" />
+                        </div>
+                        <Skeleton className="h-6 w-20" />
+                    </div>
+                </CardContent>
+            </Card>
+        ))}
+    </div>
+);
 
 export const StudentSchedule = () => {
   const { profile } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all'); // New filter state
+  const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all'); // New filter state
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
 
-  const { data: schedules } = useQuery({
-    queryKey: ['student-schedule', profile?.batch],
-    queryFn: async (): Promise<Schedule[]> => {
-      if (!profile?.batch?.length || !profile?.subjects?.length) return [];
-      const { data, error } = await supabase
-        .from('schedules')
-        .select('*')
-        .in('batch', profile.batch)
-        .in('subject', profile.subjects)
-        .order('day_of_week')
-        .order('start_time');
-      
-      if (error) throw error;
-      return data || [];
+  // 1. Fetch user's specific enrollments from the new table
+  const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
+    queryKey: ['userEnrollments', profile?.user_id],
+    queryFn: async () => {
+        if (!profile?.user_id) return [];
+        const { data, error } = await supabase
+            .from('user_enrollments')
+            .select('batch_name, subject_name')
+            .eq('user_id', profile.user_id);
+        if (error) {
+            console.error("Error fetching user enrollments:", error);
+            return [];
+        }
+        return data || [];
     },
-    enabled: !!profile?.batch && !!profile?.subjects
+    enabled: !!profile?.user_id
   });
 
-  const { data: ongoingClass } = useQuery({
-    queryKey: ['ongoing-class', profile?.batch],
+  // Extract unique batches and subjects from the fetched enrollments for filter dropdowns
+  const availableBatches = useMemo(() => {
+    return Array.from(new Set(userEnrollments?.map(e => e.batch_name) || [])).sort();
+  }, [userEnrollments]);
+
+  const availableSubjects = useMemo(() => {
+    return Array.from(new Set(userEnrollments?.map(e => e.subject_name) || [])).sort();
+  }, [userEnrollments]);
+
+  // 2. Fetch schedules based on specific enrolled combinations and selected filters
+  const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
+    queryKey: ['student-schedule', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
+    queryFn: async (): Promise<Schedule[]> => {
+        if (!userEnrollments || userEnrollments.length === 0) return [];
+
+        let query = supabase.from('schedules').select('*');
+
+        // Dynamically build OR conditions for each specific enrolled combination
+        const combinationFilters = userEnrollments
+            .filter(enrollment =>
+                (selectedBatchFilter === 'all' || enrollment.batch_name === selectedBatchFilter) &&
+                (selectedSubjectFilter === 'all' || enrollment.subject_name === selectedSubjectFilter)
+            )
+            .map(enrollment => `(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
+
+        if (combinationFilters.length > 0) {
+            query = query.or(combinationFilters.join(','));
+        } else {
+            return []; // Return empty if no combinations match filters
+        }
+
+        query = query.order('day_of_week').order('start_time');
+
+        const { data, error } = await query;
+      
+        if (error) {
+            console.error("Error fetching filtered schedules:", error);
+            throw error; // Propagate error for react-query
+        }
+        return data || [];
+    },
+    enabled: !!userEnrollments && userEnrollments.length > 0
+  });
+
+  const { data: ongoingClass, isLoading: isLoadingOngoingClass } = useQuery<OngoingClass | null>({
+    queryKey: ['ongoing-class', profile?.user_id, userEnrollments],
     queryFn: async (): Promise<OngoingClass | null> => {
-      if (!profile?.batch?.length || !profile?.subjects) return null;
+      if (!profile?.user_id || !userEnrollments || userEnrollments.length === 0) return null;
 
       const now = new Date();
       const currentDay = now.getDay();
       const currentTimeStr = now.toTimeString().slice(0, 8);
 
-      const { data: scheduleData, error: scheduleError } = await supabase
+      let query = supabase
         .from('schedules')
         .select(`
           subject,
@@ -74,14 +150,26 @@ export const StudentSchedule = () => {
           meeting_links!inner (
             link
           )
-        `)
-        .in('batch', profile.batch)
-        .in('subject', profile.subjects)
+        `);
+
+      // Dynamically build OR conditions for each specific enrolled combination for ongoing class
+      const combinationFilters = userEnrollments
+          .map(enrollment => `(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
+
+      if (combinationFilters.length > 0) {
+          query = query.or(combinationFilters.join(','));
+      } else {
+          return null;
+      }
+
+      query = query
         .eq('day_of_week', currentDay)
         .lte('start_time', currentTimeStr)
         .gte('end_time', currentTimeStr)
         .eq('meeting_links.is_active', true)
         .limit(1);
+
+      const { data: scheduleData, error: scheduleError } = await query;
 
       if (scheduleError) throw scheduleError;
 
@@ -96,7 +184,7 @@ export const StudentSchedule = () => {
         meeting_link: (schedule.meeting_links as any)?.link || ''
       };
     },
-    enabled: !!profile?.batch && !!profile?.subjects,
+    enabled: !!profile?.user_id && !!userEnrollments && userEnrollments.length > 0,
     refetchInterval: 30000 // Refetch every 30 seconds
   });
 
@@ -130,6 +218,12 @@ export const StudentSchedule = () => {
            currentTimeMinutes >= startTimeMinutes && 
            currentTimeMinutes <= endTimeMinutes;
   };
+
+  const isLoading = isLoadingEnrollments || isLoadingSchedules || isLoadingOngoingClass;
+
+  if (isLoading) {
+    return <ScheduleSkeleton />;
+  }
 
   return (
     <div className="space-y-6 p-6 bg-gray-50 min-h-screen">
@@ -174,6 +268,34 @@ export const StudentSchedule = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Filter Section */}
+      <div className="flex gap-4">
+        {/* Select for Batch filter */}
+        <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
+          <SelectTrigger className="w-48 h-10">
+            <SelectValue placeholder="Filter by batch" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Batches</SelectItem>
+            {availableBatches.map((batch) => (
+              <SelectItem key={batch} value={batch}>{batch}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {/* Select for Subject filter */}
+        <Select value={selectedSubjectFilter} onValueChange={setSelectedSubjectFilter}>
+          <SelectTrigger className="w-48 h-10">
+            <SelectValue placeholder="Filter by subject" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Subjects</SelectItem>
+            {availableSubjects.map((subject) => (
+              <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       <div className="grid gap-6">
         {DAYS.map((day, index) => (
