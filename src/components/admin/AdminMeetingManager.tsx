@@ -40,39 +40,35 @@ export const AdminMeetingManager = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Set up real-time subscription to the schedules table
+  // Set up real-time subscription to the meeting_links table
   useEffect(() => {
     const channel = supabase
-      .channel('realtime-meeting-links-final')
+      .channel('realtime-meeting-links-from-correct-table')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'schedules' },
+        { event: '*', schema: 'public', table: 'meeting_links' },
         (payload) => {
-          // When a change is detected, invalidate the query to refetch the data
-          queryClient.invalidateQueries({ queryKey: ['admin-all-meeting-links-final'] });
+          queryClient.invalidateQueries({ queryKey: ['admin-meeting-links-from-table'] });
         }
       )
       .subscribe();
 
-    // Cleanup the subscription when the component unmounts
     return () => {
       supabase.removeChannel(channel);
     };
   }, [queryClient]);
 
-  // Fetch all schedules that have a meeting link
+  // Fetch all links from the meeting_links table
   const { data: meetingLinks = [], isLoading } = useQuery<MeetingLink[]>({
-    queryKey: ['admin-all-meeting-links-final'],
+    queryKey: ['admin-meeting-links-from-table'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('schedules')
+        .from('meeting_links')
         .select('id, subject, batch, link')
-        .not('link', 'is', null) // Only get rows where a link exists
         .order('batch, subject');
       
       if (error) {
-        // This will show the actual database error in the console
-        console.error("Error fetching meeting links:", error);
+        console.error("Error fetching from meeting_links table:", error);
         throw error;
       };
       return data || [];
@@ -95,7 +91,7 @@ export const AdminMeetingManager = () => {
             <LinkIcon className="mr-3 h-8 w-8 text-primary" />
             All Meeting Links
           </h1>
-          <p className="text-gray-500 mt-1">A complete, real-time list of all class meeting links from the schedules table.</p>
+          <p className="text-gray-500 mt-1">A real-time list of all links from the meeting_links table.</p>
       </div>
 
       {/* Links List */}
@@ -145,7 +141,7 @@ export const AdminMeetingManager = () => {
                 <Search className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-700">No Meeting Links Found</h3>
                 <p className="text-muted-foreground mt-2 max-w-md mx-auto">
-                  Either no links exist in the 'schedules' table, or the admin role lacks permission to view them. Please see the next step to fix permissions.
+                  Either no links exist in the 'meeting_links' table, or the admin role lacks permission to view them. Please check the security policy.
                 </p>
             </div>
         )}
