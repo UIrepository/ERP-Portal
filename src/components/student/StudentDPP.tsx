@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -102,12 +101,17 @@ export const StudentDPP = () => {
   }, [userEnrollments, selectedBatchFilter]);
 
   // Ensure selected filters are still valid when options change
-  if (selectedBatchFilter !== 'all' && !displayedBatches.includes(selectedBatchFilter)) {
-      setSelectedBatchFilter('all');
-  }
-  if (selectedSubjectFilter !== 'all' && !displayedSubjects.includes(selectedSubjectFilter)) {
-      setSelectedSubjectFilter('all');
-  }
+  useEffect(() => {
+    if (selectedBatchFilter !== 'all' && !displayedBatches.includes(selectedBatchFilter)) {
+        setSelectedBatchFilter('all');
+    }
+  }, [selectedBatchFilter, displayedBatches]);
+
+  useEffect(() => {
+    if (selectedSubjectFilter !== 'all' && !displayedSubjects.includes(selectedSubjectFilter)) {
+        setSelectedSubjectFilter('all');
+    }
+  }, [selectedSubjectFilter, displayedSubjects]);
 
   const { data: dppContent, isLoading: isLoadingDPPContent } = useQuery<DPPContent[]>({
     queryKey: ['student-dpp', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
@@ -188,39 +192,33 @@ export const StudentDPP = () => {
   const isLoading = isLoadingEnrollments || isLoadingDPPContent;
 
   return (
-    <div className="p-6 bg-gradient-to-br from-green-50 to-blue-50 min-h-full flex flex-col justify-center items-center">
-      <div className="max-w-4xl mx-auto w-full text-center">
-        
-        {/* Header Section */}
-        <div className="relative p-8 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-r from-green-500 to-blue-500 text-white mb-10">
-            <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/10 rounded-full"></div>
-            <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-white/10 rounded-full"></div>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white/10 rounded-full"></div>
-
-            <div className="relative z-10">
-                <div className="flex items-center justify-center mb-4">
-                    <Target className="h-16 w-16 text-green-100 drop-shadow-md" />
-                </div>
-                <h1 className="text-4xl md:text-5xl font-bold mb-2 tracking-tight drop-shadow-lg">
-                    DPP Section
-                </h1>
-                <p className="text-xl md:text-2xl text-green-100 drop-shadow-sm font-semibold">
-                    Daily Practice Problems & Assignments
-                </p>
-            </div>
+    <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
+      {/* Header Section */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800 flex items-center">
+            <Target className="mr-3 h-8 w-8 text-primary" />
+            DPP Section
+          </h1>
+          <p className="text-gray-500 mt-1">Daily Practice Problems & Assignments.</p>
         </div>
+        <div className="flex gap-2">
+          {displayedBatches.map(b => <Badge key={b} variant="outline">{b}</Badge>)}
+        </div>
+      </div>
 
-        {/* Filters and Search Section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="relative flex-1 col-span-full md:col-span-1">
+
+      {/* Filters and Search Section */}
+      <div className="flex gap-4">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search DPP content..."
-              className="pl-10 h-10 bg-white shadow-sm"
+              className="pl-10 h-10"
             />
           </div>
           <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
-            <SelectTrigger className="w-full h-10 bg-white shadow-sm">
+            <SelectTrigger className="w-48 h-10">
               <SelectValue placeholder="Filter by batch" />
             </SelectTrigger>
             <SelectContent>
@@ -235,7 +233,7 @@ export const StudentDPP = () => {
             onValueChange={setSelectedSubjectFilter}
             disabled={selectedBatchFilter === 'all'}
           >
-            <SelectTrigger className="w-full h-10">
+            <SelectTrigger className="w-48 h-10">
               <SelectValue placeholder="Filter by subject" />
             </SelectTrigger>
             <SelectContent>
@@ -245,54 +243,53 @@ export const StudentDPP = () => {
               ))}
             </SelectContent>
           </Select>
-        </div>
+      </div>
 
-        {/* Content Grid */}
-        <div>
-          {isLoading ? (
-            <DPPSkeleton />
-          ) : dppContent && dppContent.length > 0 ? (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {dppContent.map((dpp) => (
-                <Card key={dpp.id} className="bg-white hover:shadow-lg transition-shadow duration-300 flex flex-col rounded-xl overflow-hidden">
-                  <CardContent className="p-5 flex flex-col flex-grow">
-                    <div className="flex-grow">
-                      <div className="flex items-start gap-4 mb-3">
-                        <div className="bg-green-100 p-2 rounded-full flex-shrink-0">
-                          <Target className="h-6 w-6 text-green-500" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-lg text-gray-800 leading-tight">{dpp.title}</h3>
-                          {dpp.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{dpp.description}</p>}
-                        </div>
+      {/* Content Grid */}
+      <div>
+        {isLoading ? (
+          <DPPSkeleton />
+        ) : dppContent && dppContent.length > 0 ? (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {dppContent.map((dpp) => (
+              <Card key={dpp.id} className="bg-white hover:shadow-lg transition-shadow duration-300 flex flex-col rounded-xl overflow-hidden">
+                <CardContent className="p-5 flex flex-col flex-grow">
+                  <div className="flex-grow">
+                    <div className="flex items-start gap-4 mb-3">
+                      <div className="bg-primary/10 p-2 rounded-full flex-shrink-0">
+                        <Target className="h-6 w-6 text-primary" />
                       </div>
-                      <div className="flex flex-wrap gap-2 mt-4">
-                        <Badge variant="outline">{dpp.subject}</Badge>
-                        <Badge variant="secondary">{dpp.batch}</Badge>
-                        {dpp.difficulty && (
-                          <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">{dpp.difficulty}</Badge>
-                        )}
+                      <div>
+                        <h3 className="font-semibold text-lg text-gray-800 leading-tight">{dpp.title}</h3>
+                        {dpp.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{dpp.description}</p>}
                       </div>
                     </div>
-                    <Button 
-                      onClick={() => handleAccessDPP(dpp)}
-                      className="w-full mt-5 bg-green-600 hover:bg-green-700 text-white font-semibold transition-all transform hover:scale-[1.01] active:scale-95"
-                      >
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      Start DPP
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card className="text-center py-20 bg-white rounded-lg border-dashed border-2 shadow-sm">
-              <Target className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-700">No DPP Content Yet</h3>
-              <p className="text-muted-foreground mt-2">Daily practice problems for your batch and subjects will appear here soon.</p>
-            </Card>
-          )}
-        </div>
+                    <div className="flex flex-wrap gap-2 mt-4">
+                      <Badge variant="outline">{dpp.subject}</Badge>
+                      <Badge variant="secondary">{dpp.batch}</Badge>
+                      {dpp.difficulty && (
+                        <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">{dpp.difficulty}</Badge>
+                      )}
+                    </div>
+                  </div>
+                  <Button 
+                    onClick={() => handleAccessDPP(dpp)}
+                    className="w-full mt-5"
+                    >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Start DPP
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card className="text-center py-20 bg-white rounded-lg border-dashed border-2">
+            <Target className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-700">No DPP Content Yet</h3>
+            <p className="text-muted-foreground mt-2">Daily practice problems for your batch and subjects will appear here soon.</p>
+          </Card>
+        )}
       </div>
     </div>
   );
