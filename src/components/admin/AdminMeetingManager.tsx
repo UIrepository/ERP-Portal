@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Link as LinkIcon, ExternalLink, Copy, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface MeetingLink {
@@ -40,19 +39,17 @@ const LinksSkeleton = () => (
 export const AdminMeetingManager = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedBatch, setSelectedBatch] = useState('all');
-  const [selectedSubject, setSelectedSubject] = useState('all');
 
-  // Set up real-time subscription
+  // Set up real-time subscription to the schedules table
   useEffect(() => {
     const channel = supabase
-      .channel('realtime-meeting-links')
+      .channel('realtime-meeting-links-no-filter')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'schedules' },
         (payload) => {
           // When a change is detected, invalidate the query to refetch the data
-          queryClient.invalidateQueries({ queryKey: ['admin-all-meeting-links-list'] });
+          queryClient.invalidateQueries({ queryKey: ['admin-all-meeting-links-no-filter'] });
         }
       )
       .subscribe();
@@ -63,8 +60,9 @@ export const AdminMeetingManager = () => {
     };
   }, [queryClient]);
 
-  const { data: meetingLinks = [], isLoading: isLoadingLinks } = useQuery({
-    queryKey: ['admin-all-meeting-links-list'],
+  // Fetch all schedules that have a meeting link
+  const { data: meetingLinks = [], isLoading } = useQuery<MeetingLink[]>({
+    queryKey: ['admin-all-meeting-links-no-filter'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('schedules')
@@ -73,35 +71,9 @@ export const AdminMeetingManager = () => {
         .order('batch, subject');
       
       if (error) throw error;
-      // Fetch ALL links, do not make them unique
-      return (data || []) as MeetingLink[];
+      return data || [];
     },
   });
-  
-  const { data: options = [], isLoading: isLoadingOptions } = useQuery({
-      queryKey: ['all-options-for-links'],
-      queryFn: async () => {
-          const { data, error } = await supabase.rpc('get_all_options');
-          if (error) throw error;
-          return data || [];
-      }
-  });
-
-  const { allBatches, allSubjects, filteredLinks } = useMemo(() => {
-    const allBatches = Array.from(new Set(options.filter((o: any) => o.type === 'batch').map((o: any) => o.name))).sort();
-    const allSubjects = Array.from(new Set(options.filter((o: any) => o.type === 'subject').map((o: any) => o.name))).sort();
-
-    const filtered = meetingLinks.filter(link =>
-      (selectedBatch === 'all' || link.batch === selectedBatch) &&
-      (selectedSubject === 'all' || link.subject === selectedSubject)
-    );
-    
-    return {
-      allBatches,
-      allSubjects,
-      filteredLinks: filtered,
-    };
-  }, [meetingLinks, options, selectedBatch, selectedSubject]);
 
   const handleCopyLink = (link: string) => {
     navigator.clipboard.writeText(link);
@@ -111,43 +83,23 @@ export const AdminMeetingManager = () => {
     });
   };
   
-  const isLoading = isLoadingLinks || isLoadingOptions;
-
   return (
     <div className="space-y-8 p-6 bg-gray-50/50 min-h-full">
       {/* Header Section */}
       <div>
           <h1 className="text-3xl font-bold text-gray-800 flex items-center">
             <LinkIcon className="mr-3 h-8 w-8 text-primary" />
-            Meeting Links Overview
+            All Meeting Links
           </h1>
-          <p className="text-gray-500 mt-1">A real-time list of all class meeting links in the system.</p>
-        </div>
-
-      {/* Filter Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Select value={selectedBatch} onValueChange={setSelectedBatch}>
-            <SelectTrigger><SelectValue placeholder="Filter by Batch" /></SelectTrigger>
-            <SelectContent>
-                <SelectItem value="all">All Batches</SelectItem>
-                {allBatches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
-            </SelectContent>
-        </Select>
-        <Select value={selectedSubject} onValueChange={setSelectedSubject}>
-            <SelectTrigger><SelectValue placeholder="Filter by Subject" /></SelectTrigger>
-            <SelectContent>
-                <SelectItem value="all">All Subjects</SelectItem>
-                {allSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-            </SelectContent>
-        </Select>
+          <p className="text-gray-500 mt-1">A complete, real-time list of all class meeting links.</p>
       </div>
 
       {/* Links List */}
       <div className="space-y-4">
         {isLoading ? (
             <LinksSkeleton />
-        ) : filteredLinks.length > 0 ? (
-          filteredLinks.map((meeting) => (
+        ) : meetingLinks.length > 0 ? (
+          meetingLinks.map((meeting) => (
             <Card key={meeting.id} className="bg-white">
               <CardContent className="p-5 flex flex-col md:flex-row md:items-center md:justify-between">
                 <div className="flex-grow mb-4 md:mb-0">
@@ -189,7 +141,7 @@ export const AdminMeetingManager = () => {
                 <Search className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-700">No Meeting Links Found</h3>
                 <p className="text-muted-foreground mt-2">
-                  There are no links matching your current filters.
+                  There are no meeting links currently set in the schedules table.
                 </p>
             </div>
         )}
