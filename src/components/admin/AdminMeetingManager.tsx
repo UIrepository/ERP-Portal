@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
@@ -43,13 +43,13 @@ export const AdminMeetingManager = () => {
   // Set up real-time subscription to the schedules table
   useEffect(() => {
     const channel = supabase
-      .channel('realtime-meeting-links-no-filter')
+      .channel('realtime-meeting-links-all')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'schedules' },
         (payload) => {
           // When a change is detected, invalidate the query to refetch the data
-          queryClient.invalidateQueries({ queryKey: ['admin-all-meeting-links-no-filter'] });
+          queryClient.invalidateQueries({ queryKey: ['admin-all-meeting-links-final'] });
         }
       )
       .subscribe();
@@ -62,7 +62,7 @@ export const AdminMeetingManager = () => {
 
   // Fetch all schedules that have a meeting link
   const { data: meetingLinks = [], isLoading } = useQuery<MeetingLink[]>({
-    queryKey: ['admin-all-meeting-links-no-filter'],
+    queryKey: ['admin-all-meeting-links-final'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('schedules')
