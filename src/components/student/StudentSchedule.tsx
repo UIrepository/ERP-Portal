@@ -18,7 +18,7 @@ interface Schedule {
   start_time: string;
   end_time: string;
   link?: string;
-  date?: string; // Added date field
+  date?: string;
 }
 
 interface UserEnrollment {
@@ -91,22 +91,14 @@ export const StudentSchedule = () => {
     queryKey: ['student-schedule-direct', userEnrollments, selectedBatchFilter],
     queryFn: async (): Promise<Schedule[]> => {
         if (!userEnrollments || userEnrollments.length === 0) return [];
-
         let query = supabase.from('schedules').select('*');
-
         const batchesToFilter = selectedBatchFilter === 'all'
             ? Array.from(new Set(userEnrollments.map(e => e.batch_name)))
             : [selectedBatchFilter];
-
-        if (batchesToFilter.length === 0) {
-          return [];
-        }
-
+        if (batchesToFilter.length === 0) return [];
         query = query.in('batch', batchesToFilter);
-        query = query.order('date', { nullsFirst: true }).order('day_of_week').order('start_time');
-
+        query = query.order('day_of_week').order('start_time');
         const { data, error } = await query;
-      
         if (error) {
             console.error("Error fetching schedules directly:", error);
             throw error;
@@ -116,18 +108,40 @@ export const StudentSchedule = () => {
     enabled: !!userEnrollments && userEnrollments.length > 0
   });
 
+  // Set up real-time subscription for the schedules table
+  useEffect(() => {
+    if (!profile?.user_id) return;
+
+    const channel = supabase
+      .channel('student-schedules-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'schedules',
+        },
+        (payload) => {
+          console.log('Student schedule change received!', payload);
+          queryClient.invalidateQueries({ queryKey: ['student-schedule-direct'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient, profile?.user_id]);
+
   const isLoading = isLoadingEnrollments || isLoadingSchedules;
 
-  const groupedSchedules = useMemo(() => {
-    if (!schedules) return {};
-    return schedules.reduce((acc, schedule) => {
-      const day = schedule.date ? format(new Date(`${schedule.date}T00:00:00`), 'eeee, MMMM do') : DAYS[schedule.day_of_week];
-      if (!acc[day]) acc[day] = [];
-      acc[day].push(schedule);
-      return acc;
-    }, {} as Record<string, Schedule[]>);
-  }, [schedules]);
-
+  const groupedSchedules = schedules?.reduce((acc, schedule) => {
+    const day = schedule.date ? format(new Date(`${schedule.date}T00:00:00`), 'eeee, MMMM do') : DAYS[schedule.day_of_week];
+    if (!acc[day]) acc[day] = [];
+    acc[day].push(schedule);
+    return acc;
+  }, {} as Record<string, Schedule[]>);
+  
   const orderedDays = useMemo(() => {
       if (!groupedSchedules) return [];
       return Object.keys(groupedSchedules).sort((a, b) => {
@@ -136,7 +150,6 @@ export const StudentSchedule = () => {
           if (aIsDay && !bIsDay) return -1;
           if (!aIsDay && bIsDay) return 1;
           if (aIsDay && bIsDay) return DAYS.indexOf(a) - DAYS.indexOf(b);
-          // For date-based keys, sort them chronologically
           return new Date(a.split(', ')[1]).getTime() - new Date(b.split(', ')[1]).getTime();
       });
   }, [groupedSchedules]);
