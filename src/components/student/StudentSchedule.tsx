@@ -51,7 +51,6 @@ const ScheduleSkeleton = () => (
 
 export const StudentSchedule = () => {
   const { profile } = useAuth();
-  const queryClient = useQueryClient();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
 
@@ -97,7 +96,7 @@ export const StudentSchedule = () => {
             : [selectedBatchFilter];
         if (batchesToFilter.length === 0) return [];
         query = query.in('batch', batchesToFilter);
-        query = query.order('day_of_week').order('start_time');
+        query = query.order('date', { nullsFirst: true }).order('day_of_week').order('start_time');
         const { data, error } = await query;
         if (error) {
             console.error("Error fetching schedules directly:", error);
@@ -108,39 +107,17 @@ export const StudentSchedule = () => {
     enabled: !!userEnrollments && userEnrollments.length > 0
   });
 
-  // Set up real-time subscription for the schedules table
-  useEffect(() => {
-    if (!profile?.user_id) return;
-
-    const channel = supabase
-      .channel('student-schedules-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'schedules',
-        },
-        (payload) => {
-          console.log('Student schedule change received!', payload);
-          queryClient.invalidateQueries({ queryKey: ['student-schedule-direct'] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient, profile?.user_id]);
-
   const isLoading = isLoadingEnrollments || isLoadingSchedules;
 
-  const groupedSchedules = schedules?.reduce((acc, schedule) => {
-    const day = schedule.date ? format(new Date(`${schedule.date}T00:00:00`), 'eeee, MMMM do') : DAYS[schedule.day_of_week];
-    if (!acc[day]) acc[day] = [];
-    acc[day].push(schedule);
-    return acc;
-  }, {} as Record<string, Schedule[]>);
+  const groupedSchedules = useMemo(() => {
+    if (!schedules) return {};
+    return schedules.reduce((acc, schedule) => {
+      const day = schedule.date ? format(new Date(`${schedule.date}T00:00:00`), 'eeee, MMMM do') : DAYS[schedule.day_of_week];
+      if (!acc[day]) acc[day] = [];
+      acc[day].push(schedule);
+      return acc;
+    }, {} as Record<string, Schedule[]>);
+  }, [schedules]);
   
   const orderedDays = useMemo(() => {
       if (!groupedSchedules) return [];
