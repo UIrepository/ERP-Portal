@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Added for filters
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Crown, ExternalLink, Lock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -22,7 +22,6 @@ interface UIKiPadhaiContent {
   subject: string;
 }
 
-// Define the structure for an enrollment record from the new table
 interface UserEnrollment {
     batch_name: string;
     subject_name: string;
@@ -53,10 +52,9 @@ const PremiumContentSkeleton = () => (
 
 export const StudentUIKiPadhai = () => {
   const { profile } = useAuth();
-  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all'); // New filter state
-  const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all'); // New filter state
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
+  const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
 
-  // 1. Fetch user's specific enrollments from the new table
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['userEnrollments', profile?.user_id],
     queryFn: async () => {
@@ -74,27 +72,51 @@ export const StudentUIKiPadhai = () => {
     enabled: !!profile?.user_id
   });
 
-  // Extract unique batches and subjects from the fetched enrollments for filter dropdowns
-  const availableBatches = useMemo(() => {
-    return Array.from(new Set(userEnrollments?.map(e => e.batch_name) || [])).sort();
-  }, [userEnrollments]);
+  // Derived state for filter options, implementing cascading logic
+  const displayedBatches = useMemo(() => {
+    if (!userEnrollments) return [];
+    if (selectedSubjectFilter === 'all') {
+      return Array.from(new Set(userEnrollments.map(e => e.batch_name))).sort();
+    } else {
+      return Array.from(new Set(
+        userEnrollments
+          .filter(e => e.subject_name === selectedSubjectFilter)
+          .map(e => e.batch_name)
+      )).sort();
+    }
+  }, [userEnrollments, selectedSubjectFilter]);
 
-  const availableSubjects = useMemo(() => {
-    return Array.from(new Set(userEnrollments?.map(e => e.subject_name) || [])).sort();
-  }, [userEnrollments]);
+  const displayedSubjects = useMemo(() => {
+    if (!userEnrollments) return [];
+    if (selectedBatchFilter === 'all') {
+      return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
+    } else {
+      return Array.from(new Set(
+        userEnrollments
+          .filter(e => e.batch_name === selectedBatchFilter)
+          .map(e => e.subject_name)
+      )).sort();
+    }
+  }, [userEnrollments, selectedBatchFilter]);
 
-  // 2. Fetch UI Ki Padhai content based on specific enrolled combinations and selected filters
+  // Ensure selected filters are still valid when options change
+  if (selectedBatchFilter !== 'all' && !displayedBatches.includes(selectedBatchFilter)) {
+      setSelectedBatchFilter('all');
+  }
+  if (selectedSubjectFilter !== 'all' && !displayedSubjects.includes(selectedSubjectFilter)) {
+      setSelectedSubjectFilter('all');
+  }
+
   const { data: premiumContent, isLoading: isLoadingPremiumContent } = useQuery<UIKiPadhaiContent[]>({
     queryKey: ['student-ui-ki-padhai', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
     queryFn: async (): Promise<UIKiPadhaiContent[]> => {
         if (!userEnrollments || userEnrollments.length === 0) return [];
 
         let query = supabase
-            .from('dpp_content') // This table name seems incorrect based on description, assuming it holds UI Ki Padhai content for now. Adjust if another table exists.
+            .from('dpp_content') // Assuming 'dpp_content' also holds UI Ki Padhai content based on previous context. Adjust table if 'ui_ki_padhai_content' exists.
             .select('*')
             .eq('is_active', true);
 
-        // Dynamically build OR conditions for each specific enrolled combination
         const combinationFilters = userEnrollments
             .filter(enrollment =>
                 (selectedBatchFilter === 'all' || enrollment.batch_name === selectedBatchFilter) &&
@@ -105,7 +127,7 @@ export const StudentUIKiPadhai = () => {
         if (combinationFilters.length > 0) {
             query = query.or(combinationFilters.join(','));
         } else {
-            return []; // Return empty if no combinations match filters
+            return [];
         }
             
         query = query.order('created_at', { ascending: false });
@@ -122,8 +144,8 @@ export const StudentUIKiPadhai = () => {
   });
 
   const handleAccessContent = (content: UIKiPadhaiContent) => {
-    // This logic should be updated based on actual premium access field in profiles
-    const hasPremiumAccess = true; // For demonstration, assuming access if content is fetched. Replace with profile?.premium_access or similar
+    // This logic should be updated based on actual premium access field in profiles or user_enrollments if specific tiers exist
+    const hasPremiumAccess = true; // For demonstration, assuming access if content is fetched. Replace with actual logic.
 
     if (hasPremiumAccess) {
       window.open(content.link, '_blank');
@@ -151,7 +173,7 @@ export const StudentUIKiPadhai = () => {
       </div>
       
       {/* Premium Banner - Shown if user does not have access */}
-      {false && ( // Replace with !profile?.premium_access
+      {false && ( // Replace with !profile?.premium_access or similar
           <Card className="border-yellow-200 bg-yellow-50">
             <CardContent className="p-5 flex items-center gap-4">
                 <div className="bg-yellow-100 p-3 rounded-full">
@@ -175,7 +197,7 @@ export const StudentUIKiPadhai = () => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Batches</SelectItem>
-            {availableBatches.map((batch) => (
+            {displayedBatches.map((batch) => (
               <SelectItem key={batch} value={batch}>{batch}</SelectItem>
             ))}
           </SelectContent>
@@ -186,7 +208,7 @@ export const StudentUIKiPadhai = () => {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Subjects</SelectItem>
-            {availableSubjects.map((subject) => (
+            {displayedSubjects.map((subject) => (
               <SelectItem key={subject} value={subject}>{subject}</SelectItem>
             ))}
           </SelectContent>
