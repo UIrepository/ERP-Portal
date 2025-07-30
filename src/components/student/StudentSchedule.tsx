@@ -2,12 +2,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card'; // Fixed import
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar, Clock, ExternalLink, Users } from 'lucide-react';
-import { format, setHours, setMinutes, getDay, addDays, startOfWeek } from 'date-fns';
+import { format, getDay } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface Schedule {
