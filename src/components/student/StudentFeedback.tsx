@@ -7,9 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
-import { MessageSquare, Send, CheckCircle, Star, Sparkles } from 'lucide-react'; // Added Sparkles
+import { MessageSquare, Send, CheckCircle, Star, Sparkles } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Skeleton } from '@/components/ui/skeleton'; // Added Skeleton
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge'; // Added Badge import
 
 // Define the structure for an enrollment record from the new table
 interface UserEnrollment {
@@ -81,7 +82,7 @@ export const StudentFeedback = () => {
       if (!profile?.user_id || !userEnrollments || userEnrollments.length === 0) return [];
       
       // Fetch feedback only for combinations the user is enrolled in
-      const combinations = userEnrollments.map(e => `(batch.eq.${e.batch_name},subject.eq.${e.subject_name})`).join(',');
+      const combinations = userEnrollments.map(e => `and(batch.eq.${e.batch_name},subject.eq.${e.subject_name})`).join(','); // Fixed: Use and()
 
       const { data, error } = await supabase
         .from('feedback')
@@ -199,7 +200,7 @@ export const StudentFeedback = () => {
           <CardHeader className="text-center p-6 border-b">
             <CardTitle className="text-2xl font-bold text-gray-800">Your Feedback Tasks</CardTitle>
             <CardDescription className="text-base text-gray-600">
-              Submit feedback for each of your enrolled courses.
+              Submit feedback for each of your enrolled batch and subject combinations.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6 space-y-4">
@@ -221,7 +222,7 @@ export const StudentFeedback = () => {
                     </div>
                     {task.submitted ? (
                     <div className="flex items-center gap-2 text-green-600 font-medium">
-                        <CheckCircle className="h-5 w-5 fill-green-500 text-white" /> {/* Filled icon */}
+                        <CheckCircle className="h-5 w-5 fill-green-500 text-white" />
                         <span>Feedback Submitted</span>
                     </div>
                     ) : (
@@ -236,7 +237,7 @@ export const StudentFeedback = () => {
                 ))
             ) : (
                 <div className="text-center py-8 text-gray-500">
-                    <MessageSquare className="h-16 w-16 mx-auto mb-4 text-gray-300" /> {/* Larger icon */}
+                    <MessageSquare className="h-16 w-16 mx-auto mb-4 text-gray-300" />
                     <p className="text-xl font-semibold mb-2">No Feedback Tasks Found</p>
                     <p className="text-muted-foreground mt-2 max-w-sm mx-auto">
                         It looks like you are not enrolled in any batches or subjects yet. Please contact your administrator for enrollment.
@@ -272,7 +273,7 @@ export const StudentFeedback = () => {
                 <MessageSquare className="h-4 w-4 text-primary" /> Additional Comments (Mandatory)
               </label>
               <Textarea 
-                className="mt-2 bg-gray-50 border-gray-200 focus-visible:ring-primary/50" // Improved styling
+                className="mt-2 bg-gray-50 border-gray-200 focus-visible:ring-primary/50"
                 rows={4}
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
