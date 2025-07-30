@@ -1,15 +1,18 @@
 // uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/Sidebar.tsx
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { 
-  LayoutDashboard, 
-  Calendar, 
-  Clock, 
-  Video, 
-  FileText, 
-  Target, 
-  Crown, 
-  MessageSquare, 
+import { useQuery } from '@tanstack/react-query'; // Added for useQuery
+import { supabase } from '@/integrations/supabase/client'; // Added for supabase client
+import { useMemo } from 'react'; // Added useMemo
+import {
+  LayoutDashboard,
+  Calendar,
+  Clock,
+  Video,
+  FileText,
+  Target,
+  Crown,
+  MessageSquare,
   BookOpen,
   Users,
   UserCheck,
@@ -27,8 +30,41 @@ interface SidebarProps {
   onTabChange: (tab: string) => void;
 }
 
+// Define the structure for an enrollment record from the new table
+interface UserEnrollment {
+    batch_name: string;
+    subject_name: string;
+}
+
 export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const { profile, signOut } = useAuth();
+
+  // Fetch user's specific enrollments for sidebar display
+  const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
+    queryKey: ['sidebarUserEnrollments', profile?.user_id],
+    queryFn: async () => {
+        if (!profile?.user_id) return [];
+        const { data, error } = await supabase
+            .from('user_enrollments')
+            .select('batch_name, subject_name')
+            .eq('user_id', profile.user_id);
+        if (error) {
+            console.error("Error fetching sidebar user enrollments:", error);
+            return [];
+        }
+        return data || [];
+    },
+    enabled: !!profile?.user_id
+  });
+
+  // Extract unique batches and subjects from the fetched enrollments for display
+  const availableBatches = useMemo(() => {
+    return Array.from(new Set(userEnrollments?.map(e => e.batch_name) || [])).sort();
+  }, [userEnrollments]);
+
+  const availableSubjects = useMemo(() => {
+    return Array.from(new Set(userEnrollments?.map(e => e.subject_name) || [])).sort();
+  }, [userEnrollments]);
 
   const studentTabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -85,26 +121,33 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
         return 'Portal';
     }
   }
+  // The formatArrayString function is no longer strictly needed for profile.batch/subjects
+  // if they are removed from the profiles table and all data comes from user_enrollments.
+  // However, it's kept here for robustness in case profile.batch/subjects still exist
+  // for other roles or legacy data.
   const formatArrayString = (arr: string | string[] | null | undefined) => {
     if (!arr) return '';
+
     if (Array.isArray(arr)) {
-      // For actual arrays, remove any quotes from individual string items
-      return arr.map(item => typeof item === 'string' ? item.replace(/"/g, '') : item).join(', ');
+      return arr.map(item =>
+        typeof item === 'string' ? item.replace(/[\\"]/g, '') : item
+      ).join(', ');
     }
+
     try {
-      // Attempt to parse as JSON array string (e.g., "[\"Item1\", \"Item2\"]")
       const parsed = JSON.parse(arr);
       if (Array.isArray(parsed)) {
-        return parsed.map(item => typeof item === 'string' ? item.replace(/"/g, '') : item).join(', ');
+        return parsed.map(item =>
+          typeof item === 'string' ? item.replace(/[\\"]/g, '') : item
+        ).join(', ');
       }
     } catch (e) {
-      // If parsing fails (e.g., it's a raw string like "\Re Attempt\"),
-      // remove all quotes, brackets, AND backslashes.
-      return String(arr).replace(/[\\"\\[\\]]/g, ''); // Modified line
+      // JSON parsing failed, treat as a raw string and clean it
     }
-    // Fallback for any other string format
-    return String(arr).replace(/[\\"\\[\\]]/g, ''); // Modified line
+
+    return String(arr).replace(/[\\"\\[\\]]/g, '');
   };
+
   return (
     <div className="w-64 bg-white border-r border-gray-200 h-full flex flex-col">
       <div className="p-4 border-b border-gray-200">
@@ -112,7 +155,32 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
           {getPortalName()}
         </h2>
         <p className="text-sm text-gray-500 mt-1">{profile?.name}</p>
-        {profile?.batch && <p className="text-xs text-gray-500 mt-1">Batch: {formatArrayString(profile.batch)}</p>}
+        
+        {/* Updated to display batches from availableBatches */}
+        {profile?.role === 'student' && availableBatches.length > 0 && (
+          <p className="text-xs text-gray-500 mt-1">Batch: {availableBatches.join(', ')}</p>
+        )}
+        {/* Optionally display subjects, or combine with batch */}
+        {profile?.role === 'student' && availableSubjects.length > 0 && (
+          <p className="text-xs text-gray-500 mt-1">Subjects: {availableSubjects.join(', ')}</p>
+        )}
+
+        {/* Display loading state for enrollments */}
+        {profile?.role === 'student' && isLoadingEnrollments && (
+             <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                <span className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-gray-400"></span>
+                Loading enrollments...
+             </p>
+        )}
+        {/* If no enrollments and not loading, display a message */}
+        {profile?.role === 'student' && !isLoadingEnrollments && availableBatches.length === 0 && availableSubjects.length === 0 && (
+             <p className="text-xs text-gray-500 mt-1">No enrollments found.</p>
+        )}
+
+        {/* For Teacher/Admin roles, if profile.batch/subjects still exist in DB, keep old display */}
+        {(profile?.role === 'teacher' || profile?.role === 'super_admin') && profile?.batch && (
+            <p className="text-xs text-gray-500 mt-1">Batch: {formatArrayString(profile.batch)}</p>
+        )}
       </div>
       
       <nav className="p-4 space-y-2 flex-grow">
