@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -69,6 +69,7 @@ const Countdown = ({ targetDate }: { targetDate: Date }) => {
 
 export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) => {
   const { profile } = useAuth();
+  const queryClient = useQueryClient();
   const now = useMemo(() => new Date(), []);
   const currentDay = now.getDay();
   const currentTimeStr = format(now, 'HH:mm:ss');
@@ -88,13 +89,13 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
   });
 
   const { data: ongoingClass, isLoading: isLoadingOngoingClass, isError: isOngoingClassError } = useQuery<OngoingClass | null>({
-    queryKey: ['ongoingClassRPC', profile?.user_id, currentDay, currentTimeStr],
+    queryKey: ['ongoingClassRPC', profile?.user_id],
     queryFn: async (): Promise<OngoingClass | null> => {
       if (!profile?.user_id) return null;
       const { data, error } = await supabase.rpc('get_schedules_with_links_filtered_by_enrollment', {
         p_user_id: profile.user_id,
-        p_day_of_week: currentDay,
-        p_current_time: currentTimeStr,
+        p_day_of_week: new Date().getDay(),
+        p_current_time: format(new Date(), 'HH:mm:ss'),
         p_is_active_link: true
       });
       if (error) {
@@ -112,8 +113,44 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
       };
     },
     enabled: !!profile?.user_id,
-    refetchInterval: 30000,
   });
+
+  // Set up real-time subscription for ongoing class changes
+  useEffect(() => {
+    if (!profile?.user_id) return;
+
+    const channel = supabase
+      .channel('ongoing-class-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'schedules',
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['ongoingClassRPC', profile?.user_id] });
+          queryClient.invalidateQueries({ queryKey: ['allStudentSchedulesRPC', profile?.user_id] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'meeting_links',
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['ongoingClassRPC', profile?.user_id] });
+          queryClient.invalidateQueries({ queryKey: ['allStudentSchedulesRPC', profile?.user_id] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient, profile?.user_id]);
 
   const nextUpcomingClass = useMemo(() => {
     if (!allSchedules || allSchedules.length === 0) return null;
