@@ -4,13 +4,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Link as LinkIcon, ExternalLink, Copy, Search } from 'lucide-react';
+import { Link as LinkIcon, ExternalLink, Copy, Search, CalendarCheck } from 'lucide-react'; // Changed icon for header
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface MeetingLink {
-  // Using 'link' as the unique identifier for rendering and fetching.
-  // This matches your confirmed table structure.
   link: string;
   subject: string;
   batch: string;
@@ -19,7 +17,7 @@ interface MeetingLink {
 const LinksSkeleton = () => (
     <div className="space-y-4">
         {[...Array(3)].map((_, i) => (
-            <Card key={i} className="p-4">
+            <Card key={i} className="p-4 rounded-xl"> {/* Rounded corners for cards */}
                 <div className="space-y-3">
                     <div className="flex items-center gap-3">
                         <Skeleton className="h-8 w-8 rounded-full" />
@@ -66,8 +64,7 @@ export const AdminMeetingManager = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('meeting_links') // Querying 'meeting_links' table
-        // Select ONLY the columns you confirmed are present
-        .select('link, subject, batch') 
+        .select('link, subject, batch')
         .order('batch, subject');
       
       if (error) {
@@ -83,33 +80,44 @@ export const AdminMeetingManager = () => {
     navigator.clipboard.writeText(link);
     toast({
       title: 'Link Copied',
-      description: 'The meeting link has been copied to your clipboard.',
+      description: 'The session link has been copied to your clipboard.', // Updated text
     });
   };
   
   return (
-    <div className="space-y-8 p-6 bg-gray-50/50 min-h-full">
-      {/* Header Section */}
-      <div>
-          <h1 className="text-3xl font-bold text-gray-800 flex items-center">
-            <LinkIcon className="mr-3 h-8 w-8 text-primary" />
-            All Meeting Links (meeting_links table) {/* Indicate which table is being used */}
-          </h1>
-          <p className="text-gray-500 mt-1">A real-time list of all links.</p>
-      </div>
+    <div className="space-y-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 min-h-full"> {/* Gradient background */}
+      {/* Header Section - Enhanced Design */}
+      <div className="relative p-8 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-r from-blue-600 to-indigo-700 text-white animate-fade-in-up">
+            {/* Animated background circles */}
+            <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/10 rounded-full animate-pulse-slow"></div>
+            <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-white/10 rounded-full animate-pulse-slow animation-delay-500"></div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white/10 rounded-full animate-pulse-slow animation-delay-1000"></div>
 
-      {/* Links List */}
+            <div className="relative z-10 text-center">
+                <div className="flex items-center justify-center mb-4">
+                    <CalendarCheck className="h-16 w-16 text-blue-100 drop-shadow-md" /> {/* New icon */}
+                </div>
+                <h1 className="text-4xl md:text-5xl font-bold mb-2 tracking-tight drop-shadow-lg">
+                    Manage Online Sessions
+                </h1>
+                <p className="text-xl md:text-2xl text-blue-100 drop-shadow-sm font-semibold">
+                    Central hub for all class session links.
+                </p>
+            </div>
+        </div>
+
+      {/* Sessions List */}
       <div className="space-y-4">
         {isLoading ? (
             <LinksSkeleton />
         ) : meetingLinks.length > 0 ? (
           meetingLinks.map((meeting) => (
-            <Card key={meeting.link} className="bg-white hover:shadow-lg transition-shadow duration-300"> {/* Using meeting.link as key */}
+            <Card key={meeting.link} className="bg-white hover:shadow-lg transition-shadow duration-300 rounded-xl"> {/* Rounded cards */}
               <CardContent className="p-5 flex flex-col md:flex-row md:items-center md:justify-between">
                 <div className="flex-grow mb-4 md:mb-0">
                   <div className="flex items-center gap-3">
-                    <div className="bg-primary/10 p-2 rounded-full">
-                      <LinkIcon className="h-5 w-5 text-primary" />
+                    <div className="bg-blue-100 p-2 rounded-full"> {/* Updated icon background */}
+                      <LinkIcon className="h-5 w-5 text-blue-600" /> {/* Updated icon color */}
                     </div>
                     <div>
                         <h3 className="font-semibold text-gray-800">{meeting.subject}</h3>
@@ -125,6 +133,7 @@ export const AdminMeetingManager = () => {
                     variant="outline"
                     size="sm"
                     onClick={() => handleCopyLink(meeting.link)}
+                    className="text-blue-700 border-blue-300 hover:bg-blue-50" {/* Themed button */}
                   >
                     <Copy className="h-4 w-4 mr-2" />
                     Copy
@@ -132,20 +141,21 @@ export const AdminMeetingManager = () => {
                   <Button
                     size="sm"
                     onClick={() => window.open(meeting.link, '_blank')}
+                    className="bg-blue-600 hover:bg-blue-700 text-white" {/* Themed button */}
                   >
                     <ExternalLink className="h-4 w-4 mr-2" />
-                    Open Link
+                    Open Session
                   </Button>
                 </div>
               </CardContent>
             </Card>
           ))
         ) : (
-            <div className="text-center py-20 bg-white rounded-lg border-dashed border-2">
+            <div className="text-center py-20 bg-white rounded-lg border-dashed border-2 shadow-sm">
                 <Search className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-700">No Meeting Links Found</h3>
+                <h3 className="text-xl font-semibold text-gray-700">No Online Sessions Found</h3> {/* Updated text */}
                 <p className="text-muted-foreground mt-2 max-w-md mx-auto">
-                  No links available in the 'meeting_links' table, or the admin role lacks permission to view them. Please check the security policy.
+                  There are no active online class sessions. Please ensure the 'meeting_links' table is populated and accessible.
                 </p>
             </div>
         )}
