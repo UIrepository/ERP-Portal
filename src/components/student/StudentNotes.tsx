@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+// uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/student/StudentNotes.tsx
+import { useState, useMemo } from 'react';
+import { useQuery } => '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,6 +10,22 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileText, Download, Search } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+
+interface NotesContent {
+  id: string;
+  title: string;
+  filename: string;
+  subject: string;
+  batch: string;
+  file_url: string;
+  tags?: string[];
+  created_at: string;
+}
+
+interface UserEnrollment {
+    batch_name: string;
+    subject_name: string;
+}
 
 const NotesSkeleton = () => (
   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -33,33 +50,78 @@ const NotesSkeleton = () => (
 export const StudentNotes = () => {
   const { profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState<string>('all');
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
+  const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
 
-  const batches = Array.isArray(profile?.batch) ? profile.batch : [profile?.batch].filter(Boolean);
-
-  const { data: notes, isLoading } = useQuery({
-    queryKey: ['student-notes', batches, profile?.subjects],
+  // 1. Fetch user's specific enrollments from the new table
+  const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
+    queryKey: ['userEnrollments', profile?.user_id],
     queryFn: async () => {
-      if (!batches.length || !profile?.subjects) return [];
-      const { data } = await supabase
-        .from('notes')
-        .select('*')
-        .in('batch', batches)
-        .in('subject', profile.subjects)
-        .order('created_at', { ascending: false });
-      return data || [];
+        if (!profile?.user_id) return [];
+        const { data, error } = await supabase
+            .from('user_enrollments')
+            .select('batch_name, subject_name')
+            .eq('user_id', profile.user_id);
+        if (error) {
+            console.error("Error fetching user enrollments:", error);
+            return [];
+        }
+        return data || [];
     },
-    enabled: !!profile?.batch && !!profile?.subjects
+    enabled: !!profile?.user_id
   });
 
+  // Extract unique batches and subjects from the fetched enrollments for filter dropdowns
+  const availableBatches = useMemo(() => {
+    return Array.from(new Set(userEnrollments?.map(e => e.batch_name) || [])).sort();
+  }, [userEnrollments]);
+
+  const availableSubjects = useMemo(() => {
+    return Array.from(new Set(userEnrollments?.map(e => e.subject_name) || [])).sort();
+  }, [userEnrollments]);
+
+  // 2. Fetch Notes content based on specific enrolled combinations and selected filters
+  const { data: notes, isLoading: isLoadingNotesContent } = useQuery<NotesContent[]>({
+    queryKey: ['student-notes', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
+    queryFn: async (): Promise<NotesContent[]> => {
+        if (!userEnrollments || userEnrollments.length === 0) return [];
+
+        let query = supabase.from('notes').select('*');
+
+        // Dynamically build OR conditions for each specific enrolled combination
+        const combinationFilters = userEnrollments
+            .filter(enrollment =>
+                (selectedBatchFilter === 'all' || enrollment.batch_name === selectedBatchFilter) &&
+                (selectedSubjectFilter === 'all' || enrollment.subject_name === selectedSubjectFilter)
+            )
+            .map(enrollment => `(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
+
+        if (combinationFilters.length > 0) {
+            query = query.or(combinationFilters.join(','));
+        } else {
+            return []; // Return empty if no combinations match filters
+        }
+        
+        query = query.order('created_at', { ascending: false });
+
+        const { data, error } = await query;
+      
+        if (error) {
+            console.error("Error fetching filtered Notes content:", error);
+            return [];
+        }
+        return (data || []) as NotesContent[];
+    },
+    enabled: !!userEnrollments && userEnrollments.length > 0 // Only run if enrollments are loaded and exist
+  });
+
+  // Client-side filtering only for search term
   const filteredNotes = notes?.filter(note => {
     const matchesSearch = !searchTerm || 
       note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       note.filename.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesSubject = selectedSubject === 'all' || note.subject === selectedSubject;
-    
-    return matchesSearch && matchesSubject;
+    return matchesSearch;
   });
 
   const logActivity = async (activityType: string, description: string, metadata?: any) => {
@@ -70,7 +132,7 @@ export const StudentNotes = () => {
       activity_type: activityType,
       description,
       metadata,
-      batch: batches.length > 0 ? batches[0] : null,
+      batch: availableBatches.length > 0 ? availableBatches[0] : null,
       subject: metadata.subject,
     });
   };
@@ -91,7 +153,7 @@ export const StudentNotes = () => {
     watermarkDiv.style.color = 'rgba(0, 0, 0, 0.1)';
     watermarkDiv.style.fontSize = '4vw';
     watermarkDiv.style.fontWeight = 'bold';
-    watermarkDiv.style.pointerEvents = 'none';
+    waterarkDiv.style.pointerEvents = 'none';
     watermarkDiv.style.textAlign = 'center';
     watermarkDiv.style.zIndex = '9999';
     watermarkDiv.textContent = watermarkText;
@@ -109,16 +171,21 @@ export const StudentNotes = () => {
     }, 1000);
   };
 
+  const isLoading = isLoadingEnrollments || isLoadingNotesContent;
+
   return (
     <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
       {/* Header Section */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Notes & Resources</h1>
+          <h1 className="text-3xl font-bold text-gray-800 flex items-center">
+            <FileText className="mr-3 h-8 w-8 text-primary" />
+            Notes & Resources
+          </h1>
           <p className="text-gray-500 mt-1">Download your class notes and materials here.</p>
         </div>
         <div className="flex gap-2">
-          <Badge variant="outline">Batches: {batches.join(', ')}</Badge>
+          <Badge variant="outline">Batches: {availableBatches.join(', ')}</Badge>
         </div>
       </div>
 
@@ -133,13 +200,24 @@ export const StudentNotes = () => {
             className="pl-10 h-10"
           />
         </div>
-        <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+        <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
+          <SelectTrigger className="w-48 h-10">
+            <SelectValue placeholder="Filter by batch" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Batches</SelectItem>
+            {availableBatches.map((batch) => (
+              <SelectItem key={batch} value={batch}>{batch}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={selectedSubjectFilter} onValueChange={setSelectedSubjectFilter}>
           <SelectTrigger className="w-48 h-10">
             <SelectValue placeholder="Filter by subject" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Subjects</SelectItem>
-            {profile?.subjects?.map((subject) => (
+            {availableSubjects.map((subject) => (
               <SelectItem key={subject} value={subject}>{subject}</SelectItem>
             ))}
           </SelectContent>
