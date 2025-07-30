@@ -101,12 +101,11 @@ export const AdminMeetingManager = () => {
   // Set up real-time subscription to the schedules table
   useEffect(() => {
     const channel = supabase
-      .channel('schedules-realtime')
+      .channel('schedules-realtime-meetings')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'schedules' },
         (payload) => {
-          console.log('Change received!', payload);
           // When a change occurs, invalidate the query to refetch data
           queryClient.invalidateQueries({ queryKey: ['all-meeting-links'] });
         }
@@ -159,7 +158,7 @@ export const AdminMeetingManager = () => {
   if (isLoading) {
     return (
       <div className="p-6 space-y-6">
-        <Skeleton className="h-8 w-1/3" />
+        <Skeleton className="h-8 w-1/trd" />
         <div className="grid md:grid-cols-3 gap-6">
           <Skeleton className="h-96" />
           <Skeleton className="h-96" />
