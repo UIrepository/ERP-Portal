@@ -1,10 +1,9 @@
-// uirepository/teachgrid-hub/teachgrid-hub-18fb4b82a0e6ac673de0608908646c2131d885a1/src/components/admin/AdminFeedbackViewer.tsx
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquare, User, Calendar, Star, BarChart2, Loader2 } from 'lucide-react'; // Added Loader2
+import { MessageSquare, User, Calendar, Star, BarChart2, Loader2, AlertTriangle } from 'lucide-react'; // Added AlertTriangle
 import { format } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
