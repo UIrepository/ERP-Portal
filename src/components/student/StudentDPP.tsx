@@ -87,6 +87,7 @@ export const StudentDPP = () => {
 
   const displayedSubjects = useMemo(() => {
     if (!userEnrollments) return [];
+    // If a specific batch is selected, only show subjects associated with that batch
     if (selectedBatchFilter !== 'all') {
       return Array.from(new Set(
         userEnrollments
@@ -94,6 +95,7 @@ export const StudentDPP = () => {
           .map(e => e.subject_name)
       )).sort();
     }
+    // Otherwise (if 'All Batches' is selected), show all subjects available across all enrollments
     return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
   }, [userEnrollments, selectedBatchFilter]);
 
@@ -111,7 +113,7 @@ export const StudentDPP = () => {
         if (!userEnrollments || userEnrollments.length === 0) return [];
 
         let query = supabase.from('dpp_content').select('*')
-                            .eq('is_active', true); // Filter by is_active
+                            .eq('is_active', true); // Filter by is_active (assuming column exists)
 
         const combinationFilters = userEnrollments
             .filter(enrollment =>
