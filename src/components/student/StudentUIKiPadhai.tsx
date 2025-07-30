@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -86,7 +87,7 @@ export const StudentUIKiPadhai = () => {
     queryKey: ['student-ui-ki-padhai', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
     queryFn: async (): Promise<UIKiPadhaiContent[]> => {
         if (!userEnrollments || userEnrollments.length === 0) return [];
-        let query = supabase.from('ui_ki_padhai_content').select('*').eq('is_active', true);
+        let query = supabase.from('ui_ki_padhai_content').select('id, title, description, category, link, is_active, created_at, batch, subject').eq('is_active', true);
 
         const combinationFilters = userEnrollments
             .filter(enrollment =>

@@ -1,3 +1,4 @@
+
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -52,16 +53,16 @@ export const EnrollmentAnalytics = () => {
     }
 
     const chartData = allBatches.map(batch => {
-      const batchCounts: { name: string; [subject: string]: number } = { name: batch };
+      const batchData: Record<string, any> = { batch: batch }; // Use 'batch' instead of 'name'
       allSubjects.forEach(subject => {
-        batchCounts[subject] = students.filter(
+        batchData[subject] = students.filter(
           s => {
             const batches = Array.isArray(s.batch) ? s.batch : [s.batch];
             return batches.includes(batch) && s.subjects?.includes(subject)
           }
         ).length;
       });
-      return batchCounts;
+      return batchData;
     });
 
     return {
@@ -146,7 +147,7 @@ export const EnrollmentAnalytics = () => {
           <ResponsiveContainer width="100%" height={400}>
             <BarChart data={analyticsData.chartData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+              <XAxis dataKey="batch" tick={{ fontSize: 12 }} />
               <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
               <Tooltip />
               <Legend />
