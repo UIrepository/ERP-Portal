@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,6 +18,7 @@ interface Schedule {
   start_time: string;
   end_time: string;
   link?: string;
+  date?: string; // Added date field
 }
 
 interface UserEnrollment {
@@ -60,7 +60,6 @@ export const StudentSchedule = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch user's specific enrollments
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['userEnrollments', profile?.user_id],
     queryFn: async () => {
@@ -78,17 +77,16 @@ export const StudentSchedule = () => {
     enabled: !!profile?.user_id
   });
 
-  // Available batches for the filter dropdown
   const availableBatches = useMemo(() => {
     return Array.from(new Set(userEnrollments?.map(e => e.batch_name) || [])).sort();
   }, [userEnrollments]);
 
-  // Reset selected batch filter if it becomes invalid
-  if (selectedBatchFilter !== 'all' && !availableBatches.includes(selectedBatchFilter)) {
-      setSelectedBatchFilter('all');
-  }
+  useEffect(() => {
+    if (selectedBatchFilter !== 'all' && !availableBatches.includes(selectedBatchFilter)) {
+        setSelectedBatchFilter('all');
+    }
+  }, [selectedBatchFilter, availableBatches]);
 
-  // Directly fetch schedules from the 'schedules' table
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
     queryKey: ['student-schedule-direct', userEnrollments, selectedBatchFilter],
     queryFn: async (): Promise<Schedule[]> => {
@@ -96,7 +94,7 @@ export const StudentSchedule = () => {
 
         let query = supabase.from('schedules').select('*');
 
-        let batchesToFilter = selectedBatchFilter === 'all'
+        const batchesToFilter = selectedBatchFilter === 'all'
             ? Array.from(new Set(userEnrollments.map(e => e.batch_name)))
             : [selectedBatchFilter];
 
@@ -118,68 +116,26 @@ export const StudentSchedule = () => {
     enabled: !!userEnrollments && userEnrollments.length > 0
   });
 
-  // Set up real-time subscriptions for schedule data
-  useEffect(() => {
-    if (!profile?.user_id) return;
-
-    const scheduleChannel = supabase
-      .channel('schedule-realtime-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'schedules'
-        },
-        () => {
-          console.log('Real-time update: schedules changed');
-          queryClient.invalidateQueries({ queryKey: ['student-schedule-direct'] });
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'meeting_links'
-        },
-        () => {
-          console.log('Real-time update: meeting_links changed');
-          queryClient.invalidateQueries({ queryKey: ['student-schedule-direct'] });
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_enrollments',
-          filter: `user_id=eq.${profile.user_id}`
-        },
-        () => {
-          console.log('Real-time update: user_enrollments changed');
-          queryClient.invalidateQueries({ queryKey: ['userEnrollments'] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(scheduleChannel);
-    };
-  }, [profile?.user_id, queryClient]);
-
   const isLoading = isLoadingEnrollments || isLoadingSchedules;
 
-  if (isLoading) {
-    return <ScheduleSkeleton />;
-  }
-
   const groupedSchedules = schedules?.reduce((acc, schedule) => {
-    const day = DAYS[schedule.day_of_week];
+    const day = schedule.date ? format(new Date(schedule.date), 'eeee, MMMM do') : DAYS[schedule.day_of_week];
     if (!acc[day]) acc[day] = [];
     acc[day].push(schedule);
     return acc;
   }, {} as Record<string, Schedule[]>);
+
+  const orderedDays = useMemo(() => {
+      if (!groupedSchedules) return [];
+      return Object.keys(groupedSchedules).sort((a, b) => {
+          const aIsDay = DAYS.includes(a);
+          const bIsDay = DAYS.includes(b);
+          if (aIsDay && !bIsDay) return -1;
+          if (!aIsDay && bIsDay) return 1;
+          if (aIsDay && bIsDay) return DAYS.indexOf(a) - DAYS.indexOf(b);
+          return new Date(a).getTime() - new Date(b).getTime();
+      });
+  }, [groupedSchedules]);
 
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
@@ -187,22 +143,16 @@ export const StudentSchedule = () => {
     date.setHours(parseInt(hours), parseInt(minutes));
     return format(date, 'h:mm a');
   };
-
+  
   const isCurrentTime = (dayIndex: number, startTime: string, endTime: string) => {
     const now = new Date();
     const currentDay = now.getDay();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    const currentTimeMinutes = currentHour * 60 + currentMinute;
-
+    const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
     const [startHour, startMin] = startTime.split(':').map(Number);
     const [endHour, endMin] = endTime.split(':').map(Number);
     const startTimeMinutes = startHour * 60 + startMin;
     const endTimeMinutes = endHour * 60 + endMin;
-
-    return dayIndex === currentDay && 
-           currentTimeMinutes >= startTimeMinutes && 
-           currentTimeMinutes <= endTimeMinutes;
+    return dayIndex === currentDay && currentTimeMinutes >= startTimeMinutes && currentTimeMinutes <= endTimeMinutes;
   };
 
   return (
@@ -218,7 +168,6 @@ export const StudentSchedule = () => {
         </div>
       </div>
 
-      {/* Filter Section - Only Batch Filter */}
       <div className="flex gap-4">
         <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
           <SelectTrigger className="w-48 h-10">
@@ -233,8 +182,9 @@ export const StudentSchedule = () => {
         </Select>
       </div>
 
+      {isLoading ? <ScheduleSkeleton /> : (
       <div className="grid gap-6">
-        {DAYS.map((day, index) => (
+        {orderedDays.map((day) => (
           <Card key={day} className="overflow-hidden">
             <CardHeader className="bg-white border-b">
               <CardTitle className="flex items-center gap-2">
@@ -248,11 +198,7 @@ export const StudentSchedule = () => {
                   {groupedSchedules[day].map((schedule) => (
                     <div 
                       key={schedule.id} 
-                      className={`p-4 border-b last:border-b-0 transition-colors ${
-                        isCurrentTime(schedule.day_of_week, schedule.start_time, schedule.end_time)
-                          ? 'bg-blue-50 border-blue-200'
-                          : 'hover:bg-gray-50'
-                      }`}
+                      className={`p-4 border-b last:border-b-0 transition-colors ${ isCurrentTime(schedule.day_of_week, schedule.start_time, schedule.end_time) && !schedule.date ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50' }`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -263,16 +209,10 @@ export const StudentSchedule = () => {
                                 {formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}
                               </span>
                             </div>
-                            {isCurrentTime(schedule.day_of_week, schedule.start_time, schedule.end_time) && (
-                              <Badge variant="default" className="bg-blue-600">Live</Badge>
-                            )}
+                            {isCurrentTime(schedule.day_of_week, schedule.start_time, schedule.end_time) && !schedule.date && <Badge variant="default" className="bg-blue-600">Live</Badge>}
                           </div>
-                          <h4 className="text-lg font-semibold text-gray-900 mt-1">
-                            {schedule.subject}
-                          </h4>
-                          <Badge variant="outline" className="mt-2">
-                            {schedule.batch}
-                          </Badge>
+                          <h4 className="text-lg font-semibold text-gray-900 mt-1">{schedule.subject}</h4>
+                          <Badge variant="outline" className="mt-2">{schedule.batch}</Badge>
                         </div>
                         {schedule.link && (
                           <Button size="sm" asChild>
@@ -295,6 +235,7 @@ export const StudentSchedule = () => {
           </Card>
         ))}
       </div>
+      )}
     </div>
   );
 };
