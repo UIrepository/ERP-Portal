@@ -88,12 +88,12 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
             .eq('user_id', profile.user_id);
         if (error) {
             console.error("Error fetching user enrollments:", error);
-            throw error; // Throw error so react-query can catch it and set isError
+            throw error;
         }
         return data || [];
     },
     enabled: !!profile?.user_id,
-    retry: 1 // Retry once on failure
+    retry: 1
   });
 
   const { data: allSchedules, isLoading: isLoadingAllSchedules, isError: isAllSchedulesError } = useQuery<Schedule[]>({
@@ -104,7 +104,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
       let query = supabase.from('schedules').select('*');
 
       const combinationFilters = userEnrollments
-          .map(enrollment => `(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
+          .map(enrollment => `and(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`); // Changed to use and()
 
       if (combinationFilters.length > 0) {
           query = query.or(combinationFilters.join(','));
@@ -176,7 +176,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
         `);
 
       const combinationFilters = userEnrollments
-          .map(enrollment => `(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
+          .map(enrollment => `and(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`); // Changed to use and()
 
       if (combinationFilters.length > 0) {
           query = query.or(combinationFilters.join(','));
@@ -235,7 +235,6 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     );
   }
 
-  // Handle case where enrollments fetch succeeds but returns no data or an error occurred
   if (!userEnrollments || userEnrollments.length === 0 || hasErrors) {
     return (
       <div className="p-6 bg-gradient-to-br from-gray-50 to-white min-h-screen flex items-center justify-center">
@@ -253,7 +252,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
             }
           </p>
           <Button 
-            onClick={() => onTabChange('dashboard')} // Redirect to dashboard or home
+            onClick={() => onTabChange('dashboard')}
             size="lg" 
             variant="outline" 
             className="text-primary border-primary hover:bg-primary hover:text-white animate-fade-in-up animation-delay-600"
