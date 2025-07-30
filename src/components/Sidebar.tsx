@@ -1,3 +1,4 @@
+// uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/Sidebar.tsx
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { 
@@ -87,17 +88,22 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const formatArrayString = (arr: string | string[] | null | undefined) => {
     if (!arr) return '';
     if (Array.isArray(arr)) {
+      // For actual arrays, remove any quotes from individual string items
       return arr.map(item => typeof item === 'string' ? item.replace(/"/g, '') : item).join(', ');
     }
     try {
+      // Attempt to parse as JSON array string (e.g., "[\"Item1\", \"Item2\"]")
       const parsed = JSON.parse(arr);
       if (Array.isArray(parsed)) {
         return parsed.map(item => typeof item === 'string' ? item.replace(/"/g, '') : item).join(', ');
       }
     } catch (e) {
-      return String(arr).replace(/"/g, '').replace(/[\[\]]/g, '');
+      // If parsing fails (e.g., it's a raw string like "\Re Attempt\"),
+      // remove all quotes, brackets, AND backslashes.
+      return String(arr).replace(/[\\"\\[\\]]/g, ''); // Modified line
     }
-    return String(arr).replace(/"/g, '').replace(/[\[\]]/g, '');
+    // Fallback for any other string format
+    return String(arr).replace(/[\\"\\[\\]]/g, ''); // Modified line
   };
   return (
     <div className="w-64 bg-white border-r border-gray-200 h-full flex flex-col">
