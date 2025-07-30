@@ -7,10 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
-import { MessageSquare, Send, CheckCircle, Star, Sparkles } from 'lucide-react';
+import { MessageSquare, Send, CheckCircle, Star, Sparkles, XCircle } from 'lucide-react'; // Added XCircle for dialog close button
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge'; // Added Badge import
+import { Badge } from '@/components/ui/badge';
 
 // Define the structure for an enrollment record from the new table
 interface UserEnrollment {
@@ -37,7 +37,7 @@ const StarRating = ({ rating, setRating }: { rating: number, setRating: (rating:
     {[1, 2, 3, 4, 5].map((star) => (
       <Star
         key={star}
-        className={`cursor-pointer ${rating >= star ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
+        className={`cursor-pointer transition-colors duration-200 ${rating >= star ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 hover:text-gray-400'}`}
         onClick={() => setRating(star)}
       />
     ))}
@@ -77,18 +77,17 @@ export const StudentFeedback = () => {
 
   // Fetch already submitted feedback to mark tasks as completed
   const { data: submittedFeedback = [], isLoading: isLoadingSubmittedFeedback } = useQuery({
-    queryKey: ['student-submitted-feedback', profile?.user_id, userEnrollments], // Add userEnrollments to dependency
+    queryKey: ['student-submitted-feedback', profile?.user_id, userEnrollments],
     queryFn: async () => {
       if (!profile?.user_id || !userEnrollments || userEnrollments.length === 0) return [];
       
-      // Fetch feedback only for combinations the user is enrolled in
-      const combinations = userEnrollments.map(e => `and(batch.eq.${e.batch_name},subject.eq.${e.subject_name})`).join(','); // Fixed: Use and()
+      const combinations = userEnrollments.map(e => `and(batch.eq.${e.batch_name},subject.eq.${e.subject_name})`).join(',');
 
       const { data, error } = await supabase
         .from('feedback')
         .select('batch, subject')
         .eq('submitted_by', profile?.user_id)
-        .or(combinations); // Filter by user's specific enrolled combinations
+        .or(combinations);
 
       if (error) {
         console.error("Error fetching submitted feedback:", error);
@@ -96,7 +95,7 @@ export const StudentFeedback = () => {
       }
       return data || [];
     },
-    enabled: !!profile?.user_id && !!userEnrollments && userEnrollments.length > 0, // Enable when user and enrollments are loaded
+    enabled: !!profile?.user_id && !!userEnrollments && userEnrollments.length > 0,
   });
 
   // Generate feedback tasks based on userEnrollments
@@ -127,7 +126,7 @@ export const StudentFeedback = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-submitted-feedback'] });
-      toast({ title: 'Success', description: 'Thank you for your valuable feedback!', variant: "success" }); // Added success variant
+      toast({ title: 'Success', description: 'Thank you for your valuable feedback!', variant: "success" });
       setIsDialogOpen(false);
       resetForm();
     },
@@ -249,18 +248,25 @@ export const StudentFeedback = () => {
       </div>
       
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl" onInteractOutside={(e) => e.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold">Feedback for {selectedFeedbackTask?.subject} ({selectedFeedbackTask?.batch})</DialogTitle>
-            <CardDescription>Your insights are highly valued and will help us improve.</CardDescription>
+        <DialogContent className="max-w-2xl bg-white p-0 rounded-2xl overflow-hidden shadow-2xl transform transition-all animate-fade-in-up"> {/* Enhanced DialogContent */}
+          <DialogHeader className="relative p-6 bg-gradient-to-r from-blue-500 to-indigo-600 text-white"> {/* Enhanced Header */}
+            <DialogTitle className="text-2xl font-bold flex items-center justify-center gap-2">
+                <MessageSquare className="h-6 w-6" /> Feedback for {selectedFeedbackTask?.subject} ({selectedFeedbackTask?.batch})
+            </DialogTitle>
+            <CardDescription className="text-blue-100 text-center mt-2">Your insights are highly valued and will help us improve.</CardDescription>
+            <DialogClose asChild>
+                <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white hover:bg-white/20">
+                    <XCircle className="h-6 w-6" />
+                </Button>
+            </DialogClose>
           </DialogHeader>
-          <div className="space-y-6 py-4">
+          <div className="space-y-6 py-6 px-6"> {/* Added padding for content */}
             {questions.map(({ key, text }) => (
-              <div key={key}>
-                <label className="font-medium flex items-center gap-2 mb-2">
+              <div key={key} className="p-4 border border-gray-200 rounded-lg bg-gray-50"> {/* Individual question card */}
+                <label className="font-semibold text-gray-700 flex items-center gap-2 mb-3">
                     <Sparkles className="h-4 w-4 text-yellow-500" /> {text}
                 </label>
-                <div className="mt-2">
+                <div>
                   <StarRating 
                     rating={ratings[key as keyof typeof ratings]} 
                     setRating={(rating) => setRatings(prev => ({ ...prev, [key]: rating }))} 
@@ -269,11 +275,11 @@ export const StudentFeedback = () => {
               </div>
             ))}
             <div>
-              <label className="font-medium flex items-center gap-2 mb-2">
+              <label className="font-semibold text-gray-700 flex items-center gap-2 mb-3">
                 <MessageSquare className="h-4 w-4 text-primary" /> Additional Comments (Mandatory)
               </label>
               <Textarea 
-                className="mt-2 bg-gray-50 border-gray-200 focus-visible:ring-primary/50"
+                className="mt-2 bg-white border-gray-300 focus-visible:ring-primary/50 shadow-sm" // More integrated styling
                 rows={4}
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
@@ -281,11 +287,13 @@ export const StudentFeedback = () => {
               />
             </div>
           </div>
-          <DialogFooter className="flex-col sm:flex-row">
+          <DialogFooter className="flex-col sm:flex-row p-6 border-t border-gray-100 bg-gray-50"> {/* Enhanced Footer */}
             <DialogClose asChild>
-                <Button variant="outline" onClick={resetForm} className="w-full sm:w-auto">Cancel</Button>
+                <Button variant="outline" onClick={resetForm} className="w-full sm:w-auto text-gray-700 border-gray-300 hover:bg-gray-100">Cancel</Button>
             </DialogClose>
-            <Button onClick={handleSubmit} className="w-full sm:w-auto bg-primary hover:bg-primary/90"><Send className="mr-2 h-4 w-4"/>Submit Feedback</Button>
+            <Button onClick={handleSubmit} className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white font-semibold">
+                <Send className="mr-2 h-4 w-4"/>Submit Feedback
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
