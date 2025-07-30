@@ -17,7 +17,7 @@ interface Schedule {
   start_time: string;
   end_time: string;
   link?: string; // Direct link from schedules table (if exists)
-  meeting_link_url?: string; // New field for the link returned by RPC function
+  meeting_link_url?: string; // Link from joined meeting_links table via RPC
 }
 
 interface OngoingClass {
@@ -82,7 +82,6 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
   const currentDay = now.getDay();
   const currentTimeStr = format(now, 'HH:mm:ss'); // Format to 'HH:mm:ss' for TIME type in Postgres
 
-  // RPC call to get ALL relevant schedules for the user
   const { data: allSchedules, isLoading: isLoadingAllSchedules, isError: isAllSchedulesError } = useQuery<Schedule[]>({
     queryKey: ['allStudentSchedulesRPC', profile?.user_id],
     queryFn: async (): Promise<Schedule[]> => {
@@ -104,7 +103,6 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     enabled: !!profile?.user_id
   });
 
-  // RPC call to get the ONGOING class
   const { data: ongoingClass, isLoading: isLoadingOngoingClass, isError: isOngoingClassError } = useQuery<OngoingClass | null>({
     queryKey: ['ongoingClassRPC', profile?.user_id, currentDay, currentTimeStr],
     queryFn: async (): Promise<OngoingClass | null> => {
