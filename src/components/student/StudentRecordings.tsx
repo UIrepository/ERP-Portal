@@ -8,9 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Video, Play, Search } from 'lucide-react';
+import { Video, Play, Search, ExternalLink } from 'lucide-react'; // Added ExternalLink import
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { format } from 'date-fns'; // Corrected import: removed 's'
+import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface RecordingContent {
@@ -69,7 +69,6 @@ export const StudentRecordings = () => {
     enabled: !!profile?.user_id
   });
 
-  // Derived state for filter options, implementing cascading logic
   const displayedBatches = useMemo(() => {
     if (!userEnrollments) return [];
     if (selectedSubjectFilter === 'all') {
@@ -85,7 +84,6 @@ export const StudentRecordings = () => {
 
   const displayedSubjects = useMemo(() => {
     if (!userEnrollments) return [];
-    // If a specific batch is selected, only show subjects associated with that batch
     if (selectedBatchFilter !== 'all') {
       return Array.from(new Set(
         userEnrollments
@@ -93,11 +91,9 @@ export const StudentRecordings = () => {
           .map(e => e.subject_name)
       )).sort();
     }
-    // Otherwise (if 'All Batches' is selected), show all subjects available across all enrollments
     return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
   }, [userEnrollments, selectedBatchFilter]);
 
-  // Ensure selected filters are still valid when options change
   if (selectedBatchFilter !== 'all' && !displayedBatches.includes(selectedBatchFilter)) {
       setSelectedBatchFilter('all');
   }
@@ -122,7 +118,7 @@ export const StudentRecordings = () => {
         if (combinationFilters.length > 0) {
             query = query.or(combinationFilters.join(','));
         } else {
-            return []; // Return empty if no combinations match filters
+            return [];
         }
         
         query = query.order('date', { ascending: false });
