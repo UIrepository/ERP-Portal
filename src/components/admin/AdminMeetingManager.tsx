@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, parse, isWithinInterval, isAfter, isBefore, getDay, set } from 'date-fns';
+import { format, parse, isWithinInterval, isAfter, getDay, set } from 'date-fns';
 import { ExternalLink, Clock, Calendar, Video } from 'lucide-react';
 
 interface Schedule {
@@ -96,7 +96,7 @@ export const AdminMeetingManager = () => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'schedules' },
         () => {
-          queryClient.invalidateQueries({ queryKey: ['all-meeting-links'] });
+          queryClient.invalidateQueries({ queryKey: ['all-meeting-links-daily'] });
         }
       )
       .subscribe();
@@ -108,7 +108,7 @@ export const AdminMeetingManager = () => {
 
   // Fetch all schedules with a meeting link
   const { data: schedules = [], isLoading } = useQuery<Schedule[]>({
-    queryKey: ['all-meeting-links'],
+    queryKey: ['all-meeting-links-daily'],
     queryFn: async (): Promise<Schedule[]> => {
       const { data, error } = await supabase.from('schedules').select('*').not('link', 'is', null);
       if (error) throw error;
@@ -129,8 +129,8 @@ export const AdminMeetingManager = () => {
       const startTime = parse(schedule.start_time, 'HH:mm:ss', new Date());
       const endTime = parse(schedule.end_time, 'HH:mm:ss', new Date());
 
-      const classStartDateTime = set(now, { hours: startTime.getHours(), minutes: startTime.getMinutes() });
-      const classEndDateTime = set(now, { hours: endTime.getHours(), minutes: endTime.getMinutes() });
+      const classStartDateTime = set(now, { hours: startTime.getHours(), minutes: startTime.getMinutes(), seconds: 0 });
+      const classEndDateTime = set(now, { hours: endTime.getHours(), minutes: endTime.getMinutes(), seconds: 0 });
 
       if (isWithinInterval(now, { start: classStartDateTime, end: classEndDateTime })) {
         ongoing.push(schedule);
