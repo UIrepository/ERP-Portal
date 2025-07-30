@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -97,13 +96,19 @@ export const StudentNotes = () => {
     return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
   }, [userEnrollments, selectedBatchFilter]);
 
-  // Ensure selected filters are still valid when options change
-  if (selectedBatchFilter !== 'all' && !displayedBatches.includes(selectedBatchFilter)) {
-      setSelectedBatchFilter('all');
-  }
-  if (selectedSubjectFilter !== 'all' && !displayedSubjects.includes(selectedSubjectFilter)) {
-      setSelectedSubjectFilter('all');
-  }
+  // FIX: Moved filter reset logic into useEffect hooks
+  useEffect(() => {
+    if (selectedBatchFilter !== 'all' && !displayedBatches.includes(selectedBatchFilter)) {
+        setSelectedBatchFilter('all');
+    }
+  }, [selectedBatchFilter, displayedBatches]);
+
+  useEffect(() => {
+      if (selectedSubjectFilter !== 'all' && !displayedSubjects.includes(selectedSubjectFilter)) {
+          setSelectedSubjectFilter('all');
+      }
+  }, [selectedSubjectFilter, displayedSubjects]);
+
 
   const { data: notes, isLoading: isLoadingNotesContent } = useQuery<NotesContent[]>({
     queryKey: ['student-notes', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
