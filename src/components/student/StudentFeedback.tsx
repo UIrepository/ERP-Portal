@@ -1,3 +1,4 @@
+// uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/student/StudentFeedback.tsx
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,6 +9,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
 import { MessageSquare, Send, CheckCircle, Star } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
+
+// Define the structure for an enrollment record from the new table
+interface UserEnrollment {
+    batch_name: string;
+    subject_name: string;
+}
 
 const StarRating = ({ rating, setRating }: { rating: number, setRating: (rating: number) => void }) => (
   <div className="flex gap-1">
@@ -34,7 +41,26 @@ export const StudentFeedback = () => {
   });
   const [comments, setComments] = useState('');
 
-  const { data: submittedFeedback = [] } = useQuery({
+  // 1. Fetch user's specific enrollments from the new table
+  const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
+    queryKey: ['userEnrollments', profile?.user_id],
+    queryFn: async () => {
+        if (!profile?.user_id) return [];
+        const { data, error } = await supabase
+            .from('user_enrollments')
+            .select('batch_name, subject_name')
+            .eq('user_id', profile.user_id);
+        if (error) {
+            console.error("Error fetching user enrollments:", error);
+            return [];
+        }
+        return data || [];
+    },
+    enabled: !!profile?.user_id
+  });
+
+  // Fetch already submitted feedback to mark tasks as completed
+  const { data: submittedFeedback = [], isLoading: isLoadingSubmittedFeedback } = useQuery({
     queryKey: ['student-submitted-feedback', profile?.user_id],
     queryFn: async () => {
       const { data } = await supabase
@@ -46,24 +72,22 @@ export const StudentFeedback = () => {
     enabled: !!profile?.user_id,
   });
 
+  // Generate feedback tasks based on userEnrollments
   const feedbackTasks = useMemo(() => {
-    const batches = Array.isArray(profile?.batch) ? profile.batch : [profile?.batch].filter(Boolean);
-    if (!batches.length || !profile?.subjects) return [];
+    if (!userEnrollments) return [];
     
     const tasks: { batch: string; subject: string; submitted: boolean }[] = [];
     const submittedSet = new Set(submittedFeedback.map(f => `${f.batch}-${f.subject}`));
 
-    batches.forEach(batch => {
-      profile.subjects?.forEach(subject => {
+    userEnrollments.forEach(enrollment => {
         tasks.push({
-          batch,
-          subject,
-          submitted: submittedSet.has(`${batch}-${subject}`),
+            batch: enrollment.batch_name,
+            subject: enrollment.subject_name,
+            submitted: submittedSet.has(`${enrollment.batch_name}-${enrollment.subject_name}`),
         });
-      });
     });
     return tasks;
-  }, [profile, submittedFeedback]);
+  }, [userEnrollments, submittedFeedback]);
 
   const submitFeedbackMutation = useMutation({
     mutationFn: async (feedbackData: any) => {
@@ -115,6 +139,16 @@ export const StudentFeedback = () => {
     { key: 'premium_content_usefulness', text: 'Are you finding UI ki Padhai premium contents useful?' },
   ];
 
+  const isLoading = isLoadingEnrollments || isLoadingSubmittedFeedback;
+
+  if (isLoading) {
+    return (
+        <div className="flex items-center justify-center h-64 bg-gray-50/50">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
       <div className="flex items-center justify-between">
@@ -133,22 +167,30 @@ export const StudentFeedback = () => {
           <CardDescription>Submit feedback for each of your enrolled batch and subject combinations.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {feedbackTasks.map((task, index) => (
-            <div key={index} className={`p-4 border rounded-lg flex items-center justify-between ${task.submitted ? 'bg-green-50 border-green-200' : 'bg-white'}`}>
-              <div>
-                <p className="font-semibold">{task.subject}</p>
-                <p className="text-sm text-muted-foreground">Batch: {task.batch}</p>
-              </div>
-              {task.submitted ? (
-                <div className="flex items-center gap-2 text-green-600">
-                  <CheckCircle className="h-5 w-5" />
-                  <span>Completed</span>
+          {feedbackTasks.length > 0 ? (
+            feedbackTasks.map((task, index) => (
+              <div key={index} className={`p-4 border rounded-lg flex items-center justify-between ${task.submitted ? 'bg-green-50 border-green-200' : 'bg-white'}`}>
+                <div>
+                  <p className="font-semibold">{task.subject}</p>
+                  <p className="text-sm text-muted-foreground">Batch: {task.batch}</p>
                 </div>
-              ) : (
-                <Button onClick={() => handleOpenDialog(task)}>Give Feedback</Button>
-              )}
+                {task.submitted ? (
+                  <div className="flex items-center gap-2 text-green-600">
+                    <CheckCircle className="h-5 w-5" />
+                    <span>Completed</span>
+                  </div>
+                ) : (
+                  <Button onClick={() => handleOpenDialog(task)}>Give Feedback</Button>
+                )}
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <MessageSquare className="h-12 w-12 mx-auto mb-4" />
+              <p>No feedback tasks found for your enrollments.</p>
+              <p className="text-sm mt-2">Ensure you are enrolled in batches and subjects via Admin.</p>
             </div>
-          ))}
+          )}
         </CardContent>
       </Card>
       
