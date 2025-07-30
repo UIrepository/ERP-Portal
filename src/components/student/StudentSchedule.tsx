@@ -6,10 +6,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Added for filters
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar, Clock, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
-import { Skeleton } from '@/components/ui/skeleton'; // Added for loading state
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Schedule {
   id: string;
@@ -21,7 +21,7 @@ interface Schedule {
   link?: string;
 }
 
-interface OngoingClass {
+interface OngoingClass { // This interface is defined here but not used in StudentSchedule, kept for consistency if copy-pasting components.
   subject: string;
   batch: string;
   start_time: string;
@@ -29,7 +29,6 @@ interface OngoingClass {
   meeting_link: string;
 }
 
-// Define the structure for an enrollment record from the new table
 interface UserEnrollment {
     batch_name: string;
     subject_name: string;
@@ -61,15 +60,14 @@ const ScheduleSkeleton = () => (
 export const StudentSchedule = () => {
   const { profile } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all'); // New filter state
-  const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all'); // New filter state
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
+  const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
 
-  // 1. Fetch user's specific enrollments from the new table
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['userEnrollments', profile?.user_id],
     queryFn: async () => {
@@ -87,16 +85,38 @@ export const StudentSchedule = () => {
     enabled: !!profile?.user_id
   });
 
-  // Extract unique batches and subjects from the fetched enrollments for filter dropdowns
   const availableBatches = useMemo(() => {
-    return Array.from(new Set(userEnrollments?.map(e => e.batch_name) || [])).sort();
-  }, [userEnrollments]);
+    if (!userEnrollments) return [];
+    if (selectedSubjectFilter === 'all') {
+      return Array.from(new Set(userEnrollments.map(e => e.batch_name))).sort();
+    } else {
+      return Array.from(new Set(
+        userEnrollments
+          .filter(e => e.subject_name === selectedSubjectFilter)
+          .map(e => e.batch_name)
+      )).sort();
+    }
+  }, [userEnrollments, selectedSubjectFilter]);
 
   const availableSubjects = useMemo(() => {
-    return Array.from(new Set(userEnrollments?.map(e => e.subject_name) || [])).sort();
-  }, [userEnrollments]);
+    if (!userEnrollments) return [];
+    if (selectedBatchFilter !== 'all') {
+      return Array.from(new Set(
+        userEnrollments
+          .filter(e => e.batch_name === selectedBatchFilter)
+          .map(e => e.subject_name)
+      )).sort();
+    }
+    return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
+  }, [userEnrollments, selectedBatchFilter]);
 
-  // 2. Fetch schedules based on specific enrolled combinations and selected filters
+  if (selectedBatchFilter !== 'all' && !availableBatches.includes(selectedBatchFilter)) {
+      setSelectedBatchFilter('all');
+  }
+  if (selectedSubjectFilter !== 'all' && !availableSubjects.includes(selectedSubjectFilter)) {
+      setSelectedSubjectFilter('all');
+  }
+
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
     queryKey: ['student-schedule', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
     queryFn: async (): Promise<Schedule[]> => {
@@ -104,7 +124,6 @@ export const StudentSchedule = () => {
 
         let query = supabase.from('schedules').select('*');
 
-        // Dynamically build OR conditions for each specific enrolled combination
         const combinationFilters = userEnrollments
             .filter(enrollment =>
                 (selectedBatchFilter === 'all' || enrollment.batch_name === selectedBatchFilter) &&
@@ -115,7 +134,7 @@ export const StudentSchedule = () => {
         if (combinationFilters.length > 0) {
             query = query.or(combinationFilters.join(','));
         } else {
-            return []; // Return empty if no combinations match filters
+            return [];
         }
 
         query = query.order('day_of_week').order('start_time');
@@ -124,69 +143,20 @@ export const StudentSchedule = () => {
       
         if (error) {
             console.error("Error fetching filtered schedules:", error);
-            throw error; // Propagate error for react-query
+            throw error;
         }
         return data || [];
     },
     enabled: !!userEnrollments && userEnrollments.length > 0
   });
 
-  const { data: ongoingClass, isLoading: isLoadingOngoingClass } = useQuery<OngoingClass | null>({
-    queryKey: ['ongoing-class', profile?.user_id, userEnrollments],
-    queryFn: async (): Promise<OngoingClass | null> => {
-      if (!profile?.user_id || !userEnrollments || userEnrollments.length === 0) return null;
+  // Note: ongoingClass logic is primarily within StudentCurrentClass.tsx, not here.
+  // This component's loading state only includes schedules and enrollments.
+  const isLoading = isLoadingEnrollments || isLoadingSchedules;
 
-      const now = new Date();
-      const currentDay = now.getDay();
-      const currentTimeStr = now.toTimeString().slice(0, 8);
-
-      let query = supabase
-        .from('schedules')
-        .select(`
-          subject,
-          batch,
-          start_time,
-          end_time,
-          meeting_links!inner (
-            link
-          )
-        `);
-
-      // Dynamically build OR conditions for each specific enrolled combination for ongoing class
-      const combinationFilters = userEnrollments
-          .map(enrollment => `(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
-
-      if (combinationFilters.length > 0) {
-          query = query.or(combinationFilters.join(','));
-      } else {
-          return null;
-      }
-
-      query = query
-        .eq('day_of_week', currentDay)
-        .lte('start_time', currentTimeStr)
-        .gte('end_time', currentTimeStr)
-        .eq('meeting_links.is_active', true)
-        .limit(1);
-
-      const { data: scheduleData, error: scheduleError } = await query;
-
-      if (scheduleError) throw scheduleError;
-
-      if (!scheduleData || scheduleData.length === 0) return null;
-
-      const schedule = scheduleData[0];
-      return {
-        subject: schedule.subject,
-        batch: schedule.batch,
-        start_time: schedule.start_time,
-        end_time: schedule.end_time,
-        meeting_link: (schedule.meeting_links as any)?.link || ''
-      };
-    },
-    enabled: !!profile?.user_id && !!userEnrollments && userEnrollments.length > 0,
-    refetchInterval: 30000 // Refetch every 30 seconds
-  });
+  if (isLoading) {
+    return <ScheduleSkeleton />;
+  }
 
   const groupedSchedules = schedules?.reduce((acc, schedule) => {
     const day = DAYS[schedule.day_of_week];
@@ -219,11 +189,6 @@ export const StudentSchedule = () => {
            currentTimeMinutes <= endTimeMinutes;
   };
 
-  const isLoading = isLoadingEnrollments || isLoadingSchedules || isLoadingOngoingClass;
-
-  if (isLoading) {
-    return <ScheduleSkeleton />;
-  }
 
   return (
     <div className="space-y-6 p-6 bg-gray-50 min-h-screen">
@@ -238,40 +203,8 @@ export const StudentSchedule = () => {
         </div>
       </div>
 
-      {ongoingClass && (
-        <Card className="border-green-200 bg-green-50">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="text-green-800 font-semibold">Live Class</span>
-                </div>
-                <h3 className="text-xl font-bold text-green-900">{ongoingClass.subject}</h3>
-                <p className="text-green-700">
-                  {formatTime(ongoingClass.start_time)} - {formatTime(ongoingClass.end_time)}
-                </p>
-                <Badge variant="outline" className="mt-2 border-green-300 text-green-800">
-                  {ongoingClass.batch}
-                </Badge>
-              </div>
-              {ongoingClass.meeting_link && (
-                <Button 
-                  onClick={() => window.open(ongoingClass.meeting_link, '_blank')}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Join Class
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Filter Section */}
       <div className="flex gap-4">
-        {/* Select for Batch filter */}
         <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
           <SelectTrigger className="w-48 h-10">
             <SelectValue placeholder="Filter by batch" />
@@ -283,8 +216,11 @@ export const StudentSchedule = () => {
             ))}
           </SelectContent>
         </Select>
-        {/* Select for Subject filter */}
-        <Select value={selectedSubjectFilter} onValueChange={setSelectedSubjectFilter}>
+        <Select
+          value={selectedSubjectFilter}
+          onValueChange={setSelectedSubjectFilter}
+          disabled={selectedBatchFilter === 'all'}
+        >
           <SelectTrigger className="w-48 h-10">
             <SelectValue placeholder="Filter by subject" />
           </SelectTrigger>
