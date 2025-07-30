@@ -60,7 +60,7 @@ const ScheduleSkeleton = () => (
 export const StudentSchedule = () => {
   const { profile } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
+  // Removed selectedSubjectFilter, as per request
   const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
 
   useEffect(() => {
@@ -87,13 +87,14 @@ export const StudentSchedule = () => {
 
   const availableBatches = useMemo(() => {
     if (!userEnrollments) return [];
-    // Batches can be filtered by selected subject, but always show all user's enrolled batches as top-level filter options
+    // Always show all batches the user is enrolled in as top-level filter options
     return Array.from(new Set(userEnrollments.map(e => e.batch_name))).sort();
   }, [userEnrollments]);
 
-  const availableSubjects = useMemo(() => {
+  // The displayedSubjects logic is simplified as it's no longer directly linked to a filter,
+  // but rather shows all subjects for the selected batch.
+  const allSubjectsInSelectedBatch = useMemo(() => {
     if (!userEnrollments) return [];
-    // If a specific batch is selected, show all subjects associated with that batch in user's enrollments
     if (selectedBatchFilter !== 'all') {
       return Array.from(new Set(
         userEnrollments
@@ -101,62 +102,41 @@ export const StudentSchedule = () => {
           .map(e => e.subject_name)
       )).sort();
     }
-    // If no specific batch is selected ('All Batches'), show all subjects the user is enrolled in
+    // If 'All Batches' is selected, show all subjects available across all enrollments.
     return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
   }, [userEnrollments, selectedBatchFilter]);
 
 
-  // Ensure selected filters are still valid when options change
+  // Ensure selected batch filter is still valid when options change
   if (selectedBatchFilter !== 'all' && !availableBatches.includes(selectedBatchFilter)) {
       setSelectedBatchFilter('all');
   }
-  // If selectedBatchFilter changes from 'all' to a specific batch, and the current selectedSubjectFilter is not valid for the new batch
-  // or if selectedBatchFilter becomes 'all' and selectedSubjectFilter is no longer valid
-  if (selectedSubjectFilter !== 'all' && !availableSubjects.includes(selectedSubjectFilter)) {
-      setSelectedSubjectFilter('all');
-  }
+  // Removed selectedSubjectFilter reset logic as filter is removed
 
 
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
-    queryKey: ['student-schedule', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
+    queryKey: ['student-schedule', userEnrollments, selectedBatchFilter], // Removed selectedSubjectFilter from queryKey
     queryFn: async (): Promise<Schedule[]> => {
         if (!userEnrollments || userEnrollments.length === 0) return [];
 
         let query = supabase.from('schedules').select('*');
 
-        // Initial filter based on user's full enrollments or selected batch
-        let baseBatches = selectedBatchFilter === 'all'
-            ? Array.from(new Set(userEnrollments.map(e => e.batch_name)))
-            : [selectedBatchFilter];
+        // Determine batches to filter by
+        let batchesToFilter = selectedBatchFilter === 'all'
+            ? Array.from(new Set(userEnrollments.map(e => e.batch_name))) // If 'All Batches' selected, consider all user's enrolled batches
+            : [selectedBatchFilter]; // Otherwise, just the selected batch
 
-        if (baseBatches.length === 0) return []; // No batches selected or available
+        if (batchesToFilter.length === 0) return []; // No batches selected or available, return empty
 
-        // Build main query filters
-        let combinedFilters: string[] = [];
+        // Build the OR filter for batches
+        const batchFilters = batchesToFilter.map(batchName => `(batch.eq.${batchName})`);
 
-        if (selectedSubjectFilter === 'all') {
-            // If subject is 'all', show all classes for the selected batch(es)
-            if (baseBatches.length > 0) {
-                combinedFilters = baseBatches.map(batch => `(batch.eq.${batch})`);
-            }
+        if (batchFilters.length > 0) {
+            query = query.or(batchFilters.join(','));
         } else {
-            // If a specific subject is selected, filter by that subject within the selected batch(es)
-            if (baseBatches.length > 0) {
-                baseBatches.forEach(batch => {
-                    // Only add combination if the user is enrolled in that specific batch-subject pair
-                    if (userEnrollments.some(e => e.batch_name === batch && e.subject_name === selectedSubjectFilter)) {
-                        combinedFilters.push(`(batch.eq.${batch},subject.eq.${selectedSubjectFilter})`);
-                    }
-                });
-            }
+            return []; // No batches, no schedules
         }
         
-        if (combinedFilters.length > 0) {
-            query = query.or(combinedFilters.join(','));
-        } else {
-            return []; // No matching filters/combinations, return empty
-        }
-
         query = query.order('day_of_week').order('start_time');
 
         const { data, error } = await query;
@@ -170,7 +150,7 @@ export const StudentSchedule = () => {
     enabled: !!userEnrollments && userEnrollments.length > 0
   });
 
-  const isLoading = isLoadingEnrollments || isLoadingSchedules; // Combined loading state without ongoingClass
+  const isLoading = isLoadingEnrollments || isLoadingSchedules;
 
   if (isLoading) {
     return <ScheduleSkeleton />;
@@ -221,7 +201,7 @@ export const StudentSchedule = () => {
         </div>
       </div>
 
-      {/* Filter Section */}
+      {/* Filter Section - Subject Filter Removed */}
       <div className="flex gap-4">
         <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
           <SelectTrigger className="w-48 h-10">
@@ -234,22 +214,7 @@ export const StudentSchedule = () => {
             ))}
           </SelectContent>
         </Select>
-        <Select
-          value={selectedSubjectFilter}
-          onValueChange={setSelectedSubjectFilter}
-          disabled={selectedBatchFilter === 'all'} // Subject filter disabled if 'All Batches' is selected
-        >
-          <SelectTrigger className="w-48 h-10">
-            <SelectValue placeholder="Filter by subject" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Subjects</SelectItem>
-            {/* Show subjects relevant to selected batch, or all available if 'All Batches' is chosen */}
-            {availableSubjects.map((subject) => (
-              <SelectItem key={subject} value={subject}>{subject}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* Subject filter is removed entirely */}
       </div>
 
       <div className="grid gap-6">
