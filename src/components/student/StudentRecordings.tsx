@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Video, Play, Search, ExternalLink } from 'lucide-react'; // Added ExternalLink import
+import { Video, Play, Search, ExternalLink } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -165,17 +165,30 @@ export const StudentRecordings = () => {
   };
 
   const WatermarkedPlayer = ({ recording }: { recording: any }) => (
-    <div className="relative aspect-video">
-        <iframe
+    <div
+      className="relative aspect-video"
+      onContextMenu={(e) => e.preventDefault()}
+      onKeyDown={(e) => {
+        if (e.ctrlKey && e.shiftKey && e.key === 'I') e.preventDefault();
+        if (e.ctrlKey && e.shiftKey && e.key === 'C') e.preventDefault();
+        if (e.ctrlKey && e.shiftKey && e.key === 'J') e.preventDefault();
+        if (e.ctrlKey && e.key === 'U') e.preventDefault();
+        if (e.key === 'F12') e.preventDefault();
+      }}
+    >
+      <iframe
         src={recording.embed_link}
         className="absolute top-0 left-0 w-full h-full rounded-lg"
         frameBorder="0"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         allowFullScreen
-        />
-        <div className="absolute top-2 right-2 bg-black/30 text-white/80 text-xs px-2 py-1 rounded pointer-events-none backdrop-blur-sm">
-        {profile?.name} - {profile?.email}
-        </div>
+      />
+      <div className="absolute top-2 left-2 bg-black/30 text-white/80 text-xs px-2 py-1 rounded pointer-events-none backdrop-blur-sm">
+        {profile?.email}
+      </div>
+      <div className="absolute bottom-2 right-2 pointer-events-none">
+        <img src="/imagelogo.png" alt="Logo" className="h-10 w-auto opacity-50" />
+      </div>
     </div>
   );
 
@@ -264,26 +277,16 @@ export const StudentRecordings = () => {
                         </div>
                       </div>
                     </div>
-                    <Button onClick={() => handleWatchRecording(recording)} className="w-full mt-5">
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      Watch Recording
-                    </Button>
+                    <DialogTrigger asChild>
+                      <Button onClick={() => handleWatchRecording(recording)} className="w-full mt-5">
+                        <Play className="h-4 w-4 mr-2" />
+                        Watch Recording
+                      </Button>
+                    </DialogTrigger>
                   </CardContent>
                 </Card>
                 <DialogContent className="max-w-4xl p-0 border-0">
-                  {/* WatermarkedPlayer component definition */}
-                  <div className="relative aspect-video">
-                      <iframe
-                      src={recording.embed_link}
-                      className="absolute top-0 left-0 w-full h-full rounded-lg"
-                      frameBorder="0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      />
-                      <div className="absolute top-2 right-2 bg-black/30 text-white/80 text-xs px-2 py-1 rounded pointer-events-none backdrop-blur-sm">
-                      {profile?.name} - {profile?.email}
-                      </div>
-                  </div>
+                  <WatermarkedPlayer recording={recording} />
                 </DialogContent>
               </Dialog>
             ))}
