@@ -2,7 +2,7 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { StudentSchedule } from './student/StudentSchedule';
-import { StudentCurrentClass } from './student/StudentCurrentClass'; // Updated import
+import { StudentCurrentClass } from './student/StudentCurrentClass';
 import { StudentRecordings } from './student/StudentRecordings';
 import { StudentNotes } from './student/StudentNotes';
 import { StudentDPP } from './student/StudentDPP';
@@ -12,7 +12,7 @@ import { StudentExams } from './student/StudentExams';
 import { FileText, Video, Target, MessageSquare, Calendar, Clock, Crown, BookOpen } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react'; // Added useMemo
 import { format } from 'date-fns';
 
 interface StudentDashboardProps {
@@ -20,8 +20,42 @@ interface StudentDashboardProps {
   onTabChange: (tab: string) => void;
 }
 
+// Define the structure for an enrollment record from the new table
+interface UserEnrollment {
+    batch_name: string;
+    subject_name: string;
+}
+
 export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardProps) => {
   const { profile } = useAuth();
+
+  // Fetch user's specific enrollments from the new table for dashboard display
+  const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
+    queryKey: ['dashboardUserEnrollments', profile?.user_id],
+    queryFn: async () => {
+        if (!profile?.user_id) return [];
+        const { data, error } = await supabase
+            .from('user_enrollments')
+            .select('batch_name, subject_name')
+            .eq('user_id', profile.user_id);
+        if (error) {
+            console.error("Error fetching dashboard user enrollments:", error);
+            return [];
+        }
+        return data || [];
+    },
+    enabled: !!profile?.user_id
+  });
+
+  // Extract unique batches and subjects from the fetched enrollments for display
+  const availableBatches = useMemo(() => {
+    return Array.from(new Set(userEnrollments?.map(e => e.batch_name) || [])).sort();
+  }, [userEnrollments]);
+
+  const availableSubjects = useMemo(() => {
+    return Array.from(new Set(userEnrollments?.map(e => e.subject_name) || [])).sort();
+  }, [userEnrollments]);
+
 
   // Note: These analytics queries currently rely on the old batch/subjects columns
   // or may need further refinement/creation of database views/functions
@@ -187,24 +221,22 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
     );
   }
   
-  // Note: profile.batch and profile.subjects are from the old profiles table.
-  // To display current active batches/subjects accurately, you would fetch them from user_enrollments
-  // and process them here (similar to how it's done in StudentDPP/Recordings/Notes).
-  const formatArrayString = (arr: string | string[] | null | undefined) => {
-    if (!arr) return '';
-    if (Array.isArray(arr)) {
-      return arr.map(item => typeof item === 'string' ? item.replace(/"/g, '') : item).join(', ');
-    }
-    try {
-      const parsed = JSON.parse(arr);
-      if (Array.isArray(parsed)) {
-        return parsed.map(item => typeof item === 'string' ? item.replace(/"/g, '') : item).join(', ');
-      }
-    } catch (e) {
-      return String(arr).replace(/"/g, '').replace(/[\[\]]/g, '');
-    }
-    return String(arr).replace(/"/g, '').replace(/[\[\]]/g, '');
-  };
+  // No longer needed to format Array<string | string[]> since availableBatches/Subjects are clean arrays
+  // const formatArrayString = (arr: string | string[] | null | undefined) => {
+  //   if (!arr) return '';
+  //   if (Array.isArray(arr)) {
+  //     return arr.map(item => typeof item === 'string' ? item.replace(/"/g, '') : item).join(', ');
+  //   }
+  //   try {
+  //     const parsed = JSON.parse(arr);
+  //     if (Array.isArray(parsed)) {
+  //       return parsed.map(item => typeof item === 'string' ? item.replace(/"/g, '') : item).join(', ');
+  //     }
+  //   } catch (e) {
+  //     return String(arr).replace(/"/g, '').replace(/[\[\]]/g, '');
+  //   }
+  //   return String(arr).replace(/"/g, '').replace(/[\[\]]/g, '');
+  // };
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -238,15 +270,30 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
             {profile?.name}
           </h1>
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
-            {/* These below lines should eventually be updated to reflect enrolledCombinations from user_enrollments
-                For now, they continue to use profile.batch/subjects from the old profiles table,
-                which might be removed in a later phase. */}
-            <div className="text-gray-600">
-              <span className="font-medium">Batch:</span> {formatArrayString(profile?.batch)} 
-            </div>
-            <div className="text-gray-600">
-              <span className="font-medium">Subjects:</span> {formatArrayString(profile?.subjects)}
-            </div>
+            {/* Updated to display batches from user_enrollments */}
+            {availableBatches.length > 0 && (
+              <div className="text-gray-600">
+                <span className="font-medium">Batches:</span> {availableBatches.join(', ')} 
+              </div>
+            )}
+            {/* Updated to display subjects from user_enrollments */}
+            {availableSubjects.length > 0 && (
+              <div className="text-gray-600">
+                <span className="font-medium">Subjects:</span> {availableSubjects.join(', ')}
+              </div>
+            )}
+            {/* Show a message if no enrollments are found */}
+            {availableBatches.length === 0 && availableSubjects.length === 0 && !isLoadingEnrollments && (
+                <div className="text-gray-600">
+                    <span className="font-medium">Enrollments:</span> No batches or subjects assigned.
+                </div>
+            )}
+            {isLoadingEnrollments && (
+                <div className="text-gray-600 flex items-center gap-2">
+                    <span className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-gray-400"></span>
+                    <span className="font-medium">Loading Enrollments...</span>
+                </div>
+            )}
           </div>
         </div>
 
