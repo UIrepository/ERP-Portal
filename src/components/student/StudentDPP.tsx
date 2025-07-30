@@ -100,19 +100,13 @@ export const StudentDPP = () => {
   }, [userEnrollments, selectedBatchFilter]);
 
   // Ensure selected filters are still valid when options change
-  // If the previously selected batch is no longer available, reset batch filter
   if (selectedBatchFilter !== 'all' && !displayedBatches.includes(selectedBatchFilter)) {
       setSelectedBatchFilter('all');
   }
-  // If a specific batch is selected, and the subject filter is not 'all'
-  // AND the currently selected subject is not in the newly filtered displayedSubjects, reset it.
-  // This handles the cascading reset for subjects when batch changes.
   if (selectedSubjectFilter !== 'all' && !displayedSubjects.includes(selectedSubjectFilter)) {
       setSelectedSubjectFilter('all');
   }
 
-
-  // 2. Fetch DPP content based on specific enrolled combinations and selected filters
   const { data: dppContent, isLoading: isLoadingDppContent } = useQuery<DPPContent[]>({
     queryKey: ['student-dpp', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
     queryFn: async (): Promise<DPPContent[]> => {
@@ -125,13 +119,12 @@ export const StudentDPP = () => {
                 (selectedBatchFilter === 'all' || enrollment.batch_name === selectedBatchFilter) &&
                 (selectedSubjectFilter === 'all' || enrollment.subject_name === selectedSubjectFilter)
             )
-            .map(enrollment => `(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
+            .map(enrollment => `and(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
 
         if (combinationFilters.length > 0) {
             query = query.or(combinationFilters.join(','));
         } else {
-            // If no combinations match filters, return empty to avoid fetching irrelevant data
-            return [];
+            return []; // Return empty if no combinations match filters
         }
         
         query = query.order('created_at', { ascending: false });
@@ -140,11 +133,11 @@ export const StudentDPP = () => {
       
         if (error) {
             console.error("Error fetching filtered DPP content:", error);
-            return [];
+            throw error;
         }
         return (data || []) as DPPContent[];
     },
-    enabled: !!userEnrollments && userEnrollments.length > 0 // Only run if enrollments are loaded and exist
+    enabled: !!userEnrollments && userEnrollments.length > 0
   });
 
   // Client-side filtering only for search term
@@ -190,7 +183,6 @@ export const StudentDPP = () => {
             className="pl-10 h-10"
           />
         </div>
-        {/* Select for Batch filter */}
         <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
           <SelectTrigger className="w-48 h-10">
             <SelectValue placeholder="Filter by batch" />
@@ -202,7 +194,6 @@ export const StudentDPP = () => {
             ))}
           </SelectContent>
         </Select>
-        {/* Existing Select for Subject filter */}
         <Select
           value={selectedSubjectFilter}
           onValueChange={setSelectedSubjectFilter}
