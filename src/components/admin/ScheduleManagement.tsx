@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, getDay } from 'date-fns';
-import { Clock } from 'lucide-react';
+import { User } from 'lucide-react';
 
 interface Schedule {
   id: string;
@@ -14,6 +14,17 @@ interface Schedule {
   day_of_week: number;
   start_time: string;
   end_time: string;
+}
+
+interface TeacherEnrollment {
+    user_id: string;
+    batch_name: string;
+    subject_name: string;
+}
+
+interface TeacherProfile {
+    id: string;
+    name: string;
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -40,19 +51,47 @@ export const ScheduleManagement = () => {
     queryKey: ['admin-all-schedules'],
     queryFn: async (): Promise<Schedule[]> => {
         const { data, error } = await supabase.from('schedules').select('*').order('day_of_week').order('start_time');
-        if (error) {
-            console.error("Error fetching all schedules:", error);
-            throw error;
-        }
+        if (error) throw error;
         return data || [];
     },
   });
   
+  const { data: teacherEnrollments, isLoading: isLoadingEnrollments } = useQuery<any[]>({
+      queryKey: ['teacher-enrollments-for-schedule'],
+      queryFn: async () => {
+          const { data, error } = await supabase
+              .from('user_enrollments')
+              .select(`
+                  user_id,
+                  batch_name,
+                  subject_name,
+                  profile:profiles ( name )
+              `);
+
+          if (error) {
+              console.error('Error fetching teacher enrollments:', error);
+              return [];
+          }
+          return data;
+      }
+  });
+  
+  const teacherMap = useMemo(() => {
+      const map = new Map<string, string>();
+      if (teacherEnrollments) {
+          teacherEnrollments.forEach(enrollment => {
+              const key = `${enrollment.batch_name}-${enrollment.subject_name}`;
+              if(enrollment.profile) {
+                map.set(key, enrollment.profile.name);
+              }
+          });
+      }
+      return map;
+  }, [teacherEnrollments]);
+
   const timeSlots = useMemo(() => {
     const slots = new Set<string>();
-    schedules?.forEach(s => {
-        slots.add(s.start_time);
-    });
+    schedules?.forEach(s => slots.add(s.start_time));
     return Array.from(slots).sort();
   }, [schedules]);
 
@@ -64,6 +103,7 @@ export const ScheduleManagement = () => {
   };
 
   const today = getDay(currentTime);
+  const isLoading = isLoadingSchedules || isLoadingEnrollments;
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -74,7 +114,7 @@ export const ScheduleManagement = () => {
         </div>
       </div>
         
-      {isLoadingSchedules ? <ScheduleSkeleton /> : (
+      {isLoading ? <ScheduleSkeleton /> : (
       <div className="bg-white p-4 rounded-2xl shadow-lg">
           <div className="grid grid-cols-8">
               <div className="text-center font-semibold text-gray-500 py-2">Time</div>
@@ -92,14 +132,23 @@ export const ScheduleManagement = () => {
                           const classInfo = schedules?.filter(s => s.day_of_week === dayIndex && s.start_time === time);
                           return (
                               <div key={`${day}-${time}`} className={`p-2 border-r last:border-r-0 ${dayIndex === today ? 'bg-blue-50' : ''}`}>
-                                  {classInfo && classInfo.length > 0 && classInfo.map(info => (
-                                      <Card key={info.id} className="bg-white shadow-md hover:shadow-lg transition-shadow mb-2">
-                                          <CardContent className="p-3">
-                                              <p className="font-bold text-gray-800 text-sm">{info.subject}</p>
-                                              <Badge variant="secondary" className="mt-1">{info.batch}</Badge>
-                                          </CardContent>
-                                      </Card>
-                                  ))}
+                                  {classInfo && classInfo.length > 0 && classInfo.map(info => {
+                                      const teacherName = teacherMap.get(`${info.batch}-${info.subject}`);
+                                      return (
+                                        <Card key={info.id} className="bg-white shadow-md hover:shadow-lg transition-shadow mb-2">
+                                            <CardContent className="p-3">
+                                                <p className="font-bold text-gray-800 text-sm">{info.subject}</p>
+                                                <Badge variant="secondary" className="mt-1">{info.batch}</Badge>
+                                                {teacherName && (
+                                                    <div className="flex items-center text-xs text-muted-foreground mt-2">
+                                                        <User className="h-3 w-3 mr-1" />
+                                                        {teacherName}
+                                                    </div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                      );
+                                  })}
                               </div>
                           );
                       })}
