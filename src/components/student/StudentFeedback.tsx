@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
-import { MessageSquare, Send, CheckCircle, Star, Sparkles, XCircle } from 'lucide-react'; // XCircle is still imported but will not be used in JSX
+import { MessageSquare, Send, CheckCircle, Star, Sparkles, XCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -118,9 +118,16 @@ export const StudentFeedback = () => {
   const submitFeedbackMutation = useMutation({
     mutationFn: async (feedbackData: any) => {
       const { error } = await supabase.from('feedback').insert([{
-        ...feedbackData,
+        // Explicitly define columns to insert
+        batch: feedbackData.batch,
+        subject: feedbackData.subject,
+        teacher_quality: feedbackData.teacher_quality,
+        concept_clarity: feedbackData.concept_clarity,
+        dpp_quality: feedbackData.dpp_quality,
+        premium_content_usefulness: feedbackData.premium_content_usefulness,
+        comments: feedbackData.comments,
         submitted_by: profile?.user_id,
-        date: new Date().toISOString().split('T')[0],
+        date: new Date().toISOString().split('T')[0], // Ensure date is formatted correctly
       }]);
       if (error) throw error;
     },
@@ -152,8 +159,8 @@ export const StudentFeedback = () => {
       return;
     }
     submitFeedbackMutation.mutate({
-      ...selectedFeedbackTask,
-      ...ratings,
+      ...selectedFeedbackTask, // Spreads batch and subject
+      ...ratings, // Spreads all rating fields
       comments,
     });
   };
@@ -248,17 +255,14 @@ export const StudentFeedback = () => {
       </div>
       
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        {/* Removed the extra DialogPrimitive.Close component from DialogContent */}
-        <DialogContent className="max-w-2xl bg-white p-0 rounded-2xl overflow-hidden shadow-2xl transform transition-all animate-fade-in-up [&>button]:hidden"> {/* Added [&>button]:hidden here */}
+        {/* Hiding the default close button from DialogContent */}
+        <DialogContent className="max-w-2xl bg-white p-0 rounded-2xl overflow-hidden shadow-2xl transform transition-all animate-fade-in-up [&>button]:hidden">
           <DialogHeader className="relative p-6 bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
             <DialogTitle className="text-2xl font-bold flex items-center justify-center gap-2">
                 <MessageSquare className="h-6 w-6" /> Feedback for {selectedFeedbackTask?.subject} ({selectedFeedbackTask?.batch})
             </DialogTitle>
             <CardDescription className="text-blue-100 text-center mt-2">Your insights are highly valued and will help us improve.</CardDescription>
-            {/* The custom close button has been removed completely, as per new request */}
-            {/* <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white hover:bg-white/20" onClick={() => setIsDialogOpen(false)}>
-                <XCircle className="h-6 w-6" />
-            </Button> */}
+            {/* Custom close button (removed from previous version as per request) */}
           </DialogHeader>
           <div className="space-y-6 py-6 px-6">
             {questions.map(({ key, text }) => (
@@ -288,7 +292,7 @@ export const StudentFeedback = () => {
             </div>
           </div>
           <DialogFooter className="flex-col sm:flex-row p-6 border-t border-gray-100 bg-gray-50">
-            {/* Only the "Cancel" button remains as the close option */}
+            {/* Only the "Cancel" button remains as the explicit close option */}
             <DialogClose asChild>
                 <Button variant="outline" onClick={resetForm} className="w-full sm:w-auto text-gray-700 border-gray-300 hover:bg-gray-100">Cancel</Button>
             </DialogClose>
