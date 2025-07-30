@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Clock, ExternalLink } from 'lucide-react';
-import { format } from 'date-fns';
+import { Calendar, Clock, ExternalLink, Users } from 'lucide-react';
+import { format, setHours, setMinutes, getDay, addDays, startOfWeek } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface Schedule {
@@ -18,7 +18,6 @@ interface Schedule {
   start_time: string;
   end_time: string;
   link?: string;
-  date?: string;
 }
 
 interface UserEnrollment {
@@ -96,7 +95,7 @@ export const StudentSchedule = () => {
             : [selectedBatchFilter];
         if (batchesToFilter.length === 0) return [];
         query = query.in('batch', batchesToFilter);
-        query = query.order('date', { nullsFirst: true }).order('day_of_week').order('start_time');
+        query = query.order('day_of_week').order('start_time');
         const { data, error } = await query;
         if (error) {
             console.error("Error fetching schedules directly:", error);
@@ -109,27 +108,13 @@ export const StudentSchedule = () => {
 
   const isLoading = isLoadingEnrollments || isLoadingSchedules;
 
-  const groupedSchedules = useMemo(() => {
-    if (!schedules) return {};
-    return schedules.reduce((acc, schedule) => {
-      const day = schedule.date ? format(new Date(`${schedule.date}T00:00:00`), 'eeee, MMMM do') : DAYS[schedule.day_of_week];
-      if (!acc[day]) acc[day] = [];
-      acc[day].push(schedule);
-      return acc;
-    }, {} as Record<string, Schedule[]>);
+  const timeSlots = useMemo(() => {
+    const slots = new Set<string>();
+    schedules?.forEach(s => {
+        slots.add(s.start_time);
+    });
+    return Array.from(slots).sort();
   }, [schedules]);
-  
-  const orderedDays = useMemo(() => {
-      if (!groupedSchedules) return [];
-      return Object.keys(groupedSchedules).sort((a, b) => {
-          const aIsDay = DAYS.includes(a);
-          const bIsDay = DAYS.includes(b);
-          if (aIsDay && !bIsDay) return -1;
-          if (!aIsDay && bIsDay) return 1;
-          if (aIsDay && bIsDay) return DAYS.indexOf(a) - DAYS.indexOf(b);
-          return new Date(a.split(', ')[1]).getTime() - new Date(b.split(', ')[1]).getTime();
-      });
-  }, [groupedSchedules]);
 
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
@@ -137,39 +122,25 @@ export const StudentSchedule = () => {
     date.setHours(parseInt(hours), parseInt(minutes));
     return format(date, 'h:mm a');
   };
-  
-  const isCurrentTime = (schedule: Schedule) => {
-    const now = new Date();
-    if (schedule.date && format(new Date(schedule.date), 'yyyy-MM-dd') !== format(now, 'yyyy-MM-dd')) {
-        return false;
-    }
-    if (!schedule.date && schedule.day_of_week !== now.getDay()) {
-        return false;
-    }
-    const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
-    const [startHour, startMin] = schedule.start_time.split(':').map(Number);
-    const [endHour, endMin] = schedule.end_time.split(':').map(Number);
-    const startTimeMinutes = startHour * 60 + startMin;
-    const endTimeMinutes = endHour * 60 + endMin;
-    return currentTimeMinutes >= startTimeMinutes && currentTimeMinutes <= endTimeMinutes;
-  };
+
+  const today = getDay(currentTime);
 
   return (
-    <div className="space-y-6 p-6 bg-gray-50 min-h-screen">
-      <div className="flex items-center justify-between">
+    <div className="p-6 bg-gray-50 min-h-screen">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-3xl font-bold text-gray-900">Class Schedule</h2>
           <p className="text-gray-600 mt-1">Your weekly class timetable</p>
         </div>
         <div className="text-right">
-          <p className="text-sm text-gray-500">Current Time</p>
-          <p className="text-lg font-semibold text-gray-900">{format(currentTime, 'PPp')}</p>
+            <p className="text-sm text-gray-500">{format(currentTime, 'PPPP')}</p>
+            <p className="text-lg font-semibold text-gray-900">{format(currentTime, 'p')}</p>
         </div>
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex gap-4 mb-6">
         <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
-          <SelectTrigger className="w-48 h-10">
+          <SelectTrigger className="w-48 h-10 bg-white">
             <SelectValue placeholder="Filter by batch" />
           </SelectTrigger>
           <SelectContent>
@@ -182,57 +153,44 @@ export const StudentSchedule = () => {
       </div>
 
       {isLoading ? <ScheduleSkeleton /> : (
-      <div className="grid gap-6">
-        {orderedDays.map((day) => (
-          <Card key={day} className="overflow-hidden">
-            <CardHeader className="bg-white border-b">
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-blue-600" />
-                {day}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {groupedSchedules?.[day]?.length > 0 ? (
-                <div className="space-y-0">
-                  {groupedSchedules[day].map((schedule) => (
-                    <div 
-                      key={schedule.id} 
-                      className={`p-4 border-b last:border-b-0 transition-colors ${ isCurrentTime(schedule) ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50' }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-2">
-                              <Clock className="h-4 w-4 text-gray-500" />
-                              <span className="font-medium text-gray-900">
-                                {formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}
-                              </span>
-                            </div>
-                            {isCurrentTime(schedule) && <Badge variant="default" className="bg-blue-600">Live</Badge>}
-                          </div>
-                          <h4 className="text-lg font-semibold text-gray-900 mt-1">{schedule.subject}</h4>
-                          <Badge variant="outline" className="mt-2">{schedule.batch}</Badge>
-                        </div>
-                        {schedule.link && (
-                          <Button size="sm" asChild>
-                            <a href={schedule.link} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="h-4 w-4 mr-1" /> Join
-                            </a>
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-8 text-center text-gray-500">
-                  <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                  <p>No classes scheduled for {day}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+      <div className="bg-white p-4 rounded-2xl shadow-lg">
+          <div className="grid grid-cols-8">
+              <div className="text-center font-semibold text-gray-500 py-2">Time</div>
+              {DAYS.map((day, index) => (
+                  <div key={day} className={`text-center font-semibold py-2 ${index === today ? 'text-primary' : 'text-gray-500'}`}>
+                      {day}
+                  </div>
+              ))}
+          </div>
+          <div className="relative">
+              {timeSlots.map(time => (
+                  <div key={time} className="grid grid-cols-8 border-t">
+                      <div className="text-center text-sm font-medium text-gray-700 py-4 px-2 border-r">{formatTime(time)}</div>
+                      {DAYS.map((day, dayIndex) => {
+                          const classInfo = schedules?.find(s => s.day_of_week === dayIndex && s.start_time === time);
+                          return (
+                              <div key={`${day}-${time}`} className={`p-2 border-r last:border-r-0 ${dayIndex === today ? 'bg-blue-50' : ''}`}>
+                                  {classInfo && (
+                                      <Card className="bg-white shadow-md hover:shadow-lg transition-shadow">
+                                          <CardContent className="p-3">
+                                              <p className="font-bold text-gray-800 text-sm">{classInfo.subject}</p>
+                                              <Badge variant="secondary" className="mt-1">{classInfo.batch}</Badge>
+                                              {classInfo.link && (
+                                                  <Button size="sm" asChild className="w-full mt-2">
+                                                      <a href={classInfo.link} target="_blank" rel="noopener noreferrer">
+                                                          <ExternalLink className="h-4 w-4 mr-1" /> Join
+                                                      </a>
+                                                  </Button>
+                                              )}
+                                          </CardContent>
+                                      </Card>
+                                  )}
+                              </div>
+                          );
+                      })}
+                  </div>
+              ))}
+          </div>
       </div>
       )}
     </div>
