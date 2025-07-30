@@ -1,4 +1,5 @@
-import { useState } from 'react';
+// uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/student/StudentRecordings.tsx
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -11,6 +12,21 @@ import { Video, Play, Search } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+
+interface RecordingContent {
+  id: string;
+  date: string;
+  subject: string;
+  topic: string;
+  embed_link: string;
+  batch: string;
+  created_at: string;
+}
+
+interface UserEnrollment {
+    batch_name: string;
+    subject_name: string;
+}
 
 const RecordingSkeleton = () => (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -33,22 +49,69 @@ const RecordingSkeleton = () => (
 export const StudentRecordings = () => {
   const { profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState('all');
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState('all');
+  const [selectedBatchFilter, setSelectedBatchFilter] = useState('all');
 
-  const batches = Array.isArray(profile?.batch) ? profile.batch : [profile?.batch].filter(Boolean);
-
-  const { data: recordings, isLoading } = useQuery({
-    queryKey: ['student-recordings', batches, profile?.subjects],
+  // 1. Fetch user's specific enrollments from the new table
+  const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
+    queryKey: ['userEnrollments', profile?.user_id],
     queryFn: async () => {
-      if (!batches.length || !profile?.subjects) return [];
-      const { data } = await supabase
-        .from('recordings')
-        .in('batch', batches)
-        .in('subject', profile.subjects)
-        .order('date', { ascending: false });
-      return data || [];
+        if (!profile?.user_id) return [];
+        const { data, error } = await supabase
+            .from('user_enrollments')
+            .select('batch_name, subject_name')
+            .eq('user_id', profile.user_id);
+        if (error) {
+            console.error("Error fetching user enrollments:", error);
+            return [];
+        }
+        return data || [];
     },
-    enabled: !!profile?.batch && !!profile?.subjects
+    enabled: !!profile?.user_id
+  });
+
+  // Extract unique batches and subjects from the fetched enrollments for filter dropdowns
+  const availableBatches = useMemo(() => {
+    return Array.from(new Set(userEnrollments?.map(e => e.batch_name) || [])).sort();
+  }, [userEnrollments]);
+
+  const availableSubjects = useMemo(() => {
+    return Array.from(new Set(userEnrollments?.map(e => e.subject_name) || [])).sort();
+  }, [userEnrollments]);
+
+  // 2. Fetch Recording content based on specific enrolled combinations and selected filters
+  const { data: recordings, isLoading: isLoadingRecordingsContent } = useQuery<RecordingContent[]>({
+    queryKey: ['student-recordings', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
+    queryFn: async (): Promise<RecordingContent[]> => {
+        if (!userEnrollments || userEnrollments.length === 0) return [];
+
+        let query = supabase.from('recordings').select('*');
+
+        // Dynamically build OR conditions for each specific enrolled combination
+        const combinationFilters = userEnrollments
+            .filter(enrollment =>
+                (selectedBatchFilter === 'all' || enrollment.batch_name === selectedBatchFilter) &&
+                (selectedSubjectFilter === 'all' || enrollment.subject_name === selectedSubjectFilter)
+            )
+            .map(enrollment => `(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
+
+        if (combinationFilters.length > 0) {
+            query = query.or(combinationFilters.join(','));
+        } else {
+            return []; // Return empty if no combinations match filters
+        }
+        
+        query = query.order('date', { ascending: false });
+
+        const { data, error } = await query;
+      
+        if (error) {
+            console.error("Error fetching filtered Recording content:", error);
+            return [];
+        }
+        return (data || []) as RecordingContent[];
+    },
+    enabled: !!userEnrollments && userEnrollments.length > 0 // Only run if enrollments are loaded and exist
   });
 
   const filteredRecordings = recordings?.filter(recording => {
@@ -56,9 +119,7 @@ export const StudentRecordings = () => {
       recording.topic.toLowerCase().includes(searchTerm.toLowerCase()) ||
       recording.subject.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesSubject = selectedSubject === 'all' || recording.subject === selectedSubject;
-    
-    return matchesSearch && matchesSubject;
+    return matchesSearch;
   });
 
   const logActivity = async (activityType: string, description: string, metadata?: any) => {
@@ -69,7 +130,7 @@ export const StudentRecordings = () => {
       activity_type: activityType,
       description,
       metadata,
-      batch: batches.length > 0 ? batches[0] : null,
+      batch: availableBatches.length > 0 ? availableBatches[0] : null, // Use availableBatches
       subject: metadata.subject,
     });
   };
@@ -97,6 +158,8 @@ export const StudentRecordings = () => {
     </div>
   );
 
+  const isLoading = isLoadingEnrollments || isLoadingRecordingsContent;
+
   return (
     <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
       {/* Header Section */}
@@ -109,7 +172,7 @@ export const StudentRecordings = () => {
           <p className="text-gray-500 mt-1">Review past lectures and catch up on missed classes.</p>
         </div>
         <div className="flex gap-2">
-          <Badge variant="outline">Batches: {batches.join(', ')}</Badge>
+          <Badge variant="outline">Batches: {availableBatches.join(', ')}</Badge>
         </div>
       </div>
 
@@ -124,13 +187,24 @@ export const StudentRecordings = () => {
             className="pl-10 h-10"
           />
         </div>
-        <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+        <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
+          <SelectTrigger className="w-48 h-10">
+            <SelectValue placeholder="Filter by batch" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Batches</SelectItem>
+            {availableBatches.map((batch) => (
+              <SelectItem key={batch} value={batch}>{batch}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={selectedSubjectFilter} onValueChange={setSelectedSubjectFilter}>
           <SelectTrigger className="w-48 h-10">
             <SelectValue placeholder="Filter by subject" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Subjects</SelectItem>
-            {profile?.subjects?.map((subject) => (
+            {availableSubjects.map((subject) => (
               <SelectItem key={subject} value={subject}>{subject}</SelectItem>
             ))}
           </SelectContent>
