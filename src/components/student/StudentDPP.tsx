@@ -1,3 +1,4 @@
+// uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/student/StudentDPP.tsx
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BookOpen, ExternalLink, Search, Target } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton }onents/ui/skeleton';
 
 interface DPPContent {
   id: string;
@@ -18,6 +19,7 @@ interface DPPContent {
   batch: string;
   difficulty?: string;
   link: string;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -45,34 +47,49 @@ export const StudentDPP = () => {
   const { profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
+  const [selectedBatch, setSelectedBatch] = useState<string>('all'); // New state for selected batch
   
   const batches = Array.isArray(profile?.batch) ? profile.batch : [profile?.batch].filter(Boolean);
+  const subjects = Array.isArray(profile?.subjects) ? profile.subjects : [profile?.subjects].filter(Boolean); // Ensure subjects is an array
 
   const { data: dppContent, isLoading } = useQuery({
-    queryKey: ['student-dpp', batches, profile?.subjects],
+    queryKey: ['student-dpp', batches, subjects, selectedBatch, selectedSubject], // Added selectedBatch, selectedSubject to queryKey
     queryFn: async (): Promise<DPPContent[]> => {
-      if (!batches.length || !profile?.subjects) return [];
-      const { data, error } = await supabase
-        .from('dpp_content')
-        .select('*')
-        .in('batch', batches)
-        .in('subject', profile.subjects)
-        .order('created_at', { ascending: false });
+        if (!batches.length || !subjects.length) return [];
+
+        let query = supabase.from('dpp_content').select('*');
+
+        // Apply filters based on profile enrollment first
+        query = query.in('batch', batches).in('subject', subjects);
+
+        // Apply dynamic filters from select dropdowns
+        if (selectedBatch !== 'all') {
+            query = query.eq('batch', selectedBatch);
+        }
+        if (selectedSubject !== 'all') {
+            query = query.eq('subject', selectedSubject);
+        }
+        
+        query = query.order('created_at', { ascending: false });
+
+        const { data, error } = await query;
       
-      if (error) throw error;
-      return (data || []) as DPPContent[];
+        if (error) {
+            console.error("Error fetching DPP content:", error);
+            return [];
+        }
+        return (data || []) as DPPContent[];
     },
-    enabled: !!profile?.batch && !!profile?.subjects
+    enabled: !!profile?.batch && !!profile?.subjects // Query only runs if profile data is available
   });
 
+  // Client-side filtering only for search term, as batch/subject filters are now server-side
   const filteredDPP = dppContent?.filter(dpp => {
     const matchesSearch = !searchTerm || 
       dpp.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       dpp.description?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesSubject = selectedSubject === 'all' || dpp.subject === selectedSubject;
-    
-    return matchesSearch && matchesSubject;
+    return matchesSearch; // Batch and subject are already filtered by queryFn
   });
 
   const handleOpenDPP = (dpp: DPPContent) => {
@@ -91,7 +108,8 @@ export const StudentDPP = () => {
           <p className="text-gray-500 mt-1">Daily Practice Problems to sharpen your skills.</p>
         </div>
         <div className="flex gap-2">
-          <Badge variant="outline">Batches: {batches.join(', ')}</Badge>
+          {/* Display all enrolled batches as informational badges */}
+          {batches.map(b => <Badge key={b} variant="outline">{b}</Badge>)}
         </div>
       </div>
 
@@ -106,6 +124,19 @@ export const StudentDPP = () => {
             className="pl-10 h-10"
           />
         </div>
+        {/* New Select for Batch filter */}
+        <Select value={selectedBatch} onValueChange={setSelectedBatch}>
+          <SelectTrigger className="w-48 h-10">
+            <SelectValue placeholder="Filter by batch" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Batches</SelectItem>
+            {profile?.batch?.map((batch) => (
+              <SelectItem key={batch} value={batch}>{batch}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {/* Existing Select for Subject filter */}
         <Select value={selectedSubject} onValueChange={setSelectedSubject}>
           <SelectTrigger className="w-48 h-10">
             <SelectValue placeholder="Filter by subject" />
