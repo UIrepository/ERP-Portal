@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Clock, ExternalLink, Video } from 'lucide-react';
-import { format, differenceInSeconds, nextDay } from 'date-fns';
+import { format, differenceInSeconds, nextDay, addDays } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // Countdown Timer Component
@@ -72,13 +73,24 @@ export const TeacherYourClasses = () => {
     const now = new Date();
     return schedules.map(schedule => {
       const [hour, minute] = schedule.start_time.split(':').map(Number);
-      let nextOccurrence = nextDay(now, schedule.day_of_week);
+      
+      // Calculate next occurrence based on day_of_week (0 = Sunday, 1 = Monday, etc.)
+      const dayOfWeek = schedule.day_of_week;
+      const currentDay = now.getDay();
+      
+      let daysUntilNext = (dayOfWeek - currentDay + 7) % 7;
+      if (daysUntilNext === 0) {
+        // If it's the same day, check if the time has passed
+        const todayClass = new Date(now);
+        todayClass.setHours(hour, minute, 0, 0);
+        if (todayClass <= now) {
+          daysUntilNext = 7; // Next week
+        }
+      }
+      
+      const nextOccurrence = addDays(now, daysUntilNext);
       nextOccurrence.setHours(hour, minute, 0, 0);
 
-      // If the next occurrence is in the past for this week, get next week's occurrence
-      if (nextOccurrence < now) {
-        nextOccurrence.setDate(nextOccurrence.getDate() + 7);
-      }
       return { ...schedule, nextOccurrence };
     }).sort((a, b) => a.nextOccurrence.getTime() - b.nextOccurrence.getTime());
   }, [schedules]);

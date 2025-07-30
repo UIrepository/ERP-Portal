@@ -26,13 +26,22 @@ export const TeacherFeedback = () => {
     queryFn: async (): Promise<Feedback[]> => {
       const { data, error } = await supabase
         .from('feedback')
-        .select('*')
+        .select('id, subject, batch, comments, created_at, date')
         .eq('batch', profile?.batch)
         .in('subject', profile?.subjects || [])
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      return data || [];
+      
+      // Transform the data to match our interface
+      return (data || []).map(item => ({
+        id: item.id,
+        subject: item.subject,
+        batch: item.batch,
+        feedback_text: item.comments, // Map comments to feedback_text
+        created_at: item.created_at,
+        date: item.date
+      }));
     },
     enabled: !!profile?.batch && !!profile?.subjects
   });
