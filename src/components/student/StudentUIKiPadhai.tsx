@@ -7,8 +7,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Crown, ExternalLink, Lock, Search } from 'lucide-react'; // Added Search import
+import { Crown, ExternalLink, Lock, Search } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input'; // Added Input import
 
 interface UIKiPadhaiContent {
   id: string;
