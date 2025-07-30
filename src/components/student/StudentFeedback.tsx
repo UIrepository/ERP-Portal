@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
-import { MessageSquare, Send, CheckCircle, Star, Sparkles, XCircle } from 'lucide-react'; // Added XCircle for dialog close button
+import { MessageSquare, Send, CheckCircle, Star, Sparkles, XCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -248,21 +248,20 @@ export const StudentFeedback = () => {
       </div>
       
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl bg-white p-0 rounded-2xl overflow-hidden shadow-2xl transform transition-all animate-fade-in-up"> {/* Enhanced DialogContent */}
-          <DialogHeader className="relative p-6 bg-gradient-to-r from-blue-500 to-indigo-600 text-white"> {/* Enhanced Header */}
+        <DialogContent className="max-w-2xl bg-white p-0 rounded-2xl overflow-hidden shadow-2xl transform transition-all animate-fade-in-up">
+          <DialogHeader className="relative p-6 bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
             <DialogTitle className="text-2xl font-bold flex items-center justify-center gap-2">
                 <MessageSquare className="h-6 w-6" /> Feedback for {selectedFeedbackTask?.subject} ({selectedFeedbackTask?.batch})
             </DialogTitle>
             <CardDescription className="text-blue-100 text-center mt-2">Your insights are highly valued and will help us improve.</CardDescription>
-            <DialogClose asChild>
-                <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white hover:bg-white/20">
-                    <XCircle className="h-6 w-6" />
-                </Button>
-            </DialogClose>
+            {/* Removed the extra DialogClose component here */}
+            <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white hover:bg-white/20" onClick={() => setIsDialogOpen(false)}>
+                <XCircle className="h-6 w-6" />
+            </Button>
           </DialogHeader>
-          <div className="space-y-6 py-6 px-6"> {/* Added padding for content */}
+          <div className="space-y-6 py-6 px-6">
             {questions.map(({ key, text }) => (
-              <div key={key} className="p-4 border border-gray-200 rounded-lg bg-gray-50"> {/* Individual question card */}
+              <div key={key} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
                 <label className="font-semibold text-gray-700 flex items-center gap-2 mb-3">
                     <Sparkles className="h-4 w-4 text-yellow-500" /> {text}
                 </label>
@@ -279,7 +278,7 @@ export const StudentFeedback = () => {
                 <MessageSquare className="h-4 w-4 text-primary" /> Additional Comments (Mandatory)
               </label>
               <Textarea 
-                className="mt-2 bg-white border-gray-300 focus-visible:ring-primary/50 shadow-sm" // More integrated styling
+                className="mt-2 bg-white border-gray-300 focus-visible:ring-primary/50 shadow-sm"
                 rows={4}
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
@@ -287,7 +286,8 @@ export const StudentFeedback = () => {
               />
             </div>
           </div>
-          <DialogFooter className="flex-col sm:flex-row p-6 border-t border-gray-100 bg-gray-50"> {/* Enhanced Footer */}
+          <DialogFooter className="flex-col sm:flex-row p-6 border-t border-gray-100 bg-gray-50">
+            {/* Kept this DialogClose only if you want the "Cancel" button to also close the dialog */}
             <DialogClose asChild>
                 <Button variant="outline" onClick={resetForm} className="w-full sm:w-auto text-gray-700 border-gray-300 hover:bg-gray-100">Cancel</Button>
             </DialogClose>
