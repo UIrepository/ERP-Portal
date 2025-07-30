@@ -1,5 +1,5 @@
 // uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/student/StudentDPP.tsx
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BookOpen, ExternalLink, Search, Target } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton'; // Corrected import statement
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface DPPContent {
   id: string;
@@ -21,6 +21,12 @@ interface DPPContent {
   link: string;
   is_active: boolean;
   created_at: string;
+}
+
+// Define the structure for an enrollment record from the new table
+interface UserEnrollment {
+    batch_name: string;
+    subject_name: string;
 }
 
 const DPPSkeleton = () => (
@@ -46,28 +52,85 @@ const DPPSkeleton = () => (
 export const StudentDPP = () => {
   const { profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSubject, setSelectedSubject] = useState<string>('all');
-  const [selectedBatch, setSelectedBatch] = useState<string>('all'); // New state for selected batch
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
+  const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
   
-  const batches = Array.isArray(profile?.batch) ? profile.batch : [profile?.batch].filter(Boolean);
-  const subjects = Array.isArray(profile?.subjects) ? profile.subjects : [profile?.subjects].filter(Boolean); // Ensure subjects is an array
+  // 1. Fetch user's specific enrollments from the new table
+  const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
+    queryKey: ['userEnrollments', profile?.user_id],
+    queryFn: async () => {
+        if (!profile?.user_id) return [];
+        const { data, error } = await supabase
+            .from('user_enrollments')
+            .select('batch_name, subject_name')
+            .eq('user_id', profile.user_id);
+        if (error) {
+            console.error("Error fetching user enrollments:", error);
+            return [];
+        }
+        return data || [];
+    },
+    enabled: !!profile?.user_id
+  });
 
-  const { data: dppContent, isLoading } = useQuery({
-    queryKey: ['student-dpp', batches, subjects, selectedBatch, selectedSubject], // Added selectedBatch, selectedSubject to queryKey
+  // Derived state for filter options, implementing cascading logic
+  const displayedBatches = useMemo(() => {
+    if (!userEnrollments) return [];
+    if (selectedSubjectFilter === 'all') {
+      return Array.from(new Set(userEnrollments.map(e => e.batch_name))).sort();
+    } else {
+      return Array.from(new Set(
+        userEnrollments
+          .filter(e => e.subject_name === selectedSubjectFilter)
+          .map(e => e.batch_name)
+      )).sort();
+    }
+  }, [userEnrollments, selectedSubjectFilter]);
+
+  const displayedSubjects = useMemo(() => {
+    if (!userEnrollments) return [];
+    if (selectedBatchFilter === 'all') {
+      return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
+    } else {
+      return Array.from(new Set(
+        userEnrollments
+          .filter(e => e.batch_name === selectedBatchFilter)
+          .map(e => e.subject_name)
+      )).sort();
+    }
+  }, [userEnrollments, selectedBatchFilter]);
+
+  // Ensure selected filters are still valid when options change
+  // This will reset filters if the previously selected option is no longer available
+  if (selectedBatchFilter !== 'all' && !displayedBatches.includes(selectedBatchFilter)) {
+      setSelectedBatchFilter('all');
+  }
+  if (selectedSubjectFilter !== 'all' && !displayedSubjects.includes(selectedSubjectFilter)) {
+      setSelectedSubjectFilter('all');
+  }
+
+
+  // 2. Fetch DPP content based on specific enrolled combinations and selected filters
+  const { data: dppContent, isLoading: isLoadingDppContent } = useQuery<DPPContent[]>({
+    queryKey: ['student-dpp', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
     queryFn: async (): Promise<DPPContent[]> => {
-        if (!batches.length || !subjects.length) return [];
+        if (!userEnrollments || userEnrollments.length === 0) return [];
 
         let query = supabase.from('dpp_content').select('*');
 
-        // Apply filters based on profile enrollment first
-        query = query.in('batch', batches).in('subject', subjects);
+        // Dynamically build OR conditions for each specific enrolled combination
+        const combinationFilters = userEnrollments
+            .filter(enrollment =>
+                (selectedBatchFilter === 'all' || enrollment.batch_name === selectedBatchFilter) &&
+                (selectedSubjectFilter === 'all' || enrollment.subject_name === selectedSubjectFilter)
+            )
+            .map(enrollment => `(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
 
-        // Apply dynamic filters from select dropdowns
-        if (selectedBatch !== 'all') {
-            query = query.eq('batch', selectedBatch);
-        }
-        if (selectedSubject !== 'all') {
-            query = query.eq('subject', selectedSubject);
+        if (combinationFilters.length > 0) {
+            query = query.or(combinationFilters.join(','));
+        } else {
+            // If no combinations match filters, return empty to avoid fetching irrelevant data
+            return [];
         }
         
         query = query.order('created_at', { ascending: false });
@@ -75,26 +138,28 @@ export const StudentDPP = () => {
         const { data, error } = await query;
       
         if (error) {
-            console.error("Error fetching DPP content:", error);
+            console.error("Error fetching filtered DPP content:", error);
             return [];
         }
         return (data || []) as DPPContent[];
     },
-    enabled: !!profile?.batch && !!profile?.subjects // Query only runs if profile data is available
+    enabled: !!userEnrollments && userEnrollments.length > 0 // Only run if enrollments are loaded and exist
   });
 
-  // Client-side filtering only for search term, as batch/subject filters are now server-side
+  // Client-side filtering only for search term
   const filteredDPP = dppContent?.filter(dpp => {
     const matchesSearch = !searchTerm || 
       dpp.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       dpp.description?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    return matchesSearch; // Batch and subject are already filtered by queryFn
+    return matchesSearch;
   });
 
   const handleOpenDPP = (dpp: DPPContent) => {
     window.open(dpp.link, '_blank');
   };
+
+  const isLoading = isLoadingEnrollments || isLoadingDppContent;
 
   return (
     <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
@@ -109,7 +174,7 @@ export const StudentDPP = () => {
         </div>
         <div className="flex gap-2">
           {/* Display all enrolled batches as informational badges */}
-          {batches.map(b => <Badge key={b} variant="outline">{b}</Badge>)}
+          {displayedBatches.map(b => <Badge key={b} variant="outline">{b}</Badge>)}
         </div>
       </div>
 
@@ -124,26 +189,26 @@ export const StudentDPP = () => {
             className="pl-10 h-10"
           />
         </div>
-        {/* New Select for Batch filter */}
-        <Select value={selectedBatch} onValueChange={setSelectedBatch}>
+        {/* Select for Batch filter */}
+        <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
           <SelectTrigger className="w-48 h-10">
             <SelectValue placeholder="Filter by batch" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Batches</SelectItem>
-            {profile?.batch?.map((batch) => (
+            {displayedBatches.map((batch) => (
               <SelectItem key={batch} value={batch}>{batch}</SelectItem>
             ))}
           </SelectContent>
         </Select>
         {/* Existing Select for Subject filter */}
-        <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+        <Select value={selectedSubjectFilter} onValueChange={setSelectedSubjectFilter}>
           <SelectTrigger className="w-48 h-10">
             <SelectValue placeholder="Filter by subject" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Subjects</SelectItem>
-            {profile?.subjects?.map((subject) => (
+            {displayedSubjects.map((subject) => (
               <SelectItem key={subject} value={subject}>{subject}</SelectItem>
             ))}
           </SelectContent>
