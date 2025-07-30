@@ -1,3 +1,4 @@
+// uirepository/teachgrid-hub/teachgrid-hub-18fb4b82a0e6ac673de0608908646c2131d885a1/src/components/admin/AdminMeetingManager.tsx
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,6 +10,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface MeetingLink {
+  // Using 'link' as the unique identifier for rendering and fetching.
+  // This matches your confirmed table structure for 'meeting_links'.
   link: string;
   subject: string;
   batch: string;
@@ -64,7 +67,8 @@ export const AdminMeetingManager = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('meeting_links') // Querying 'meeting_links' table
-        .select('link, subject, batch')
+        // Select ONLY the columns you confirmed are present
+        .select('link, subject, batch') 
         .order('batch, subject');
       
       if (error) {
