@@ -6,8 +6,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ExternalLink, Clock, Calendar, AlertTriangle } from 'lucide-react'; // Added AlertTriangle for warning
-import { format, differenceInSeconds, nextDay, parseISO } from 'date-fns'; // Added parseISO
+import { ExternalLink, Clock, Calendar, AlertTriangle } from 'lucide-react';
+import { format, differenceInSeconds, nextDay, parseISO } from 'date-fns';
 
 interface Schedule {
   id: string;
@@ -27,7 +27,6 @@ interface OngoingClass {
   meeting_link: string;
 }
 
-// Define the structure for an enrollment record from the new table
 interface UserEnrollment {
     batch_name: string;
     subject_name: string;
@@ -37,7 +36,6 @@ interface StudentCurrentClassProps {
     onTabChange: (tab: string) => void;
 }
 
-// Countdown Timer Component
 const Countdown = ({ targetDate }: { targetDate: Date }) => {
   const calculateTimeLeft = () => {
     const totalSeconds = differenceInSeconds(targetDate, new Date());
@@ -80,8 +78,7 @@ const Countdown = ({ targetDate }: { targetDate: Date }) => {
 export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) => {
   const { profile } = useAuth();
 
-  // 1. Fetch user's specific enrollments from the new table
-  const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
+  const { data: userEnrollments, isLoading: isLoadingEnrollments, isError: isEnrollmentsError } = useQuery<UserEnrollment[]>({
     queryKey: ['userEnrollments', profile?.user_id],
     queryFn: async () => {
         if (!profile?.user_id) return [];
@@ -91,15 +88,15 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
             .eq('user_id', profile.user_id);
         if (error) {
             console.error("Error fetching user enrollments:", error);
-            return [];
+            throw error; // Throw error so react-query can catch it and set isError
         }
         return data || [];
     },
-    enabled: !!profile?.user_id
+    enabled: !!profile?.user_id,
+    retry: 1 // Retry once on failure
   });
 
-  // 2. Fetch all schedules based on specific enrolled combinations
-  const { data: allSchedules, isLoading: isLoadingAllSchedules } = useQuery<Schedule[]>({
+  const { data: allSchedules, isLoading: isLoadingAllSchedules, isError: isAllSchedulesError } = useQuery<Schedule[]>({
     queryKey: ['allStudentSchedules', profile?.user_id, userEnrollments],
     queryFn: async (): Promise<Schedule[]> => {
       if (!profile?.user_id || !userEnrollments || userEnrollments.length === 0) return [];
@@ -118,20 +115,19 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
       const { data, error } = await query;
       if (error) {
           console.error("Error fetching all schedules:", error);
-          return [];
+          throw error;
       }
       return data || [];
     },
-    enabled: !!profile?.user_id && !!userEnrollments && userEnrollments.length > 0,
+    enabled: !!userEnrollments && userEnrollments.length > 0,
+    retry: 1
   });
 
-
-  // 3. Find the next upcoming class from all schedules
   const nextUpcomingClass = useMemo(() => {
     if (!allSchedules || allSchedules.length === 0) return null;
 
     const now = new Date();
-    const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const currentDay = now.getDay();
     const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
 
     let upcomingCandidates: (Schedule & { nextOccurrence: Date })[] = [];
@@ -143,32 +139,28 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
       let occurrence = nextDay(now, schedule.day_of_week);
       occurrence.setHours(startHour, startMin, 0, 0);
 
-      // If the class is today and already passed, consider next week's occurrence
       if (schedule.day_of_week === currentDay && startTimeMinutes <= currentTimeMinutes) {
         occurrence.setDate(occurrence.getDate() + 7);
       }
       
-      // Filter out past occurrences, or if the occurrence is too far in the future (e.g., more than a week)
       if (occurrence > now) {
          upcomingCandidates.push({ ...schedule, nextOccurrence: occurrence });
       }
     });
 
-    // Sort to find the nearest upcoming class
     upcomingCandidates.sort((a, b) => a.nextOccurrence.getTime() - b.nextOccurrence.getTime());
 
     return upcomingCandidates.length > 0 ? upcomingCandidates[0] : null;
   }, [allSchedules]);
 
 
-  // 4. Fetch ongoing class (existing logic)
-  const { data: ongoingClass, isLoading: isLoadingOngoingClass } = useQuery<OngoingClass | null>({
+  const { data: ongoingClass, isLoading: isLoadingOngoingClass, isError: isOngoingClassError } = useQuery<OngoingClass | null>({
     queryKey: ['current-ongoing-class', profile?.user_id, userEnrollments],
     queryFn: async (): Promise<OngoingClass | null> => {
       if (!profile?.user_id || !userEnrollments || userEnrollments.length === 0) return null;
 
       const now = new Date();
-      const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      const currentDay = now.getDay();
       const currentTime = now.toTimeString().slice(0, 8);
 
       let query = supabase
@@ -201,7 +193,10 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
 
       const { data: scheduleData, error: scheduleError } = await query;
 
-      if (scheduleError) throw scheduleError;
+      if (scheduleError) {
+        console.error("Error fetching ongoing class:", scheduleError);
+        throw scheduleError;
+      }
 
       if (!scheduleData || scheduleData.length === 0) return null;
 
@@ -215,7 +210,8 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
       };
     },
     enabled: !!profile?.user_id && !!userEnrollments && userEnrollments.length > 0,
-    refetchInterval: 30000
+    refetchInterval: 30000,
+    retry: 1
   });
 
   const formatTime = (time: string) => {
@@ -225,9 +221,10 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     return format(date, 'h:mm a');
   };
 
-  const isLoading = isLoadingEnrollments || isLoadingOngoingClass || isLoadingAllSchedules;
+  const isLoadingInitialData = isLoadingEnrollments || isLoadingAllSchedules || isLoadingOngoingClass;
+  const hasErrors = isEnrollmentsError || isAllSchedulesError || isOngoingClassError;
 
-  if (isLoading) {
+  if (isLoadingInitialData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50/50">
         <div className="flex flex-col items-center space-y-4">
@@ -238,13 +235,43 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     );
   }
 
+  // Handle case where enrollments fetch succeeds but returns no data or an error occurred
+  if (!userEnrollments || userEnrollments.length === 0 || hasErrors) {
+    return (
+      <div className="p-6 bg-gradient-to-br from-gray-50 to-white min-h-screen flex items-center justify-center">
+        <Card className="p-12 text-center rounded-3xl shadow-xl border-2 border-dashed border-gray-300 bg-white transform transition-all duration-500 hover:scale-105">
+          <div className="mb-8">
+            <AlertTriangle className="h-20 w-20 mx-auto text-red-500 animate-fade-in-up" />
+          </div>
+          <h3 className="text-3xl font-bold text-gray-800 mb-4 animate-fade-in-up animation-delay-200">
+            {hasErrors ? "Error Loading Enrollments" : "No Enrollments Found"}
+          </h3>
+          <p className="text-gray-600 mb-8 max-w-lg mx-auto animate-fade-in-up animation-delay-400">
+            {hasErrors 
+              ? "There was an issue fetching your enrollment details. Please try again later or contact support."
+              : "It looks like you are not enrolled in any batches or subjects yet. Please contact your administrator for enrollment."
+            }
+          </p>
+          <Button 
+            onClick={() => onTabChange('dashboard')} // Redirect to dashboard or home
+            size="lg" 
+            variant="outline" 
+            className="text-primary border-primary hover:bg-primary hover:text-white animate-fade-in-up animation-delay-600"
+          >
+            <Calendar className="h-5 w-5 mr-2" />
+            Go to Dashboard
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 bg-gradient-to-br from-gray-50 to-white min-h-screen flex items-center justify-center">
       <div className="max-w-3xl w-full mx-auto text-center">
         
         {ongoingClass ? (
           <Card className="relative p-10 overflow-hidden rounded-3xl shadow-2xl border-none bg-gradient-to-br from-green-500 to-emerald-600 text-white animate-fade-in-up">
-            {/* Animated background circles */}
             <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/10 rounded-full animate-pulse-slow"></div>
             <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-white/10 rounded-full animate-pulse-slow animation-delay-500"></div>
 
@@ -333,7 +360,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
             )}
 
             <Button 
-              onClick={() => onTabChange('schedule')} // Redirect to schedule tab
+              onClick={() => onTabChange('schedule')}
               size="lg" 
               variant="outline" 
               className="text-primary border-primary hover:bg-primary hover:text-white mt-8 animate-fade-in-up animation-delay-1000"
