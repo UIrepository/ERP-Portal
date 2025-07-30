@@ -16,7 +16,13 @@ export const AdminBatchAllocation = () => {
   const [selectedBatches, setSelectedBatches] = useState<string[]>([]);
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
 
-  const { data: users } = useQuery({ /* ...fetches users... */ });
+  const { data: users = [] } = useQuery({
+    queryKey: ['admin-users-allocation'],
+    queryFn: async () => {
+        const { data } = await supabase.from('profiles').select('*');
+        return data || [];
+    }
+  });
 
   // This query now just reads the master list, which is auto-populated by the trigger
   const { data: options = [] } = useQuery({
@@ -87,7 +93,23 @@ export const AdminBatchAllocation = () => {
       <h2 className="text-2xl font-bold flex items-center"><Layers className="mr-2 h-6 w-6" />Batch & Subject Allocation</h2>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
-            {/* User list remains the same */}
+            <CardHeader>
+                <CardTitle>Users</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="space-y-3 h-96 overflow-y-auto">
+                    {users.map(user => (
+                        <div key={user.id} onClick={() => handleUserSelect(user)} className="p-3 border rounded-lg cursor-pointer hover:bg-muted/50">
+                            <h4 className="font-medium">{user.name} ({user.role})</h4>
+                            <p className="text-sm text-muted-foreground">{user.email}</p>
+                            <div className="flex flex-wrap gap-1 mt-2">
+                                {getUserBatches(user).map((b: string) => <Badge key={b} variant="secondary">{b}</Badge>)}
+                                {user.subjects?.map((s: string) => <Badge key={s} variant="outline">{s}</Badge>)}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </CardContent>
         </Card>
 
         {selectedUser && (
