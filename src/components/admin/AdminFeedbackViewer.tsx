@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquare, User, Calendar, Star, BarChart2, Loader2, AlertTriangle } from 'lucide-react'; // AlertTriangle is imported here
+import { MessageSquare, User, Calendar, Star, BarChart2, Loader2, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,7 +21,7 @@ interface FeedbackEntry {
   dpp_quality: number;
   premium_content_usefulness: number;
   comments: string;
-  profiles: { // Joined profile data
+  profiles: {
     name: string;
     email: string;
   } | null;
@@ -69,22 +69,21 @@ export const AdminFeedbackViewer = () => {
   // Set up real-time subscription for feedback data
   useEffect(() => {
     const channel = supabase
-      .channel('feedback-realtime-admin') // Unique channel name for this component
+      .channel('feedback-realtime-admin')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'feedback' },
         (payload) => {
           console.log(`Real-time update from feedback table: ${payload.eventType}`);
-          // Invalidate the query cache to refetch data on changes
           queryClient.invalidateQueries({ queryKey: ['admin-feedback-viewer'] });
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel); // Clean up subscription on unmount
+      supabase.removeChannel(channel);
     };
-  }, [queryClient]); // Re-run effect if queryClient changes (unlikely)
+  }, [queryClient]);
 
   // Fetch all feedback data, including joined profile information
   const { data: feedback = [], isLoading, isError, error } = useQuery<FeedbackEntry[]>({
@@ -104,18 +103,27 @@ export const AdminFeedbackViewer = () => {
           dpp_quality,
           premium_content_usefulness,
           comments,
-          profiles (
+          profiles!inner (
             name,
             email
           )
         `)
-        .order('created_at', { ascending: false }); // Order by most recent first
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error("Error fetching feedback:", error);
-        throw error; // Propagate error for TanStack Query's onError
+        throw error;
       }
-      return data || [];
+      
+      // Transform the data to match our interface
+      const transformedData: FeedbackEntry[] = (data || []).map(item => ({
+        ...item,
+        profiles: item.profiles && typeof item.profiles === 'object' && !Array.isArray(item.profiles)
+          ? item.profiles as { name: string; email: string }
+          : null
+      }));
+      
+      return transformedData;
     },
   });
 
@@ -139,7 +147,7 @@ export const AdminFeedbackViewer = () => {
       allSubjects: Array.from(uniqueSubjects).sort(),
       filteredFeedback: filtered,
     };
-  }, [feedback, selectedBatch, selectedSubject]); // Re-calculate when feedback or filters change
+  }, [feedback, selectedBatch, selectedSubject]);
 
   // Render loading state
   if (isLoading) {

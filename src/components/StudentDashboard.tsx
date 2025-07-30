@@ -1,4 +1,3 @@
-
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { StudentSchedule } from './student/StudentSchedule';
@@ -24,6 +23,13 @@ interface StudentDashboardProps {
 interface UserEnrollment {
     batch_name: string;
     subject_name: string;
+}
+
+interface AnalyticsData {
+  totalNotes: number;
+  totalRecordings: number;
+  totalDPP: number;
+  feedbackSubmitted: number;
 }
 
 export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardProps) => {
@@ -58,7 +64,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
   }, [userEnrollments]);
 
   // Analytics queries updated to use userEnrollments
-  const { data: analyticsData, refetch: refetchAnalytics, isLoading: isLoadingAnalytics } = useQuery({
+  const { data: analyticsData, refetch: refetchAnalytics, isLoading: isLoadingAnalytics } = useQuery<AnalyticsData>({
     queryKey: ['student-analytics', profile?.user_id, userEnrollments],
     queryFn: async () => {
       if (!profile?.user_id || !userEnrollments || userEnrollments.length === 0) {
@@ -71,7 +77,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
         .join(',');
 
       // Helper function to fetch count for a table with combination filter
-      const fetchCount = async (tableName: string) => {
+      const fetchCount = async (tableName: 'notes' | 'recordings' | 'dpp_content') => {
         const { count, error } = await supabase
           .from(tableName)
           .select('*', { count: 'exact', head: true })
@@ -99,7 +105,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
 
       if (feedbackError) {
         console.error("Error fetching feedback count:", feedbackError);
-        return 0;
+        return { totalNotes: notesCount, totalRecordings: recordingsCount, totalDPP: dppCount, feedbackSubmitted: 0 };
       }
 
       return {
@@ -109,7 +115,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
         feedbackSubmitted: feedbackCount || 0
       };
     },
-    enabled: !!profile?.user_id && !isLoadingEnrollments && userEnrollments.length > 0,
+    enabled: !!profile?.user_id && !isLoadingEnrollments && userEnrollments && userEnrollments.length > 0,
   });
 
   // Fetch recent activities
