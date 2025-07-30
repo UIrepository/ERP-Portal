@@ -18,15 +18,8 @@ interface Schedule {
   day_of_week: number;
   start_time: string;
   end_time: string;
-  link?: string;
-}
-
-interface OngoingClass {
-  subject: string;
-  batch: string;
-  start_time: string;
-  end_time: string;
-  meeting_link: string;
+  link?: string; // Schedule might have its own link
+  // meeting_link_url?: string; // Removed as RPC is no longer used for this component
 }
 
 interface UserEnrollment {
@@ -60,7 +53,6 @@ const ScheduleSkeleton = () => (
 export const StudentSchedule = () => {
   const { profile } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
-  // Removed selectedSubjectFilter, as per request
   const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
 
   useEffect(() => {
@@ -68,6 +60,7 @@ export const StudentSchedule = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // Fetch user's specific enrollments
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['userEnrollments', profile?.user_id],
     queryFn: async () => {
@@ -85,69 +78,49 @@ export const StudentSchedule = () => {
     enabled: !!profile?.user_id
   });
 
+  // Available batches for the filter dropdown (all batches user is enrolled in)
   const availableBatches = useMemo(() => {
-    if (!userEnrollments) return [];
-    // Always show all batches the user is enrolled in as top-level filter options
-    return Array.from(new Set(userEnrollments.map(e => e.batch_name))).sort();
+    return Array.from(new Set(userEnrollments?.map(e => e.batch_name) || [])).sort();
   }, [userEnrollments]);
 
-  // The displayedSubjects logic is simplified as it's no longer directly linked to a filter,
-  // but rather shows all subjects for the selected batch.
-  const allSubjectsInSelectedBatch = useMemo(() => {
-    if (!userEnrollments) return [];
-    if (selectedBatchFilter !== 'all') {
-      return Array.from(new Set(
-        userEnrollments
-          .filter(e => e.batch_name === selectedBatchFilter)
-          .map(e => e.subject_name)
-      )).sort();
-    }
-    // If 'All Batches' is selected, show all subjects available across all enrollments.
-    return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
-  }, [userEnrollments, selectedBatchFilter]);
-
-
-  // Ensure selected batch filter is still valid when options change
+  // Reset selected batch filter if it becomes invalid (e.g., after enrollments load or change)
   if (selectedBatchFilter !== 'all' && !availableBatches.includes(selectedBatchFilter)) {
       setSelectedBatchFilter('all');
   }
-  // Removed selectedSubjectFilter reset logic as filter is removed
 
-
+  // Directly fetch schedules from the 'schedules' table
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
-    queryKey: ['student-schedule', userEnrollments, selectedBatchFilter], // Removed selectedSubjectFilter from queryKey
+    queryKey: ['student-schedule-direct', userEnrollments, selectedBatchFilter],
     queryFn: async (): Promise<Schedule[]> => {
         if (!userEnrollments || userEnrollments.length === 0) return [];
 
         let query = supabase.from('schedules').select('*');
 
-        // Determine batches to filter by
+        // Determine which batches to filter by
         let batchesToFilter = selectedBatchFilter === 'all'
-            ? Array.from(new Set(userEnrollments.map(e => e.batch_name))) // If 'All Batches' selected, consider all user's enrolled batches
-            : [selectedBatchFilter]; // Otherwise, just the selected batch
+            ? Array.from(new Set(userEnrollments.map(e => e.batch_name))) // If 'All Batches', use all enrolled batches
+            : [selectedBatchFilter]; // Otherwise, use the single selected batch
 
-        if (batchesToFilter.length === 0) return []; // No batches selected or available, return empty
-
-        // Build the OR filter for batches
-        const batchFilters = batchesToFilter.map(batchName => `(batch.eq.${batchName})`);
-
-        if (batchFilters.length > 0) {
-            query = query.or(batchFilters.join(','));
-        } else {
-            return []; // No batches, no schedules
+        if (batchesToFilter.length === 0) {
+          // If after filtering, there are no batches to query for, return empty
+          return [];
         }
+
+        // Apply the filter for batch names using .in()
+        query = query.in('batch', batchesToFilter);
         
+        // Add additional ordering
         query = query.order('day_of_week').order('start_time');
 
         const { data, error } = await query;
       
         if (error) {
-            console.error("Error fetching filtered schedules:", error);
+            console.error("Error fetching schedules directly:", error);
             throw error;
         }
         return data || [];
     },
-    enabled: !!userEnrollments && userEnrollments.length > 0
+    enabled: !!userEnrollments && userEnrollments.length > 0 // Enable only if enrollments are loaded and exist
   });
 
   const isLoading = isLoadingEnrollments || isLoadingSchedules;
@@ -187,7 +160,6 @@ export const StudentSchedule = () => {
            currentTimeMinutes <= endTimeMinutes;
   };
 
-
   return (
     <div className="space-y-6 p-6 bg-gray-50 min-h-screen">
       <div className="flex items-center justify-between">
@@ -201,7 +173,7 @@ export const StudentSchedule = () => {
         </div>
       </div>
 
-      {/* Filter Section - Subject Filter Removed */}
+      {/* Filter Section - Only Batch Filter */}
       <div className="flex gap-4">
         <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
           <SelectTrigger className="w-48 h-10">
@@ -214,7 +186,6 @@ export const StudentSchedule = () => {
             ))}
           </SelectContent>
         </Select>
-        {/* Subject filter is removed entirely */}
       </div>
 
       <div className="grid gap-6">
@@ -258,6 +229,13 @@ export const StudentSchedule = () => {
                             {schedule.batch}
                           </Badge>
                         </div>
+                        {schedule.link && ( // Display Join Class button if link exists on schedule table
+                          <Button size="sm" asChild>
+                            <a href={schedule.link} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="h-4 w-4 mr-1" /> Join
+                            </a>
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
