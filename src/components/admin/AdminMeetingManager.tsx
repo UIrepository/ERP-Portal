@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -44,24 +44,22 @@ const MeetingCard = ({ schedule, day }: { schedule: Schedule; day: string }) => 
   </Card>
 );
 
-// A list container for a specific category of meetings (Ongoing, Upcoming, Past)
+// A list container for a specific category of meetings
 const MeetingList = ({ title, schedules, now }: { title: string; schedules: Schedule[]; now: Date }) => {
-  const getScheduleDateTime = (s: Schedule) => {
-    const weekStart = startOfWeek(now, { weekStartsOn: 0 }); // Use Sunday as the start of the week
-    const scheduleDate = addDays(weekStart, s.day_of_week);
-    const startTime = parse(s.start_time, 'HH:mm:ss', new Date());
-    return set(scheduleDate, { hours: startTime.getHours(), minutes: startTime.getMinutes() });
-  };
+    const getScheduleDateTime = (s: Schedule) => {
+        const weekStart = startOfWeek(now, { weekStartsOn: 0 });
+        const scheduleDate = addDays(weekStart, s.day_of_week);
+        const startTime = parse(s.start_time, 'HH:mm:ss', new Date());
+        return set(scheduleDate, { hours: startTime.getHours(), minutes: startTime.getMinutes() });
+    };
 
-  // Sort the schedules based on their category
-  const sortedSchedules = useMemo(() => {
-    return [...schedules].sort((a, b) => {
-      const dateA = getScheduleDateTime(a);
-      const dateB = getScheduleDateTime(b);
-      // For upcoming, sort from nearest to furthest. For past, sort from most recent to oldest.
-      return title === 'Upcoming' ? dateA.getTime() - dateB.getTime() : dateB.getTime() - dateA.getTime();
-    });
-  }, [schedules, now, title]);
+    const sortedSchedules = useMemo(() => {
+        return [...schedules].sort((a, b) => {
+            const dateA = getScheduleDateTime(a);
+            const dateB = getScheduleDateTime(b);
+            return title === 'Upcoming' ? dateA.getTime() - dateB.getTime() : dateB.getTime() - dateA.getTime();
+        });
+    }, [schedules, now, title]);
 
   return (
     <Card>
@@ -89,9 +87,10 @@ const MeetingList = ({ title, schedules, now }: { title: string; schedules: Sche
   );
 };
 
-// The main component for the meeting manager page
+// Main component for the meeting manager page
 export const AdminMeetingManager = () => {
   const [now, setNow] = useState(new Date());
+  const queryClient = useQueryClient();
 
   // Keep the current time updated
   useEffect(() => {
@@ -99,7 +98,28 @@ export const AdminMeetingManager = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch all schedules that have a meeting link
+  // Set up real-time subscription to the schedules table
+  useEffect(() => {
+    const channel = supabase
+      .channel('schedules-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'schedules' },
+        (payload) => {
+          console.log('Change received!', payload);
+          // When a change occurs, invalidate the query to refetch data
+          queryClient.invalidateQueries({ queryKey: ['all-meeting-links'] });
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on component unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  // Fetch all schedules with a meeting link
   const { data: schedules = [], isLoading } = useQuery<Schedule[]>({
     queryKey: ['all-meeting-links'],
     queryFn: async (): Promise<Schedule[]> => {
