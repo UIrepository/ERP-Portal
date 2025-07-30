@@ -1,13 +1,23 @@
 // uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/student/StudentCurrentClass.tsx
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ExternalLink, Clock, Calendar } from 'lucide-react';
-import { format } from 'date-fns';
-import { useMemo } from 'react'; // Added useMemo
+import { ExternalLink, Clock, Calendar, AlertTriangle } from 'lucide-react'; // Added AlertTriangle for warning
+import { format, differenceInSeconds, nextDay, parseISO } from 'date-fns'; // Added parseISO
+
+interface Schedule {
+  id: string;
+  subject: string;
+  batch: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  link?: string;
+}
 
 interface OngoingClass {
   subject: string;
@@ -23,7 +33,51 @@ interface UserEnrollment {
     subject_name: string;
 }
 
-export const StudentCurrentClass = () => {
+interface StudentCurrentClassProps {
+    onTabChange: (tab: string) => void;
+}
+
+// Countdown Timer Component
+const Countdown = ({ targetDate }: { targetDate: Date }) => {
+  const calculateTimeLeft = () => {
+    const totalSeconds = differenceInSeconds(targetDate, new Date());
+    if (totalSeconds <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0, isLive: true, isStartingSoon: false };
+
+    const days = Math.floor(totalSeconds / (3600 * 24));
+    const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+
+    const isStartingSoon = days === 0 && hours === 0 && minutes < 15 && totalSeconds > 0;
+    
+    return { days, hours, minutes, seconds, isLive: false, isStartingSoon };
+  };
+
+  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft);
+
+  useEffect(() => {
+    const timer = setInterval(() => setTimeLeft(calculateTimeLeft()), 1000);
+    return () => clearInterval(timer);
+  }, [targetDate]);
+
+  if (timeLeft.isLive) {
+    return <Badge className="bg-green-500 text-white animate-pulse">Live Now!</Badge>;
+  }
+
+  return (
+    <div className={`flex items-center justify-center gap-2 font-mono text-lg ${timeLeft.isStartingSoon ? 'text-red-500 animate-pulse-fast' : 'text-gray-700'}`}>
+      <Clock className="h-5 w-5" />
+      <span className="font-semibold">Starts in:</span>
+      <span>{String(timeLeft.days).padStart(2, '0')}d</span>
+      <span>{String(timeLeft.hours).padStart(2, '0')}h</span>
+      <span>{String(timeLeft.minutes).padStart(2, '0')}m</span>
+      <span>{String(timeLeft.seconds).padStart(2, '0')}s</span>
+    </div>
+  );
+};
+
+
+export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) => {
   const { profile } = useAuth();
 
   // 1. Fetch user's specific enrollments from the new table
@@ -44,13 +98,75 @@ export const StudentCurrentClass = () => {
     enabled: !!profile?.user_id
   });
 
-  // 2. Fetch ongoing class based on specific enrolled combinations
-  const { data: ongoingClass, isLoading: isLoadingOngoingClass } = useQuery<OngoingClass | null>({
-    queryKey: ['current-ongoing-class', profile?.user_id, userEnrollments], // Added userEnrollments to queryKey
-    queryFn: async (): Promise<OngoingClass | null> => {
-      if (!profile?.user_id || !userEnrollments || userEnrollments.length === 0) return null; // Check userEnrollments
+  // 2. Fetch all schedules based on specific enrolled combinations
+  const { data: allSchedules, isLoading: isLoadingAllSchedules } = useQuery<Schedule[]>({
+    queryKey: ['allStudentSchedules', profile?.user_id, userEnrollments],
+    queryFn: async (): Promise<Schedule[]> => {
+      if (!profile?.user_id || !userEnrollments || userEnrollments.length === 0) return [];
 
-      // Get current day and time
+      let query = supabase.from('schedules').select('*');
+
+      const combinationFilters = userEnrollments
+          .map(enrollment => `(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
+
+      if (combinationFilters.length > 0) {
+          query = query.or(combinationFilters.join(','));
+      } else {
+          return [];
+      }
+
+      const { data, error } = await query;
+      if (error) {
+          console.error("Error fetching all schedules:", error);
+          return [];
+      }
+      return data || [];
+    },
+    enabled: !!profile?.user_id && !!userEnrollments && userEnrollments.length > 0,
+  });
+
+
+  // 3. Find the next upcoming class from all schedules
+  const nextUpcomingClass = useMemo(() => {
+    if (!allSchedules || allSchedules.length === 0) return null;
+
+    const now = new Date();
+    const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
+
+    let upcomingCandidates: (Schedule & { nextOccurrence: Date })[] = [];
+
+    allSchedules.forEach(schedule => {
+      const [startHour, startMin] = schedule.start_time.split(':').map(Number);
+      const startTimeMinutes = startHour * 60 + startMin;
+
+      let occurrence = nextDay(now, schedule.day_of_week);
+      occurrence.setHours(startHour, startMin, 0, 0);
+
+      // If the class is today and already passed, consider next week's occurrence
+      if (schedule.day_of_week === currentDay && startTimeMinutes <= currentTimeMinutes) {
+        occurrence.setDate(occurrence.getDate() + 7);
+      }
+      
+      // Filter out past occurrences, or if the occurrence is too far in the future (e.g., more than a week)
+      if (occurrence > now) {
+         upcomingCandidates.push({ ...schedule, nextOccurrence: occurrence });
+      }
+    });
+
+    // Sort to find the nearest upcoming class
+    upcomingCandidates.sort((a, b) => a.nextOccurrence.getTime() - b.nextOccurrence.getTime());
+
+    return upcomingCandidates.length > 0 ? upcomingCandidates[0] : null;
+  }, [allSchedules]);
+
+
+  // 4. Fetch ongoing class (existing logic)
+  const { data: ongoingClass, isLoading: isLoadingOngoingClass } = useQuery<OngoingClass | null>({
+    queryKey: ['current-ongoing-class', profile?.user_id, userEnrollments],
+    queryFn: async (): Promise<OngoingClass | null> => {
+      if (!profile?.user_id || !userEnrollments || userEnrollments.length === 0) return null;
+
       const now = new Date();
       const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
       const currentTime = now.toTimeString().slice(0, 8);
@@ -67,14 +183,13 @@ export const StudentCurrentClass = () => {
           )
         `);
 
-      // Dynamically build OR conditions for each specific enrolled combination
       const combinationFilters = userEnrollments
           .map(enrollment => `(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
 
       if (combinationFilters.length > 0) {
           query = query.or(combinationFilters.join(','));
       } else {
-          return null; // No relevant enrollments, so no class
+          return null;
       }
 
       query = query
@@ -99,7 +214,7 @@ export const StudentCurrentClass = () => {
         meeting_link: (schedule.meeting_links as any)?.link || ''
       };
     },
-    enabled: !!profile?.user_id && !!userEnrollments && userEnrollments.length > 0, // Enable only if user and enrollments are loaded
+    enabled: !!profile?.user_id && !!userEnrollments && userEnrollments.length > 0,
     refetchInterval: 30000
   });
 
@@ -110,7 +225,7 @@ export const StudentCurrentClass = () => {
     return format(date, 'h:mm a');
   };
 
-  const isLoading = isLoadingEnrollments || isLoadingOngoingClass; // Combine loading states
+  const isLoading = isLoadingEnrollments || isLoadingOngoingClass || isLoadingAllSchedules;
 
   if (isLoading) {
     return (
@@ -184,9 +299,45 @@ export const StudentCurrentClass = () => {
               No Ongoing Class Right Now
             </h3>
             <p className="text-gray-600 mb-8 max-w-lg mx-auto animate-fade-in-up animation-delay-400">
-              Relax and prepare for your next session. You don't have any classes scheduled at this moment.
+              Relax and prepare for your next session.
             </p>
-            <Button size="lg" variant="outline" className="text-primary border-primary hover:bg-primary hover:text-white animate-fade-in-up animation-delay-600">
+            
+            {nextUpcomingClass ? (
+                <div className="space-y-6">
+                    <p className="text-xl font-semibold text-gray-700 animate-fade-in-up animation-delay-500">
+                        Your Next Class: <span className="text-primary">{nextUpcomingClass.subject} ({nextUpcomingClass.batch})</span>
+                    </p>
+                    <p className="text-lg text-gray-600 animate-fade-in-up animation-delay-600">
+                        {format(nextUpcomingClass.nextOccurrence, "eeee, MMMM do 'at' h:mm a")}
+                    </p>
+                    <Countdown targetDate={nextUpcomingClass.nextOccurrence} />
+                    {nextUpcomingClass.link && (
+                        <Button
+                            onClick={() => window.open(nextUpcomingClass.link!, '_blank')}
+                            size="lg"
+                            className="bg-primary hover:bg-primary/90 text-white mt-6 animate-fade-in-up animation-delay-800"
+                        >
+                            <ExternalLink className="h-5 w-5 mr-2" />
+                            Go to Next Class
+                        </Button>
+                    )}
+                </div>
+            ) : (
+                <div className="space-y-4 animate-fade-in-up animation-delay-500">
+                    <AlertTriangle className="h-16 w-16 mx-auto text-yellow-500" />
+                    <p className="text-xl font-semibold text-gray-700">No Upcoming Classes Found</p>
+                    <p className="text-gray-600">
+                        It looks like there are no scheduled classes for your current enrollments.
+                    </p>
+                </div>
+            )}
+
+            <Button 
+              onClick={() => onTabChange('schedule')} // Redirect to schedule tab
+              size="lg" 
+              variant="outline" 
+              className="text-primary border-primary hover:bg-primary hover:text-white mt-8 animate-fade-in-up animation-delay-1000"
+            >
               <Calendar className="h-5 w-5 mr-2" />
               View Your Full Schedule
             </Button>
