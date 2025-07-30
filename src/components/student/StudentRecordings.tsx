@@ -1,4 +1,4 @@
-// uirepository/teachgrid-hub/teachgrid-hub-c86295b3bb030c2c90bf7c173e7bd66116f57f33/src/components/student/StudentRecordings.tsx
+// uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/student/StudentRecordings.tsx
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Video, Play, Search } from 'lucide-react';
+import { Video, Play, Search, ExternalLink } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -164,25 +164,20 @@ export const StudentRecordings = () => {
     });
   };
 
-  const getModifiedEmbedLink = (originalLink: string) => {
-    if (originalLink.includes('drive.google.com') && originalLink.endsWith('/preview')) {
-      return originalLink.replace('/preview', '/view?usp=sharing&rm=minimal');
-    }
-    return originalLink;
-  };
-
   const WatermarkedPlayer = ({ recording }: { recording: any }) => (
     <div
       className="relative aspect-video"
       onContextMenu={(e) => e.preventDefault()}
       onKeyDown={(e) => {
-        if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'C' || e.key === 'J')) e.preventDefault();
+        if (e.ctrlKey && e.shiftKey && e.key === 'I') e.preventDefault();
+        if (e.ctrlKey && e.shiftKey && e.key === 'C') e.preventDefault();
+        if (e.ctrlKey && e.shiftKey && e.key === 'J') e.preventDefault();
         if (e.ctrlKey && e.key === 'U') e.preventDefault();
         if (e.key === 'F12') e.preventDefault();
       }}
     >
       <iframe
-        src={getModifiedEmbedLink(recording.embed_link)}
+        src={recording.embed_link}
         className="absolute top-0 left-0 w-full h-full rounded-lg"
         frameBorder="0"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -211,6 +206,7 @@ export const StudentRecordings = () => {
           <p className="text-gray-500 mt-1">Review past lectures and catch up on missed classes.</p>
         </div>
         <div className="flex gap-2">
+          {/* Display all enrolled batches */}
           {displayedBatches.map(b => <Badge key={b} variant="outline">{b}</Badge>)}
         </div>
       </div>
@@ -240,7 +236,7 @@ export const StudentRecordings = () => {
         <Select
           value={selectedSubjectFilter}
           onValueChange={setSelectedSubjectFilter}
-          disabled={selectedBatchFilter === 'all'}
+          disabled={selectedBatchFilter === 'all'} // Subject filter disabled if 'All Batches' is selected
         >
           <SelectTrigger className="w-48 h-10">
             <SelectValue placeholder="Filter by subject" />
