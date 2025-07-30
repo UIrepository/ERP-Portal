@@ -48,19 +48,15 @@ const PremiumContentSkeleton = () => (
 
 export const StudentUIKiPadhai = () => {
   const { profile } = useAuth();
-  const queryClient = useQueryClient();
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
   const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
-  const [searchTerm, setSearchTerm] = useState('');
 
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['userEnrollments', profile?.user_id],
     queryFn: async () => {
         if (!profile?.user_id) return [];
-        const { data, error } = await supabase
-            .from('user_enrollments')
-            .select('batch_name, subject_name')
-            .eq('user_id', profile.user_id);
+        const { data, error } = await supabase.from('user_enrollments').select('batch_name, subject_name').eq('user_id', profile.user_id);
         if (error) {
             console.error("Error fetching user enrollments:", error);
             return [];
@@ -75,22 +71,14 @@ export const StudentUIKiPadhai = () => {
     if (selectedSubjectFilter === 'all') {
       return Array.from(new Set(userEnrollments.map(e => e.batch_name))).sort();
     } else {
-      return Array.from(new Set(
-        userEnrollments
-          .filter(e => e.subject_name === selectedSubjectFilter)
-          .map(e => e.batch_name)
-      )).sort();
+      return Array.from(new Set(userEnrollments.filter(e => e.subject_name === selectedSubjectFilter).map(e => e.batch_name))).sort();
     }
   }, [userEnrollments, selectedSubjectFilter]);
 
   const displayedSubjects = useMemo(() => {
     if (!userEnrollments) return [];
     if (selectedBatchFilter !== 'all') {
-      return Array.from(new Set(
-        userEnrollments
-          .filter(e => e.batch_name === selectedBatchFilter)
-          .map(e => e.subject_name)
-      )).sort();
+      return Array.from(new Set(userEnrollments.filter(e => e.batch_name === selectedBatchFilter).map(e => e.subject_name))).sort();
     }
     return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
   }, [userEnrollments, selectedBatchFilter]);
@@ -111,11 +99,7 @@ export const StudentUIKiPadhai = () => {
     queryKey: ['student-ui-ki-padhai', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
     queryFn: async (): Promise<UIKiPadhaiContent[]> => {
         if (!userEnrollments || userEnrollments.length === 0) return [];
-
-        let query = supabase
-            .from('dpp_content')
-            .select('*')
-            .eq('is_active', true);
+        let query = supabase.from('ui_ki_padhai_content').select('*').eq('is_active', true);
 
         const combinationFilters = userEnrollments
             .filter(enrollment =>
@@ -144,48 +128,12 @@ export const StudentUIKiPadhai = () => {
   });
 
   const filteredContent = useMemo(() => {
-    return premiumContent?.filter(content => 
+    if (!premiumContent) return [];
+    return premiumContent.filter(content => 
         content.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        content.description?.toLowerCase().includes(searchTerm.toLowerCase())
+        (content.description && content.description.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [premiumContent, searchTerm]);
-
-  useEffect(() => {
-    if (!profile?.user_id) return;
-
-    const uiKiPadhaiChannel = supabase
-      .channel('ui-ki-padhai-realtime-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'dpp_content'
-        },
-        () => {
-          console.log('Real-time update: dpp_content changed');
-          queryClient.invalidateQueries({ queryKey: ['student-ui-ki-padhai'] });
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_enrollments',
-          filter: `user_id=eq.${profile.user_id}`
-        },
-        () => {
-          console.log('Real-time update: user_enrollments changed');
-          queryClient.invalidateQueries({ queryKey: ['userEnrollments'] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(uiKiPadhaiChannel);
-    };
-  }, [profile?.user_id, queryClient]);
 
   const handleAccessContent = (content: UIKiPadhaiContent) => {
     window.open(content.link, '_blank');
@@ -197,7 +145,6 @@ export const StudentUIKiPadhai = () => {
     <div className="p-6 bg-gradient-to-br from-yellow-50 to-orange-50 min-h-full flex flex-col items-center">
       <div className="max-w-4xl mx-auto w-full">
         
-        {/* Header Section - Premium Design */}
         <div className="relative p-8 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-r from-yellow-500 to-orange-500 text-white mb-10 text-center animate-fade-in-up">
             <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/10 rounded-full animate-pulse-slow"></div>
             <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-white/10 rounded-full animate-pulse-slow animation-delay-500"></div>
@@ -216,19 +163,18 @@ export const StudentUIKiPadhai = () => {
             </div>
         </div>
 
-        {/* Filters and Search Section */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <div className="relative flex-1 col-span-full md:col-span-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
-              placeholder="Search premium content..."
-              className="pl-10 h-10 bg-white shadow-sm"
+              placeholder="Search content..."
+              className="w-full pl-12 h-12 text-lg bg-white shadow-lg rounded-full"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
-            <SelectTrigger className="w-full h-10 bg-white shadow-sm">
+            <SelectTrigger className="w-full h-12 text-lg bg-white shadow-lg rounded-full">
               <SelectValue placeholder="Filter by batch" />
             </SelectTrigger>
             <SelectContent>
@@ -242,7 +188,7 @@ export const StudentUIKiPadhai = () => {
             value={selectedSubjectFilter}
             onValueChange={setSelectedSubjectFilter}
           >
-            <SelectTrigger className="w-full h-10 bg-white shadow-sm">
+            <SelectTrigger className="w-full h-12 text-lg bg-white shadow-lg rounded-full">
               <SelectValue placeholder="Filter by subject" />
             </SelectTrigger>
             <SelectContent>
@@ -254,13 +200,12 @@ export const StudentUIKiPadhai = () => {
           </Select>
         </div>
 
-        {/* Content List */}
         <div className="space-y-4">
           {isLoading ? (
             <PremiumContentSkeleton />
           ) : filteredContent && filteredContent.length > 0 ? (
             filteredContent.map((content) => (
-                <Card key={content.id} className="bg-white hover:shadow-lg transition-shadow duration-300">
+                <Card key={content.id} className="bg-white hover:shadow-xl transition-shadow duration-300 group">
                     <CardContent className="p-5 flex flex-col md:flex-row md:items-center md:justify-between">
                         <div className="flex-grow mb-4 md:mb-0">
                             <div className="flex items-center gap-3">
@@ -268,7 +213,7 @@ export const StudentUIKiPadhai = () => {
                                     <Crown className="h-6 w-6 text-yellow-500" />
                                 </div>
                                 <div>
-                                    <h3 className="font-semibold text-gray-800">{content.title}</h3>
+                                    <h3 className="font-semibold text-gray-800 group-hover:text-primary transition-colors">{content.title}</h3>
                                     <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{content.description}</p>
                                 </div>
                             </div>
@@ -295,8 +240,8 @@ export const StudentUIKiPadhai = () => {
           ) : (
             <div className="text-center py-20 bg-white rounded-lg border-dashed border-2 shadow-sm">
               <Crown className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-700">No Premium Content Yet</h3>
-              <p className="text-muted-foreground mt-2">Exclusive courses and materials for your batch and subjects will appear here soon.</p>
+              <h3 className="text-xl font-semibold text-gray-700">No Premium Content Available</h3>
+              <p className="text-muted-foreground mt-2">Please check back later for exclusive courses and materials.</p>
             </div>
           )}
         </div>
