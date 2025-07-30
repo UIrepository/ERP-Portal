@@ -15,23 +15,27 @@ interface MeetingLink {
   batch: string;
 }
 
-const LinksSkeleton = () => (
+const LinksSkeleton = () => {
+  return (
     <div className="space-y-4">
-        {[...Array(3)].map((_, i) => (
-            <Card key={i} className="p-4 rounded-xl">
-                <div className="space-y-3">
-                    <Skeleton className="h-8 w-8 rounded-full" />
-                    <Skeleton className="h-5 w-1/3" />
-                    <Skeleton className="h-4 w-4/5" />
-                    <div className="flex gap-2 justify-end">
-                        <Skeleton className="h-9 w-24" />
-                        <Skeleton className="h-9 w-24" />
-                    </div>
-                </div>
-            </Card>
-        ))}
+      {[...Array(3)].map((_, i) => (
+        <Card key={i} className="p-4 rounded-xl">
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-8 w-8 rounded-full" />
+              <Skeleton className="h-5 w-1/3" />
+            </div>
+            <Skeleton className="h-4 w-4/5" />
+            <div className="flex gap-2 justify-end">
+              <Skeleton className="h-9 w-24" />
+              <Skeleton className="h-9 w-24" />
+            </div>
+          </div>
+        </Card>
+      ))}
     </div>
-);
+  );
+};
 
 
 export const AdminMeetingManager = () => {
@@ -69,7 +73,7 @@ export const AdminMeetingManager = () => {
       if (error) {
         console.error("Error fetching from meeting_links table:", error);
         throw error;
-      };
+      }
       return (data || []) as MeetingLink[];
     },
   });
@@ -84,26 +88,25 @@ export const AdminMeetingManager = () => {
   
   return (
     <div className="space-y-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 min-h-full">
-      {/* Gradient background */}
       {/* Header Section - Enhanced Design */}
       <div className="relative p-8 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-r from-blue-600 to-indigo-700 text-white animate-fade-in-up">
-            {/* Animated background circles */}
-            <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/10 rounded-full animate-pulse-slow"></div>
-            <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-white/10 rounded-full animate-pulse-slow animation-delay-500"></div>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white/10 rounded-full animate-pulse-slow animation-delay-1000"></div>
+        {/* Animated background circles */}
+        <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/10 rounded-full animate-pulse-slow"></div>
+        <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-white/10 rounded-full animate-pulse-slow animation-delay-500"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white/10 rounded-full animate-pulse-slow animation-delay-1000"></div>
 
-            <div className="relative z-10 text-center">
-                <div className="flex items-center justify-center mb-4">
-                    <CalendarCheck className="h-16 w-16 text-blue-100 drop-shadow-md" />
-                </div>
-                <h1 className="text-4xl md:text-5xl font-bold mb-2 tracking-tight drop-shadow-lg">
-                    Manage Online Sessions
-                </h1>
-                <p className="text-xl md:text-2xl text-blue-100 drop-shadow-sm font-semibold">
-                    Central hub for all class session links.
-                </p>
+        <div className="relative z-10 text-center">
+            <div className="flex items-center justify-center mb-4">
+                <CalendarCheck className="h-16 w-16 text-blue-100 drop-shadow-md" />
             </div>
+            <h1 className="text-4xl md:text-5xl font-bold mb-2 tracking-tight drop-shadow-lg">
+                Manage Online Sessions
+            </h1>
+            <p className="text-xl md:text-2xl text-blue-100 drop-shadow-sm font-semibold">
+                Central hub for all class session links.
+            </p>
         </div>
+      </div>
 
       {/* Sessions List */}
       <div className="space-y-4">
