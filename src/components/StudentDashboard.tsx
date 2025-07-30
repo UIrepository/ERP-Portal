@@ -20,7 +20,6 @@ interface StudentDashboardProps {
   onTabChange: (tab: string) => void;
 }
 
-// Define the structure for an enrollment record from the new table
 interface UserEnrollment {
     batch_name: string;
     subject_name: string;
@@ -29,7 +28,7 @@ interface UserEnrollment {
 export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardProps) => {
   const { profile } = useAuth();
 
-  // Fetch user's specific enrollments from the new table for dashboard display
+  // Fetch user's specific enrollments for dashboard display AND analytics filtering
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['dashboardUserEnrollments', profile?.user_id],
     queryFn: async () => {
@@ -57,54 +56,63 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
   }, [userEnrollments]);
 
 
-  // Note: These analytics queries currently rely on the old batch/subjects columns
-  // or may need further refinement/creation of database views/functions
-  // to correctly aggregate based on the new user_enrollments table.
-  const { data: analyticsData, refetch: refetchAnalytics } = useQuery({
-    queryKey: ['student-analytics', profile?.user_id],
+  // Analytics queries updated to use userEnrollments
+  const { data: analyticsData, refetch: refetchAnalytics, isLoading: isLoadingAnalytics } = useQuery({
+    queryKey: ['student-analytics', profile?.user_id, userEnrollments], // Add userEnrollments to queryKey
     queryFn: async () => {
-      if (!profile) return null;
+      if (!profile?.user_id || !userEnrollments || userEnrollments.length === 0) {
+        // If no enrollments, return 0 for all analytics
+        return { totalNotes: 0, totalRecordings: 0, totalDPP: 0, feedbackSubmitted: 0 };
+      }
 
-      // These queries still use profile.batch/subjects which are being phased out.
-      // For accurate analytics with user_enrollments, you would need to:
-      // 1. Fetch user_enrollments first for the user_id.
-      // 2. Then query DPP/Notes/Recordings using an OR filter for each combination,
-      //    or create database views/functions to aggregate.
-      // This is a complex refactor beyond this scope but important for future accuracy.
-      const [notesResult, recordingsResult, dppResult, feedbackResult] = await Promise.all([
-        supabase
-          .from('notes')
-          .select('*')
-          .in('batch', profile.batch || []) // Relies on old profile.batch
-          .in('subject', profile.subjects || []), // Relies on old profile.subjects
-        supabase
-          .from('recordings')
-          .select('*')
-          .in('batch', profile.batch || []) // Relies on old profile.batch
-          .in('subject', profile.subjects || []), // Relies on old profile.subjects
-        supabase
-          .from('dpp_content')
-          .select('*')
-          .in('batch', profile.batch || []) // Relies on old profile.batch
-          .in('subject', profile.subjects || []), // Relies on old profile.subjects
-        supabase
-          .from('feedback')
-          .select('*')
-          .eq('batch', profile.batch) // Relies on old profile.batch
-          .eq('submitted_by', profile.user_id)
+      // Build the OR filter for combinations from userEnrollments
+      const combinationsFilterString = userEnrollments
+        .map(e => `and(batch.eq.${e.batch_name},subject.eq.${e.subject_name})`)
+        .join(',');
+
+      // Helper function to fetch count for a table with combination filter
+      const fetchCount = async (tableName: string) => {
+        const { count, error } = await supabase
+          .from(tableName)
+          .select('*', { count: 'exact', head: true }) // Request only count
+          .or(combinationsFilterString); // Apply the combined filter
+
+        if (error) {
+          console.error(`Error fetching count for ${tableName}:`, error);
+          return 0;
+        }
+        return count || 0;
+      };
+
+      const [notesCount, recordingsCount, dppCount] = await Promise.all([
+        fetchCount('notes'),
+        fetchCount('recordings'),
+        fetchCount('dpp_content'),
       ]);
 
+      // For feedback, it's submitted_by user_id AND combination
+      const { count: feedbackCount, error: feedbackError } = await supabase
+        .from('feedback')
+        .select('*', { count: 'exact', head: true })
+        .eq('submitted_by', profile.user_id)
+        .or(combinationsFilterString);
+
+      if (feedbackError) {
+        console.error("Error fetching feedback count:", feedbackError);
+        return 0; // Or throw error based on desired error handling
+      }
+
       return {
-        totalNotes: notesResult.data?.length || 0,
-        totalRecordings: recordingsResult.data?.length || 0,
-        totalDPP: dppResult.data?.length || 0,
-        feedbackSubmitted: feedbackResult.data?.length || 0
+        totalNotes: notesCount,
+        totalRecordings: recordingsCount,
+        totalDPP: dppCount,
+        feedbackSubmitted: feedbackCount || 0
       };
     },
-    enabled: !!profile
+    enabled: !!profile?.user_id && !isLoadingEnrollments && userEnrollments.length > 0, // Only enabled when enrollments are loaded and exist
   });
 
-  // Fetch recent activities
+  // Fetch recent activities - this query remains unchanged as it only filters by user_id
   const { data: recentActivities, refetch: refetchActivities } = useQuery({
     queryKey: ['student-activities', profile?.user_id],
     queryFn: async () => {
@@ -196,17 +204,21 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
     };
   }, [profile?.user_id, refetchActivities, refetchAnalytics]);
 
-  // Function to log activities
+  // Function to log activities - should eventually log specific enrollment combo
   const logActivity = async (activityType: string, description: string, metadata?: any) => {
     if (!profile?.user_id) return;
     
-    // Note: The batch/subject logging here might not align with new user_enrollments model.
-    // Consider updating this to fetch/log specific enrollment combo from user_enrollments.
+    // Simplified logging for now; a more robust solution would pass the specific batch/subject of the activity
+    const loggedBatch = availableBatches.length > 0 ? availableBatches[0] : null;
+    const loggedSubject = availableSubjects.length > 0 ? availableSubjects[0] : null;
+
     await supabase.from('student_activities').insert({
       user_id: profile.user_id,
       activity_type: activityType,
       description,
-      metadata
+      metadata,
+      batch: loggedBatch, // This might need to be more specific based on the actual activity
+      subject: loggedSubject, // This might need to be more specific based on the actual activity
     });
   };
 
@@ -221,26 +233,6 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
     );
   }
   
-  // The formatArrayString function is no longer strictly needed for profile.batch/subjects
-  // if they are removed from the profiles table and all data comes from user_enrollments.
-  // However, it's kept here for robustness in case profile.batch/subjects still exist
-  // for other roles or legacy data.
-  // const formatArrayString = (arr: string | string[] | null | undefined) => {
-  //   if (!arr) return '';
-  //   if (Array.isArray(arr)) {
-  //     return arr.map(item => typeof item === 'string' ? item.replace(/"/g, '') : item).join(', ');
-  //   }
-  //   try {
-  //     const parsed = JSON.parse(arr);
-  //     if (Array.isArray(parsed)) {
-  //       return parsed.map(item => typeof item === 'string' ? item.replace(/"/g, '') : item).join(', ');
-  //     }
-  //   } catch (e) {
-  //     return String(arr).replace(/"/g, '').replace(/[\[\]]/g, '');
-  //   }
-  //   return String(arr).replace(/"/g, '').replace(/[\[\]]/g, '');
-  // };
-
   const renderTabContent = () => {
     switch (activeTab) {
       case 'schedule':
@@ -264,6 +256,9 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
     }
   };
 
+  // Overall loading for the dashboard content (header + analytics)
+  const isDashboardLoading = isLoadingEnrollments || isLoadingAnalytics;
+
   const renderDashboardContent = () => (
     <div className="min-h-screen bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -273,44 +268,41 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
             {profile?.name}
           </h1>
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
-            {/* Updated to display batches from user_enrollments */}
-            {availableBatches.length > 0 && (
-              <div className="text-gray-600">
-                <span className="font-medium">Batches:</span> {availableBatches.join(', ')} 
-              </div>
-            )}
-            {/* Updated to display subjects from user_enrollments */}
-            {availableSubjects.length > 0 && (
-              <div className="text-gray-600">
-                <span className="font-medium">Subjects:</span> {availableSubjects.join(', ')}
-              </div>
-            )}
-            {/* Show a message if no enrollments are found and not loading */}
-            {availableBatches.length === 0 && availableSubjects.length === 0 && !isLoadingEnrollments && (
-                <div className="text-gray-600">
-                    <span className="font-medium">Enrollments:</span> No batches or subjects assigned.
-                </div>
-            )}
-            {/* Show loading indicator for enrollments */}
-            {isLoadingEnrollments && (
+            {isDashboardLoading ? (
                 <div className="text-gray-600 flex items-center gap-2">
                     <span className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-gray-400"></span>
-                    <span className="font-medium">Loading Enrollments...</span>
+                    <span className="font-medium">Loading Enrollments & Stats...</span>
                 </div>
+            ) : (
+                <>
+                    {availableBatches.length > 0 && (
+                    <div className="text-gray-600">
+                        <span className="font-medium">Batches:</span> {availableBatches.join(', ')} 
+                    </div>
+                    )}
+                    {availableSubjects.length > 0 && (
+                    <div className="text-gray-600">
+                        <span className="font-medium">Subjects:</span> {availableSubjects.join(', ')}
+                    </div>
+                    )}
+                    {availableBatches.length === 0 && availableSubjects.length === 0 && (
+                        <div className="text-gray-600">
+                            <span className="font-medium">Enrollments:</span> No batches or subjects assigned.
+                        </div>
+                    )}
+                </>
             )}
           </div>
         </div>
 
         {/* Statistics Cards */}
-        {/* Note: The queries for these stats still rely on the old profile.batch/subjects.
-            For accurate counts with the new user_enrollments model, these would need refactoring. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           <Card className="bg-white border border-gray-200 rounded-2xl shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 mb-1">Notes Downloaded</p>
-                  <p className="text-3xl font-semibold text-gray-900">{analyticsData?.totalNotes || 0}</p>
+                  <p className="text-3xl font-semibold text-gray-900">{isDashboardLoading ? <Skeleton className="h-8 w-16"/> : analyticsData?.totalNotes || 0}</p>
                 </div>
                 <FileText className="h-8 w-8 text-gray-400" />
               </div>
@@ -322,7 +314,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 mb-1">Recordings Watched</p>
-                  <p className="text-3xl font-semibold text-gray-900">{analyticsData?.totalRecordings || 0}</p>
+                  <p className="text-3xl font-semibold text-gray-900">{isDashboardLoading ? <Skeleton className="h-8 w-16"/> : analyticsData?.totalRecordings || 0}</p>
                 </div>
                 <Video className="h-8 w-8 text-gray-400" />
               </div>
@@ -334,7 +326,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 mb-1">DPPs Attempted</p>
-                  <p className="text-3xl font-semibold text-gray-900">{analyticsData?.totalDPP || 0}</p>
+                  <p className="text-3xl font-semibold text-gray-900">{isDashboardLoading ? <Skeleton className="h-8 w-16"/> : analyticsData?.totalDPP || 0}</p>
                 </div>
                 <Target className="h-8 w-8 text-gray-400" />
               </div>
@@ -346,7 +338,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 mb-1">Feedback Submitted</p>
-                  <p className="text-3xl font-semibold text-gray-900">{analyticsData?.feedbackSubmitted || 0}</p>
+                  <p className="text-3xl font-semibold text-gray-900">{isDashboardLoading ? <Skeleton className="h-8 w-16"/> : analyticsData?.feedbackSubmitted || 0}</p>
                 </div>
                 <MessageSquare className="h-8 w-8 text-gray-400" />
               </div>
