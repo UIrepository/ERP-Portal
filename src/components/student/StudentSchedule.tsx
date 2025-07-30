@@ -21,7 +21,7 @@ interface Schedule {
   link?: string;
 }
 
-interface OngoingClass { // This interface is defined here but not used in StudentSchedule, kept for consistency if copy-pasting components.
+interface OngoingClass {
   subject: string;
   batch: string;
   start_time: string;
@@ -87,19 +87,13 @@ export const StudentSchedule = () => {
 
   const availableBatches = useMemo(() => {
     if (!userEnrollments) return [];
-    if (selectedSubjectFilter === 'all') {
-      return Array.from(new Set(userEnrollments.map(e => e.batch_name))).sort();
-    } else {
-      return Array.from(new Set(
-        userEnrollments
-          .filter(e => e.subject_name === selectedSubjectFilter)
-          .map(e => e.batch_name)
-      )).sort();
-    }
-  }, [userEnrollments, selectedSubjectFilter]);
+    // Batches can be filtered by selected subject, but always show all user's enrolled batches as top-level filter options
+    return Array.from(new Set(userEnrollments.map(e => e.batch_name))).sort();
+  }, [userEnrollments]);
 
   const availableSubjects = useMemo(() => {
     if (!userEnrollments) return [];
+    // If a specific batch is selected, show all subjects associated with that batch in user's enrollments
     if (selectedBatchFilter !== 'all') {
       return Array.from(new Set(
         userEnrollments
@@ -107,15 +101,21 @@ export const StudentSchedule = () => {
           .map(e => e.subject_name)
       )).sort();
     }
+    // If no specific batch is selected ('All Batches'), show all subjects the user is enrolled in
     return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
   }, [userEnrollments, selectedBatchFilter]);
 
+
+  // Ensure selected filters are still valid when options change
   if (selectedBatchFilter !== 'all' && !availableBatches.includes(selectedBatchFilter)) {
       setSelectedBatchFilter('all');
   }
+  // If selectedBatchFilter changes from 'all' to a specific batch, and the current selectedSubjectFilter is not valid for the new batch
+  // or if selectedBatchFilter becomes 'all' and selectedSubjectFilter is no longer valid
   if (selectedSubjectFilter !== 'all' && !availableSubjects.includes(selectedSubjectFilter)) {
       setSelectedSubjectFilter('all');
   }
+
 
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
     queryKey: ['student-schedule', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
@@ -124,17 +124,37 @@ export const StudentSchedule = () => {
 
         let query = supabase.from('schedules').select('*');
 
-        const combinationFilters = userEnrollments
-            .filter(enrollment =>
-                (selectedBatchFilter === 'all' || enrollment.batch_name === selectedBatchFilter) &&
-                (selectedSubjectFilter === 'all' || enrollment.subject_name === selectedSubjectFilter)
-            )
-            .map(enrollment => `(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
+        // Initial filter based on user's full enrollments or selected batch
+        let baseBatches = selectedBatchFilter === 'all'
+            ? Array.from(new Set(userEnrollments.map(e => e.batch_name)))
+            : [selectedBatchFilter];
 
-        if (combinationFilters.length > 0) {
-            query = query.or(combinationFilters.join(','));
+        if (baseBatches.length === 0) return []; // No batches selected or available
+
+        // Build main query filters
+        let combinedFilters: string[] = [];
+
+        if (selectedSubjectFilter === 'all') {
+            // If subject is 'all', show all classes for the selected batch(es)
+            if (baseBatches.length > 0) {
+                combinedFilters = baseBatches.map(batch => `(batch.eq.${batch})`);
+            }
         } else {
-            return [];
+            // If a specific subject is selected, filter by that subject within the selected batch(es)
+            if (baseBatches.length > 0) {
+                baseBatches.forEach(batch => {
+                    // Only add combination if the user is enrolled in that specific batch-subject pair
+                    if (userEnrollments.some(e => e.batch_name === batch && e.subject_name === selectedSubjectFilter)) {
+                        combinedFilters.push(`(batch.eq.${batch},subject.eq.${selectedSubjectFilter})`);
+                    }
+                });
+            }
+        }
+        
+        if (combinedFilters.length > 0) {
+            query = query.or(combinedFilters.join(','));
+        } else {
+            return []; // No matching filters/combinations, return empty
         }
 
         query = query.order('day_of_week').order('start_time');
@@ -150,9 +170,7 @@ export const StudentSchedule = () => {
     enabled: !!userEnrollments && userEnrollments.length > 0
   });
 
-  // Note: ongoingClass logic is primarily within StudentCurrentClass.tsx, not here.
-  // This component's loading state only includes schedules and enrollments.
-  const isLoading = isLoadingEnrollments || isLoadingSchedules;
+  const isLoading = isLoadingEnrollments || isLoadingSchedules; // Combined loading state without ongoingClass
 
   if (isLoading) {
     return <ScheduleSkeleton />;
@@ -219,13 +237,14 @@ export const StudentSchedule = () => {
         <Select
           value={selectedSubjectFilter}
           onValueChange={setSelectedSubjectFilter}
-          disabled={selectedBatchFilter === 'all'}
+          disabled={selectedBatchFilter === 'all'} // Subject filter disabled if 'All Batches' is selected
         >
           <SelectTrigger className="w-48 h-10">
             <SelectValue placeholder="Filter by subject" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Subjects</SelectItem>
+            {/* Show subjects relevant to selected batch, or all available if 'All Batches' is chosen */}
             {availableSubjects.map((subject) => (
               <SelectItem key={subject} value={subject}>{subject}</SelectItem>
             ))}
