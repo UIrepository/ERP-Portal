@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,6 +18,7 @@ interface UIKiPadhaiContent {
   link: string;
   is_active: boolean;
   created_at: string;
+  // Ensure these properties exist as per the database schema
   batch: string;
   subject: string;
 }
@@ -90,7 +90,7 @@ export const StudentUIKiPadhai = () => {
         
         const { data, error } = await supabase
             .from('ui_ki_padhai_content')
-            .select('id, title, description, category, link, is_active, created_at, batch, subject')
+            .select('id, title, description, category, link, is_active, created_at, batch, subject') // Ensure batch and subject are selected
             .eq('is_active', true)
             .order('created_at', { ascending: false });
 
@@ -103,8 +103,12 @@ export const StudentUIKiPadhai = () => {
 
         // Filter content based on user enrollments and selected filters
         const filteredContent = data.filter(content => {
-            if (!content.batch || !content.subject) return false;
-            
+            // Add defensive checks for content.batch and content.subject
+            if (typeof content.batch !== 'string' || typeof content.subject !== 'string') {
+              console.warn('Skipping content due to missing or invalid batch/subject:', content);
+              return false;
+            }
+
             // Check if user is enrolled in this batch/subject combination
             const isEnrolled = userEnrollments.some(enrollment =>
                 enrollment.batch_name === content.batch &&
