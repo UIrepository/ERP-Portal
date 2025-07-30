@@ -12,7 +12,7 @@ import { StudentExams } from './student/StudentExams';
 import { FileText, Video, Target, MessageSquare, Calendar, Clock, Crown, BookOpen } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useEffect, useMemo } from 'react'; // Added useMemo
+import { useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
 
 interface StudentDashboardProps {
@@ -221,7 +221,10 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
     );
   }
   
-  // No longer needed to format Array<string | string[]> since availableBatches/Subjects are clean arrays
+  // The formatArrayString function is no longer strictly needed for profile.batch/subjects
+  // if they are removed from the profiles table and all data comes from user_enrollments.
+  // However, it's kept here for robustness in case profile.batch/subjects still exist
+  // for other roles or legacy data.
   // const formatArrayString = (arr: string | string[] | null | undefined) => {
   //   if (!arr) return '';
   //   if (Array.isArray(arr)) {
@@ -243,7 +246,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
       case 'schedule':
         return <StudentSchedule />;
       case 'current-class':
-        return <StudentCurrentClass onTabChange={onTabChange} />; // Pass onTabChange
+        return <StudentCurrentClass onTabChange={onTabChange} />;
       case 'recordings':
         return <StudentRecordings />;
       case 'notes':
@@ -282,12 +285,13 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
                 <span className="font-medium">Subjects:</span> {availableSubjects.join(', ')}
               </div>
             )}
-            {/* Show a message if no enrollments are found */}
+            {/* Show a message if no enrollments are found and not loading */}
             {availableBatches.length === 0 && availableSubjects.length === 0 && !isLoadingEnrollments && (
                 <div className="text-gray-600">
                     <span className="font-medium">Enrollments:</span> No batches or subjects assigned.
                 </div>
             )}
+            {/* Show loading indicator for enrollments */}
             {isLoadingEnrollments && (
                 <div className="text-gray-600 flex items-center gap-2">
                     <span className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-gray-400"></span>
