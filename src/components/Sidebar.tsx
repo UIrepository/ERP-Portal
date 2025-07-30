@@ -160,7 +160,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
         {profile?.role === 'student' && availableBatches.length > 0 && (
           <p className="text-xs text-gray-500 mt-1">Batch: {availableBatches.join(', ')}</p>
         )}
-        {/* Optionally display subjects, or combine with batch */}
+        {/* Updated to display subjects from availableSubjects */}
         {profile?.role === 'student' && availableSubjects.length > 0 && (
           <p className="text-xs text-gray-500 mt-1">Subjects: {availableSubjects.join(', ')}</p>
         )}
