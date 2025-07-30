@@ -28,22 +28,19 @@ interface UserEnrollment {
 }
 
 const PremiumContentSkeleton = () => (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+    <div className="space-y-4">
         {[...Array(3)].map((_, i) => (
-            <Card key={i} className="p-5 space-y-4">
-                <div className="flex items-start gap-4">
-                    <Skeleton className="h-10 w-10 rounded-full" />
-                    <div className="w-full space-y-2">
-                        <Skeleton className="h-5 w-4/5" />
-                        <Skeleton className="h-4 w-full" />
-                        <Skeleton className="h-4 w-2/3" />
+            <Card key={i} className="p-4">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <Skeleton className="h-10 w-10 rounded-full" />
+                        <div className="space-y-2">
+                            <Skeleton className="h-4 w-48" />
+                            <Skeleton className="h-4 w-32" />
+                        </div>
                     </div>
+                    <Skeleton className="h-10 w-28" />
                 </div>
-                <div className="flex gap-2">
-                    <Skeleton className="h-5 w-24" />
-                    <Skeleton className="h-5 w-20" />
-                </div>
-                 <Skeleton className="h-10 w-full" />
             </Card>
         ))}
     </div>
@@ -197,40 +194,35 @@ export const StudentUIKiPadhai = () => {
   const isLoading = isLoadingEnrollments || isLoadingPremiumContent;
 
   return (
-    <div className="p-6 bg-gradient-to-br from-yellow-50 to-orange-50 min-h-full flex flex-col items-center">
-      <div className="max-w-6xl mx-auto w-full">
-        
-        {/* Header Section - Premium Design */}
-        <div className="relative p-8 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-r from-yellow-500 to-orange-500 text-white mb-10 text-center">
-            <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/10 rounded-full animate-pulse"></div>
-            <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-white/10 rounded-full animate-pulse [animation-delay:500ms]"></div>
+    <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
+      {/* Header Section */}
+      <div className="flex items-center justify-between">
+          <div>
+              <h1 className="text-3xl font-bold text-gray-800 flex items-center">
+                  <Crown className="mr-3 h-8 w-8 text-primary" />
+                  UI Ki Padhai
+              </h1>
+              <p className="text-gray-500 mt-1">Exclusive Premium Content & Advanced Courses.</p>
+          </div>
+          <div className="flex gap-2">
+              {displayedBatches.map(b => <Badge key={b} variant="outline">{b}</Badge>)}
+          </div>
+      </div>
 
-            <div className="relative z-10">
-                <div className="flex items-center justify-center mb-4">
-                    <Crown className="h-16 w-16 text-yellow-100 drop-shadow-md" />
-                </div>
-                <h1 className="text-4xl md:text-5xl font-bold mb-2 tracking-tight drop-shadow-lg">
-                    UI Ki Padhai
-                </h1>
-                <p className="text-xl md:text-2xl text-yellow-100 drop-shadow-sm font-semibold">
-                    Exclusive Premium Content & Advanced Courses
-                </p>
-            </div>
-        </div>
 
-        {/* Filters and Search Section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="relative flex-1 col-span-full md:col-span-1">
+      {/* Filters and Search Section */}
+      <div className="flex gap-4">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search premium content..."
-              className="pl-10 h-10 bg-white shadow-sm"
+              className="pl-10 h-10"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
-            <SelectTrigger className="w-full h-10 bg-white shadow-sm">
+            <SelectTrigger className="w-48 h-10">
               <SelectValue placeholder="Filter by batch" />
             </SelectTrigger>
             <SelectContent>
@@ -244,7 +236,7 @@ export const StudentUIKiPadhai = () => {
             value={selectedSubjectFilter}
             onValueChange={setSelectedSubjectFilter}
           >
-            <SelectTrigger className="w-full h-10 bg-white shadow-sm">
+            <SelectTrigger className="w-48 h-10">
               <SelectValue placeholder="Filter by subject" />
             </SelectTrigger>
             <SelectContent>
@@ -254,54 +246,52 @@ export const StudentUIKiPadhai = () => {
               ))}
             </SelectContent>
           </Select>
-        </div>
+      </div>
 
-        {/* Content Grid */}
-        <div>
+      {/* Content List */}
+      <div className="space-y-4">
           {isLoading ? (
             <PremiumContentSkeleton />
           ) : filteredContent && filteredContent.length > 0 ? (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {filteredContent.map((content) => (
-                <Card key={content.id} className="bg-white hover:shadow-lg transition-shadow duration-300 flex flex-col rounded-xl overflow-hidden">
-                  <CardContent className="p-5 flex flex-col flex-grow">
-                    <div className="flex-grow">
-                      <div className="flex items-start gap-4 mb-3">
-                        <div className="bg-yellow-100 p-2 rounded-full flex-shrink-0">
-                          <Crown className="h-6 w-6 text-yellow-500" />
+            filteredContent.map((content) => (
+                <Card key={content.id} className="bg-white hover:shadow-lg transition-shadow duration-300">
+                    <CardContent className="p-5 flex flex-col md:flex-row md:items-center md:justify-between">
+                        <div className="flex-grow mb-4 md:mb-0">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-primary/10 p-2 rounded-full">
+                                    <Crown className="h-5 w-5 text-primary" />
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold text-gray-800">{content.title}</h3>
+                                    <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{content.description}</p>
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2 mt-3 pl-11">
+                                <Badge variant="outline">{content.subject}</Badge>
+                                <Badge variant="secondary">{content.batch}</Badge>
+                                {content.category && (
+                                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{content.category}</Badge>
+                                )}
+                            </div>
                         </div>
-                        <div>
-                          <h3 className="font-semibold text-lg text-gray-800 leading-tight">{content.title}</h3>
-                          {content.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{content.description}</p>}
+                        <div className="flex gap-2 justify-end">
+                            <Button 
+                                onClick={() => handleAccessContent(content)}
+                            >
+                                <ExternalLink className="h-4 w-4 mr-2" />
+                                Access Content
+                            </Button>
                         </div>
-                      </div>
-                      <div className="flex flex-wrap gap-2 mt-4">
-                        <Badge variant="outline">{content.subject}</Badge>
-                        <Badge variant="secondary">{content.batch}</Badge>
-                        {content.category && (
-                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{content.category}</Badge>
-                        )}
-                      </div>
-                    </div>
-                    <Button 
-                      onClick={() => handleAccessContent(content)}
-                      className="w-full mt-5 bg-yellow-600 hover:bg-yellow-700 text-white font-semibold transition-all transform hover:scale-[1.01] active:scale-95"
-                      >
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      Access Content
-                    </Button>
-                  </CardContent>
+                    </CardContent>
                 </Card>
-              ))}
-            </div>
+            ))
           ) : (
-            <Card className="text-center py-20 bg-white rounded-lg border-dashed border-2 shadow-sm">
+            <div className="text-center py-20 bg-white rounded-lg border-dashed border-2">
               <Crown className="h-16 w-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-gray-700">No Premium Content Yet</h3>
               <p className="text-muted-foreground mt-2">Exclusive courses and materials for your batch and subjects will appear here soon.</p>
-            </Card>
+            </div>
           )}
-        </div>
       </div>
     </div>
   );
