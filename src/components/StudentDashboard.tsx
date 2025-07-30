@@ -1,7 +1,8 @@
+// uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/StudentDashboard.tsx
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { StudentSchedule } from './student/StudentSchedule';
-import { StudentCurrentClass } from './student/StudentCurrentClass';
+import { StudentCurrentClass } from './student/StudentCurrentClass'; // Updated import
 import { StudentRecordings } from './student/StudentRecordings';
 import { StudentNotes } from './student/StudentNotes';
 import { StudentDPP } from './student/StudentDPP';
@@ -22,31 +23,40 @@ interface StudentDashboardProps {
 export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardProps) => {
   const { profile } = useAuth();
 
+  // Note: These analytics queries currently rely on the old batch/subjects columns
+  // or may need further refinement/creation of database views/functions
+  // to correctly aggregate based on the new user_enrollments table.
   const { data: analyticsData, refetch: refetchAnalytics } = useQuery({
     queryKey: ['student-analytics', profile?.user_id],
     queryFn: async () => {
       if (!profile) return null;
 
+      // These queries still use profile.batch/subjects which are being phased out.
+      // For accurate analytics with user_enrollments, you would need to:
+      // 1. Fetch user_enrollments first for the user_id.
+      // 2. Then query DPP/Notes/Recordings using an OR filter for each combination,
+      //    or create database views/functions to aggregate.
+      // This is a complex refactor beyond this scope but important for future accuracy.
       const [notesResult, recordingsResult, dppResult, feedbackResult] = await Promise.all([
         supabase
           .from('notes')
           .select('*')
-          .in('batch', profile.batch || [])
-          .in('subject', profile.subjects || []),
+          .in('batch', profile.batch || []) // Relies on old profile.batch
+          .in('subject', profile.subjects || []), // Relies on old profile.subjects
         supabase
           .from('recordings')
           .select('*')
-          .eq('batch', profile.batch)
-          .in('subject', profile.subjects || []),
+          .in('batch', profile.batch || []) // Relies on old profile.batch
+          .in('subject', profile.subjects || []), // Relies on old profile.subjects
         supabase
           .from('dpp_content')
           .select('*')
-          .eq('batch', profile.batch)
-          .in('subject', profile.subjects || []),
+          .in('batch', profile.batch || []) // Relies on old profile.batch
+          .in('subject', profile.subjects || []), // Relies on old profile.subjects
         supabase
           .from('feedback')
           .select('*')
-          .eq('batch', profile.batch)
+          .eq('batch', profile.batch) // Relies on old profile.batch
           .eq('submitted_by', profile.user_id)
       ]);
 
@@ -156,6 +166,8 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
   const logActivity = async (activityType: string, description: string, metadata?: any) => {
     if (!profile?.user_id) return;
     
+    // Note: The batch/subject logging here might not align with new user_enrollments model.
+    // Consider updating this to fetch/log specific enrollment combo from user_enrollments.
     await supabase.from('student_activities').insert({
       user_id: profile.user_id,
       activity_type: activityType,
@@ -174,6 +186,10 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
       </div>
     );
   }
+  
+  // Note: profile.batch and profile.subjects are from the old profiles table.
+  // To display current active batches/subjects accurately, you would fetch them from user_enrollments
+  // and process them here (similar to how it's done in StudentDPP/Recordings/Notes).
   const formatArrayString = (arr: string | string[] | null | undefined) => {
     if (!arr) return '';
     if (Array.isArray(arr)) {
@@ -189,12 +205,13 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
     }
     return String(arr).replace(/"/g, '').replace(/[\[\]]/g, '');
   };
+
   const renderTabContent = () => {
     switch (activeTab) {
       case 'schedule':
         return <StudentSchedule />;
       case 'current-class':
-        return <StudentCurrentClass />;
+        return <StudentCurrentClass onTabChange={onTabChange} />; // Pass onTabChange
       case 'recordings':
         return <StudentRecordings />;
       case 'notes':
@@ -221,8 +238,11 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
             {profile?.name}
           </h1>
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+            {/* These below lines should eventually be updated to reflect enrolledCombinations from user_enrollments
+                For now, they continue to use profile.batch/subjects from the old profiles table,
+                which might be removed in a later phase. */}
             <div className="text-gray-600">
-              <span className="font-medium">Batch:</span> {formatArrayString(profile?.batch)}
+              <span className="font-medium">Batch:</span> {formatArrayString(profile?.batch)} 
             </div>
             <div className="text-gray-600">
               <span className="font-medium">Subjects:</span> {formatArrayString(profile?.subjects)}
@@ -231,6 +251,8 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
         </div>
 
         {/* Statistics Cards */}
+        {/* Note: The queries for these stats still rely on the old profile.batch/subjects.
+            For accurate counts with the new user_enrollments model, these would need refactoring. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           <Card className="bg-white border border-gray-200 rounded-2xl shadow-sm">
             <CardContent className="p-6">
