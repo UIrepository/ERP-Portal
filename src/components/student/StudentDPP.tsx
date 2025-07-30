@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BookOpen, ExternalLink, Search, Target } from 'lucide-react';
-import { Skeleton }onents/ui/skeleton';
+import { Skeleton } from '@/components/ui/skeleton'; // Corrected import statement
 
 interface DPPContent {
   id: string;
