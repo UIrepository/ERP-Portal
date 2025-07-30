@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ExternalLink, Clock, Calendar, AlertTriangle } from 'lucide-react';
-import { format, differenceInSeconds, nextDay, parseISO } from 'date-fns';
+import { format, differenceInSeconds, nextDay } from 'date-fns';
 
 interface Schedule {
   id: string;
@@ -16,7 +16,8 @@ interface Schedule {
   day_of_week: number;
   start_time: string;
   end_time: string;
-  link?: string;
+  link?: string; // Direct link from schedules table (if exists)
+  meeting_link_url?: string; // New field for the link returned by RPC function
 }
 
 interface OngoingClass {
@@ -24,7 +25,7 @@ interface OngoingClass {
   batch: string;
   start_time: string;
   end_time: string;
-  meeting_link: string;
+  meeting_link: string; // This will now come from meeting_link_url
 }
 
 interface UserEnrollment {
@@ -77,49 +78,62 @@ const Countdown = ({ targetDate }: { targetDate: Date }) => {
 
 export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) => {
   const { profile } = useAuth();
+  const now = useMemo(() => new Date(), []); // Memoize current date/time for queries
+  const currentDay = now.getDay();
+  const currentTimeStr = format(now, 'HH:mm:ss'); // Format to 'HH:mm:ss' for TIME type in Postgres
 
-  const { data: userEnrollments, isLoading: isLoadingEnrollments, isError: isEnrollmentsError } = useQuery<UserEnrollment[]>({
-    queryKey: ['userEnrollments', profile?.user_id],
-    queryFn: async () => {
-        if (!profile?.user_id) return [];
-        const { data, error } = await supabase
-            .from('user_enrollments')
-            .select('batch_name, subject_name')
-            .eq('user_id', profile.user_id);
-        if (error) {
-            console.error("Error fetching user enrollments:", error);
-            throw error;
-        }
-        return data || [];
-    },
-    enabled: !!profile?.user_id,
-    retry: 1
-  });
-
+  // RPC call to get ALL relevant schedules for the user
   const { data: allSchedules, isLoading: isLoadingAllSchedules, isError: isAllSchedulesError } = useQuery<Schedule[]>({
-    queryKey: ['allStudentSchedules', profile?.user_id, userEnrollments],
+    queryKey: ['allStudentSchedulesRPC', profile?.user_id],
     queryFn: async (): Promise<Schedule[]> => {
-      if (!profile?.user_id || !userEnrollments || userEnrollments.length === 0) return [];
+      if (!profile?.user_id) return [];
+      
+      const { data, error } = await supabase.rpc('get_schedules_with_links_filtered_by_enrollment', {
+        p_user_id: profile.user_id,
+        p_day_of_week: null, // Get all days
+        p_current_time: null, // Don't filter by time yet
+        p_is_active_link: false // Don't filter by active link yet
+      });
 
-      let query = supabase.from('schedules').select('*');
-
-      const combinationFilters = userEnrollments
-          .map(enrollment => `and(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`); // Changed to use and()
-
-      if (combinationFilters.length > 0) {
-          query = query.or(combinationFilters.join(','));
-      } else {
-          return [];
-      }
-
-      const { data, error } = await query;
       if (error) {
-          console.error("Error fetching all schedules:", error);
+          console.error("Error fetching all schedules via RPC:", error);
           throw error;
       }
       return data || [];
     },
-    enabled: !!userEnrollments && userEnrollments.length > 0,
+    enabled: !!profile?.user_id
+  });
+
+  // RPC call to get the ONGOING class
+  const { data: ongoingClass, isLoading: isLoadingOngoingClass, isError: isOngoingClassError } = useQuery<OngoingClass | null>({
+    queryKey: ['ongoingClassRPC', profile?.user_id, currentDay, currentTimeStr],
+    queryFn: async (): Promise<OngoingClass | null> => {
+      if (!profile?.user_id) return null;
+
+      const { data, error } = await supabase.rpc('get_schedules_with_links_filtered_by_enrollment', {
+        p_user_id: profile.user_id,
+        p_day_of_week: currentDay,
+        p_current_time: currentTimeStr,
+        p_is_active_link: true // Filter for active meeting links
+      });
+
+      if (error) {
+        console.error("Error fetching ongoing class via RPC:", error);
+        throw error;
+      }
+      if (!data || data.length === 0) return null;
+
+      const schedule = data[0];
+      return {
+        subject: schedule.subject,
+        batch: schedule.batch,
+        start_time: schedule.start_time,
+        end_time: schedule.end_time,
+        meeting_link: schedule.meeting_link_url || schedule.link || '' // Use meeting_link_url from RPC, fallback to direct link
+      };
+    },
+    enabled: !!profile?.user_id,
+    refetchInterval: 30000,
     retry: 1
   });
 
@@ -127,92 +141,44 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     if (!allSchedules || allSchedules.length === 0) return null;
 
     const now = new Date();
-    const currentDay = now.getDay();
-    const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
-
-    let upcomingCandidates: (Schedule & { nextOccurrence: Date })[] = [];
-
-    allSchedules.forEach(schedule => {
+    const futureSchedules = allSchedules.filter(schedule => {
       const [startHour, startMin] = schedule.start_time.split(':').map(Number);
-      const startTimeMinutes = startHour * 60 + startMin;
-
       let occurrence = nextDay(now, schedule.day_of_week);
       occurrence.setHours(startHour, startMin, 0, 0);
 
-      if (schedule.day_of_week === currentDay && startTimeMinutes <= currentTimeMinutes) {
+      if (format(occurrence, 'yyyy-MM-dd') === format(now, 'yyyy-MM-dd') && occurrence <= now) {
         occurrence.setDate(occurrence.getDate() + 7);
       }
-      
-      if (occurrence > now) {
-         upcomingCandidates.push({ ...schedule, nextOccurrence: occurrence });
-      }
+      return occurrence > now;
     });
 
-    upcomingCandidates.sort((a, b) => a.nextOccurrence.getTime() - b.nextOccurrence.getTime());
-
-    return upcomingCandidates.length > 0 ? upcomingCandidates[0] : null;
-  }, [allSchedules]);
-
-
-  const { data: ongoingClass, isLoading: isLoadingOngoingClass, isError: isOngoingClassError } = useQuery<OngoingClass | null>({
-    queryKey: ['current-ongoing-class', profile?.user_id, userEnrollments],
-    queryFn: async (): Promise<OngoingClass | null> => {
-      if (!profile?.user_id || !userEnrollments || userEnrollments.length === 0) return null;
-
-      const now = new Date();
-      const currentDay = now.getDay();
-      const currentTime = now.toTimeString().slice(0, 8);
-
-      let query = supabase
-        .from('schedules')
-        .select(`
-          subject,
-          batch,
-          start_time,
-          end_time,
-          meeting_links!inner (
-            link
-          )
-        `);
-
-      const combinationFilters = userEnrollments
-          .map(enrollment => `and(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`); // Changed to use and()
-
-      if (combinationFilters.length > 0) {
-          query = query.or(combinationFilters.join(','));
-      } else {
-          return null;
-      }
-
-      query = query
-        .eq('day_of_week', currentDay)
-        .lte('start_time', currentTime)
-        .gte('end_time', currentTime)
-        .eq('meeting_links.is_active', true)
-        .limit(1);
-
-      const { data: scheduleData, error: scheduleError } = await query;
-
-      if (scheduleError) {
-        console.error("Error fetching ongoing class:", scheduleError);
-        throw scheduleError;
-      }
-
-      if (!scheduleData || scheduleData.length === 0) return null;
-
-      const schedule = scheduleData[0];
-      return {
-        subject: schedule.subject,
-        batch: schedule.batch,
-        start_time: schedule.start_time,
-        end_time: schedule.end_time,
-        meeting_link: (schedule.meeting_links as any)?.link || ''
+    futureSchedules.sort((a, b) => {
+      const getOccurrenceTime = (schedule: Schedule) => {
+        const [startHour, startMin] = schedule.start_time.split(':').map(Number);
+        let occurrence = nextDay(now, schedule.day_of_week);
+        occurrence.setHours(startHour, startMin, 0, 0);
+        if (format(occurrence, 'yyyy-MM-dd') === format(now, 'yyyy-MM-dd') && occurrence <= now) {
+            occurrence.setDate(occurrence.getDate() + 7);
+        }
+        return occurrence.getTime();
       };
-    },
-    enabled: !!profile?.user_id && !!userEnrollments && userEnrollments.length > 0,
-    refetchInterval: 30000,
-    retry: 1
-  });
+      return getOccurrenceTime(a) - getOccurrenceTime(b);
+    });
+
+    return futureSchedules.length > 0 ? {
+        ...futureSchedules[0],
+        nextOccurrence: (() => {
+            const [startHour, startMin] = futureSchedules[0].start_time.split(':').map(Number);
+            let occurrence = nextDay(now, futureSchedules[0].day_of_week);
+            occurrence.setHours(startHour, startMin, 0, 0);
+            if (format(occurrence, 'yyyy-MM-dd') === format(now, 'yyyy-MM-dd') && occurrence <= now) {
+                occurrence.setDate(occurrence.getDate() + 7);
+            }
+            return occurrence;
+        })()
+    } : null;
+  }, [allSchedules, now]);
+
 
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
@@ -221,8 +187,8 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     return format(date, 'h:mm a');
   };
 
-  const isLoadingInitialData = isLoadingEnrollments || isLoadingAllSchedules || isLoadingOngoingClass;
-  const hasErrors = isEnrollmentsError || isAllSchedulesError || isOngoingClassError;
+  const isLoadingInitialData = isLoadingAllSchedules || isLoadingOngoingClass;
+  const hasErrors = isAllSchedulesError || isOngoingClassError;
 
   if (isLoadingInitialData) {
     return (
@@ -235,7 +201,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     );
   }
 
-  if (!userEnrollments || userEnrollments.length === 0 || hasErrors) {
+  if (!allSchedules || allSchedules.length === 0 || hasErrors) {
     return (
       <div className="p-6 bg-gradient-to-br from-gray-50 to-white min-h-screen flex items-center justify-center">
         <Card className="p-12 text-center rounded-3xl shadow-xl border-2 border-dashed border-gray-300 bg-white transform transition-all duration-500 hover:scale-105">
@@ -243,12 +209,12 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
             <AlertTriangle className="h-20 w-20 mx-auto text-red-500 animate-fade-in-up" />
           </div>
           <h3 className="text-3xl font-bold text-gray-800 mb-4 animate-fade-in-up animation-delay-200">
-            {hasErrors ? "Error Loading Enrollments" : "No Enrollments Found"}
+            {hasErrors ? "Error Loading Schedules" : "No Schedules Found"}
           </h3>
           <p className="text-gray-600 mb-8 max-w-lg mx-auto animate-fade-in-up animation-delay-400">
             {hasErrors 
-              ? "There was an issue fetching your enrollment details. Please try again later or contact support."
-              : "It looks like you are not enrolled in any batches or subjects yet. Please contact your administrator for enrollment."
+              ? "There was an issue fetching your class schedules. Please try again later or contact support."
+              : "It looks like there are no class schedules associated with your enrollments. Please contact your administrator."
             }
           </p>
           <Button 
@@ -337,9 +303,9 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
                         {format(nextUpcomingClass.nextOccurrence, "eeee, MMMM do 'at' h:mm a")}
                     </p>
                     <Countdown targetDate={nextUpcomingClass.nextOccurrence} />
-                    {nextUpcomingClass.link && (
+                    {nextUpcomingClass.meeting_link_url && (
                         <Button
-                            onClick={() => window.open(nextUpcomingClass.link!, '_blank')}
+                            onClick={() => window.open(nextUpcomingClass.meeting_link_url!, '_blank')}
                             size="lg"
                             className="bg-primary hover:bg-primary/90 text-white mt-6 animate-fade-in-up animation-delay-800"
                         >
