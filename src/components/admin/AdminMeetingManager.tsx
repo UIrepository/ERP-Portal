@@ -1,175 +1,178 @@
-import { useState, useEffect, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Link as LinkIcon, ExternalLink, Copy, Search } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, parse, isWithinInterval, isAfter, getDay, set } from 'date-fns';
-import { ExternalLink, Clock, Calendar, Video } from 'lucide-react';
 
-interface Schedule {
+interface MeetingLink {
   id: string;
   subject: string;
   batch: string;
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
   link: string;
 }
 
-// A single card representing a class meeting
-const MeetingCard = ({ schedule }: { schedule: Schedule }) => (
-  <Card className="bg-white hover:shadow-md transition-shadow">
-    <CardContent className="p-4 flex items-center justify-between">
-      <div>
-        <h4 className="font-bold">{schedule.subject}</h4>
-        <div className="text-sm text-muted-foreground flex items-center mt-1">
-          <Badge variant="secondary" className="mr-2">
-            {schedule.batch}
-          </Badge>
-          |
-          <Clock className="h-3 w-3 mx-2" />
-          {format(parse(schedule.start_time, 'HH:mm:ss', new Date()), 'h:mm a')}
-        </div>
-      </div>
-      <Button asChild size="sm">
-        <a href={schedule.link} target="_blank" rel="noopener noreferrer">
-          <ExternalLink className="h-4 w-4 mr-2" />
-          Join
-        </a>
-      </Button>
-    </CardContent>
-  </Card>
+const LinksSkeleton = () => (
+    <div className="space-y-4">
+        {[...Array(3)].map((_, i) => (
+            <Card key={i} className="p-4">
+                <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                        <Skeleton className="h-8 w-8 rounded-full" />
+                        <Skeleton className="h-5 w-1/3" />
+                    </div>
+                    <Skeleton className="h-4 w-4/5" />
+                    <div className="flex gap-2 justify-end">
+                        <Skeleton className="h-9 w-24" />
+                        <Skeleton className="h-9 w-24" />
+                    </div>
+                </div>
+            </Card>
+        ))}
+    </div>
 );
 
-// A list container for a specific category of meetings
-const MeetingList = ({ title, schedules }: { title: string; schedules: Schedule[] }) => {
-  const sortedSchedules = useMemo(() => {
-    return [...schedules].sort((a, b) => {
-      const timeA = parse(a.start_time, 'HH:mm:ss', new Date()).getTime();
-      const timeB = parse(b.start_time, 'HH:mm:ss', new Date()).getTime();
-      // For upcoming, sort from nearest to furthest. For past, sort from most recent to oldest.
-      return title === 'Upcoming (Today)' ? timeA - timeB : timeB - timeA;
-    });
-  }, [schedules, title]);
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center">
-          {title === 'Ongoing' && <Video className="h-5 w-5 mr-2 text-green-500" />}
-          {title === 'Upcoming (Today)' && <Calendar className="h-5 w-5 mr-2 text-blue-500" />}
-          {title === 'Past (Today)' && <Clock className="h-5 w-5 mr-2 text-gray-500" />}
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3 h-[60vh] overflow-y-auto p-4">
-        {sortedSchedules.length > 0 ? (
-          sortedSchedules.map(schedule => <MeetingCard key={schedule.id} schedule={schedule} />)
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-sm text-muted-foreground text-center py-4">No {title.split(' ')[0].toLowerCase()} classes today.</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-};
-
-// Main component for the meeting manager page
 export const AdminMeetingManager = () => {
-  const [now, setNow] = useState(new Date());
-  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [selectedBatch, setSelectedBatch] = useState('all');
+  const [selectedSubject, setSelectedSubject] = useState('all');
 
-  // Keep the current time updated
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 60000); // Update every minute
-    return () => clearInterval(timer);
-  }, []);
-
-  // Set up real-time subscription to the schedules table
-  useEffect(() => {
-    const channel = supabase
-      .channel('schedules-realtime-meetings')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'schedules' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['all-meeting-links-daily'] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
-
-  // Fetch all schedules with a meeting link
-  const { data: schedules = [], isLoading } = useQuery<Schedule[]>({
-    queryKey: ['all-meeting-links-daily'],
-    queryFn: async (): Promise<Schedule[]> => {
-      const { data, error } = await supabase.from('schedules').select('*').not('link', 'is', null);
+  const { data: meetingLinks = [], isLoading: isLoadingLinks } = useQuery({
+    queryKey: ['admin-all-meeting-links-simple'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('schedules')
+        .select('id, subject, batch, link')
+        .not('link', 'is', null)
+        .order('batch, subject');
+      
       if (error) throw error;
-      return data || [];
+      // Get the last unique link for each subject-batch combo
+      const uniqueLinks = Array.from(new Map(data.map(item => [`${item.subject}-${item.batch}`, item])).values());
+      return (uniqueLinks || []) as MeetingLink[];
     },
   });
-
-  // Categorize today's schedules into ongoing, upcoming, and past
-  const categorizedSchedules = useMemo(() => {
-    const todayDay = getDay(now);
-    const ongoing: Schedule[] = [];
-    const upcoming: Schedule[] = [];
-    const past: Schedule[] = [];
-
-    const todaySchedules = schedules.filter(schedule => schedule.day_of_week === todayDay);
-
-    todaySchedules.forEach(schedule => {
-      const startTime = parse(schedule.start_time, 'HH:mm:ss', new Date());
-      const endTime = parse(schedule.end_time, 'HH:mm:ss', new Date());
-
-      const classStartDateTime = set(now, { hours: startTime.getHours(), minutes: startTime.getMinutes(), seconds: 0 });
-      const classEndDateTime = set(now, { hours: endTime.getHours(), minutes: endTime.getMinutes(), seconds: 0 });
-
-      if (isWithinInterval(now, { start: classStartDateTime, end: classEndDateTime })) {
-        ongoing.push(schedule);
-      } else if (isAfter(classStartDateTime, now)) {
-        upcoming.push(schedule);
-      } else {
-        past.push(schedule);
+  
+  const { data: options = [], isLoading: isLoadingOptions } = useQuery({
+      queryKey: ['all-options-central-links'],
+      queryFn: async () => {
+          const { data, error } = await supabase.rpc('get_all_options');
+          if (error) throw error;
+          return data || [];
       }
-    });
+  });
 
-    return { ongoing, upcoming, past };
-  }, [schedules, now]);
+  const { allBatches, allSubjects, filteredLinks } = useMemo(() => {
+    const allBatches = Array.from(new Set(options.filter((o: any) => o.type === 'batch').map((o: any) => o.name))).sort();
+    const allSubjects = Array.from(new Set(options.filter((o: any) => o.type === 'subject').map((o: any) => o.name))).sort();
 
-  if (isLoading) {
-    return (
-      <div className="p-6 space-y-6">
-        <Skeleton className="h-8 w-1/3" />
-        <div className="grid md:grid-cols-3 gap-6">
-          <Skeleton className="h-96" />
-          <Skeleton className="h-96" />
-          <Skeleton className="h-96" />
-        </div>
-      </div>
+    const filtered = meetingLinks.filter(link =>
+      (selectedBatch === 'all' || link.batch === selectedBatch) &&
+      (selectedSubject === 'all' || link.subject === selectedSubject)
     );
-  }
+    
+    return {
+      allBatches,
+      allSubjects,
+      filteredLinks: filtered,
+    };
+  }, [meetingLinks, options, selectedBatch, selectedSubject]);
+
+  const handleCopyLink = (link: string) => {
+    navigator.clipboard.writeText(link);
+    toast({
+      title: 'Link Copied',
+      description: 'The meeting link has been copied to your clipboard.',
+    });
+  };
+  
+  const isLoading = isLoadingLinks || isLoadingOptions;
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="mb-6">
-        <h2 className="text-3xl font-bold text-gray-900">Today's Meeting Links</h2>
-        <p className="text-gray-600 mt-1">
-          A real-time overview of all scheduled meetings for today, {format(now, 'PPPP')}.
-        </p>
+    <div className="space-y-8 p-6 bg-gray-50/50 min-h-full">
+      {/* Header Section */}
+      <div>
+          <h1 className="text-3xl font-bold text-gray-800 flex items-center">
+            <LinkIcon className="mr-3 h-8 w-8 text-primary" />
+            Meeting Links Overview
+          </h1>
+          <p className="text-gray-500 mt-1">A complete list of all class meeting links in the system.</p>
+        </div>
+
+      {/* Filter Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Select value={selectedBatch} onValueChange={setSelectedBatch}>
+            <SelectTrigger><SelectValue placeholder="Filter by Batch" /></SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">All Batches</SelectItem>
+                {allBatches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+            </SelectContent>
+        </Select>
+        <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+            <SelectTrigger><SelectValue placeholder="Filter by Subject" /></SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">All Subjects</SelectItem>
+                {allSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+        </Select>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-6">
-        <MeetingList title="Ongoing" schedules={categorizedSchedules.ongoing} />
-        <MeetingList title="Upcoming (Today)" schedules={categorizedSchedules.upcoming} />
-        <MeetingList title="Past (Today)" schedules={categorizedSchedules.past} />
+      {/* Links List */}
+      <div className="space-y-4">
+        {isLoading ? (
+            <LinksSkeleton />
+        ) : filteredLinks.length > 0 ? (
+          filteredLinks.map((meeting) => (
+            <Card key={meeting.id} className="bg-white">
+              <CardContent className="p-5 flex flex-col md:flex-row md:items-center md:justify-between">
+                <div className="flex-grow mb-4 md:mb-0">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-primary/10 p-2 rounded-full">
+                      <LinkIcon className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-gray-800">{meeting.subject}</h3>
+                        <Badge variant="secondary" className="mt-1">{meeting.batch}</Badge>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-3 truncate pl-11">
+                    {meeting.link}
+                  </p>
+                </div>
+                <div className="flex gap-2 justify-end shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleCopyLink(meeting.link)}
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => window.open(meeting.link, '_blank')}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Open Link
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+            <div className="text-center py-20 bg-white rounded-lg border-dashed border-2">
+                <Search className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-700">No Meeting Links Found</h3>
+                <p className="text-muted-foreground mt-2">
+                  There are no links matching your current filters.
+                </p>
+            </div>
+        )}
       </div>
     </div>
   );
