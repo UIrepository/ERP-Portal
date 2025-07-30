@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Crown, ExternalLink, Lock } from 'lucide-react';
+import { Crown, ExternalLink, Lock, Search } from 'lucide-react'; // Added Search import
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface UIKiPadhaiContent {
@@ -209,7 +209,7 @@ export const StudentUIKiPadhai = () => {
             onValueChange={setSelectedSubjectFilter}
             disabled={selectedBatchFilter === 'all'} // Subject filter disabled if 'All Batches' is selected
           >
-            <SelectTrigger className="w-full h-10 bg-white shadow-sm">
+            <SelectTrigger className="w-full h-10">
               <SelectValue placeholder="Filter by subject" />
             </SelectTrigger>
             <SelectContent>
