@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Corrected import
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileText, Download, Search } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -113,12 +113,13 @@ export const StudentNotes = () => {
 
         let query = supabase.from('notes').select('*');
 
+        // Changed to use and() within the combination filters to fix PGRST100 error
         const combinationFilters = userEnrollments
             .filter(enrollment =>
                 (selectedBatchFilter === 'all' || enrollment.batch_name === selectedBatchFilter) &&
                 (selectedSubjectFilter === 'all' || enrollment.subject_name === selectedSubjectFilter)
             )
-            .map(enrollment => `(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
+            .map(enrollment => `and(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`); // FIX APPLIED HERE
 
         if (combinationFilters.length > 0) {
             query = query.or(combinationFilters.join(','));
@@ -132,7 +133,7 @@ export const StudentNotes = () => {
       
         if (error) {
             console.error("Error fetching filtered Notes content:", error);
-            return [];
+            throw error;
         }
         return (data || []) as NotesContent[];
     },
