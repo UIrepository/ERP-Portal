@@ -114,81 +114,82 @@ export const StudentCurrentClass = () => {
 
   if (isLoading) {
     return (
-      <div className="p-6 bg-gray-50 min-h-screen">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50/50">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+          <p className="text-lg text-gray-600">Loading class status...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="max-w-2xl mx-auto">
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Current Class</h2>
-          <p className="text-gray-600">Join your ongoing class session</p>
-        </div>
-
+    <div className="p-6 bg-gradient-to-br from-gray-50 to-white min-h-screen flex items-center justify-center">
+      <div className="max-w-3xl w-full mx-auto text-center">
+        
         {ongoingClass ? (
-          <Card className="border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
-            <CardContent className="p-8 text-center">
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <div className="w-4 h-4 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-green-800 font-semibold text-lg">Live Class in Progress</span>
+          <Card className="relative p-10 overflow-hidden rounded-3xl shadow-2xl border-none bg-gradient-to-br from-green-500 to-emerald-600 text-white animate-fade-in-up">
+            {/* Animated background circles */}
+            <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/10 rounded-full animate-pulse-slow"></div>
+            <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-white/10 rounded-full animate-pulse-slow animation-delay-500"></div>
+
+            <div className="relative z-10">
+              <div className="flex items-center justify-center gap-4 mb-6">
+                <div className="w-5 h-5 bg-white rounded-full animate-ping"></div>
+                <span className="font-extrabold text-2xl drop-shadow-md">LIVE CLASS IN PROGRESS</span>
               </div>
               
-              <h3 className="text-3xl font-bold text-green-900 mb-2">
+              <h3 className="text-5xl font-bold mb-4 tracking-tight drop-shadow-lg">
                 {ongoingClass.subject}
               </h3>
               
-              <div className="flex items-center justify-center gap-6 mb-6 text-green-700">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  <span className="font-medium">
+              <div className="flex items-center justify-center gap-8 mb-8 text-green-100">
+                <div className="flex items-center gap-3 text-lg font-semibold">
+                  <Clock className="h-6 w-6" />
+                  <span>
                     {formatTime(ongoingClass.start_time)} - {formatTime(ongoingClass.end_time)}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  <Badge variant="outline" className="border-green-300 text-green-800">
+                <div className="flex items-center gap-3 text-lg font-semibold">
+                  <Calendar className="h-6 w-6" />
+                  <span>
                     {ongoingClass.batch}
-                  </Badge>
+                  </span>
                 </div>
               </div>
 
               {ongoingClass.meeting_link ? (
                 <Button 
                   onClick={() => window.open(ongoingClass.meeting_link, '_blank')}
-                  className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg"
+                  className="bg-white text-green-700 hover:bg-gray-100 hover:text-green-800 px-10 py-4 text-xl font-bold rounded-full shadow-lg transition-all transform hover:scale-105 active:scale-95"
                   size="lg"
                 >
-                  <ExternalLink className="h-5 w-5 mr-2" />
+                  <ExternalLink className="h-6 w-6 mr-3" />
                   Join Class Now
                 </Button>
               ) : (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <p className="text-yellow-800">Meeting link not available</p>
+                <div className="bg-yellow-100 border border-yellow-300 text-yellow-900 rounded-lg p-5 mt-6 shadow-md">
+                  <p className="text-lg font-medium">Meeting link not available for this session.</p>
+                  <p className="text-sm mt-2 opacity-90">Please check your schedule or contact support if this persists.</p>
                 </div>
               )}
-            </CardContent>
+            </div>
           </Card>
         ) : (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <div className="mb-6">
-                <Clock className="h-16 w-16 mx-auto text-gray-300" />
-              </div>
-              <h3 className="text-2xl font-semibold text-gray-600 mb-2">
-                No Ongoing Class
-              </h3>
-              <p className="text-gray-500 mb-6">
-                You don't have any classes scheduled right now.
-              </p>
-              <p className="text-sm text-gray-400">
-                Check your schedule for upcoming classes.
-              </p>
-            </CardContent>
+          <Card className="p-12 text-center rounded-3xl shadow-xl border-2 border-dashed border-gray-300 bg-white transform transition-all duration-500 hover:scale-105">
+            <div className="mb-8">
+              <Clock className="h-20 w-20 mx-auto text-gray-400 animate-fade-in-up" />
+            </div>
+            <h3 className="text-3xl font-bold text-gray-800 mb-4 animate-fade-in-up animation-delay-200">
+              No Ongoing Class Right Now
+            </h3>
+            <p className="text-gray-600 mb-8 max-w-lg mx-auto animate-fade-in-up animation-delay-400">
+              Relax and prepare for your next session. You don't have any classes scheduled at this moment.
+            </p>
+            <Button size="lg" variant="outline" className="text-primary border-primary hover:bg-primary hover:text-white animate-fade-in-up animation-delay-600">
+              <Calendar className="h-5 w-5 mr-2" />
+              View Your Full Schedule
+            </Button>
           </Card>
         )}
       </div>
