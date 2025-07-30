@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,14 +8,17 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { UserCheck, Plus, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Combobox } from '@/components/ui/combobox';
 
 export const AdminTeacherManager = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedTeacher, setSelectedTeacher] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [editedBatches, setEditedBatches] = useState<string[]>([]);
+  const [editedSubjects, setEditedSubjects] = useState<string[]>([]);
   
-  const { data: teachers } = useQuery({
+  const { data: teachers = [] } = useQuery({
     queryKey: ['admin-teachers'],
     queryFn: async () => {
       const { data } = await supabase
@@ -27,6 +29,19 @@ export const AdminTeacherManager = () => {
       return data || [];
     },
   });
+
+  const { data: options = [] } = useQuery({
+    queryKey: ['available-options-teacher-manager'],
+    queryFn: async () => {
+      const { data } = await supabase.rpc('get_all_options');
+      return data || [];
+    }
+  });
+
+  const { batchOptions, subjectOptions } = useMemo(() => ({
+    batchOptions: options.filter((o: any) => o.type === 'batch').map((o: any) => o.name),
+    subjectOptions: options.filter((o: any) => o.type === 'subject').map((o: any) => o.name)
+  }), [options]);
 
   const updateTeacherMutation = useMutation({
     mutationFn: async (teacherData: any) => {
@@ -39,6 +54,7 @@ export const AdminTeacherManager = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-teachers'] });
+      queryClient.invalidateQueries({ queryKey: ['available-options-teacher-manager'] });
       toast({ title: "Success", description: "Teacher updated successfully" });
       setIsEditing(false);
       setSelectedTeacher(null);
@@ -53,11 +69,33 @@ export const AdminTeacherManager = () => {
     updateTeacherMutation.mutate({
       name: selectedTeacher.name,
       email: selectedTeacher.email,
-      batch: selectedTeacher.batch,
-      subjects: selectedTeacher.subjects,
+      batch: editedBatches,
+      subjects: editedSubjects,
       is_active: selectedTeacher.is_active,
     });
   };
+
+  const handleEditClick = (teacher: any) => {
+    setSelectedTeacher(teacher);
+    setEditedBatches(Array.isArray(teacher.batch) ? teacher.batch : (teacher.batch ? [teacher.batch] : []));
+    setEditedSubjects(teacher.subjects || []);
+    setIsEditing(true);
+  };
+  
+  const handleCreateOption = (type: 'batch' | 'subject', value: string) => {
+    const trimmedValue = value.trim();
+    if (trimmedValue) {
+      if (type === 'batch') {
+          if (!editedBatches.includes(trimmedValue)) setEditedBatches([...editedBatches, trimmedValue]);
+      } else {
+          if (!editedSubjects.includes(trimmedValue)) setEditedSubjects([...editedSubjects, trimmedValue]);
+      }
+    }
+  };
+
+  const getUserBatches = (user: any) => {
+      return Array.isArray(user.batch) ? user.batch : (user.batch ? [user.batch] : []);
+  }
 
   return (
     <div className="space-y-6">
@@ -80,17 +118,20 @@ export const AdminTeacherManager = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {teachers?.map((teacher) => (
+              {teachers.map((teacher) => (
                 <div
                   key={teacher.id}
                   className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer"
-                  onClick={() => setSelectedTeacher(teacher)}
+                  onClick={() => {
+                      setSelectedTeacher(teacher);
+                      setIsEditing(false);
+                  }}
                 >
                   <div>
                     <h4 className="font-medium">{teacher.name}</h4>
                     <p className="text-sm text-muted-foreground">{teacher.email}</p>
                     <div className="flex gap-2 mt-2">
-                      <Badge variant="outline">{teacher.batch}</Badge>
+                      {getUserBatches(teacher).map((b: string) => <Badge key={b} variant="outline">{b}</Badge>)}
                       <Badge variant={teacher.is_active ? "default" : "secondary"}>
                         {teacher.is_active ? "Active" : "Inactive"}
                       </Badge>
@@ -102,8 +143,7 @@ export const AdminTeacherManager = () => {
                       variant="outline"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedTeacher(teacher);
-                        setIsEditing(true);
+                        handleEditClick(teacher);
                       }}
                     >
                       <Edit className="h-4 w-4" />
@@ -120,7 +160,7 @@ export const AdminTeacherManager = () => {
           <Card>
             <CardHeader>
               <CardTitle>
-                {isEditing ? 'Edit Teacher' : 'Teacher Details'}
+                {isEditing ? `Edit ${selectedTeacher.name}` : 'Teacher Details'}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -139,16 +179,27 @@ export const AdminTeacherManager = () => {
                     <Input
                       type="email"
                       value={selectedTeacher.email}
-                      onChange={(e) => setSelectedTeacher({ ...selectedTeacher, email: e.target.value })}
-                      required
+                      disabled
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Batch</label>
-                    <Input
-                      value={selectedTeacher.batch || ''}
-                      onChange={(e) => setSelectedTeacher({ ...selectedTeacher, batch: e.target.value })}
-                      placeholder="e.g., 2024-A"
+                    <label className="block text-sm font-medium mb-1">Batches</label>
+                     <Combobox
+                        options={batchOptions}
+                        selected={editedBatches}
+                        onChange={setEditedBatches}
+                        onCreate={value => handleCreateOption('batch', value)}
+                        placeholder="Select or create batches..."
+                    />
+                  </div>
+                   <div>
+                    <label className="block text-sm font-medium mb-1">Subjects</label>
+                    <Combobox
+                        options={subjectOptions}
+                        selected={editedSubjects}
+                        onChange={setEditedSubjects}
+                        onCreate={value => handleCreateOption('subject', value)}
+                        placeholder="Select or create subjects..."
                     />
                   </div>
                   <div>
@@ -184,8 +235,12 @@ export const AdminTeacherManager = () => {
                     <p className="text-sm">{selectedTeacher.email}</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-muted-foreground">Batch</label>
-                    <p className="text-sm">{selectedTeacher.batch || 'Not assigned'}</p>
+                    <label className="block text-sm font-medium text-muted-foreground">Batches</label>
+                     <div className="flex flex-wrap gap-1 mt-1">
+                      {getUserBatches(selectedTeacher).map((batch: string) => (
+                        <Badge key={batch} variant="outline">{batch}</Badge>
+                      )) || <span className="text-sm text-muted-foreground">No batches assigned</span>}
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-muted-foreground">Subjects</label>
@@ -201,7 +256,7 @@ export const AdminTeacherManager = () => {
                       {selectedTeacher.is_active ? "Active" : "Inactive"}
                     </Badge>
                   </div>
-                  <Button onClick={() => setIsEditing(true)}>Edit Teacher</Button>
+                  <Button onClick={() => handleEditClick(selectedTeacher)}>Edit Teacher</Button>
                 </div>
               )}
             </CardContent>
