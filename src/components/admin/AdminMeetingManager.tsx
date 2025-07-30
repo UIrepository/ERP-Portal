@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useMemo, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,11 +39,32 @@ const LinksSkeleton = () => (
 
 export const AdminMeetingManager = () => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [selectedBatch, setSelectedBatch] = useState('all');
   const [selectedSubject, setSelectedSubject] = useState('all');
 
+  // Set up real-time subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel('realtime-meeting-links')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'schedules' },
+        (payload) => {
+          // When a change is detected, invalidate the query to refetch the data
+          queryClient.invalidateQueries({ queryKey: ['admin-all-meeting-links-list'] });
+        }
+      )
+      .subscribe();
+
+    // Cleanup the subscription when the component unmounts
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
   const { data: meetingLinks = [], isLoading: isLoadingLinks } = useQuery({
-    queryKey: ['admin-all-meeting-links-simple'],
+    queryKey: ['admin-all-meeting-links-list'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('schedules')
@@ -52,14 +73,13 @@ export const AdminMeetingManager = () => {
         .order('batch, subject');
       
       if (error) throw error;
-      // Get the last unique link for each subject-batch combo
-      const uniqueLinks = Array.from(new Map(data.map(item => [`${item.subject}-${item.batch}`, item])).values());
-      return (uniqueLinks || []) as MeetingLink[];
+      // Fetch ALL links, do not make them unique
+      return (data || []) as MeetingLink[];
     },
   });
   
   const { data: options = [], isLoading: isLoadingOptions } = useQuery({
-      queryKey: ['all-options-central-links'],
+      queryKey: ['all-options-for-links'],
       queryFn: async () => {
           const { data, error } = await supabase.rpc('get_all_options');
           if (error) throw error;
@@ -101,7 +121,7 @@ export const AdminMeetingManager = () => {
             <LinkIcon className="mr-3 h-8 w-8 text-primary" />
             Meeting Links Overview
           </h1>
-          <p className="text-gray-500 mt-1">A complete list of all class meeting links in the system.</p>
+          <p className="text-gray-500 mt-1">A real-time list of all class meeting links in the system.</p>
         </div>
 
       {/* Filter Section */}
