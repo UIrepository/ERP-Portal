@@ -1,17 +1,20 @@
-// uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/pages/Index.tsx
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { AuthPage } from '@/components/AuthPage';
 import { Layout } from '@/components/Layout';
 import { Sidebar } from '@/components/Sidebar';
 import { TeacherDashboard } from '@/components/TeacherDashboard';
-import { StudentDashboard } from '@/components/StudentDashboard'; // Correctly imported as named export
+import { StudentDashboard } from '@/components/StudentDashboard';
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
 import { Loader2 } from 'lucide-react';
+import { useRealtimeSync } from '@/hooks/useRealtimeSync'; // Import the hook
 
 const Index = () => {
   const { user, loading, profile } = useAuth();
   
+  // Call the centralized real-time hook
+  useRealtimeSync();
+
   const getInitialTab = () => {
     if (profile?.role === 'super_admin') {
       return 'enrollment-analytics';
@@ -22,7 +25,6 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState(getInitialTab());
 
   useEffect(() => {
-    // This effect ensures the active tab is reset when the user's role changes (e.g., after login)
     setActiveTab(getInitialTab());
   }, [profile?.role]);
 
@@ -43,7 +45,7 @@ const Index = () => {
       case 'teacher':
         return <TeacherDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
       case 'student':
-        return <StudentDashboard activeTab={activeTab} onTabChange={setActiveTab} />; // StudentDashboard is rendered here
+        return <StudentDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
       case 'super_admin':
         return <AdminDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
       default:
