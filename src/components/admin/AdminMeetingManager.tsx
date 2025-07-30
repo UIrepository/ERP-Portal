@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, getDay, parse, isWithinInterval, isAfter, isBefore, set } from 'date-fns';
+import { format, parse, isWithinInterval, isAfter, isBefore, set, addDays, startOfWeek } from 'date-fns';
 import { ExternalLink, Clock, Calendar, Video } from 'lucide-react';
 
 interface Schedule {
@@ -18,13 +18,14 @@ interface Schedule {
   link: string;
 }
 
-const MeetingCard = ({ schedule }: { schedule: Schedule }) => (
+const MeetingCard = ({ schedule, day }: { schedule: Schedule, day: string }) => (
     <Card className="bg-white hover:shadow-md transition-shadow">
         <CardContent className="p-4 flex items-center justify-between">
             <div>
                 <h4 className="font-bold">{schedule.subject}</h4>
                 <div className="text-sm text-muted-foreground flex items-center mt-1">
-                    <Badge variant="secondary" className="mr-2">{schedule.batch}</Badge> | 
+                    <Badge variant="secondary" className="mr-2">{schedule.batch}</Badge> |
+                    <Calendar className="h-3 w-3 mx-2" /> {day} |
                     <Clock className="h-3 w-3 mx-2" />
                     {format(parse(schedule.start_time, 'HH:mm:ss', new Date()), 'h:mm a')}
                 </div>
@@ -39,25 +40,48 @@ const MeetingCard = ({ schedule }: { schedule: Schedule }) => (
     </Card>
 );
 
-const MeetingList = ({ title, schedules }: { title: string, schedules: Schedule[] }) => (
-    <Card>
-        <CardHeader>
-            <CardTitle className="flex items-center">
-                {title === "Ongoing" && <Video className="h-5 w-5 mr-2 text-green-500" />}
-                {title === "Upcoming" && <Calendar className="h-5 w-5 mr-2 text-blue-500" />}
-                {title === "Past" && <Clock className="h-5 w-5 mr-2 text-gray-500" />}
-                {title}
-            </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-            {schedules.length > 0 ? (
-                schedules.map(schedule => <MeetingCard key={schedule.id} schedule={schedule} />)
-            ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">No {title.toLowerCase()} classes.</p>
-            )}
-        </CardContent>
-    </Card>
-);
+const MeetingList = ({ title, schedules, now }: { title: string, schedules: Schedule[], now: Date }) => {
+    const sortedSchedules = useMemo(() => {
+        const getScheduleDate = (s: Schedule) => {
+            const weekStart = startOfWeek(now, { weekStartsOn: 0 }); // Sunday
+            const scheduleDate = addDays(weekStart, s.day_of_week);
+            const startTime = parse(s.start_time, 'HH:mm:ss', new Date());
+            return set(scheduleDate, { hours: startTime.getHours(), minutes: startTime.getMinutes() });
+        };
+
+        return schedules.sort((a, b) => {
+            const dateA = getScheduleDate(a);
+            const dateB = getScheduleDate(b);
+            if (title === 'Upcoming') {
+                return dateA.getTime() - dateB.getTime(); // Ascending for upcoming
+            }
+            return dateB.getTime() - dateA.getTime(); // Descending for past
+        });
+    }, [schedules, now, title]);
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center">
+                    {title === "Ongoing" && <Video className="h-5 w-5 mr-2 text-green-500" />}
+                    {title === "Upcoming" && <Calendar className="h-5 w-5 mr-2 text-blue-500" />}
+                    {title === "Past" && <Clock className="h-5 w-5 mr-2 text-gray-500" />}
+                    {title}
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 h-96 overflow-y-auto">
+                {sortedSchedules.length > 0 ? (
+                    sortedSchedules.map(schedule => {
+                        const dayName = format(addDays(startOfWeek(now, { weekStartsOn: 0 }), schedule.day_of_week), 'EEEE');
+                        return <MeetingCard key={schedule.id} schedule={schedule} day={dayName} />;
+                    })
+                ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">No {title.toLowerCase()} classes.</p>
+                )}
+            </CardContent>
+        </Card>
+    );
+};
 
 export const AdminMeetingManager = () => {
   const [now, setNow] = useState(new Date());
@@ -75,42 +99,41 @@ export const AdminMeetingManager = () => {
         return data || [];
     },
   });
-  
+
   const categorizedSchedules = useMemo(() => {
-    const todayDay = getDay(now);
+    const weekStart = startOfWeek(now, { weekStartsOn: 0 }); // Sunday
     const ongoing: Schedule[] = [];
     const upcoming: Schedule[] = [];
     const past: Schedule[] = [];
 
     schedules.forEach(schedule => {
-      if (schedule.day_of_week === todayDay) {
-        const startTime = parse(schedule.start_time, 'HH:mm:ss', now);
-        const endTime = parse(schedule.end_time, 'HH:mm:ss', now);
-        
-        const scheduleStart = set(now, { hours: startTime.getHours(), minutes: startTime.getMinutes(), seconds: 0 });
-        const scheduleEnd = set(now, { hours: endTime.getHours(), minutes: endTime.getMinutes(), seconds: 0 });
+      const scheduleDay = addDays(weekStart, schedule.day_of_week);
+      const startTime = parse(schedule.start_time, 'HH:mm:ss', new Date());
+      const endTime = parse(schedule.end_time, 'HH:mm:ss', new Date());
 
-        if (isWithinInterval(now, { start: scheduleStart, end: scheduleEnd })) {
-          ongoing.push(schedule);
-        } else if (isAfter(scheduleStart, now)) {
-          upcoming.push(schedule);
-        } else if (isBefore(scheduleEnd, now)) {
-          past.push(schedule);
-        }
+      const scheduleStart = set(scheduleDay, { hours: startTime.getHours(), minutes: startTime.getMinutes(), seconds: 0 });
+      const scheduleEnd = set(scheduleDay, { hours: endTime.getHours(), minutes: endTime.getMinutes(), seconds: 0 });
+
+      if (isWithinInterval(now, { start: scheduleStart, end: scheduleEnd })) {
+        ongoing.push(schedule);
+      } else if (isAfter(scheduleStart, now)) {
+        upcoming.push(schedule);
+      } else {
+        past.push(schedule);
       }
     });
 
     return { ongoing, upcoming, past };
   }, [schedules, now]);
-  
+
   if (isLoading) {
       return (
           <div className="p-6 space-y-6">
               <Skeleton className="h-8 w-1/3" />
               <div className="grid md:grid-cols-3 gap-6">
-                  <Skeleton className="h-48" />
-                  <Skeleton className="h-48" />
-                  <Skeleton className="h-48" />
+                  <Skeleton className="h-64" />
+                  <Skeleton className="h-64" />
+                  <Skeleton className="h-64" />
               </div>
           </div>
       )
@@ -120,13 +143,13 @@ export const AdminMeetingManager = () => {
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="mb-6">
           <h2 className="text-3xl font-bold text-gray-900">Class Meeting Links</h2>
-          <p className="text-gray-600 mt-1">All scheduled meetings, sorted by their current status.</p>
+          <p className="text-gray-600 mt-1">All scheduled meetings, sorted by their current status for the week.</p>
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
-        <MeetingList title="Ongoing" schedules={categorizedSchedules.ongoing} />
-        <MeetingList title="Upcoming" schedules={categorizedSchedules.upcoming} />
-        <MeetingList title="Past" schedules={categorizedSchedules.past} />
+        <MeetingList title="Ongoing" schedules={categorizedSchedules.ongoing} now={now} />
+        <MeetingList title="Upcoming" schedules={categorizedSchedules.upcoming} now={now} />
+        <MeetingList title="Past" schedules={categorizedSchedules.past} now={now} />
       </div>
     </div>
   );
