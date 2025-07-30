@@ -1,82 +1,180 @@
-import { useEffect, useMemo } from 'react'; // Removed useState
-import { useQuery, useQueryClient } from '@tanstack/react-query'; // Added useQueryClient
+// uirepository/teachgrid-hub/teachgrid-hub-18fb4b82a0e6ac673de0608908646c2131d885a1/src/components/admin/AdminFeedbackViewer.tsx
+import { useState, useMemo, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquare, User, Calendar, Star, BarChart2 } from 'lucide-react';
+import { MessageSquare, User, Calendar, Star, BarChart2, Loader2 } from 'lucide-react'; // Added Loader2
 import { format } from 'date-fns';
-// Removed Select imports
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 
+// Interface for the fetched feedback data, including joined profile info
+interface FeedbackEntry {
+  id: string;
+  date: string;
+  subject: string;
+  batch: string;
+  submitted_by: string | null;
+  created_at: string;
+  teacher_quality: number;
+  concept_clarity: number;
+  dpp_quality: number;
+  premium_content_usefulness: number;
+  comments: string;
+  profiles: { // Joined profile data
+    name: string;
+    email: string;
+  } | null;
+}
+
+// Skeleton loader component for feedback cards
 const FeedbackSkeleton = () => (
-    <div className="space-y-4">
-        {[...Array(2)].map((_, i) => (
-            <Card key={i} className="rounded-xl">
-                <CardHeader>
-                    <Skeleton className="h-6 w-1/4" />
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <Skeleton className="h-20 w-full" />
-                </CardContent>
-            </Card>
-        ))}
-    </div>
+  <div className="space-y-4">
+    {[...Array(3)].map((_, i) => (
+      <Card key={i} className="rounded-xl">
+        <CardHeader>
+          <Skeleton className="h-6 w-1/4 mb-2" />
+          <Skeleton className="h-4 w-1/2" />
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+          </div>
+          <Skeleton className="h-16 w-full" />
+        </CardContent>
+      </Card>
+    ))}
+  </div>
 );
 
+// Star rating display component
 const RatingDisplay = ({ rating }: { rating: number }) => (
-    <div className="flex items-center gap-1">
-        {[...Array(5)].map((_, i) => (
-            <Star key={i} className={`h-4 w-4 ${i < rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} />
-        ))}
-    </div>
+  <div className="flex items-center gap-1">
+    {[...Array(5)].map((_, i) => (
+      <Star
+        key={i}
+        className={`h-4 w-4 ${i < rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
+      />
+    ))}
+  </div>
 );
 
 export const AdminFeedbackViewer = () => {
-  // Removed selectedBatch and selectedSubject states
-  const queryClient = useQueryClient(); // Initialize queryClient for invalidation
+  const [selectedBatch, setSelectedBatch] = useState('all');
+  const [selectedSubject, setSelectedSubject] = useState('all');
+  const queryClient = useQueryClient();
 
   // Set up real-time subscription for feedback data
   useEffect(() => {
     const channel = supabase
-      .channel('feedback-realtime-admin') // Unique channel name
+      .channel('feedback-realtime-admin') // Unique channel name for this component
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'feedback' },
         (payload) => {
           console.log(`Real-time update from feedback table: ${payload.eventType}`);
+          // Invalidate the query cache to refetch data on changes
           queryClient.invalidateQueries({ queryKey: ['admin-feedback-viewer'] });
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(channel); // Clean up subscription on unmount
     };
-  }, [queryClient]);
+  }, [queryClient]); // Re-run effect if queryClient changes (unlikely)
 
-
-  const { data: feedback = [], isLoading } = useQuery({
+  // Fetch all feedback data, including joined profile information
+  const { data: feedback = [], isLoading, isError, error } = useQuery<FeedbackEntry[]>({
     queryKey: ['admin-feedback-viewer'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('feedback')
         .select(`
-          *,
+          id,
+          date,
+          subject,
+          batch,
+          submitted_by,
+          created_at,
+          teacher_quality,
+          concept_clarity,
+          dpp_quality,
+          premium_content_usefulness,
+          comments,
           profiles (
             name,
             email
           )
         `)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
+        .order('created_at', { ascending: false }); // Order by most recent first
+
+      if (error) {
+        console.error("Error fetching feedback:", error);
+        throw error; // Propagate error for TanStack Query's onError
+      }
       return data || [];
     },
   });
 
-  // Removed memoization for filters, directly use all fetched feedback
-  const allFeedback = useMemo(() => {
-    return feedback;
-  }, [feedback]);
+  // Memoized data for filters and filtered display
+  const { allBatches, allSubjects, filteredFeedback } = useMemo(() => {
+    const uniqueBatches = new Set<string>();
+    const uniqueSubjects = new Set<string>();
+
+    feedback.forEach(f => {
+      if (f.batch) uniqueBatches.add(f.batch);
+      if (f.subject) uniqueSubjects.add(f.subject);
+    });
+
+    const filtered = feedback.filter(f =>
+      (selectedBatch === 'all' || f.batch === selectedBatch) &&
+      (selectedSubject === 'all' || f.subject === selectedSubject)
+    );
+    
+    return {
+      allBatches: Array.from(uniqueBatches).sort(),
+      allSubjects: Array.from(uniqueSubjects).sort(),
+      filteredFeedback: filtered,
+    };
+  }, [feedback, selectedBatch, selectedSubject]); // Re-calculate when feedback or filters change
+
+  // Render loading state
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-8 bg-gradient-to-br from-purple-50 to-indigo-50 min-h-full flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="h-12 w-12 animate-spin text-purple-600" />
+          <p className="text-xl text-gray-700">Loading Feedback...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Render error state
+  if (isError) {
+    return (
+      <div className="p-6 space-y-8 bg-gradient-to-br from-purple-50 to-indigo-50 min-h-full flex items-center justify-center text-center">
+        <Card className="p-8 rounded-3xl shadow-xl border-red-400 border-2 bg-white">
+          <AlertTriangle className="h-16 w-16 text-red-600 mx-auto mb-4" />
+          <h3 className="text-2xl font-bold text-gray-800 mb-2">Error Loading Feedback</h3>
+          <p className="text-gray-600 mb-4">
+            There was a problem fetching feedback data. This could be due to:
+          </p>
+          <ul className="list-disc list-inside text-left text-gray-700 space-y-1">
+            <li>Incorrect Row Level Security (RLS) policies on `public.feedback` or `public.profiles`.</li>
+            <li>Your admin user's role not being `super_admin` in the `public.profiles` table.</li>
+            <li>Network issues or a temporary Supabase outage.</li>
+          </ul>
+          <p className="mt-4 text-sm text-red-500">Error details: {error?.message || 'Unknown error'}</p>
+          <p className="mt-4 text-gray-600">Please check your Supabase dashboard and try again.</p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-8 bg-gradient-to-br from-purple-50 to-indigo-50 min-h-full">
@@ -100,14 +198,28 @@ export const AdminFeedbackViewer = () => {
             </div>
         </div>
 
-       {/* Removed Filter Section */}
+       {/* Filter Section */}
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Select value={selectedBatch} onValueChange={setSelectedBatch}>
+            <SelectTrigger className="bg-white"><SelectValue placeholder="Filter by Batch" /></SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">All Batches</SelectItem>
+                {allBatches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+            </SelectContent>
+        </Select>
+        <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+            <SelectTrigger className="bg-white"><SelectValue placeholder="Filter by Subject" /></SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">All Subjects</SelectItem>
+                {allSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+        </Select>
+      </div>
 
       {/* Feedback List */}
       <div className="space-y-6">
-        {isLoading ? (
-            <FeedbackSkeleton />
-        ) : allFeedback.length > 0 ? (
-          allFeedback.map((item: any) => (
+        {filteredFeedback.length > 0 ? (
+          filteredFeedback.map((item: FeedbackEntry) => (
             <Card key={item.id} className="bg-white rounded-xl shadow-md">
                 <CardHeader>
                     <div className="flex justify-between items-start">
@@ -140,7 +252,7 @@ export const AdminFeedbackViewer = () => {
           <div className="text-center py-20 bg-white rounded-lg border-dashed border-2 shadow-sm">
             <MessageSquare className="h-16 w-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-700">No Feedback Found</h3>
-            <p className="text-muted-foreground mt-2">There is no feedback available.</p>
+            <p className="text-muted-foreground mt-2">There is no feedback available matching your criteria.</p>
           </div>
         )}
       </div>
