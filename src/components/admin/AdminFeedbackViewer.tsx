@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquare, User, Calendar, Star } from 'lucide-react';
+import { MessageSquare, User, Calendar, Star, BarChart2 } from 'lucide-react'; // Added BarChart2 for header icon
 import { format } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 const FeedbackSkeleton = () => (
     <div className="space-y-4">
         {[...Array(2)].map((_, i) => (
-            <Card key={i}>
+            <Card key={i} className="rounded-xl"> {/* Added rounded-xl for consistency */}
                 <CardHeader>
                     <Skeleton className="h-6 w-1/4" />
                 </CardHeader>
@@ -74,24 +74,38 @@ export const AdminFeedbackViewer = () => {
   }, [feedback, selectedBatch, selectedSubject]);
 
   return (
-    <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
-      {/* Header Section */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-800">Feedback Viewer</h1>
-        <p className="text-gray-500 mt-1">Review feedback submitted by students with their identity.</p>
-      </div>
+    <div className="p-6 space-y-8 bg-gradient-to-br from-purple-50 to-indigo-50 min-h-full"> {/* Gradient background */}
+      {/* Header Section - Enhanced Design */}
+      <div className="relative p-8 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-r from-purple-600 to-indigo-700 text-white animate-fade-in-up">
+            {/* Animated background circles */}
+            <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/10 rounded-full animate-pulse-slow"></div>
+            <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-white/10 rounded-full animate-pulse-slow animation-delay-500"></div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white/10 rounded-full animate-pulse-slow animation-delay-1000"></div>
+
+            <div className="relative z-10 text-center">
+                <div className="flex items-center justify-center mb-4">
+                    <BarChart2 className="h-16 w-16 text-purple-100 drop-shadow-md" /> {/* New icon for analytics feel */}
+                </div>
+                <h1 className="text-4xl md:text-5xl font-bold mb-2 tracking-tight drop-shadow-lg">
+                    Student Feedback Analytics
+                </h1>
+                <p className="text-xl md:text-2xl text-purple-100 drop-shadow-sm font-semibold">
+                    Gain insights from student responses to improve teaching.
+                </p>
+            </div>
+        </div>
 
        {/* Filter Section */}
        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Select value={selectedBatch} onValueChange={setSelectedBatch}>
-            <SelectTrigger><SelectValue placeholder="Filter by Batch" /></SelectTrigger>
+            <SelectTrigger className="bg-white"><SelectValue placeholder="Filter by Batch" /></SelectTrigger>
             <SelectContent>
                 <SelectItem value="all">All Batches</SelectItem>
                 {allBatches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
             </SelectContent>
         </Select>
         <Select value={selectedSubject} onValueChange={setSelectedSubject}>
-            <SelectTrigger><SelectValue placeholder="Filter by Subject" /></SelectTrigger>
+            <SelectTrigger className="bg-white"><SelectValue placeholder="Filter by Subject" /></SelectTrigger>
             <SelectContent>
                 <SelectItem value="all">All Subjects</SelectItem>
                 {allSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
@@ -105,13 +119,13 @@ export const AdminFeedbackViewer = () => {
             <FeedbackSkeleton />
         ) : filteredFeedback.length > 0 ? (
           filteredFeedback.map((item: any) => (
-            <Card key={item.id} className="bg-white">
+            <Card key={item.id} className="bg-white rounded-xl shadow-md"> {/* Added rounded-xl for consistency */}
                 <CardHeader>
                     <div className="flex justify-between items-start">
                         <div>
-                            <CardTitle className="flex items-center gap-2">{item.subject} <Badge variant="secondary">{item.batch}</Badge></CardTitle>
-                            <CardDescription className="flex items-center gap-2 mt-2">
-                                <User className="h-4 w-4" /> {item.profiles?.name || 'Anonymous'} ({item.profiles?.email || 'No email'})
+                            <CardTitle className="flex items-center gap-2 text-xl font-bold">{item.subject} <Badge variant="secondary">{item.batch}</Badge></CardTitle> {/* Increased font size */}
+                            <CardDescription className="flex items-center gap-2 mt-2 text-base text-gray-600"> {/* Increased font size */}
+                                <User className="h-5 w-5 text-purple-500" /> {item.profiles?.name || 'Anonymous'} ({item.profiles?.email || 'No email'})
                             </CardDescription>
                         </div>
                         <div className="text-sm text-muted-foreground text-right">
@@ -129,12 +143,12 @@ export const AdminFeedbackViewer = () => {
                     <div className="flex justify-between items-center"><span className="font-medium text-sm">DPP Quality</span> <RatingDisplay rating={item.dpp_quality} /></div>
                     <div className="flex justify-between items-center"><span className="font-medium text-sm">Premium Content</span> <RatingDisplay rating={item.premium_content_usefulness} /></div>
                 </div>
-                <p className="mt-4 text-sm text-gray-800 italic">"{item.comments}"</p>
+                <p className="mt-4 text-base text-gray-800 italic">"{item.comments}"</p> {/* Increased font size */}
               </CardContent>
             </Card>
           ))
         ) : (
-          <div className="text-center py-20 bg-white rounded-lg border-dashed border-2">
+          <div className="text-center py-20 bg-white rounded-lg border-dashed border-2 shadow-sm">
             <MessageSquare className="h-16 w-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-700">No Feedback Found</h3>
             <p className="text-muted-foreground mt-2">There is no feedback matching your current filters.</p>
