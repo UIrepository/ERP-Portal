@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, getDay } from 'date-fns';
+import { AlertTriangle } from 'lucide-react';
 
 // Interface for the schedule data
 interface Schedule {
@@ -24,12 +25,10 @@ const ScheduleSkeleton = () => (
     <div className="space-y-6">
         {[...Array(3)].map((_, i) => (
             <Card key={i}>
-                <CardHeader>
+                <div className="p-4 space-y-3">
                     <Skeleton className="h-6 w-1/3" />
-                </CardHeader>
-                <CardContent className="space-y-4">
-                     <Skeleton className="h-24 w-full" />
-                </CardContent>
+                    <Skeleton className="h-24 w-full mt-2" />
+                </div>
             </Card>
         ))}
     </div>
@@ -40,7 +39,6 @@ export const ScheduleManagement = () => {
   const queryClient = useQueryClient();
 
   // --- Real-time Subscription ---
-  // Sets up a listener for any changes in the 'schedules' table.
   useEffect(() => {
     const channel = supabase
       .channel('admin-realtime-schedules')
@@ -60,20 +58,23 @@ export const ScheduleManagement = () => {
   }, [queryClient]);
 
   // --- Data Fetching ---
-  // Fetches ALL schedules from the database without any filtering.
-  const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
+  const { data: schedules, isLoading, isError, error } = useQuery<Schedule[]>({
     queryKey: ['admin-all-schedules'],
     queryFn: async (): Promise<Schedule[]> => {
         const { data, error } = await supabase.from('schedules').select('*').order('day_of_week').order('start_time');
-        if (error) throw error;
+        if (error) {
+          console.error("Error fetching schedules:", error);
+          throw error;
+        }
         return data || [];
     },
   });
 
   // --- Data Processing ---
   const timeSlots = useMemo(() => {
+    if (!schedules) return [];
     const slots = new Set<string>();
-    schedules?.forEach(s => slots.add(s.start_time));
+    schedules.forEach(s => slots.add(s.start_time));
     return Array.from(slots).sort();
   }, [schedules]);
 
@@ -85,7 +86,6 @@ export const ScheduleManagement = () => {
   };
 
   const today = getDay(currentTime);
-  const isLoading = isLoadingSchedules;
 
   // --- Rendering ---
   return (
@@ -97,7 +97,20 @@ export const ScheduleManagement = () => {
         </div>
       </div>
         
-      {isLoading ? <ScheduleSkeleton /> : (
+      {isLoading ? (
+        <ScheduleSkeleton />
+      ) : isError ? (
+        <Card className="text-center py-20 bg-white rounded-lg border-dashed border-2 border-red-400 shadow-sm">
+            <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-destructive">Failed to Load Schedule</h3>
+            <p className="text-muted-foreground mt-2">
+                This is likely due to a Row Level Security (RLS) policy preventing access.
+            </p>
+            <p className="text-sm text-gray-500 mt-4">
+                <strong>Error:</strong> {error?.message}
+            </p>
+        </Card>
+      ) : (
       <div className="bg-white p-4 rounded-2xl shadow-lg">
           <div className="grid grid-cols-8">
               <div className="text-center font-semibold text-gray-500 py-2">Time</div>
@@ -112,10 +125,10 @@ export const ScheduleManagement = () => {
                   <div key={time} className="grid grid-cols-8 border-t">
                       <div className="text-center text-sm font-medium text-gray-700 py-4 px-2 border-r">{formatTime(time)}</div>
                       {DAYS.map((day, dayIndex) => {
-                          const classInfo = schedules?.filter(s => s.day_of_week === dayIndex && s.start_time === time);
+                          const classInfo = schedules.filter(s => s.day_of_week === dayIndex && s.start_time === time);
                           return (
                               <div key={`${day}-${time}`} className={`p-2 border-r last:border-r-0 ${dayIndex === today ? 'bg-blue-50' : ''}`}>
-                                  {classInfo && classInfo.length > 0 && classInfo.map(info => (
+                                  {classInfo.length > 0 && classInfo.map(info => (
                                     <Card key={info.id} className="bg-white shadow-md hover:shadow-lg transition-shadow mb-2">
                                         <CardContent className="p-3">
                                             <p className="font-bold text-gray-800 text-sm">{info.subject}</p>
