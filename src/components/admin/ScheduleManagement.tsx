@@ -37,20 +37,25 @@ export const ScheduleManagement = () => {
   const [currentTime] = useState(new Date());
   const queryClient = useQueryClient();
 
-  // Set up real-time subscription to the 'schedules' table
+  // --- Real-time Subscription ---
+  // This useEffect hook sets up a listener for any changes (inserts, updates, deletes)
+  // in the public 'schedules' table in your Supabase database.
   useEffect(() => {
     const channel = supabase
-      .channel('admin-schedule-changes')
+      .channel('admin-realtime-schedules')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'schedules' },
         (payload) => {
-          console.log('Real-time update from schedules table:', payload);
+          // When a change is detected, invalidate the React Query cache for this query.
+          // This automatically triggers a refetch of the data, ensuring the UI is always in sync.
+          console.log('Schedule change detected!', payload);
           queryClient.invalidateQueries({ queryKey: ['admin-all-schedules'] });
         }
       )
       .subscribe();
 
+    // Cleanup function to remove the channel subscription when the component unmounts.
     return () => {
       supabase.removeChannel(channel);
     };
