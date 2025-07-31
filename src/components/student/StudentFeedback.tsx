@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
 import { MessageSquare, Send, CheckCircle, Star, Sparkles, Timer } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog'; // <-- FIXED: Added DialogDescription
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { differenceInHours, formatDistanceToNow, addDays } from 'date-fns';
@@ -18,8 +18,7 @@ interface UserEnrollment {
     subject_name: string;
 }
 
-// --- New Cooldown Timer Component ---
-// This component calculates and displays the time remaining until the next feedback can be submitted.
+// --- Cooldown Timer Component ---
 const CooldownTimer = ({ lastSubmissionDate }: { lastSubmissionDate: Date }) => {
     const [timeLeft, setTimeLeft] = useState('');
 
@@ -31,7 +30,7 @@ const CooldownTimer = ({ lastSubmissionDate }: { lastSubmissionDate: Date }) => 
         };
 
         updateTimer();
-        const intervalId = setInterval(updateTimer, 60000); // Update every minute for accuracy
+        const intervalId = setInterval(updateTimer, 60000);
 
         return () => clearInterval(intervalId);
     }, [lastSubmissionDate]);
@@ -70,7 +69,6 @@ export const StudentFeedback = () => {
   });
   const [comments, setComments] = useState('');
 
-  // Fetches the student's enrollments
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['userEnrollments', profile?.user_id],
     queryFn: async () => {
@@ -88,7 +86,6 @@ export const StudentFeedback = () => {
     enabled: !!profile?.user_id
   });
 
-  // Fetches all previously submitted feedback for the current user
   const { data: submittedFeedback = [], isLoading: isLoadingSubmittedFeedback } = useQuery({
     queryKey: ['student-submitted-feedback', profile?.user_id],
     queryFn: async () => {
@@ -109,11 +106,9 @@ export const StudentFeedback = () => {
   });
 
   // --- Frontend Cooldown Logic ---
-  // This logic runs in the browser to determine if a student can submit feedback.
   const feedbackTasks = useMemo(() => {
     if (!userEnrollments) return [];
     
-    // Find the most recent submission for each batch/subject combination
     const latestSubmissions = new Map<string, Date>();
     submittedFeedback.forEach(f => {
         const key = `${f.batch}-${f.subject}`;
@@ -122,23 +117,20 @@ export const StudentFeedback = () => {
         }
     });
 
-    // Create a task for each enrollment and check its cooldown status
     return userEnrollments.map(enrollment => {
         const key = `${enrollment.batch_name}-${enrollment.subject_name}`;
         const lastSubmission = latestSubmissions.get(key);
-        // A student can submit if they've never submitted before OR if it's been more than 72 hours
         const canSubmit = !lastSubmission || differenceInHours(new Date(), lastSubmission) >= 72;
 
         return {
             batch: enrollment.batch_name,
             subject: enrollment.subject_name,
-            canSubmit, // This is calculated on the frontend
+            canSubmit,
             lastSubmissionDate: lastSubmission,
         };
     }).sort((a,b) => a.subject.localeCompare(b.subject) || a.batch.localeCompare(b.batch));
   }, [userEnrollments, submittedFeedback]);
 
-  // Mutation for submitting new feedback
   const submitFeedbackMutation = useMutation({
     mutationFn: async (feedbackData: any) => {
       const { error } = await supabase.from('feedback').insert([feedbackData]);
