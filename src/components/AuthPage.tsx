@@ -52,7 +52,7 @@ export const AuthPage = () => {
           <div className="absolute -bottom-12 -right-12 w-64 h-64 bg-white/30 rounded-full animate-pulse-slow animation-delay-500"></div>
 
           <CardTitle className="flex justify-center z-10">
-            <img src="/logooffical" alt="Unknown IITians Logo" className="h-24 w-auto filter drop-shadow-sm" />
+            <img src="/logooffical.png" alt="Unknown IITians Logo" className="h-24 w-auto filter drop-shadow-sm" />
           </CardTitle>
           <CardDescription className="text-gray-700 text-xl font-bold tracking-wide mt-4 z-10">
             Welcome to Unknown IITians
