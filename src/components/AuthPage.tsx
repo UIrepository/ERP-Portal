@@ -96,12 +96,12 @@ export const AuthPage = () => {
       .animation-delay-4000 {
         animation-delay: 4s;
       }
-      .shadow-3xl { // If you want a more pronounced shadow on the card
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.08);
-      }
+      .shadow-3xl { /* If you want a more pronounced shadow on the card, consider adding this to tailwind.config.ts extended shadows */
+        /* box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.08); */
+      /*}
       .bg-pattern-dots-subtle {
         background-image: radial-gradient(#d1d5db 0.5px, transparent 0.5px); /* Light grey dots */
-        background-size: 20px 20px;
+        /* background-size: 20px 20px;
       }
 
       // And under @layer keyframes add:
