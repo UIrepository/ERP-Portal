@@ -3,10 +3,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Users, Loader2, AlertTriangle, BookOpen, GraduationCap } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
 
 // --- Interfaces for our data structures ---
 interface Enrollment {
@@ -212,43 +212,48 @@ export const EnrollmentAnalytics = () => {
         </CardContent>
       </Card>
       
-      {/* New Student Enrollment Cards Section */}
-      <div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center">
-            <Users className="mr-3 h-6 w-6" />
-            Student Enrollment Details
-          </h2>
-          <p className="text-muted-foreground mb-6">
-            Displaying {analyticsData.filteredStudents.length} students matching the current filters.
-          </p>
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            {analyticsData.filteredStudents.map((student, index) => (
-              <Card key={index} className="bg-white shadow-md hover:shadow-xl transition-shadow duration-300">
-                <CardHeader>
-                  <CardTitle className="text-lg">{student.name}</CardTitle>
-                  <CardDescription>{student.email}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Separator className="mb-4" />
-                  <div className="space-y-3">
-                    {student.enrollments.map((e, i) => (
-                      <div key={i} className="flex items-center justify-between p-2 rounded-md bg-gray-50 border">
-                          <div className="flex items-center gap-2">
-                              <GraduationCap className="h-4 w-4 text-primary"/>
-                              <span className="font-semibold text-sm">{e.batch}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                              <BookOpen className="h-4 w-4 text-indigo-500"/>
-                              <span className="font-semibold text-sm">{e.subject}</span>
-                          </div>
-                      </div>
+      {/* Improved Student Enrollment Table */}
+      <Card className="bg-white">
+        <CardHeader>
+            <CardTitle className="flex items-center text-lg"><Users className="mr-2 h-5 w-5" />Student Enrollment Details</CardTitle>
+            <CardDescription>A detailed list of all students and their current enrollments. Found {analyticsData.filteredStudents.length} students matching criteria.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Student Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Enrollments</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {analyticsData.filteredStudents.map((student, index) => (
+                        <TableRow key={index}>
+                            <TableCell className="font-medium">{student.name}</TableCell>
+                            <TableCell>{student.email}</TableCell>
+                            <TableCell>
+                                <div className="flex flex-col gap-2">
+                                    {student.enrollments.map((e, i) => (
+                                        <div key={i} className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 border border-gray-200 shadow-sm hover:bg-gray-100 transition-colors">
+                                            <div className="flex items-center gap-2">
+                                                <GraduationCap className="h-5 w-5 text-blue-500" />
+                                                <Badge variant="default" className="bg-blue-100 text-blue-800 hover:bg-blue-200">{e.batch}</Badge>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <BookOpen className="h-5 w-5 text-indigo-500" />
+                                                <Badge variant="default" className="bg-indigo-100 text-indigo-800 hover:bg-indigo-200">{e.subject}</Badge>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </TableCell>
+                        </TableRow>
                     ))}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-      </div>
+                </TableBody>
+            </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 };
