@@ -45,13 +45,6 @@ export const AuthPage = () => {
         <div className="absolute w-64 h-64 bg-teal-50 rounded-full mix-blend-multiply filter blur-2xl opacity-15 animate-blob animation-delay-2000 top-1/2 right-1/4"></div>
         <div className="absolute w-72 h-72 bg-gray-200 rounded-full mix-blend-multiply filter blur-2xl opacity-15 animate-blob animation-delay-4000 bottom-1/4 left-1/3"></div>
 
-        {/* Placeholder for upskilling icons - Requires custom CSS/SVG integration in index.css */}
-        {/* To add moving upskilling icons, you would typically use SVG sprites and
-            CSS animations or a library like react-spring/framer-motion.
-            Example (add these divs here and corresponding CSS animations in index.css):
-            <div className="absolute top-10 left-10 text-blue-200 opacity-20 text-4xl animate-float">📚</div>
-            <div className="absolute bottom-20 right-20 text-green-200 opacity-20 text-4xl animate-float animation-delay-1500">💡</div>
-        */}
       </div>
 
       <Card className="relative z-10 w-full max-w-sm bg-white rounded-2xl shadow-xl overflow-hidden animate-fade-in-up">
@@ -86,47 +79,6 @@ export const AuthPage = () => {
           </div>
         </CardContent>
       </Card>
-
-      {/* Add custom keyframes to src/index.css for 'blob', 'fade-in', and 'float' animations if not already present */}
-      {/*
-      // In src/index.css, under @layer utilities add:
-      .animate-blob {
-        animation: blob 7s infinite;
-      }
-      .animate-fade-in {
-        animation: fade-in 1s ease-out;
-      }
-      .animation-delay-2000 {
-        animation-delay: 2s;
-      }
-      .animation-delay-4000 {
-        animation-delay: 4s;
-      }
-      .bg-pattern-dots-subtle {
-        background-image: radial-gradient(#d1d5db 0.5px, transparent 0.5px); /* Light grey dots */
-        background-size: 20px 20px;
-      }
-      .animate-float {
-        animation: float 3s ease-in-out infinite;
-      }
-
-      // And under @layer keyframes add:
-      @keyframes blob {
-        0% { transform: translate(0px, 0px) scale(1); }
-        33% { transform: translate(30px, -50px) scale(1.1); }
-        66% { transform: translate(-20px, 20px) scale(0.9); }
-        100% { transform: translate(0px, 0px) scale(1); }
-      }
-      @keyframes fade-in {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
-      @keyframes float {
-        0% { transform: translateY(0px); }
-        50% { transform: translateY(-10px); }
-        100% { transform: translateY(0px); }
-      }
-      */}
     </div>
   );
 };
