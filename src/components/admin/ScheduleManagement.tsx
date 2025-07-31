@@ -50,6 +50,8 @@ export const ScheduleManagement = () => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'schedules' },
         (payload) => {
+          // When a change is detected, invalidate the React Query cache for this query.
+          // This automatically triggers a refetch of the data, ensuring the UI is always in sync.
           console.log('Schedule change detected!', payload);
           queryClient.invalidateQueries({ queryKey: ['admin-all-schedules'] });
         }
@@ -67,48 +69,31 @@ export const ScheduleManagement = () => {
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
     queryKey: ['admin-all-schedules'],
     queryFn: async (): Promise<Schedule[]> => {
+        // Fetches ALL schedules without any user-based filtering for a complete admin view.
         const { data, error } = await supabase.from('schedules').select('*').order('day_of_week').order('start_time');
         if (error) throw error;
         return data || [];
     },
   });
   
-  // Corrected and efficient query to get teacher enrollments and names
+  // Fetches all teacher enrollments to map teacher names to the schedule.
   const { data: teacherEnrollments, isLoading: isLoadingEnrollments } = useQuery<any[]>({
       queryKey: ['teacher-enrollments-for-schedule'],
       queryFn: async () => {
           const { data, error } = await supabase
               .from('user_enrollments')
-              .select('user_id, batch_name, subject_name');
+              .select('user_id, batch_name, subject_name, profile:profiles(name)');
 
           if (error) {
               console.error('Error fetching teacher enrollments:', error);
               return [];
           }
-
-          if (!data) return [];
-
-          // Manually fetch profiles for each enrollment to avoid join issues
-          const profiles = await Promise.all(
-            data.map(async (enrollment) => {
-              const { data: profileData, error: profileError } = await supabase
-                .from('profiles')
-                .select('name')
-                .eq('user_id', enrollment.user_id)
-                .single();
-              
-              if (profileError) {
-                console.error('Error fetching profile for user:', enrollment.user_id, profileError);
-                return { ...enrollment, profile: null };
-              }
-              return { ...enrollment, profile: profileData };
-            })
-          );
-          return profiles;
+          return data || [];
       }
   });
   
   // --- Data Processing ---
+  // Creates a map for quick lookup of teacher names based on batch and subject.
   const teacherMap = useMemo(() => {
       const map = new Map<string, string>();
       if (teacherEnrollments) {
@@ -122,12 +107,14 @@ export const ScheduleManagement = () => {
       return map;
   }, [teacherEnrollments]);
 
+  // Creates a sorted list of unique time slots to build the schedule grid rows.
   const timeSlots = useMemo(() => {
     const slots = new Set<string>();
     schedules?.forEach(s => slots.add(s.start_time));
     return Array.from(slots).sort();
   }, [schedules]);
 
+  // Utility function to format time strings for display.
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
     const date = new Date();
@@ -144,7 +131,7 @@ export const ScheduleManagement = () => {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-3xl font-bold text-gray-900">Full Class Schedule</h2>
-          <p className="text-gray-600 mt-1">A complete overview of all scheduled classes.</p>
+          <p className="text-gray-600 mt-1">A complete, real-time overview of all scheduled classes.</p>
         </div>
       </div>
         
