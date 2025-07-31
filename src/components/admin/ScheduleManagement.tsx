@@ -1,11 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, getDay } from 'date-fns';
-import { User } from 'lucide-react';
 
 // Interface for the schedule data
 interface Schedule {
@@ -41,8 +40,7 @@ export const ScheduleManagement = () => {
   const queryClient = useQueryClient();
 
   // --- Real-time Subscription ---
-  // This hook sets up a listener for any changes in the 'schedules' table.
-  // When a change is detected, it invalidates the query cache, forcing a refetch.
+  // Sets up a listener for any changes in the 'schedules' table.
   useEffect(() => {
     const channel = supabase
       .channel('admin-realtime-schedules')
@@ -50,71 +48,35 @@ export const ScheduleManagement = () => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'schedules' },
         (payload) => {
-          // When a change is detected, invalidate the React Query cache for this query.
-          // This automatically triggers a refetch of the data, ensuring the UI is always in sync.
           console.log('Schedule change detected!', payload);
           queryClient.invalidateQueries({ queryKey: ['admin-all-schedules'] });
         }
       )
       .subscribe();
 
-    // Cleanup function to remove the channel subscription when the component unmounts.
     return () => {
       supabase.removeChannel(channel);
     };
   }, [queryClient]);
 
-
   // --- Data Fetching ---
+  // Fetches ALL schedules from the database without any filtering.
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
     queryKey: ['admin-all-schedules'],
     queryFn: async (): Promise<Schedule[]> => {
-        // Fetches ALL schedules without any user-based filtering for a complete admin view.
         const { data, error } = await supabase.from('schedules').select('*').order('day_of_week').order('start_time');
         if (error) throw error;
         return data || [];
     },
   });
-  
-  // Fetches all teacher enrollments to map teacher names to the schedule.
-  const { data: teacherEnrollments, isLoading: isLoadingEnrollments } = useQuery<any[]>({
-      queryKey: ['teacher-enrollments-for-schedule'],
-      queryFn: async () => {
-          const { data, error } = await supabase
-              .from('user_enrollments')
-              .select('user_id, batch_name, subject_name, profile:profiles(name)');
 
-          if (error) {
-              console.error('Error fetching teacher enrollments:', error);
-              return [];
-          }
-          return data || [];
-      }
-  });
-  
   // --- Data Processing ---
-  // Creates a map for quick lookup of teacher names based on batch and subject.
-  const teacherMap = useMemo(() => {
-      const map = new Map<string, string>();
-      if (teacherEnrollments) {
-          teacherEnrollments.forEach(enrollment => {
-              const key = `${enrollment.batch_name}-${enrollment.subject_name}`;
-              if(enrollment.profile) {
-                map.set(key, enrollment.profile.name);
-              }
-          });
-      }
-      return map;
-  }, [teacherEnrollments]);
-
-  // Creates a sorted list of unique time slots to build the schedule grid rows.
   const timeSlots = useMemo(() => {
     const slots = new Set<string>();
     schedules?.forEach(s => slots.add(s.start_time));
     return Array.from(slots).sort();
   }, [schedules]);
 
-  // Utility function to format time strings for display.
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
     const date = new Date();
@@ -123,7 +85,7 @@ export const ScheduleManagement = () => {
   };
 
   const today = getDay(currentTime);
-  const isLoading = isLoadingSchedules || isLoadingEnrollments;
+  const isLoading = isLoadingSchedules;
 
   // --- Rendering ---
   return (
@@ -153,23 +115,14 @@ export const ScheduleManagement = () => {
                           const classInfo = schedules?.filter(s => s.day_of_week === dayIndex && s.start_time === time);
                           return (
                               <div key={`${day}-${time}`} className={`p-2 border-r last:border-r-0 ${dayIndex === today ? 'bg-blue-50' : ''}`}>
-                                  {classInfo && classInfo.length > 0 && classInfo.map(info => {
-                                      const teacherName = teacherMap.get(`${info.batch}-${info.subject}`);
-                                      return (
-                                        <Card key={info.id} className="bg-white shadow-md hover:shadow-lg transition-shadow mb-2">
-                                            <CardContent className="p-3">
-                                                <p className="font-bold text-gray-800 text-sm">{info.subject}</p>
-                                                <Badge variant="secondary" className="mt-1">{info.batch}</Badge>
-                                                {teacherName && (
-                                                    <div className="flex items-center text-xs text-muted-foreground mt-2">
-                                                        <User className="h-3 w-3 mr-1" />
-                                                        {teacherName}
-                                                    </div>
-                                                )}
-                                            </CardContent>
-                                        </Card>
-                                      );
-                                  })}
+                                  {classInfo && classInfo.length > 0 && classInfo.map(info => (
+                                    <Card key={info.id} className="bg-white shadow-md hover:shadow-lg transition-shadow mb-2">
+                                        <CardContent className="p-3">
+                                            <p className="font-bold text-gray-800 text-sm">{info.subject}</p>
+                                            <Badge variant="secondary" className="mt-1">{info.batch}</Badge>
+                                        </CardContent>
+                                    </Card>
+                                  ))}
                               </div>
                           );
                       })}
