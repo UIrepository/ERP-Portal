@@ -25,8 +25,8 @@ interface StudentEnrollmentInfo {
   enrollments: { batch: string; subject: string }[];
 }
 
-// --- Improved, more harmonious color palette ---
-const COLORS = ["#4f46e5", "#16a34a", "#f97316", "#c026d3", "#0ea5e9", "#7c3aed", "#0d9488", "#ca8a04"];
+// --- New Royal Color Palette ---
+const COLORS = ["#2563eb", "#dc2626", "#7c3aed", "#db2777", "#16a34a", "#ea580c", "#0ea5e9"];
 
 // --- Custom Tooltip for a better feel ---
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -48,12 +48,6 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 // --- Custom Shape for selectively rounded corners ---
-const RoundedBar = (props: any) => {
-    const { fill, x, y, width, height, radius } = props;
-    // The radius prop is an array [topLeft, topRight, bottomRight, bottomLeft]
-    return <path d={getPath(x, y, width, height, radius)} stroke="none" fill={fill} />;
-};
-
 const getPath = (x: number, y: number, width: number, height: number, radius: [number, number, number, number]) => {
     const [tl, tr, br, bl] = radius;
     return `M${x + tl},${y}
@@ -66,6 +60,11 @@ const getPath = (x: number, y: number, width: number, height: number, radius: [n
             L${x},${y + tl}
             Q${x},${y} ${x + tl},${y}
             Z`;
+};
+
+const RoundedBar = (props: any) => {
+    const { fill, x, y, width, height, radius } = props;
+    return <path d={getPath(x, y, width, height, radius)} stroke="none" fill={fill} />;
 };
 
 
@@ -255,12 +254,12 @@ export const EnrollmentAnalytics = () => {
                         {analyticsData.allSubjects
                             .filter(subject => selectedSubject === 'all' || selectedSubject === subject)
                             .map((subject, index, arr) => (
-                            <Bar key={subject} dataKey={subject} stackId="a" fill={COLORS[analyticsData.allSubjects.indexOf(subject) % COLORS.length]}>
+                            <Bar key={subject} dataKey={subject} stackId="a" shape={<RoundedBar />}>
                                 {analyticsData.chartData.map((entry, entryIndex) => {
                                     const isFirst = index === 0;
                                     const isLast = index === arr.length - 1;
                                     const radius: [number, number, number, number] = [isFirst ? 8 : 0, isLast ? 8 : 0, isLast ? 8 : 0, isFirst ? 8 : 0];
-                                    return <Cell key={`cell-${entryIndex}`} radius={radius}/>
+                                    return <Cell key={`cell-${entryIndex}`} fill={COLORS[analyticsData.allSubjects.indexOf(subject) % COLORS.length]} radius={radius}/>
                                 })}
                             </Bar>
                         ))}
