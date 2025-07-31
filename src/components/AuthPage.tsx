@@ -45,32 +45,28 @@ export const AuthPage = () => {
         <div className="absolute w-80 h-80 bg-gray-200 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-blob animation-delay-4000 bottom-1/4 left-1/3"></div>
       </div>
 
-      <Card className="relative z-10 w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden animate-fade-in-up">
-        <CardHeader className="text-center p-8 bg-gradient-to-r from-blue-50 to-indigo-100 text-gray-800 relative overflow-hidden border-b border-gray-200">
-          {/* Subtle decorative shapes within the header */}
-          <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/30 rounded-full animate-pulse-slow"></div>
-          <div className="absolute -bottom-12 -right-12 w-64 h-64 bg-white/30 rounded-full animate-pulse-slow animation-delay-500"></div>
-
-          <CardTitle className="flex justify-center z-10">
-            <img src="/logoofficial.png" alt="Unknown IITians Logo" className="h-24 w-auto filter drop-shadow-sm" />
-          </CardTitle>
-          <CardDescription className="text-gray-700 text-xl font-bold tracking-wide mt-4 z-10">
+      <Card className="relative z-10 w-full max-w-sm bg-white rounded-xl shadow-lg overflow-hidden animate-fade-in-up">
+        <CardHeader className="text-center pt-8 px-6 pb-4 bg-white text-gray-800 relative">
+          <div className="mt-6 flex justify-center"> {/* Added mt-6 for top margin */}
+            <img src="/logoofficial.png" alt="Unknown IITians Logo" className="h-16 w-16" /> {/* Adjusted size to 64x64px */}
+          </div>
+          <CardTitle className="text-xl font-bold text-center mb-2"> {/* Adjusted font size and weight */}
             Welcome to Unknown IITians
+          </CardTitle>
+          <CardDescription className="text-sm font-normal leading-relaxed px-4 text-center text-gray-700"> {/* Adjusted font size, weight, line height, padding, and color */}
+            Sign in with the Google account you used during course registration to access your personalized learning dashboard.
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-8">
-          <p className="text-center text-gray-700 text-lg leading-relaxed mb-10">
-            Sign in with the Google account you used during course registration to access your personalized learning dashboard.
-          </p>
+        <CardContent className="p-6"> {/* Adjusted padding */}
           <div className="space-y-4">
             <Button 
               type="button" 
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3.5 rounded-full text-lg shadow-lg transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl active:scale-95 flex items-center justify-center gap-3" 
+              className="w-full text-base font-semibold py-2.5 rounded-lg shadow-md mt-4 flex items-center justify-center gap-2" /* w-full, text-base, font-semibold, py-2.5, rounded-lg, shadow-md, mt-4, gap-2 */
               onClick={handleGoogleAuth}
               disabled={isGoogleLoading}
             >
-              {isGoogleLoading && <Loader2 className="mr-3 h-6 w-6 animate-spin text-blue-200" />}
-              <svg className="h-6 w-6" viewBox="0 0 24 24">
+              {isGoogleLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {/* Adjusted icon size */}
+              <svg className="h-4 w-4" viewBox="0 0 24 24"> {/* Adjusted icon size */}
                 <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                 <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                 <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
