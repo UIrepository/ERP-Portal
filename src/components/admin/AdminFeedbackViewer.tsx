@@ -3,12 +3,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquare, User, Calendar, Star, Loader2, AlertTriangle, Filter } from 'lucide-react';
+import { MessageSquare, Calendar, Star, Loader2, AlertTriangle, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 
-// --- Interfaces for our data structures ---
+// --- Interface for feedback data (without profile join) ---
 interface FeedbackEntry {
   id: string;
   date: string;
@@ -20,10 +20,6 @@ interface FeedbackEntry {
   dpp_quality: number;
   premium_content_usefulness: number;
   comments: string;
-  profiles: {
-    name: string;
-    email: string;
-  } | null;
 }
 
 // --- Helper component for displaying star ratings ---
@@ -54,7 +50,7 @@ export const AdminFeedbackViewer = () => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'feedback' },
         () => {
-          queryClient.invalidateQueries({ queryKey: ['admin-feedback-viewer'] });
+          queryClient.invalidateQueries({ queryKey: ['admin-feedback-viewer-no-join'] });
         }
       )
       .subscribe();
@@ -64,21 +60,21 @@ export const AdminFeedbackViewer = () => {
     };
   }, [queryClient]);
 
-  // --- Data Fetching ---
+  // --- Data Fetching (Simplified to remove the join) ---
   const { data: feedback = [], isLoading, isError, error } = useQuery<FeedbackEntry[]>({
-    queryKey: ['admin-feedback-viewer'],
+    queryKey: ['admin-feedback-viewer-no-join'],
     queryFn: async () => {
-      // This query now correctly joins with the profiles table.
+      // This query now ONLY fetches from the feedback table.
       const { data, error } = await supabase
         .from('feedback')
-        .select(`*, profiles ( name, email )`)
+        .select(`*`)
         .order('created_at', { ascending: false });
 
       if (error) {
         console.error("Error fetching feedback:", error);
         throw error;
       }
-      return data.filter(item => item.profiles) as FeedbackEntry[];
+      return data as FeedbackEntry[];
     },
   });
 
@@ -119,7 +115,7 @@ export const AdminFeedbackViewer = () => {
         <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
         <h3 className="text-xl font-semibold text-destructive">Failed to Load Feedback Data</h3>
         <p className="text-muted-foreground mt-2">
-          There was an error fetching the required data. Please ensure your RLS policies are correct.
+          Please ensure your RLS policies for the `feedback` table are correct.
         </p>
         <p className="text-sm text-gray-500 mt-4">
           <strong>Error:</strong> {error?.message}
@@ -130,13 +126,12 @@ export const AdminFeedbackViewer = () => {
 
   return (
     <div className="p-4 md:p-6 space-y-6 bg-slate-100 min-h-full">
-      {/* Header */}
+      {/* Header and Filters */}
       <div className="px-1">
         <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Feedback Viewer</h1>
         <p className="text-slate-500 mt-1">Review and analyze all feedback submitted by students.</p>
       </div>
 
-      {/* Filters */}
        <Card className="bg-white/70 backdrop-blur-sm shadow-lg border-slate-200">
         <CardHeader>
             <CardTitle className="flex items-center text-lg">
@@ -175,24 +170,13 @@ export const AdminFeedbackViewer = () => {
             <Card key={item.id} className="bg-white shadow-md rounded-xl overflow-hidden">
                 <CardHeader className="bg-slate-50 p-4 border-b">
                     <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                             <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
-                                {item.profiles?.name.charAt(0)}
-                            </div>
-                            <div>
-                                <p className="font-semibold text-slate-800">{item.profiles?.name}</p>
-                                <p className="text-xs text-slate-500">{item.profiles?.email}</p>
-                            </div>
+                        <div>
+                            <p className="font-semibold text-slate-800">Anonymous Feedback</p>
+                            <p className="text-xs text-slate-500">Submitted on: {format(new Date(item.created_at), 'PPP')}</p>
                         </div>
-                        <div className="text-right">
-                            <div className="flex items-center gap-2 text-sm text-slate-500">
-                                <Calendar className="h-4 w-4" />
-                                <span>{format(new Date(item.created_at), 'PPP')}</span>
-                            </div>
-                             <div className="flex items-center gap-2 mt-1">
-                                <Badge variant="default" className="bg-indigo-600">{item.batch}</Badge>
-                                <Badge variant="outline">{item.subject}</Badge>
-                            </div>
+                        <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="default" className="bg-indigo-600">{item.batch}</Badge>
+                            <Badge variant="outline">{item.subject}</Badge>
                         </div>
                     </div>
                 </CardHeader>
