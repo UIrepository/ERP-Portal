@@ -1,9 +1,9 @@
+// uirepository/teachgrid-hub/teachgrid-hub-d9688224fef19a4774d713506784003cfd24ff67/src/pages/Index.tsx
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { AuthPage } from '@/components/AuthPage';
 import { Layout } from '@/components/Layout';
 import { Sidebar } from '@/components/Sidebar';
-import { TeacherDashboard } from '@/components/TeacherDashboard';
 import { StudentDashboard } from '@/components/StudentDashboard';
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
 import { Loader2 } from 'lucide-react';
@@ -42,17 +42,16 @@ const Index = () => {
 
   const renderDashboard = () => {
     switch (profile?.role) {
-      case 'teacher':
-        return <TeacherDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
       case 'student':
         return <StudentDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
       case 'super_admin':
         return <AdminDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
       default:
+        // No dashboard for 'teacher' role or other roles.
         return (
           <div className="p-6 text-center">
             <h1 className="text-2xl font-bold text-destructive">Access Denied</h1>
-            <p className="text-muted-foreground mt-2">Please contact administrator for access.</p>
+            <p className="text-muted-foreground mt-2">You do not have a valid role to access the dashboard. Please contact administrator for assistance.</p>
           </div>
         );
     }
