@@ -3,10 +3,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Users, Loader2, AlertTriangle, BookOpen, GraduationCap } from 'lucide-react';
+import { Users, Loader2, AlertTriangle, BookOpen, GraduationCap, Filter } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
 
 // --- Interfaces for our data structures ---
 interface Enrollment {
@@ -19,11 +19,10 @@ interface Enrollment {
 }
 
 interface StudentEnrollmentInfo {
-  name: string;
+  name:string;
   email: string;
   enrollments: { batch: string; subject: string }[];
 }
-
 
 export const EnrollmentAnalytics = () => {
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
@@ -129,15 +128,15 @@ export const EnrollmentAnalytics = () => {
   // --- Rendering ---
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex items-center justify-center h-full p-10">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
       </div>
     );
   }
   
   if (isError) {
       return (
-        <Card className="text-center py-20 bg-white rounded-lg border-dashed border-2 border-red-400 shadow-sm">
+        <Card className="m-6 text-center py-20 bg-white rounded-lg border-dashed border-2 border-red-400 shadow-sm">
             <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-destructive">Failed to Load Enrollment Data</h3>
             <p className="text-muted-foreground mt-2">
@@ -151,20 +150,29 @@ export const EnrollmentAnalytics = () => {
   }
 
   return (
-    <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
-      {/* Header and Filter sections */}
-      <div>
+    <div className="p-4 md:p-8 space-y-8 bg-gray-50/50 min-h-full">
+      {/* Header */}
+      <div className="px-2">
         <h1 className="text-3xl font-bold text-gray-800">Student Enrollment Analytics</h1>
-        <p className="text-gray-500 mt-1">Filter and visualize student enrollment data across batches and subjects.</p>
+        <p className="text-gray-500 mt-1">An interactive overview of your student population.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader><CardTitle className="text-base font-medium">Total Students</CardTitle></CardHeader>
-          <CardContent><p className="text-4xl font-bold">{analyticsData.totalStudents}</p></CardContent>
-        </Card>
-        <Card>
-            <CardHeader><CardTitle className="text-base font-medium">Filter by Batch</CardTitle></CardHeader>
+      {/* High-Level Stats & Filters */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{analyticsData.totalStudents}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Filter by Batch</CardTitle>
+                <Filter className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
             <CardContent>
                 <Select value={selectedBatch} onValueChange={setSelectedBatch}>
                     <SelectTrigger><SelectValue placeholder="Select Batch" /></SelectTrigger>
@@ -174,9 +182,12 @@ export const EnrollmentAnalytics = () => {
                     </SelectContent>
                 </Select>
             </CardContent>
-        </Card>
-        <Card>
-            <CardHeader><CardTitle className="text-base font-medium">Filter by Subject</CardTitle></CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Filter by Subject</CardTitle>
+                <Filter className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
             <CardContent>
                 <Select value={selectedSubject} onValueChange={setSelectedSubject}>
                     <SelectTrigger><SelectValue placeholder="Select Subject" /></SelectTrigger>
@@ -186,74 +197,63 @@ export const EnrollmentAnalytics = () => {
                     </SelectContent>
                 </Select>
             </CardContent>
-        </Card>
+          </Card>
       </div>
 
-      {/* Chart Section */}
-      <Card className="bg-white">
-        <CardHeader>
-          <CardTitle className="flex items-center text-lg"><BarChart className="mr-2 h-5 w-5" />Enrollment by Subject Across Batches</CardTitle>
-          <CardDescription>High-level overview of student distribution.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={400}>
-            <BarChart data={analyticsData.chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="batch" tick={{ fontSize: 12 }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-              <Tooltip />
-              <Legend />
-              {analyticsData.allSubjects.map((subject, index) => (
-                (selectedSubject === 'all' || selectedSubject === subject) &&
-                <Bar key={subject} dataKey={subject} stackId="a" fill={`hsl(${index * 40}, 70%, 50%)`} />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-      
-      {/* Improved Student Enrollment Table */}
-      <Card className="bg-white">
-        <CardHeader>
-            <CardTitle className="flex items-center text-lg"><Users className="mr-2 h-5 w-5" />Student Enrollment Details</CardTitle>
-            <CardDescription>A detailed list of all students and their current enrollments. Found {analyticsData.filteredStudents.length} students matching criteria.</CardDescription>
-        </CardHeader>
-        <CardContent>
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Student Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Enrollments</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {analyticsData.filteredStudents.map((student, index) => (
-                        <TableRow key={index}>
-                            <TableCell className="font-medium">{student.name}</TableCell>
-                            <TableCell>{student.email}</TableCell>
-                            <TableCell>
-                                <div className="flex flex-col gap-2">
-                                    {student.enrollments.map((e, i) => (
-                                        <div key={i} className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 border border-gray-200 shadow-sm hover:bg-gray-100 transition-colors">
-                                            <div className="flex items-center gap-2">
-                                                <GraduationCap className="h-5 w-5 text-blue-500" />
-                                                <Badge variant="default" className="bg-blue-100 text-blue-800 hover:bg-blue-200">{e.batch}</Badge>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <BookOpen className="h-5 w-5 text-indigo-500" />
-                                                <Badge variant="default" className="bg-indigo-100 text-indigo-800 hover:bg-indigo-200">{e.subject}</Badge>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </TableCell>
-                        </TableRow>
+      {/* Chart & Student Directory */}
+      <div className="grid gap-8 lg:grid-cols-5">
+        {/* Student Directory */}
+        <div className="lg:col-span-2">
+            <Card className="h-full">
+                <CardHeader>
+                    <CardTitle>Student Directory</CardTitle>
+                    <CardDescription>
+                        {analyticsData.filteredStudents.length} students found.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="h-[500px] overflow-y-auto space-y-4 pr-4">
+                    {analyticsData.filteredStudents.map((student) => (
+                        <div key={student.email} className="p-3 border rounded-lg hover:bg-gray-50">
+                           <p className="font-semibold">{student.name}</p>
+                           <p className="text-xs text-muted-foreground">{student.email}</p>
+                           <Separator className="my-2" />
+                           <div className="flex flex-wrap gap-2">
+                               {student.enrollments.map((e, i) => (
+                                   <Badge key={i} variant="secondary" className="font-normal">
+                                       {e.batch} / {e.subject}
+                                   </Badge>
+                               ))}
+                           </div>
+                        </div>
                     ))}
-                </TableBody>
-            </Table>
-        </CardContent>
-      </Card>
+                </CardContent>
+            </Card>
+        </div>
+        {/* Enrollment Chart */}
+        <div className="lg:col-span-3">
+             <Card className="h-full">
+                <CardHeader>
+                  <CardTitle>Enrollment Distribution</CardTitle>
+                  <CardDescription>Visualizing students by subject across different batches.</CardDescription>
+                </CardHeader>
+                <CardContent className="pl-2">
+                  <ResponsiveContainer width="100%" height={500}>
+                    <BarChart data={analyticsData.chartData} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" allowDecimals={false} />
+                      <YAxis type="category" dataKey="batch" width={80} tick={{ fontSize: 12 }} />
+                      <Tooltip />
+                      <Legend />
+                      {analyticsData.allSubjects.map((subject, index) => (
+                        (selectedSubject === 'all' || selectedSubject === subject) &&
+                        <Bar key={subject} dataKey={subject} stackId="a" fill={`hsl(${index * 60}, 70%, 50%)`} />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+        </div>
+      </div>
     </div>
   );
 };
