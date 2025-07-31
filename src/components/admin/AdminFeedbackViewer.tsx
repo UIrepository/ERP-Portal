@@ -8,18 +8,24 @@ import { format } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 
-// --- Interface for feedback data (without profile join) ---
+// --- Interfaces for our data structures ---
 interface FeedbackEntry {
   id: string;
   date: string;
   subject: string;
   batch: string;
   created_at: string;
+  submitted_by: string; // Keep track of the user ID
   teacher_quality: number;
   concept_clarity: number;
   dpp_quality: number;
   premium_content_usefulness: number;
   comments: string;
+  // Profile information will be added manually
+  profile?: {
+    name: string;
+    email: string;
+  };
 }
 
 // --- Helper component for displaying star ratings ---
@@ -45,12 +51,12 @@ export const AdminFeedbackViewer = () => {
   // --- Real-time Subscription ---
   useEffect(() => {
     const channel = supabase
-      .channel('feedback-realtime-admin')
+      .channel('feedback-realtime-admin-v2')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'feedback' },
         () => {
-          queryClient.invalidateQueries({ queryKey: ['admin-feedback-viewer-no-join'] });
+          queryClient.invalidateQueries({ queryKey: ['admin-feedback-viewer-combined'] });
         }
       )
       .subscribe();
@@ -60,21 +66,44 @@ export const AdminFeedbackViewer = () => {
     };
   }, [queryClient]);
 
-  // --- Data Fetching (Simplified to remove the join) ---
+  // --- Data Fetching with manual join ---
   const { data: feedback = [], isLoading, isError, error } = useQuery<FeedbackEntry[]>({
-    queryKey: ['admin-feedback-viewer-no-join'],
+    queryKey: ['admin-feedback-viewer-combined'],
     queryFn: async () => {
-      // This query now ONLY fetches from the feedback table.
-      const { data, error } = await supabase
+      // Step 1: Fetch all feedback entries
+      const { data: feedbackData, error: feedbackError } = await supabase
         .from('feedback')
         .select(`*`)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error("Error fetching feedback:", error);
-        throw error;
+      if (feedbackError) {
+        console.error("Error fetching feedback:", feedbackError);
+        throw feedbackError;
       }
-      return data as FeedbackEntry[];
+      if (!feedbackData) return [];
+
+      // Step 2: Fetch all student profiles
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id, name, email')
+        .eq('role', 'student');
+      
+      if (profilesError) {
+        console.error("Error fetching profiles:", profilesError);
+        throw profilesError;
+      }
+      if (!profilesData) return feedbackData as FeedbackEntry[];
+
+      // Create a map for quick profile lookup
+      const profileMap = new Map(profilesData.map(p => [p.user_id, p]));
+
+      // Step 3: Combine feedback with profile information
+      const combinedData = feedbackData.map(fb => ({
+        ...fb,
+        profile: profileMap.get(fb.submitted_by) || null
+      }));
+
+      return combinedData as FeedbackEntry[];
     },
   });
 
@@ -115,7 +144,7 @@ export const AdminFeedbackViewer = () => {
         <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
         <h3 className="text-xl font-semibold text-destructive">Failed to Load Feedback Data</h3>
         <p className="text-muted-foreground mt-2">
-          Please ensure your RLS policies for the `feedback` table are correct.
+          There was an error fetching the required data. Please ensure your RLS policies are correct for both `feedback` and `profiles` tables.
         </p>
         <p className="text-sm text-gray-500 mt-4">
           <strong>Error:</strong> {error?.message}
@@ -170,13 +199,24 @@ export const AdminFeedbackViewer = () => {
             <Card key={item.id} className="bg-white shadow-md rounded-xl overflow-hidden">
                 <CardHeader className="bg-slate-50 p-4 border-b">
                     <div className="flex justify-between items-center">
-                        <div>
-                            <p className="font-semibold text-slate-800">Anonymous Feedback</p>
-                            <p className="text-xs text-slate-500">Submitted on: {format(new Date(item.created_at), 'PPP')}</p>
+                        <div className="flex items-center gap-3">
+                             <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
+                                {item.profile ? item.profile.name.charAt(0) : '?'}
+                            </div>
+                            <div>
+                                <p className="font-semibold text-slate-800">{item.profile ? item.profile.name : 'Anonymous'}</p>
+                                <p className="text-xs text-slate-500">{item.profile ? item.profile.email : 'No email available'}</p>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="default" className="bg-indigo-600">{item.batch}</Badge>
-                            <Badge variant="outline">{item.subject}</Badge>
+                        <div className="text-right">
+                            <div className="flex items-center gap-2 text-sm text-slate-500">
+                                <Calendar className="h-4 w-4" />
+                                <span>{format(new Date(item.created_at), 'PPP')}</span>
+                            </div>
+                             <div className="flex items-center gap-2 mt-1">
+                                <Badge variant="default" className="bg-indigo-600">{item.batch}</Badge>
+                                <Badge variant="outline">{item.subject}</Badge>
+                            </div>
                         </div>
                     </div>
                 </CardHeader>
