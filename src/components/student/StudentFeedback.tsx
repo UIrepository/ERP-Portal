@@ -30,7 +30,7 @@ const CooldownTimer = ({ lastSubmissionDate }: { lastSubmissionDate: Date }) => 
         };
 
         updateTimer();
-        const intervalId = setInterval(updateTimer, 60000); // Update every minute
+        const intervalId = setInterval(updateTimer, 60000);
 
         return () => clearInterval(intervalId);
     }, [lastSubmissionDate]);
@@ -42,7 +42,6 @@ const CooldownTimer = ({ lastSubmissionDate }: { lastSubmissionDate: Date }) => 
         </div>
     );
 };
-
 
 // --- Star Rating Component ---
 const StarRating = ({ rating, setRating }: { rating: number, setRating: (rating: number) => void }) => (
@@ -91,7 +90,6 @@ export const StudentFeedback = () => {
     queryKey: ['student-submitted-feedback', profile?.user_id],
     queryFn: async () => {
       if (!profile?.user_id) return [];
-      
       const { data, error } = await supabase
         .from('feedback')
         .select('batch, subject, created_at')
@@ -107,7 +105,6 @@ export const StudentFeedback = () => {
     enabled: !!profile?.user_id,
   });
 
-  // --- Frontend Cooldown Logic ---
   const feedbackTasks = useMemo(() => {
     if (!userEnrollments) return [];
     
@@ -165,12 +162,17 @@ export const StudentFeedback = () => {
       toast({ title: 'Incomplete Form', description: 'Please provide a rating for all questions and add a comment.', variant: 'destructive' });
       return;
     }
-    submitFeedbackMutation.mutate({
-      ...selectedFeedbackTask,
-      ...ratings,
-      comments,
-      submitted_by: profile?.user_id,
-    });
+    
+    // **FIXED**: Create a new object with only the columns that exist in the database.
+    const feedbackToSubmit = {
+        batch: selectedFeedbackTask?.batch,
+        subject: selectedFeedbackTask?.subject,
+        ...ratings,
+        comments,
+        submitted_by: profile?.user_id,
+    };
+
+    submitFeedbackMutation.mutate(feedbackToSubmit);
   };
   
   const questions = [
