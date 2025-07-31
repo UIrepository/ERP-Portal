@@ -8,17 +8,18 @@ import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Users, Loader2, AlertTriangle } from 'lucide-react';
 
-// Interface for enrollment data
+// Interface for the combined enrollment and profile data
 interface Enrollment {
+  user_id: string;
   batch_name: string;
   subject_name: string;
-  profiles: {
+  profile: {
     name: string;
     email: string;
   } | null;
 }
 
-// Interface for processed student data
+// Interface for the processed data, grouped by student
 interface StudentEnrollmentInfo {
   name: string;
   email: string;
@@ -34,7 +35,7 @@ export const EnrollmentAnalytics = () => {
   // --- Real-time Subscription ---
   useEffect(() => {
     const channel = supabase
-      .channel('admin-enrollment-analytics')
+      .channel('admin-enrollment-analytics-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_enrollments' }, () => {
         queryClient.invalidateQueries({ queryKey: ['enrollment-analytics-enrollments'] });
       })
@@ -52,21 +53,39 @@ export const EnrollmentAnalytics = () => {
   const { data: enrollments = [], isLoading: isLoadingEnrollments, isError, error } = useQuery<Enrollment[]>({
     queryKey: ['enrollment-analytics-enrollments'],
     queryFn: async () => {
-      // This query is correct and relies on the now-refreshed schema relationship.
-      const { data, error } = await supabase
+      // Step 1: Fetch all user enrollments.
+      const { data: enrollmentData, error: enrollmentError } = await supabase
         .from('user_enrollments')
-        .select(`
-          batch_name,
-          subject_name,
-          profiles ( name, email )
-        `);
+        .select('user_id, batch_name, subject_name');
 
-      if (error) {
-          console.error("Error fetching enrollments:", error)
-          throw error;
-      };
+      if (enrollmentError) {
+        console.error("Error fetching enrollments:", enrollmentError);
+        throw enrollmentError;
+      }
+      if (!enrollmentData) return [];
+
+      // Step 2: Fetch all student profiles.
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id, name, email')
+        .eq('role', 'student');
       
-      return data.filter(e => e.profiles) as Enrollment[];
+      if (profilesError) {
+        console.error("Error fetching profiles:", profilesError);
+        throw profilesError;
+      }
+      if (!profilesData) return [];
+
+      // Create a map for quick profile lookup.
+      const profileMap = new Map(profilesData.map(p => [p.user_id, p]));
+
+      // Step 3: Combine enrollments with their corresponding profiles.
+      const combinedData = enrollmentData.map(enrollment => ({
+        ...enrollment,
+        profile: profileMap.get(enrollment.user_id) || null
+      })).filter(e => e.profile); // Only include enrollments with a matching student profile.
+
+      return combinedData as Enrollment[];
     },
   });
 
@@ -79,15 +98,15 @@ export const EnrollmentAnalytics = () => {
       }
   });
 
-  // --- Data Processing (No changes needed here) ---
+  // --- Data Processing ---
   const analyticsData = useMemo(() => {
     const studentMap = new Map<string, StudentEnrollmentInfo>();
     enrollments.forEach(enrollment => {
-      if (enrollment.profiles) {
-        const email = enrollment.profiles.email;
+      if (enrollment.profile) {
+        const email = enrollment.profile.email;
         if (!studentMap.has(email)) {
           studentMap.set(email, {
-            name: enrollment.profiles.name,
+            name: enrollment.profile.name,
             email: email,
             enrollments: [],
           });
@@ -128,7 +147,7 @@ export const EnrollmentAnalytics = () => {
   
   const isLoading = isLoadingEnrollments || isLoadingOptions;
 
-  // --- Rendering (No changes needed here) ---
+  // --- Rendering ---
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
