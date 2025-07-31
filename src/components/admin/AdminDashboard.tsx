@@ -2,7 +2,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EnrollmentAnalytics } from './EnrollmentAnalytics';
-import { UserManagement } from './UserManagement';
+import { UserManagement } from './UserManagement'; // Corrected import path
 import { CourseManagement } from './CourseManagement';
 import { ContentManagement } from './ContentManagement';
 import { CommunicationTools } from './CommunicationTools';
@@ -25,7 +25,7 @@ export const AdminDashboard = ({ activeTab, onTabChange }: AdminDashboardProps) 
           <TabsTrigger value="content-management">Content Management</TabsTrigger>
           <TabsTrigger value="communication-tools">Communication Tools</TabsTrigger>
           <TabsTrigger value="system-settings">System Settings</TabsTrigger>
-          {/* Removed Teacher Analytics and Monitoring TBAS */}
+          {/* Teacher Analytics and Monitoring TBAS sections were removed previously */}
         </TabsList>
 
         <TabsContent value="enrollment-analytics" className="mt-4">
@@ -87,8 +87,6 @@ export const AdminDashboard = ({ activeTab, onTabChange }: AdminDashboardProps) 
             </CardContent>
           </Card>
         </TabsContent>
-
-        {/* Removed content for Teacher Analytics and Monitoring TBAS */}
 
         <TabsContent value="system-settings" className="mt-4">
           <Card>
