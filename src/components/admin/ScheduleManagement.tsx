@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useMemo, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,17 +14,6 @@ interface Schedule {
   day_of_week: number;
   start_time: string;
   end_time: string;
-}
-
-interface TeacherEnrollment {
-    user_id: string;
-    batch_name: string;
-    subject_name: string;
-}
-
-interface TeacherProfile {
-    id: string;
-    name: string;
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -46,6 +35,27 @@ const ScheduleSkeleton = () => (
 
 export const ScheduleManagement = () => {
   const [currentTime] = useState(new Date());
+  const queryClient = useQueryClient();
+
+  // Set up real-time subscription to the 'schedules' table
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-schedule-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'schedules' },
+        (payload) => {
+          console.log('Real-time update from schedules table:', payload);
+          queryClient.invalidateQueries({ queryKey: ['admin-all-schedules'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
 
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
     queryKey: ['admin-all-schedules'],
