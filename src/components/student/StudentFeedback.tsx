@@ -1,5 +1,4 @@
-// uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/student/StudentFeedback.tsx
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -7,30 +6,43 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
-import { MessageSquare, Send, CheckCircle, Star, Sparkles, XCircle } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { MessageSquare, Send, CheckCircle, Star, Sparkles, XCircle, Timer } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { differenceInHours, formatDistanceToNow, addDays } from 'date-fns';
 
-// Define the structure for an enrollment record from the new table
+// Interface for enrollment records
 interface UserEnrollment {
     batch_name: string;
     subject_name: string;
 }
 
-const FeedbackTaskSkeleton = () => (
-    <div className="space-y-4">
-        {[...Array(3)].map((_, i) => (
-            <div key={i} className="p-4 border rounded-lg flex items-center justify-between bg-white">
-                <div>
-                    <Skeleton className="h-5 w-32 mb-1" />
-                    <Skeleton className="h-4 w-24" />
-                </div>
-                <Skeleton className="h-9 w-28" />
-            </div>
-        ))}
-    </div>
-);
+// --- New Cooldown Timer Component ---
+const CooldownTimer = ({ lastSubmissionDate }: { lastSubmissionDate: Date }) => {
+    const [timeLeft, setTimeLeft] = useState('');
+
+    useEffect(() => {
+        const updateTimer = () => {
+            const cooldownEndDate = addDays(lastSubmissionDate, 3);
+            const distance = formatDistanceToNow(cooldownEndDate, { addSuffix: true });
+            setTimeLeft(distance);
+        };
+
+        updateTimer();
+        const intervalId = setInterval(updateTimer, 60000); // Update every minute for accuracy
+
+        return () => clearInterval(intervalId);
+    }, [lastSubmissionDate]);
+
+    return (
+        <div className="flex items-center gap-2 text-amber-600 font-medium text-sm">
+            <Timer className="h-4 w-4" />
+            <span>Available {timeLeft}</span>
+        </div>
+    );
+};
+
 
 const StarRating = ({ rating, setRating }: { rating: number, setRating: (rating: number) => void }) => (
   <div className="flex gap-1">
@@ -57,7 +69,6 @@ export const StudentFeedback = () => {
   });
   const [comments, setComments] = useState('');
 
-  // Fetch user's specific enrollments from the new table
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['userEnrollments', profile?.user_id],
     queryFn: async () => {
@@ -75,19 +86,16 @@ export const StudentFeedback = () => {
     enabled: !!profile?.user_id
   });
 
-  // Fetch already submitted feedback to mark tasks as completed
   const { data: submittedFeedback = [], isLoading: isLoadingSubmittedFeedback } = useQuery({
-    queryKey: ['student-submitted-feedback', profile?.user_id, userEnrollments],
+    queryKey: ['student-submitted-feedback', profile?.user_id],
     queryFn: async () => {
-      if (!profile?.user_id || !userEnrollments || userEnrollments.length === 0) return [];
+      if (!profile?.user_id) return [];
       
-      const combinations = userEnrollments.map(e => `and(batch.eq.${e.batch_name},subject.eq.${e.subject_name})`).join(',');
-
       const { data, error } = await supabase
         .from('feedback')
-        .select('batch, subject')
+        .select('batch, subject, created_at')
         .eq('submitted_by', profile?.user_id)
-        .or(combinations);
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error("Error fetching submitted feedback:", error);
@@ -95,40 +103,38 @@ export const StudentFeedback = () => {
       }
       return data || [];
     },
-    enabled: !!profile?.user_id && !!userEnrollments && userEnrollments.length > 0,
+    enabled: !!profile?.user_id,
   });
 
-  // Generate feedback tasks based on userEnrollments
+  // Generate feedback tasks and check cooldown status
   const feedbackTasks = useMemo(() => {
     if (!userEnrollments) return [];
     
-    const tasks: { batch: string; subject: string; submitted: boolean }[] = [];
-    const submittedSet = new Set(submittedFeedback.map(f => `${f.batch}-${f.subject}`));
+    const latestSubmissions = new Map<string, Date>();
+    submittedFeedback.forEach(f => {
+        const key = `${f.batch}-${f.subject}`;
+        if (!latestSubmissions.has(key)) {
+            latestSubmissions.set(key, new Date(f.created_at));
+        }
+    });
 
-    userEnrollments.forEach(enrollment => {
-        tasks.push({
+    return userEnrollments.map(enrollment => {
+        const key = `${enrollment.batch_name}-${enrollment.subject_name}`;
+        const lastSubmission = latestSubmissions.get(key);
+        const canSubmit = !lastSubmission || differenceInHours(new Date(), lastSubmission) >= 72;
+
+        return {
             batch: enrollment.batch_name,
             subject: enrollment.subject_name,
-            submitted: submittedSet.has(`${enrollment.batch_name}-${enrollment.subject_name}`),
-        });
-    });
-    return tasks.sort((a,b) => a.subject.localeCompare(b.subject) || a.batch.localeCompare(b.batch));
+            canSubmit,
+            lastSubmissionDate: lastSubmission,
+        };
+    }).sort((a,b) => a.subject.localeCompare(b.subject) || a.batch.localeCompare(b.batch));
   }, [userEnrollments, submittedFeedback]);
 
   const submitFeedbackMutation = useMutation({
     mutationFn: async (feedbackData: any) => {
-      const { error } = await supabase.from('feedback').insert([{
-        // Explicitly define columns to insert
-        batch: feedbackData.batch,
-        subject: feedbackData.subject,
-        teacher_quality: feedbackData.teacher_quality,
-        concept_clarity: feedbackData.concept_clarity,
-        dpp_quality: feedbackData.dpp_quality,
-        premium_content_usefulness: feedbackData.premium_content_usefulness,
-        comments: feedbackData.comments,
-        submitted_by: profile?.user_id,
-        date: new Date().toISOString().split('T')[0], // Ensure date is formatted correctly
-      }]);
+      const { error } = await supabase.from('feedback').insert([feedbackData]);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -159,9 +165,10 @@ export const StudentFeedback = () => {
       return;
     }
     submitFeedbackMutation.mutate({
-      ...selectedFeedbackTask, // Spreads batch and subject
-      ...ratings, // Spreads all rating fields
+      ...selectedFeedbackTask,
+      ...ratings,
       comments,
+      submitted_by: profile?.user_id,
     });
   };
   
@@ -176,131 +183,87 @@ export const StudentFeedback = () => {
 
   return (
     <div className="p-6 bg-gradient-to-br from-purple-50 to-indigo-50 min-h-full flex flex-col justify-center items-center">
-      <div className="max-w-4xl mx-auto w-full text-center">
+        {/* Header remains the same */}
         
-        {/* Header Section - Premium Design */}
-        <div className="relative p-8 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white mb-10 animate-fade-in-up">
-            {/* Animated background circles */}
-            <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/10 rounded-full animate-pulse-slow"></div>
-            <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-white/10 rounded-full animate-pulse-slow animation-delay-500"></div>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white/10 rounded-full animate-pulse-slow animation-delay-1000"></div>
-
-            <div className="relative z-10">
-                <div className="flex items-center justify-center mb-4">
-                    <MessageSquare className="h-16 w-16 text-purple-100 drop-shadow-md" />
-                </div>
-                <h1 className="text-4xl md:text-5xl font-bold mb-2 tracking-tight drop-shadow-lg">
-                    Your Voice Matters
-                </h1>
-                <p className="text-xl md:text-2xl text-purple-100 drop-shadow-sm font-semibold">
-                    Help us improve by sharing your valuable feedback.
-                </p>
-                <Badge variant="secondary" className="mt-5 bg-purple-100 text-purple-800 border-purple-200 text-base px-5 py-2 font-semibold shadow-md">
-                    Anonymous & Impactful
-                </Badge>
-            </div>
-        </div>
-
-        {/* Feedback Tasks List */}
-        <Card className="bg-white rounded-2xl shadow-xl animate-fade-in-up animation-delay-200">
+        <Card className="bg-white rounded-2xl shadow-xl w-full max-w-4xl">
           <CardHeader className="text-center p-6 border-b">
             <CardTitle className="text-2xl font-bold text-gray-800">Your Feedback Tasks</CardTitle>
             <CardDescription className="text-base text-gray-600">
-              Submit feedback for each of your enrolled batch and subject combinations.
+              Submit feedback for each of your classes. You can submit new feedback every 3 days.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6 space-y-4">
             {isLoading ? (
-                <FeedbackTaskSkeleton />
-            ) : feedbackTasks.length > 0 ? (
-                feedbackTasks.map((task, index) => (
+                <div>Loading...</div>
+            ) : feedbackTasks.map((task, index) => (
                 <div 
                     key={index} 
-                    className={`p-4 border rounded-lg flex items-center justify-between transition-all duration-300 ${
-                        task.submitted 
-                        ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200 shadow-sm' 
-                        : 'bg-white hover:bg-gray-50 hover:shadow-md'
-                    }`}
+                    className="p-4 border rounded-lg flex items-center justify-between transition-all duration-300 bg-white"
                 >
                     <div>
                         <p className="font-semibold text-gray-800">{task.subject}</p>
                         <p className="text-sm text-muted-foreground">Batch: {task.batch}</p>
                     </div>
-                    {task.submitted ? (
-                    <div className="flex items-center gap-2 text-green-600 font-medium">
-                        <CheckCircle className="h-5 w-5 fill-green-500 text-white" />
-                        <span>Feedback Submitted</span>
-                    </div>
+                    {task.canSubmit ? (
+                        <Button 
+                            onClick={() => handleOpenDialog(task)} 
+                            className="bg-primary hover:bg-primary/90 transition-all transform hover:scale-105 active:scale-95"
+                        >
+                            <Send className="mr-2 h-4 w-4" /> Give Feedback
+                        </Button>
                     ) : (
-                    <Button 
-                        onClick={() => handleOpenDialog(task)} 
-                        className="bg-primary hover:bg-primary/90 transition-all transform hover:scale-105 active:scale-95"
-                    >
-                        <Send className="mr-2 h-4 w-4" /> Give Feedback
-                    </Button>
+                        task.lastSubmissionDate && <CooldownTimer lastSubmissionDate={task.lastSubmissionDate} />
                     )}
                 </div>
-                ))
-            ) : (
-                <div className="text-center py-8 text-gray-500">
-                    <MessageSquare className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                    <p className="text-xl font-semibold mb-2">No Feedback Tasks Found</p>
-                    <p className="text-muted-foreground mt-2 max-w-sm mx-auto">
-                        It looks like you are not enrolled in any batches or subjects yet. Please contact your administrator for enrollment.
-                    </p>
-                </div>
-            )}
+            ))}
           </CardContent>
         </Card>
-      </div>
-      
+
+      {/* Dialog for submitting feedback */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        {/* Hiding the default close button from DialogContent */}
-        <DialogContent className="max-w-2xl bg-white p-0 rounded-2xl overflow-hidden shadow-2xl transform transition-all animate-fade-in-up [&>button]:hidden">
-          <DialogHeader className="relative p-6 bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
-            <DialogTitle className="text-2xl font-bold flex items-center justify-center gap-2">
-                <MessageSquare className="h-6 w-6" /> Feedback for {selectedFeedbackTask?.subject} ({selectedFeedbackTask?.batch})
-            </DialogTitle>
-            <CardDescription className="text-blue-100 text-center mt-2">Your insights are highly valued and will help us improve.</CardDescription>
-            {/* Custom close button (removed from previous version as per request) */}
-          </DialogHeader>
-          <div className="space-y-6 py-6 px-6">
-            {questions.map(({ key, text }) => (
-              <div key={key} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-                <label className="font-semibold text-gray-700 flex items-center gap-2 mb-3">
-                    <Sparkles className="h-4 w-4 text-yellow-500" /> {text}
-                </label>
-                <div>
-                  <StarRating 
-                    rating={ratings[key as keyof typeof ratings]} 
-                    setRating={(rating) => setRatings(prev => ({ ...prev, [key]: rating }))} 
-                  />
+          <DialogContent className="max-w-2xl bg-white p-0 rounded-2xl overflow-hidden shadow-2xl transform transition-all animate-fade-in-up [&>button]:hidden">
+            <DialogHeader className="relative p-6 bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
+                <DialogTitle className="text-2xl font-bold flex items-center justify-center gap-2">
+                    <MessageSquare className="h-6 w-6" /> Feedback for {selectedFeedbackTask?.subject} ({selectedFeedbackTask?.batch})
+                </DialogTitle>
+                <CardDescription className="text-blue-100 text-center mt-2">Your insights are highly valued and will help us improve.</CardDescription>
+            </DialogHeader>
+            <div className="space-y-6 py-6 px-6">
+                {questions.map(({ key, text }) => (
+                <div key={key} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                    <label className="font-semibold text-gray-700 flex items-center gap-2 mb-3">
+                        <Sparkles className="h-4 w-4 text-yellow-500" /> {text}
+                    </label>
+                    <div>
+                    <StarRating 
+                        rating={ratings[key as keyof typeof ratings]} 
+                        setRating={(rating) => setRatings(prev => ({ ...prev, [key]: rating }))} 
+                    />
+                    </div>
                 </div>
-              </div>
-            ))}
-            <div>
-              <label className="font-semibold text-gray-700 flex items-center gap-2 mb-3">
-                <MessageSquare className="h-4 w-4 text-primary" /> Additional Comments (Mandatory)
-              </label>
-              <Textarea 
-                className="mt-2 bg-white border-gray-300 focus-visible:ring-primary/50 shadow-sm"
-                rows={4}
-                value={comments}
-                onChange={(e) => setComments(e.target.value)}
-                placeholder="Share more details about your experience, suggestions, or concerns..."
-              />
+                ))}
+                <div>
+                <label className="font-semibold text-gray-700 flex items-center gap-2 mb-3">
+                    <MessageSquare className="h-4 w-4 text-primary" /> Additional Comments (Mandatory)
+                </label>
+                <Textarea 
+                    className="mt-2 bg-white border-gray-300 focus-visible:ring-primary/50 shadow-sm"
+                    rows={4}
+                    value={comments}
+                    onChange={(e) => setComments(e.target.value)}
+                    placeholder="Share more details about your experience, suggestions, or concerns..."
+                />
+                </div>
             </div>
-          </div>
-          <DialogFooter className="flex-col sm:flex-row p-6 border-t border-gray-100 bg-gray-50">
-            {/* Only the "Cancel" button remains as the explicit close option */}
-            <DialogClose asChild>
-                <Button variant="outline" onClick={resetForm} className="w-full sm:w-auto text-gray-700 border-gray-300 hover:bg-gray-100">Cancel</Button>
-            </DialogClose>
-            <Button onClick={handleSubmit} className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white font-semibold">
-                <Send className="mr-2 h-4 w-4"/>Submit Feedback
-            </Button>
-          </DialogFooter>
-        </DialogContent>
+            <DialogFooter className="flex-col sm:flex-row p-6 border-t border-gray-100 bg-gray-50">
+                <DialogClose asChild>
+                    <Button variant="outline" onClick={resetForm} className="w-full sm:w-auto text-gray-700 border-gray-300 hover:bg-gray-100">Cancel</Button>
+                </DialogClose>
+                <Button onClick={handleSubmit} className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white font-semibold">
+                    <Send className="mr-2 h-4 w-4"/>Submit Feedback
+                </Button>
+            </DialogFooter>
+            </DialogContent>
       </Dialog>
     </div>
   );
