@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, getDay } from 'date-fns';
 import { User } from 'lucide-react';
 
+// Interface for the schedule data
 interface Schedule {
   id: string;
   subject: string;
@@ -16,8 +17,10 @@ interface Schedule {
   end_time: string;
 }
 
+// Static data for rendering the schedule grid
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+// Skeleton component for a better loading experience
 const ScheduleSkeleton = () => (
     <div className="space-y-6">
         {[...Array(3)].map((_, i) => (
@@ -37,25 +40,30 @@ export const ScheduleManagement = () => {
   const [currentTime] = useState(new Date());
   const queryClient = useQueryClient();
 
+  // --- Real-time Subscription ---
+  // This hook sets up a listener for any changes in the 'schedules' table.
+  // When a change is detected, it invalidates the query cache, forcing a refetch.
   useEffect(() => {
     const channel = supabase
-      .channel('admin-schedule-changes')
+      .channel('admin-realtime-schedules')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'schedules' },
         (payload) => {
-          console.log('Real-time update from schedules table:', payload);
+          console.log('Schedule change detected!', payload);
           queryClient.invalidateQueries({ queryKey: ['admin-all-schedules'] });
         }
       )
       .subscribe();
 
+    // Cleanup function to remove the channel subscription when the component unmounts.
     return () => {
       supabase.removeChannel(channel);
     };
   }, [queryClient]);
 
 
+  // --- Data Fetching ---
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
     queryKey: ['admin-all-schedules'],
     queryFn: async (): Promise<Schedule[]> => {
@@ -65,16 +73,13 @@ export const ScheduleManagement = () => {
     },
   });
   
+  // Corrected and efficient query to get teacher enrollments and names
   const { data: teacherEnrollments, isLoading: isLoadingEnrollments } = useQuery<any[]>({
       queryKey: ['teacher-enrollments-for-schedule'],
       queryFn: async () => {
           const { data, error } = await supabase
               .from('user_enrollments')
-              .select(`
-                  user_id,
-                  batch_name,
-                  subject_name
-              `);
+              .select('user_id, batch_name, subject_name');
 
           if (error) {
               console.error('Error fetching teacher enrollments:', error);
@@ -83,7 +88,7 @@ export const ScheduleManagement = () => {
 
           if (!data) return [];
 
-          // Manually fetch profiles for each enrollment
+          // Manually fetch profiles for each enrollment to avoid join issues
           const profiles = await Promise.all(
             data.map(async (enrollment) => {
               const { data: profileData, error: profileError } = await supabase
@@ -103,6 +108,7 @@ export const ScheduleManagement = () => {
       }
   });
   
+  // --- Data Processing ---
   const teacherMap = useMemo(() => {
       const map = new Map<string, string>();
       if (teacherEnrollments) {
@@ -132,6 +138,7 @@ export const ScheduleManagement = () => {
   const today = getDay(currentTime);
   const isLoading = isLoadingSchedules || isLoadingEnrollments;
 
+  // --- Rendering ---
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="flex items-center justify-between mb-6">
