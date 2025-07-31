@@ -8,28 +8,41 @@ import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Users, Loader2 } from 'lucide-react';
 
-// Updated interface to include more student details
-interface StudentProfile {
+// Interface for enrollment data
+interface Enrollment {
+  batch_name: string;
+  subject_name: string;
+  profile: {
+    name: string;
+    email: string;
+  } | null;
+}
+
+// Interface for processed student data
+interface StudentEnrollmentInfo {
   name: string;
   email: string;
-  batch: string | string[] | null;
-  subjects: string[] | null;
+  enrollments: { batch: string; subject: string }[];
 }
+
 
 export const EnrollmentAnalytics = () => {
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [selectedBatch, setSelectedBatch] = useState<string>('all');
 
-  // Updated query to fetch detailed student profiles
-  const { data: students = [], isLoading: isLoadingStudents } = useQuery<StudentProfile[]>({
-    queryKey: ['enrollment-analytics-students'],
+  // Updated query to fetch from user_enrollments for accurate data
+  const { data: enrollments = [], isLoading: isLoadingEnrollments } = useQuery<Enrollment[]>({
+    queryKey: ['enrollment-analytics-enrollments'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('name, email, batch, subjects')
-        .eq('role', 'student');
+        .from('user_enrollments')
+        .select(`
+          batch_name,
+          subject_name,
+          profile:profiles ( name, email )
+        `);
       if (error) throw error;
-      return data || [];
+      return data.filter(e => e.profile) as Enrollment[];
     },
   });
 
@@ -43,43 +56,55 @@ export const EnrollmentAnalytics = () => {
   });
 
   const analyticsData = useMemo(() => {
+    // Process enrollments to group by student
+    const studentMap = new Map<string, StudentEnrollmentInfo>();
+    enrollments.forEach(enrollment => {
+      if (enrollment.profile) {
+        const email = enrollment.profile.email;
+        if (!studentMap.has(email)) {
+          studentMap.set(email, {
+            name: enrollment.profile.name,
+            email: email,
+            enrollments: [],
+          });
+        }
+        studentMap.get(email)?.enrollments.push({
+          batch: enrollment.batch_name,
+          subject: enrollment.subject_name,
+        });
+      }
+    });
+    const students = Array.from(studentMap.values());
+
     const allBatches = Array.from(new Set(options.filter((o: any) => o.type === 'batch').map((o: any) => o.name))).sort();
     const allSubjects = Array.from(new Set(options.filter((o: any) => o.type === 'subject').map((o: any) => o.name))).sort();
 
-    let filteredStudents = students;
-    if (selectedBatch !== 'all') {
-      filteredStudents = filteredStudents.filter(s => {
-        const batches = Array.isArray(s.batch) ? s.batch : (s.batch ? [s.batch] : []);
-        return batches.includes(selectedBatch);
-      });
-    }
-    if (selectedSubject !== 'all') {
-      filteredStudents = filteredStudents.filter(s => s.subjects?.includes(selectedSubject));
-    }
+    // Filtering for the table view
+    let filteredStudents = students.filter(student => {
+      const matchesBatch = selectedBatch === 'all' || student.enrollments.some(e => e.batch === selectedBatch);
+      const matchesSubject = selectedSubject === 'all' || student.enrollments.some(e => e.subject === selectedSubject);
+      return matchesBatch && matchesSubject;
+    });
 
+    // Data aggregation for the chart
     const chartData = allBatches.map(batch => {
       const batchData: Record<string, any> = { batch: batch };
       allSubjects.forEach(subject => {
-        batchData[subject] = students.filter(
-          s => {
-            const batches = Array.isArray(s.batch) ? s.batch : (s.batch ? [s.batch] : []);
-            return batches.includes(batch) && s.subjects?.includes(subject)
-          }
-        ).length;
+        batchData[subject] = enrollments.filter(e => e.batch_name === batch && e.subject_name === subject).length;
       });
       return batchData;
     });
 
     return {
       totalStudents: students.length,
-      filteredStudents, // Return the filtered list for the table
+      filteredStudents,
       chartData,
       allBatches,
       allSubjects,
     };
-  }, [students, options, selectedBatch, selectedSubject]);
+  }, [enrollments, options, selectedBatch, selectedSubject]);
   
-  const isLoading = isLoadingStudents || isLoadingOptions;
+  const isLoading = isLoadingEnrollments || isLoadingOptions;
 
   if (isLoading) {
     return (
@@ -91,13 +116,12 @@ export const EnrollmentAnalytics = () => {
 
   return (
     <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
-      {/* Header Section */}
+      {/* Header and Filter sections remain the same */}
       <div>
         <h1 className="text-3xl font-bold text-gray-800">Student Enrollment Analytics</h1>
         <p className="text-gray-500 mt-1">Filter and visualize student enrollment data across batches and subjects.</p>
       </div>
 
-      {/* Filter and Stats Section */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardHeader>
@@ -137,7 +161,7 @@ export const EnrollmentAnalytics = () => {
         </Card>
       </div>
 
-      {/* Chart Section */}
+      {/* Chart Section remains the same */}
       <Card className="bg-white">
         <CardHeader>
           <CardTitle className="flex items-center text-lg">
@@ -165,7 +189,7 @@ export const EnrollmentAnalytics = () => {
         </CardContent>
       </Card>
       
-      {/* Detailed Student Enrollment Table */}
+      {/* Updated Detailed Student Enrollment Table */}
       <Card className="bg-white">
         <CardHeader>
             <CardTitle className="flex items-center text-lg">
@@ -182,8 +206,7 @@ export const EnrollmentAnalytics = () => {
                     <TableRow>
                         <TableHead>Student Name</TableHead>
                         <TableHead>Email</TableHead>
-                        <TableHead>Enrolled Batches</TableHead>
-                        <TableHead>Enrolled Subjects</TableHead>
+                        <TableHead>Enrollments (Batch - Subject)</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -192,10 +215,15 @@ export const EnrollmentAnalytics = () => {
                             <TableCell className="font-medium">{student.name}</TableCell>
                             <TableCell>{student.email}</TableCell>
                             <TableCell>
-                                {Array.isArray(student.batch) ? student.batch.map(b => <Badge key={b} variant="secondary" className="mr-1">{b}</Badge>) : <Badge variant="secondary">{student.batch}</Badge>}
-                            </TableCell>
-                            <TableCell>
-                                {student.subjects?.map(s => <Badge key={s} variant="outline" className="mr-1">{s}</Badge>)}
+                                <div className="flex flex-col gap-2 items-start">
+                                    {student.enrollments.map((e, i) => (
+                                        <div key={i} className="flex items-center gap-2">
+                                            <Badge variant="secondary">{e.batch}</Badge>
+                                            <span>-</span>
+                                            <Badge variant="outline">{e.subject}</Badge>
+                                        </div>
+                                    ))}
+                                </div>
                             </TableCell>
                         </TableRow>
                     ))}
