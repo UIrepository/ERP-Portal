@@ -10,7 +10,7 @@ import { MessageSquare, Send, CheckCircle, Star, Sparkles, Timer } from 'lucide-
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { differenceInHours, formatDistanceToNow, addDays } from 'date-fns';
+import { differenceInHours, format, addDays } from 'date-fns';
 
 // Interface for enrollment records
 interface UserEnrollment {
@@ -18,27 +18,21 @@ interface UserEnrollment {
     subject_name: string;
 }
 
-// --- Cooldown Timer Component ---
+// --- Updated Cooldown Timer Component ---
+// This now shows the specific date when feedback will be available again.
 const CooldownTimer = ({ lastSubmissionDate }: { lastSubmissionDate: Date }) => {
-    const [timeLeft, setTimeLeft] = useState('');
+    const [availableOn, setAvailableOn] = useState('');
 
     useEffect(() => {
-        const updateTimer = () => {
-            const cooldownEndDate = addDays(lastSubmissionDate, 3);
-            const distance = formatDistanceToNow(cooldownEndDate, { addSuffix: true });
-            setTimeLeft(distance);
-        };
-
-        updateTimer();
-        const intervalId = setInterval(updateTimer, 60000);
-
-        return () => clearInterval(intervalId);
+        const cooldownEndDate = addDays(lastSubmissionDate, 3);
+        const formattedDate = format(cooldownEndDate, 'MMMM d'); // e.g., "August 3"
+        setAvailableOn(formattedDate);
     }, [lastSubmissionDate]);
 
     return (
         <div className="flex items-center gap-2 text-amber-600 font-medium text-sm">
             <Timer className="h-4 w-4" />
-            <span>Available {timeLeft}</span>
+            <span>Available on {availableOn}</span>
         </div>
     );
 };
@@ -163,7 +157,6 @@ export const StudentFeedback = () => {
       return;
     }
     
-    // **FIXED**: Create a new object with only the columns that exist in the database.
     const feedbackToSubmit = {
         batch: selectedFeedbackTask?.batch,
         subject: selectedFeedbackTask?.subject,
