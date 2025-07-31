@@ -41,17 +41,16 @@ export const AuthPage = () => {
         <div className="absolute inset-0 bg-repeat bg-pattern-dots-subtle opacity-30 animate-fade-in"></div>
         
         {/* Animated blobs with lighter, desaturated colors */}
-        <div className="absolute w-80 h-80 bg-blue-100 rounded-full mix-blend-multiply filter blur-2xl opacity-15 animate-blob top-1/4 left-1/4"></div>
+        <div className="absolute w-80 h-80 bg-blue-200 rounded-full mix-blend-multiply filter blur-2xl opacity-15 animate-blob top-1/4 left-1/4"></div>
         <div className="absolute w-64 h-64 bg-teal-50 rounded-full mix-blend-multiply filter blur-2xl opacity-15 animate-blob animation-delay-2000 top-1/2 right-1/4"></div>
-        <div className="absolute w-72 h-72 bg-gray-100 rounded-full mix-blend-multiply filter blur-2xl opacity-15 animate-blob animation-delay-4000 bottom-1/4 left-1/3"></div>
+        <div className="absolute w-72 h-72 bg-gray-200 rounded-full mix-blend-multiply filter blur-2xl opacity-15 animate-blob animation-delay-4000 bottom-1/4 left-1/3"></div>
 
-        {/* Placeholder for upskilling icons - Requires custom CSS/SVG integration */}
+        {/* Placeholder for upskilling icons - Requires custom CSS/SVG integration in index.css */}
         {/* To add moving upskilling icons, you would typically use SVG sprites and
             CSS animations or a library like react-spring/framer-motion.
-            Example:
+            Example (add these divs here and corresponding CSS animations in index.css):
             <div className="absolute top-10 left-10 text-blue-200 opacity-20 text-4xl animate-float">📚</div>
             <div className="absolute bottom-20 right-20 text-green-200 opacity-20 text-4xl animate-float animation-delay-1500">💡</div>
-            (You'd define @keyframes float in your index.css)
         */}
       </div>
 
