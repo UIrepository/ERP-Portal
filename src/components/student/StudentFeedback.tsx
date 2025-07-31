@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
-import { MessageSquare, Send, CheckCircle, Star, Sparkles, XCircle, Timer } from 'lucide-react';
+import { MessageSquare, Send, CheckCircle, Star, Sparkles, Timer } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,7 @@ interface UserEnrollment {
 }
 
 // --- New Cooldown Timer Component ---
+// This component calculates and displays the time remaining until the next feedback can be submitted.
 const CooldownTimer = ({ lastSubmissionDate }: { lastSubmissionDate: Date }) => {
     const [timeLeft, setTimeLeft] = useState('');
 
@@ -43,7 +44,7 @@ const CooldownTimer = ({ lastSubmissionDate }: { lastSubmissionDate: Date }) => 
     );
 };
 
-
+// --- Star Rating Component ---
 const StarRating = ({ rating, setRating }: { rating: number, setRating: (rating: number) => void }) => (
   <div className="flex gap-1">
     {[1, 2, 3, 4, 5].map((star) => (
@@ -69,6 +70,7 @@ export const StudentFeedback = () => {
   });
   const [comments, setComments] = useState('');
 
+  // Fetches the student's enrollments
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['userEnrollments', profile?.user_id],
     queryFn: async () => {
@@ -86,11 +88,11 @@ export const StudentFeedback = () => {
     enabled: !!profile?.user_id
   });
 
+  // Fetches all previously submitted feedback for the current user
   const { data: submittedFeedback = [], isLoading: isLoadingSubmittedFeedback } = useQuery({
     queryKey: ['student-submitted-feedback', profile?.user_id],
     queryFn: async () => {
       if (!profile?.user_id) return [];
-      
       const { data, error } = await supabase
         .from('feedback')
         .select('batch, subject, created_at')
@@ -106,10 +108,12 @@ export const StudentFeedback = () => {
     enabled: !!profile?.user_id,
   });
 
-  // Generate feedback tasks and check cooldown status
+  // --- Frontend Cooldown Logic ---
+  // This logic runs in the browser to determine if a student can submit feedback.
   const feedbackTasks = useMemo(() => {
     if (!userEnrollments) return [];
     
+    // Find the most recent submission for each batch/subject combination
     const latestSubmissions = new Map<string, Date>();
     submittedFeedback.forEach(f => {
         const key = `${f.batch}-${f.subject}`;
@@ -118,20 +122,23 @@ export const StudentFeedback = () => {
         }
     });
 
+    // Create a task for each enrollment and check its cooldown status
     return userEnrollments.map(enrollment => {
         const key = `${enrollment.batch_name}-${enrollment.subject_name}`;
         const lastSubmission = latestSubmissions.get(key);
+        // A student can submit if they've never submitted before OR if it's been more than 72 hours
         const canSubmit = !lastSubmission || differenceInHours(new Date(), lastSubmission) >= 72;
 
         return {
             batch: enrollment.batch_name,
             subject: enrollment.subject_name,
-            canSubmit,
+            canSubmit, // This is calculated on the frontend
             lastSubmissionDate: lastSubmission,
         };
     }).sort((a,b) => a.subject.localeCompare(b.subject) || a.batch.localeCompare(b.batch));
   }, [userEnrollments, submittedFeedback]);
 
+  // Mutation for submitting new feedback
   const submitFeedbackMutation = useMutation({
     mutationFn: async (feedbackData: any) => {
       const { error } = await supabase.from('feedback').insert([feedbackData]);
@@ -183,8 +190,26 @@ export const StudentFeedback = () => {
 
   return (
     <div className="p-6 bg-gradient-to-br from-purple-50 to-indigo-50 min-h-full flex flex-col justify-center items-center">
-        {/* Header remains the same */}
-        
+      <div className="max-w-4xl mx-auto w-full text-center">
+        {/* Header Section */}
+        <div className="relative p-8 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white mb-10">
+            <div className="relative z-10">
+                <div className="flex items-center justify-center mb-4">
+                    <MessageSquare className="h-16 w-16 text-purple-100 drop-shadow-md" />
+                </div>
+                <h1 className="text-4xl md:text-5xl font-bold mb-2 tracking-tight drop-shadow-lg">
+                    Your Voice Matters
+                </h1>
+                <p className="text-xl md:text-2xl text-purple-100 drop-shadow-sm font-semibold">
+                    Help us improve by sharing your valuable feedback.
+                </p>
+                <Badge variant="secondary" className="mt-5 bg-purple-100 text-purple-800 border-purple-200 text-base px-5 py-2 font-semibold shadow-md">
+                    Anonymous & Impactful
+                </Badge>
+            </div>
+        </div>
+
+        {/* Feedback Tasks List */}
         <Card className="bg-white rounded-2xl shadow-xl w-full max-w-4xl">
           <CardHeader className="text-center p-6 border-b">
             <CardTitle className="text-2xl font-bold text-gray-800">Your Feedback Tasks</CardTitle>
@@ -194,7 +219,7 @@ export const StudentFeedback = () => {
           </CardHeader>
           <CardContent className="p-6 space-y-4">
             {isLoading ? (
-                <div>Loading...</div>
+                <p>Loading your feedback tasks...</p>
             ) : feedbackTasks.map((task, index) => (
                 <div 
                     key={index} 
@@ -218,15 +243,16 @@ export const StudentFeedback = () => {
             ))}
           </CardContent>
         </Card>
+      </div>
 
       {/* Dialog for submitting feedback */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-2xl bg-white p-0 rounded-2xl overflow-hidden shadow-2xl transform transition-all animate-fade-in-up [&>button]:hidden">
+          <DialogContent className="max-w-2xl bg-white p-0 rounded-2xl overflow-hidden shadow-2xl">
             <DialogHeader className="relative p-6 bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
                 <DialogTitle className="text-2xl font-bold flex items-center justify-center gap-2">
                     <MessageSquare className="h-6 w-6" /> Feedback for {selectedFeedbackTask?.subject} ({selectedFeedbackTask?.batch})
                 </DialogTitle>
-                <CardDescription className="text-blue-100 text-center mt-2">Your insights are highly valued and will help us improve.</CardDescription>
+                <DialogDescription className="text-blue-100 text-center mt-2">Your insights are highly valued and will help us improve.</DialogDescription>
             </DialogHeader>
             <div className="space-y-6 py-6 px-6">
                 {questions.map(({ key, text }) => (
