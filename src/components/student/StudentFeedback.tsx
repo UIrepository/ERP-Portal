@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
 import { MessageSquare, Send, CheckCircle, Star, Sparkles, Timer } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog'; // <-- FIXED: Added DialogDescription
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { differenceInHours, formatDistanceToNow, addDays } from 'date-fns';
@@ -30,7 +30,7 @@ const CooldownTimer = ({ lastSubmissionDate }: { lastSubmissionDate: Date }) => 
         };
 
         updateTimer();
-        const intervalId = setInterval(updateTimer, 60000);
+        const intervalId = setInterval(updateTimer, 60000); // Update every minute
 
         return () => clearInterval(intervalId);
     }, [lastSubmissionDate]);
@@ -42,6 +42,7 @@ const CooldownTimer = ({ lastSubmissionDate }: { lastSubmissionDate: Date }) => 
         </div>
     );
 };
+
 
 // --- Star Rating Component ---
 const StarRating = ({ rating, setRating }: { rating: number, setRating: (rating: number) => void }) => (
@@ -90,6 +91,7 @@ export const StudentFeedback = () => {
     queryKey: ['student-submitted-feedback', profile?.user_id],
     queryFn: async () => {
       if (!profile?.user_id) return [];
+      
       const { data, error } = await supabase
         .from('feedback')
         .select('batch, subject, created_at')
@@ -138,7 +140,7 @@ export const StudentFeedback = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-submitted-feedback'] });
-      toast({ title: 'Success', description: 'Thank you for your valuable feedback!', variant: "success" });
+      toast({ title: 'Success', description: 'Thank you for your valuable feedback!', variant: "default" });
       setIsDialogOpen(false);
       resetForm();
     },
