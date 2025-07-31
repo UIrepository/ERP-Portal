@@ -3,23 +3,21 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Users, Loader2, AlertTriangle } from 'lucide-react';
+import { Users, Loader2, AlertTriangle, BookOpen, GraduationCap } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
 
-// Interface for the combined enrollment and profile data
+// --- Interfaces for our data structures ---
 interface Enrollment {
-  user_id: string;
   batch_name: string;
   subject_name: string;
-  profile: {
+  profiles: {
     name: string;
     email: string;
   } | null;
 }
 
-// Interface for the processed data, grouped by student
 interface StudentEnrollmentInfo {
   name: string;
   email: string;
@@ -53,39 +51,20 @@ export const EnrollmentAnalytics = () => {
   const { data: enrollments = [], isLoading: isLoadingEnrollments, isError, error } = useQuery<Enrollment[]>({
     queryKey: ['enrollment-analytics-enrollments'],
     queryFn: async () => {
-      // Step 1: Fetch all user enrollments.
-      const { data: enrollmentData, error: enrollmentError } = await supabase
+      const { data, error } = await supabase
         .from('user_enrollments')
-        .select('user_id, batch_name, subject_name');
+        .select(`
+          batch_name,
+          subject_name,
+          profiles ( name, email )
+        `);
 
-      if (enrollmentError) {
-        console.error("Error fetching enrollments:", enrollmentError);
-        throw enrollmentError;
-      }
-      if (!enrollmentData) return [];
-
-      // Step 2: Fetch all student profiles.
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('user_id, name, email')
-        .eq('role', 'student');
+      if (error) {
+          console.error("Error fetching enrollments:", error)
+          throw error;
+      };
       
-      if (profilesError) {
-        console.error("Error fetching profiles:", profilesError);
-        throw profilesError;
-      }
-      if (!profilesData) return [];
-
-      // Create a map for quick profile lookup.
-      const profileMap = new Map(profilesData.map(p => [p.user_id, p]));
-
-      // Step 3: Combine enrollments with their corresponding profiles.
-      const combinedData = enrollmentData.map(enrollment => ({
-        ...enrollment,
-        profile: profileMap.get(enrollment.user_id) || null
-      })).filter(e => e.profile); // Only include enrollments with a matching student profile.
-
-      return combinedData as Enrollment[];
+      return data.filter(e => e.profiles) as Enrollment[];
     },
   });
 
@@ -98,15 +77,15 @@ export const EnrollmentAnalytics = () => {
       }
   });
 
-  // --- Data Processing (No changes needed here) ---
+  // --- Data Processing ---
   const analyticsData = useMemo(() => {
     const studentMap = new Map<string, StudentEnrollmentInfo>();
     enrollments.forEach(enrollment => {
-      if (enrollment.profile) {
-        const email = enrollment.profile.email;
+      if (enrollment.profiles) {
+        const email = enrollment.profiles.email;
         if (!studentMap.has(email)) {
           studentMap.set(email, {
-            name: enrollment.profile.name,
+            name: enrollment.profiles.name,
             email: email,
             enrollments: [],
           });
@@ -147,7 +126,7 @@ export const EnrollmentAnalytics = () => {
   
   const isLoading = isLoadingEnrollments || isLoadingOptions;
 
-  // --- Rendering (No changes needed here) ---
+  // --- Rendering ---
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -233,43 +212,43 @@ export const EnrollmentAnalytics = () => {
         </CardContent>
       </Card>
       
-      {/* Detailed Student Enrollment Table */}
-      <Card className="bg-white">
-        <CardHeader>
-            <CardTitle className="flex items-center text-lg"><Users className="mr-2 h-5 w-5" />Student Enrollment Details</CardTitle>
-            <CardDescription>A detailed list of all students and their current enrollments. Found {analyticsData.filteredStudents.length} students matching criteria.</CardDescription>
-        </CardHeader>
-        <CardContent>
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Student Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Enrollments (Batch - Subject)</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {analyticsData.filteredStudents.map((student, index) => (
-                        <TableRow key={index}>
-                            <TableCell className="font-medium">{student.name}</TableCell>
-                            <TableCell>{student.email}</TableCell>
-                            <TableCell>
-                                <div className="flex flex-col gap-2 items-start">
-                                    {student.enrollments.map((e, i) => (
-                                        <div key={i} className="flex items-center gap-2">
-                                            <Badge variant="secondary">{e.batch}</Badge>
-                                            <span>-</span>
-                                            <Badge variant="outline">{e.subject}</Badge>
-                                        </div>
-                                    ))}
-                                </div>
-                            </TableCell>
-                        </TableRow>
+      {/* New Student Enrollment Cards Section */}
+      <div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+            <Users className="mr-3 h-6 w-6" />
+            Student Enrollment Details
+          </h2>
+          <p className="text-muted-foreground mb-6">
+            Displaying {analyticsData.filteredStudents.length} students matching the current filters.
+          </p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            {analyticsData.filteredStudents.map((student, index) => (
+              <Card key={index} className="bg-white shadow-md hover:shadow-xl transition-shadow duration-300">
+                <CardHeader>
+                  <CardTitle className="text-lg">{student.name}</CardTitle>
+                  <CardDescription>{student.email}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Separator className="mb-4" />
+                  <div className="space-y-3">
+                    {student.enrollments.map((e, i) => (
+                      <div key={i} className="flex items-center justify-between p-2 rounded-md bg-gray-50 border">
+                          <div className="flex items-center gap-2">
+                              <GraduationCap className="h-4 w-4 text-primary"/>
+                              <span className="font-semibold text-sm">{e.batch}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                              <BookOpen className="h-4 w-4 text-indigo-500"/>
+                              <span className="font-semibold text-sm">{e.subject}</span>
+                          </div>
+                      </div>
                     ))}
-                </TableBody>
-            </Table>
-        </CardContent>
-      </Card>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+      </div>
     </div>
   );
 };
