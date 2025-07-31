@@ -37,25 +37,19 @@ export const ScheduleManagement = () => {
   const [currentTime] = useState(new Date());
   const queryClient = useQueryClient();
 
-  // --- Real-time Subscription ---
-  // This useEffect hook sets up a listener for any changes (inserts, updates, deletes)
-  // in the public 'schedules' table in your Supabase database.
   useEffect(() => {
     const channel = supabase
-      .channel('admin-realtime-schedules')
+      .channel('admin-schedule-changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'schedules' },
         (payload) => {
-          // When a change is detected, invalidate the React Query cache for this query.
-          // This automatically triggers a refetch of the data, ensuring the UI is always in sync.
-          console.log('Schedule change detected!', payload);
+          console.log('Real-time update from schedules table:', payload);
           queryClient.invalidateQueries({ queryKey: ['admin-all-schedules'] });
         }
       )
       .subscribe();
 
-    // Cleanup function to remove the channel subscription when the component unmounts.
     return () => {
       supabase.removeChannel(channel);
     };
@@ -79,15 +73,33 @@ export const ScheduleManagement = () => {
               .select(`
                   user_id,
                   batch_name,
-                  subject_name,
-                  profile:profiles ( name )
+                  subject_name
               `);
 
           if (error) {
               console.error('Error fetching teacher enrollments:', error);
               return [];
           }
-          return data;
+
+          if (!data) return [];
+
+          // Manually fetch profiles for each enrollment
+          const profiles = await Promise.all(
+            data.map(async (enrollment) => {
+              const { data: profileData, error: profileError } = await supabase
+                .from('profiles')
+                .select('name')
+                .eq('user_id', enrollment.user_id)
+                .single();
+              
+              if (profileError) {
+                console.error('Error fetching profile for user:', enrollment.user_id, profileError);
+                return { ...enrollment, profile: null };
+              }
+              return { ...enrollment, profile: profileData };
+            })
+          );
+          return profiles;
       }
   });
   
