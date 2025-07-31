@@ -8,11 +8,11 @@ import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Users, Loader2, AlertTriangle } from 'lucide-react';
 
-// Interface for enrollment data
+// Interface for enrollment data, now correctly typed for the direct join
 interface Enrollment {
   batch_name: string;
   subject_name: string;
-  profiles: { // Corrected to match the actual relationship name
+  profiles: {
     name: string;
     email: string;
   } | null;
@@ -52,7 +52,7 @@ export const EnrollmentAnalytics = () => {
   const { data: enrollments = [], isLoading: isLoadingEnrollments, isError, error } = useQuery<Enrollment[]>({
     queryKey: ['enrollment-analytics-enrollments'],
     queryFn: async () => {
-      // This simplified query now works because the foreign key relationship is confirmed to exist.
+      // This simplified and correct query works once the schema cache is refreshed.
       const { data, error } = await supabase
         .from('user_enrollments')
         .select(`
@@ -79,6 +79,7 @@ export const EnrollmentAnalytics = () => {
       }
   });
 
+  // --- Data Processing (No changes needed here) ---
   const analyticsData = useMemo(() => {
     const studentMap = new Map<string, StudentEnrollmentInfo>();
     enrollments.forEach(enrollment => {
@@ -127,6 +128,7 @@ export const EnrollmentAnalytics = () => {
   
   const isLoading = isLoadingEnrollments || isLoadingOptions;
 
+  // --- Rendering (No changes needed here) ---
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
