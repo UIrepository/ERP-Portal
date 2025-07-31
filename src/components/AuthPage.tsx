@@ -35,36 +35,36 @@ export const AuthPage = () => {
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
       {/* Animated Background Overlay for Premium Look */}
-      {/* For a true "video playing" or complex animation, you'd integrate a video element or a more advanced animation library here. */}
-      {/* This example uses subtle CSS animations available from tailwindcss-animate. */}
-      <div className="absolute inset-0 z-0 bg-gradient-to-br from-indigo-800 via-blue-900 to-purple-900 opacity-90">
-        <div className="absolute inset-0 bg-pattern-dots opacity-10 animate-fade-in"></div>
-        <div className="absolute w-96 h-96 bg-indigo-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob top-1/4 left-1/4"></div>
-        <div className="absolute w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000 top-1/2 right-1/4"></div>
-        <div className="absolute w-80 h-80 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000 bottom-1/4 left-1/3"></div>
+      <div className="absolute inset-0 z-0 bg-gradient-to-br from-blue-50 via-gray-100 to-white opacity-90">
+        {/* Subtle pattern for texture */}
+        <div className="absolute inset-0 bg-repeat bg-pattern-dots-subtle opacity-30 animate-fade-in"></div>
+        {/* Animated blobs with lighter, desaturated colors */}
+        <div className="absolute w-96 h-96 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-blob top-1/4 left-1/4"></div>
+        <div className="absolute w-72 h-72 bg-teal-100 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-blob animation-delay-2000 top-1/2 right-1/4"></div>
+        <div className="absolute w-80 h-80 bg-gray-200 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-blob animation-delay-4000 bottom-1/4 left-1/3"></div>
       </div>
 
-      <Card className="relative z-10 w-full max-w-md bg-white/90 backdrop-blur-md rounded-2xl shadow-3xl overflow-hidden animate-fade-in-up">
-        <CardHeader className="text-center p-8 bg-gradient-to-r from-purple-700 to-indigo-800 text-white relative overflow-hidden">
-          {/* Decorative shapes within the header for depth */}
-          <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/15 rounded-full animate-pulse-slow"></div>
-          <div className="absolute -bottom-12 -right-12 w-64 h-64 bg-white/15 rounded-full animate-pulse-slow animation-delay-500"></div>
+      <Card className="relative z-10 w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden animate-fade-in-up">
+        <CardHeader className="text-center p-8 bg-gradient-to-r from-blue-50 to-indigo-100 text-gray-800 relative overflow-hidden border-b border-gray-200">
+          {/* Subtle decorative shapes within the header */}
+          <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/30 rounded-full animate-pulse-slow"></div>
+          <div className="absolute -bottom-12 -right-12 w-64 h-64 bg-white/30 rounded-full animate-pulse-slow animation-delay-500"></div>
 
           <CardTitle className="flex justify-center z-10">
-            <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-24 w-auto filter drop-shadow-lg" />
+            <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-24 w-auto filter drop-shadow-sm" />
           </CardTitle>
-          <CardDescription className="text-purple-200 text-xl font-bold tracking-wide mt-4 z-10">
+          <CardDescription className="text-gray-700 text-xl font-bold tracking-wide mt-4 z-10">
             Your Gateway to Academic Excellence
           </CardDescription>
         </CardHeader>
         <CardContent className="p-8">
-          <p className="text-center text-gray-800 text-lg leading-relaxed mb-10">
+          <p className="text-center text-gray-700 text-lg leading-relaxed mb-10">
             Seamlessly access your personalized learning dashboard with a single tap.
           </p>
           <div className="space-y-4">
             <Button 
               type="button" 
-              className="w-full bg-blue-700 hover:bg-blue-800 text-white font-extrabold py-3.5 rounded-full text-lg shadow-xl transition-all duration-300 transform hover:-translate-y-1 hover:shadow-2xl active:scale-95 flex items-center justify-center gap-3" 
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-3.5 rounded-full text-lg shadow-lg transition-all duration-300 transform hover:-translate-y-1 hover:shadow-xl active:scale-95 flex items-center justify-center gap-3" 
               onClick={handleGoogleAuth}
               disabled={isGoogleLoading}
             >
@@ -81,40 +81,39 @@ export const AuthPage = () => {
         </CardContent>
       </Card>
 
-      {/* Add custom keyframes to src/index.css for 'blob' and 'fade-in' animations */}
-      {/* @layer keyframes {
-        @keyframes blob {
-          0% { transform: translate(0px, 0px) scale(1); }
-          33% { transform: translate(30px, -50px) scale(1.1); }
-          66% { transform: translate(-20px, 20px) scale(0.9); }
-          100% { transform: translate(0px, 0px) scale(1); }
-        }
-        @keyframes fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
+      {/* Add custom keyframes to src/index.css for 'blob' and 'fade-in' animations if not already present */}
+      {/*
+      // In src/index.css, under @layer utilities add:
+      .animate-blob {
+        animation: blob 7s infinite;
+      }
+      .animate-fade-in {
+        animation: fade-in 1s ease-out;
+      }
+      .animation-delay-2000 {
+        animation-delay: 2s;
+      }
+      .animation-delay-4000 {
+        animation-delay: 4s;
+      }
+      .shadow-3xl { // If you want a more pronounced shadow on the card
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.08);
+      }
+      .bg-pattern-dots-subtle {
+        background-image: radial-gradient(#d1d5db 0.5px, transparent 0.5px); /* Light grey dots */
+        background-size: 20px 20px;
       }
 
-      @layer utilities {
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animate-fade-in {
-          animation: fade-in 1s ease-out;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-        .shadow-3xl {
-          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.08);
-        }
-        .bg-pattern-dots {
-          background-image: radial-gradient(#ffffff 1px, transparent 1px);
-          background-size: 20px 20px;
-        }
+      // And under @layer keyframes add:
+      @keyframes blob {
+        0% { transform: translate(0px, 0px) scale(1); }
+        33% { transform: translate(30px, -50px) scale(1.1); }
+        66% { transform: translate(-20px, 20px) scale(0.9); }
+        100% { transform: translate(0px, 0px) scale(1); }
+      }
+      @keyframes fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
       }
       */}
     </div>
