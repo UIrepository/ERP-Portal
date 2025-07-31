@@ -1,13 +1,17 @@
-
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Users, Loader2 } from 'lucide-react';
 
+// Updated interface to include more student details
 interface StudentProfile {
+  name: string;
+  email: string;
   batch: string | string[] | null;
   subjects: string[] | null;
 }
@@ -16,12 +20,13 @@ export const EnrollmentAnalytics = () => {
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [selectedBatch, setSelectedBatch] = useState<string>('all');
 
+  // Updated query to fetch detailed student profiles
   const { data: students = [], isLoading: isLoadingStudents } = useQuery<StudentProfile[]>({
     queryKey: ['enrollment-analytics-students'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('batch, subjects')
+        .select('name, email, batch, subjects')
         .eq('role', 'student');
       if (error) throw error;
       return data || [];
@@ -38,13 +43,13 @@ export const EnrollmentAnalytics = () => {
   });
 
   const analyticsData = useMemo(() => {
-    const allBatches = options.filter((o: any) => o.type === 'batch').map((o: any) => o.name).sort();
-    const allSubjects = options.filter((o: any) => o.type === 'subject').map((o: any) => o.name).sort();
+    const allBatches = Array.from(new Set(options.filter((o: any) => o.type === 'batch').map((o: any) => o.name))).sort();
+    const allSubjects = Array.from(new Set(options.filter((o: any) => o.type === 'subject').map((o: any) => o.name))).sort();
 
     let filteredStudents = students;
     if (selectedBatch !== 'all') {
       filteredStudents = filteredStudents.filter(s => {
-        const batches = Array.isArray(s.batch) ? s.batch : [s.batch];
+        const batches = Array.isArray(s.batch) ? s.batch : (s.batch ? [s.batch] : []);
         return batches.includes(selectedBatch);
       });
     }
@@ -53,11 +58,11 @@ export const EnrollmentAnalytics = () => {
     }
 
     const chartData = allBatches.map(batch => {
-      const batchData: Record<string, any> = { batch: batch }; // Use 'batch' instead of 'name'
+      const batchData: Record<string, any> = { batch: batch };
       allSubjects.forEach(subject => {
         batchData[subject] = students.filter(
           s => {
-            const batches = Array.isArray(s.batch) ? s.batch : [s.batch];
+            const batches = Array.isArray(s.batch) ? s.batch : (s.batch ? [s.batch] : []);
             return batches.includes(batch) && s.subjects?.includes(subject)
           }
         ).length;
@@ -67,7 +72,7 @@ export const EnrollmentAnalytics = () => {
 
     return {
       totalStudents: students.length,
-      filteredCount: filteredStudents.length,
+      filteredStudents, // Return the filtered list for the table
       chartData,
       allBatches,
       allSubjects,
@@ -140,7 +145,7 @@ export const EnrollmentAnalytics = () => {
             Enrollment by Subject Across Batches
           </CardTitle>
           <CardDescription>
-            Showing {analyticsData.filteredCount} students for the current filter.
+            High-level overview of student distribution.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -157,6 +162,45 @@ export const EnrollmentAnalytics = () => {
               ))}
             </BarChart>
           </ResponsiveContainer>
+        </CardContent>
+      </Card>
+      
+      {/* Detailed Student Enrollment Table */}
+      <Card className="bg-white">
+        <CardHeader>
+            <CardTitle className="flex items-center text-lg">
+                <Users className="mr-2 h-5 w-5" />
+                Student Enrollment Details
+            </CardTitle>
+            <CardDescription>
+                A detailed list of all students and their current enrollments. Found {analyticsData.filteredStudents.length} students matching criteria.
+            </CardDescription>
+        </CardHeader>
+        <CardContent>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Student Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Enrolled Batches</TableHead>
+                        <TableHead>Enrolled Subjects</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {analyticsData.filteredStudents.map((student, index) => (
+                        <TableRow key={index}>
+                            <TableCell className="font-medium">{student.name}</TableCell>
+                            <TableCell>{student.email}</TableCell>
+                            <TableCell>
+                                {Array.isArray(student.batch) ? student.batch.map(b => <Badge key={b} variant="secondary" className="mr-1">{b}</Badge>) : <Badge variant="secondary">{student.batch}</Badge>}
+                            </TableCell>
+                            <TableCell>
+                                {student.subjects?.map(s => <Badge key={s} variant="outline" className="mr-1">{s}</Badge>)}
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
         </CardContent>
       </Card>
     </div>
