@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
 import { Users, Loader2, AlertTriangle, BookOpen, GraduationCap, Filter, Search } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge'; // <-- **FIXED: Added the missing Badge import**
 
 // --- Interfaces for our data structures ---
 interface Enrollment {
