@@ -127,11 +127,9 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   
   const adminTabs = [
     { id: 'enrollment-analytics', label: 'Student Analytics', icon: BarChart2 },
-    { id: 'teacher-analytics', label: 'Teacher Analytics', icon: BarChart2 },
     { id: 'schedules', label: 'Schedules', icon: Calendar },
     { id: 'meeting-manager', label: 'Meeting Links', icon: LinkIcon },
     { id: 'feedback-viewer', label: 'Feedback Viewer', icon: MessageSquare },
-    { id: 'monitoring', label: 'Monitoring', icon: Monitor },
   ];
 
   const getTabs = () => {
