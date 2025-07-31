@@ -34,23 +34,33 @@ export const AuthPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      {/* Animated Background Overlay for Premium Look */}
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-white">
+      {/* Animated Background Overlay for Premium Look - Soothing Light with subtle animations */}
       <div className="absolute inset-0 z-0 bg-gradient-to-br from-blue-50 via-gray-100 to-white opacity-90">
         {/* Subtle pattern for texture */}
         <div className="absolute inset-0 bg-repeat bg-pattern-dots-subtle opacity-30 animate-fade-in"></div>
+        
         {/* Animated blobs with lighter, desaturated colors */}
-        <div className="absolute w-96 h-96 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-blob top-1/4 left-1/4"></div>
-        <div className="absolute w-72 h-72 bg-teal-100 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-blob animation-delay-2000 top-1/2 right-1/4"></div>
-        <div className="absolute w-80 h-80 bg-gray-200 rounded-full mix-blend-multiply filter blur-xl opacity-10 animate-blob animation-delay-4000 bottom-1/4 left-1/3"></div>
+        <div className="absolute w-80 h-80 bg-blue-100 rounded-full mix-blend-multiply filter blur-2xl opacity-15 animate-blob top-1/4 left-1/4"></div>
+        <div className="absolute w-64 h-64 bg-teal-50 rounded-full mix-blend-multiply filter blur-2xl opacity-15 animate-blob animation-delay-2000 top-1/2 right-1/4"></div>
+        <div className="absolute w-72 h-72 bg-gray-100 rounded-full mix-blend-multiply filter blur-2xl opacity-15 animate-blob animation-delay-4000 bottom-1/4 left-1/3"></div>
+
+        {/* Placeholder for upskilling icons - Requires custom CSS/SVG integration */}
+        {/* To add moving upskilling icons, you would typically use SVG sprites and
+            CSS animations or a library like react-spring/framer-motion.
+            Example:
+            <div className="absolute top-10 left-10 text-blue-200 opacity-20 text-4xl animate-float">📚</div>
+            <div className="absolute bottom-20 right-20 text-green-200 opacity-20 text-4xl animate-float animation-delay-1500">💡</div>
+            (You'd define @keyframes float in your index.css)
+        */}
       </div>
 
       <Card className="relative z-10 w-full max-w-sm bg-white rounded-2xl shadow-xl overflow-hidden animate-fade-in-up">
         <CardHeader className="text-center pt-8 px-6 pb-4 bg-white text-gray-800 relative">
-          <div className="mt-6 flex justify-center mb-4"> {/* Added mb-4 for space below logo */}
-            <img src="/logoofficial.png" alt="Unknown IITians Logo" className="h-20 w-20" /> {/* Decreased logo size to 80x80px */}
+          <div className="mt-6 flex justify-center mb-4">
+            <img src="/logoofficial.png" alt="Unknown IITians Logo" className="h-20 w-20" />
           </div>
-          <CardTitle className="text-xl font-bold text-center mb-2"> {/* Made text-xl bold */}
+          <CardTitle className="text-xl font-bold text-center mb-2">
             Welcome to Unknown IITians
           </CardTitle>
           <CardDescription className="text-sm font-normal leading-relaxed px-4 text-center text-gray-700">
@@ -61,7 +71,7 @@ export const AuthPage = () => {
           <div className="space-y-4">
             <Button 
               type="button" 
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white text-base py-2.5 rounded-lg shadow-md mt-4 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg active:scale-95 flex items-center justify-center gap-2" /* Removed font-extrabold, added subtle transform and shadow changes */
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white text-base py-2.5 rounded-lg shadow-md mt-4 transition-all duration-300 transform hover:-translate-y-0.5 hover:shadow-lg active:scale-95 flex items-center justify-center gap-2" 
               onClick={handleGoogleAuth}
               disabled={isGoogleLoading}
             >
@@ -77,6 +87,47 @@ export const AuthPage = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Add custom keyframes to src/index.css for 'blob', 'fade-in', and 'float' animations if not already present */}
+      {/*
+      // In src/index.css, under @layer utilities add:
+      .animate-blob {
+        animation: blob 7s infinite;
+      }
+      .animate-fade-in {
+        animation: fade-in 1s ease-out;
+      }
+      .animation-delay-2000 {
+        animation-delay: 2s;
+      }
+      .animation-delay-4000 {
+        animation-delay: 4s;
+      }
+      .bg-pattern-dots-subtle {
+        background-image: radial-gradient(#d1d5db 0.5px, transparent 0.5px); /* Light grey dots */
+        background-size: 20px 20px;
+      }
+      .animate-float {
+        animation: float 3s ease-in-out infinite;
+      }
+
+      // And under @layer keyframes add:
+      @keyframes blob {
+        0% { transform: translate(0px, 0px) scale(1); }
+        33% { transform: translate(30px, -50px) scale(1.1); }
+        66% { transform: translate(-20px, 20px) scale(0.9); }
+        100% { transform: translate(0px, 0px) scale(1); }
+      }
+      @keyframes fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes float {
+        0% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+        100% { transform: translateY(0px); }
+      }
+      */}
     </div>
   );
 };
