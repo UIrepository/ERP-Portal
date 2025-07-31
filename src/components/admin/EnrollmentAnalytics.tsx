@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Users, Loader2, AlertTriangle } from 'lucide-react';
 
-// Interface for enrollment data, now correctly typed for the direct join
+// Interface for enrollment data
 interface Enrollment {
   batch_name: string;
   subject_name: string;
@@ -52,7 +52,7 @@ export const EnrollmentAnalytics = () => {
   const { data: enrollments = [], isLoading: isLoadingEnrollments, isError, error } = useQuery<Enrollment[]>({
     queryKey: ['enrollment-analytics-enrollments'],
     queryFn: async () => {
-      // This simplified and correct query works once the schema cache is refreshed.
+      // This query is correct and relies on the now-refreshed schema relationship.
       const { data, error } = await supabase
         .from('user_enrollments')
         .select(`
