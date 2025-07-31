@@ -35,8 +35,15 @@ const ScheduleSkeleton = () => (
 );
 
 export const ScheduleManagement = () => {
-  const [currentDate] = useState(new Date());
+  const [currentTime, setCurrentTime] = useState(new Date());
   const queryClient = useQueryClient();
+
+  // --- Real-time Clock ---
+  // This hook updates the current time every second.
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // --- Real-time Subscription ---
   useEffect(() => {
@@ -72,9 +79,9 @@ export const ScheduleManagement = () => {
 
   // --- Data Processing ---
   const weekDates = useMemo(() => {
-    const start = startOfWeek(currentDate);
+    const start = startOfWeek(currentTime);
     return Array.from({ length: 7 }).map((_, i) => addDays(start, i));
-  }, [currentDate]);
+  }, [currentTime]);
 
   const timeSlots = useMemo(() => {
     if (!schedules) return [];
@@ -98,7 +105,11 @@ export const ScheduleManagement = () => {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-3xl font-bold text-gray-900">Full Class Schedule</h2>
-          <p className="text-gray-600 mt-1">A complete, real-time overview of all scheduled classes.</p>
+          <p className="text-gray-600 mt-1">A real-time overview of all scheduled classes.</p>
+        </div>
+        <div className="text-right">
+            <p className="text-sm text-gray-500">{format(currentTime, 'PPPP')}</p>
+            <p className="text-lg font-semibold text-gray-900">{format(currentTime, 'p')}</p>
         </div>
       </div>
         
@@ -109,7 +120,7 @@ export const ScheduleManagement = () => {
             <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-destructive">Failed to Load Schedule</h3>
             <p className="text-muted-foreground mt-2">
-                This is likely due to a Row Level Security (RLS) policy preventing access.
+                This may be due to a Row Level Security (RLS) policy preventing access.
             </p>
             <p className="text-sm text-gray-500 mt-4">
                 <strong>Error:</strong> {error?.message}
