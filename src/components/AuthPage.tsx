@@ -9,7 +9,8 @@ import { supabase } from '@/integrations/supabase/client';
 
 export const AuthPage = () => {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const { signIn, signUp } = useAuth(); // signIn and signUp are no longer directly used but kept for AuthContext compatibility
+  // signIn and signUp are no longer directly used but kept for AuthContext compatibility
+  const { signIn, signUp } = useAuth(); 
 
   const handleGoogleAuth = async () => {
     setIsGoogleLoading(true);
@@ -51,15 +52,15 @@ export const AuthPage = () => {
           <div className="absolute -bottom-12 -right-12 w-64 h-64 bg-white/30 rounded-full animate-pulse-slow animation-delay-500"></div>
 
           <CardTitle className="flex justify-center z-10">
-            <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-24 w-auto filter drop-shadow-sm" />
+            <img src="/logooffical" alt="Unknown IITians Logo" className="h-24 w-auto filter drop-shadow-sm" />
           </CardTitle>
           <CardDescription className="text-gray-700 text-xl font-bold tracking-wide mt-4 z-10">
-            Your Gateway to Academic Excellence
+            Welcome to Unknown IITians
           </CardDescription>
         </CardHeader>
         <CardContent className="p-8">
           <p className="text-center text-gray-700 text-lg leading-relaxed mb-10">
-            Seamlessly access your personalized learning dashboard with a single tap.
+            Sign in with the Google account you used during course registration to access your personalized learning dashboard.
           </p>
           <div className="space-y-4">
             <Button 
