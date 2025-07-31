@@ -8,22 +8,23 @@ import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Users, Loader2, AlertTriangle } from 'lucide-react';
 
-// Interfaces for our data structures
+// Interface for enrollment data
 interface Enrollment {
-  user_id: string;
   batch_name: string;
   subject_name: string;
-  profile: {
+  profiles: { // Corrected to match the actual relationship name
     name: string;
     email: string;
   } | null;
 }
 
+// Interface for processed student data
 interface StudentEnrollmentInfo {
   name: string;
   email: string;
   enrollments: { batch: string; subject: string }[];
 }
+
 
 export const EnrollmentAnalytics = () => {
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
@@ -34,16 +35,12 @@ export const EnrollmentAnalytics = () => {
   useEffect(() => {
     const channel = supabase
       .channel('admin-enrollment-analytics')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'user_enrollments' },
-        () => queryClient.invalidateQueries({ queryKey: ['enrollment-analytics-enrollments'] })
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'profiles' },
-        () => queryClient.invalidateQueries({ queryKey: ['enrollment-analytics-enrollments'] })
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_enrollments' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['enrollment-analytics-enrollments'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['enrollment-analytics-enrollments'] });
+      })
       .subscribe();
 
     return () => {
@@ -55,39 +52,21 @@ export const EnrollmentAnalytics = () => {
   const { data: enrollments = [], isLoading: isLoadingEnrollments, isError, error } = useQuery<Enrollment[]>({
     queryKey: ['enrollment-analytics-enrollments'],
     queryFn: async () => {
-      // Step 1: Fetch all user enrollments
-      const { data: enrollmentData, error: enrollmentError } = await supabase
+      // This simplified query now works because the foreign key relationship is confirmed to exist.
+      const { data, error } = await supabase
         .from('user_enrollments')
-        .select('user_id, batch_name, subject_name');
+        .select(`
+          batch_name,
+          subject_name,
+          profiles ( name, email )
+        `);
 
-      if (enrollmentError) {
-        console.error("Error fetching enrollments:", enrollmentError);
-        throw enrollmentError;
-      }
-      if (!enrollmentData) return [];
-
-      // Step 2: Fetch all student profiles
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('user_id, name, email')
-        .eq('role', 'student');
+      if (error) {
+          console.error("Error fetching enrollments:", error)
+          throw error;
+      };
       
-      if (profilesError) {
-        console.error("Error fetching profiles:", profilesError);
-        throw profilesError;
-      }
-      if (!profilesData) return [];
-
-      // Create a map for quick profile lookup
-      const profileMap = new Map(profilesData.map(p => [p.user_id, p]));
-
-      // Step 3: Combine enrollments with profiles
-      const combinedData = enrollmentData.map(enrollment => ({
-        ...enrollment,
-        profile: profileMap.get(enrollment.user_id) || null
-      })).filter(e => e.profile); // Ensure we only include enrollments with a matching student profile
-
-      return combinedData as Enrollment[];
+      return data.filter(e => e.profiles) as Enrollment[];
     },
   });
 
@@ -103,11 +82,11 @@ export const EnrollmentAnalytics = () => {
   const analyticsData = useMemo(() => {
     const studentMap = new Map<string, StudentEnrollmentInfo>();
     enrollments.forEach(enrollment => {
-      if (enrollment.profile) {
-        const email = enrollment.profile.email;
+      if (enrollment.profiles) {
+        const email = enrollment.profiles.email;
         if (!studentMap.has(email)) {
           studentMap.set(email, {
-            name: enrollment.profile.name,
+            name: enrollment.profiles.name,
             email: email,
             enrollments: [],
           });
