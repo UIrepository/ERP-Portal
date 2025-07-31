@@ -1,15 +1,16 @@
-import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useMemo, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Users, Loader2 } from 'lucide-react';
+import { Users, Loader2, AlertTriangle } from 'lucide-react';
 
-// Interface for enrollment data
+// Interfaces for our data structures
 interface Enrollment {
+  user_id: string;
   batch_name: string;
   subject_name: string;
   profile: {
@@ -18,31 +19,75 @@ interface Enrollment {
   } | null;
 }
 
-// Interface for processed student data
 interface StudentEnrollmentInfo {
   name: string;
   email: string;
   enrollments: { batch: string; subject: string }[];
 }
 
-
 export const EnrollmentAnalytics = () => {
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [selectedBatch, setSelectedBatch] = useState<string>('all');
+  const queryClient = useQueryClient();
 
-  // Updated query to fetch from user_enrollments for accurate data
-  const { data: enrollments = [], isLoading: isLoadingEnrollments } = useQuery<Enrollment[]>({
+  // --- Real-time Subscription ---
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin-enrollment-analytics')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_enrollments' },
+        () => queryClient.invalidateQueries({ queryKey: ['enrollment-analytics-enrollments'] })
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'profiles' },
+        () => queryClient.invalidateQueries({ queryKey: ['enrollment-analytics-enrollments'] })
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  // --- Data Fetching ---
+  const { data: enrollments = [], isLoading: isLoadingEnrollments, isError, error } = useQuery<Enrollment[]>({
     queryKey: ['enrollment-analytics-enrollments'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Step 1: Fetch all user enrollments
+      const { data: enrollmentData, error: enrollmentError } = await supabase
         .from('user_enrollments')
-        .select(`
-          batch_name,
-          subject_name,
-          profile:profiles ( name, email )
-        `);
-      if (error) throw error;
-      return data.filter(e => e.profile) as Enrollment[];
+        .select('user_id, batch_name, subject_name');
+
+      if (enrollmentError) {
+        console.error("Error fetching enrollments:", enrollmentError);
+        throw enrollmentError;
+      }
+      if (!enrollmentData) return [];
+
+      // Step 2: Fetch all student profiles
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id, name, email')
+        .eq('role', 'student');
+      
+      if (profilesError) {
+        console.error("Error fetching profiles:", profilesError);
+        throw profilesError;
+      }
+      if (!profilesData) return [];
+
+      // Create a map for quick profile lookup
+      const profileMap = new Map(profilesData.map(p => [p.user_id, p]));
+
+      // Step 3: Combine enrollments with profiles
+      const combinedData = enrollmentData.map(enrollment => ({
+        ...enrollment,
+        profile: profileMap.get(enrollment.user_id) || null
+      })).filter(e => e.profile); // Ensure we only include enrollments with a matching student profile
+
+      return combinedData as Enrollment[];
     },
   });
 
@@ -56,7 +101,6 @@ export const EnrollmentAnalytics = () => {
   });
 
   const analyticsData = useMemo(() => {
-    // Process enrollments to group by student
     const studentMap = new Map<string, StudentEnrollmentInfo>();
     enrollments.forEach(enrollment => {
       if (enrollment.profile) {
@@ -79,14 +123,12 @@ export const EnrollmentAnalytics = () => {
     const allBatches = Array.from(new Set(options.filter((o: any) => o.type === 'batch').map((o: any) => o.name))).sort();
     const allSubjects = Array.from(new Set(options.filter((o: any) => o.type === 'subject').map((o: any) => o.name))).sort();
 
-    // Filtering for the table view
     let filteredStudents = students.filter(student => {
       const matchesBatch = selectedBatch === 'all' || student.enrollments.some(e => e.batch === selectedBatch);
       const matchesSubject = selectedSubject === 'all' || student.enrollments.some(e => e.subject === selectedSubject);
       return matchesBatch && matchesSubject;
     });
 
-    // Data aggregation for the chart
     const chartData = allBatches.map(batch => {
       const batchData: Record<string, any> = { batch: batch };
       allSubjects.forEach(subject => {
@@ -113,10 +155,25 @@ export const EnrollmentAnalytics = () => {
       </div>
     );
   }
+  
+  if (isError) {
+      return (
+        <Card className="text-center py-20 bg-white rounded-lg border-dashed border-2 border-red-400 shadow-sm">
+            <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-destructive">Failed to Load Enrollment Data</h3>
+            <p className="text-muted-foreground mt-2">
+                There was an error fetching the required data from the database.
+            </p>
+            <p className="text-sm text-gray-500 mt-4">
+                <strong>Error:</strong> {error?.message}
+            </p>
+        </Card>
+      )
+  }
 
   return (
     <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
-      {/* Header and Filter sections remain the same */}
+      {/* Header and Filter sections */}
       <div>
         <h1 className="text-3xl font-bold text-gray-800">Student Enrollment Analytics</h1>
         <p className="text-gray-500 mt-1">Filter and visualize student enrollment data across batches and subjects.</p>
@@ -124,12 +181,8 @@ export const EnrollmentAnalytics = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base font-medium">Total Students</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-4xl font-bold">{analyticsData.totalStudents}</p>
-          </CardContent>
+          <CardHeader><CardTitle className="text-base font-medium">Total Students</CardTitle></CardHeader>
+          <CardContent><p className="text-4xl font-bold">{analyticsData.totalStudents}</p></CardContent>
         </Card>
         <Card>
             <CardHeader><CardTitle className="text-base font-medium">Filter by Batch</CardTitle></CardHeader>
@@ -138,9 +191,7 @@ export const EnrollmentAnalytics = () => {
                     <SelectTrigger><SelectValue placeholder="Select Batch" /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">All Batches</SelectItem>
-                        {analyticsData.allBatches.map(batch => (
-                        <SelectItem key={batch} value={batch}>{batch}</SelectItem>
-                        ))}
+                        {analyticsData.allBatches.map(batch => (<SelectItem key={batch} value={batch}>{batch}</SelectItem>))}
                     </SelectContent>
                 </Select>
             </CardContent>
@@ -152,25 +203,18 @@ export const EnrollmentAnalytics = () => {
                     <SelectTrigger><SelectValue placeholder="Select Subject" /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">All Subjects</SelectItem>
-                        {analyticsData.allSubjects.map(subject => (
-                        <SelectItem key={subject} value={subject}>{subject}</SelectItem>
-                        ))}
+                        {analyticsData.allSubjects.map(subject => (<SelectItem key={subject} value={subject}>{subject}</SelectItem>))}
                     </SelectContent>
                 </Select>
             </CardContent>
         </Card>
       </div>
 
-      {/* Chart Section remains the same */}
+      {/* Chart Section */}
       <Card className="bg-white">
         <CardHeader>
-          <CardTitle className="flex items-center text-lg">
-            <BarChart className="mr-2 h-5 w-5" />
-            Enrollment by Subject Across Batches
-          </CardTitle>
-          <CardDescription>
-            High-level overview of student distribution.
-          </CardDescription>
+          <CardTitle className="flex items-center text-lg"><BarChart className="mr-2 h-5 w-5" />Enrollment by Subject Across Batches</CardTitle>
+          <CardDescription>High-level overview of student distribution.</CardDescription>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={400}>
@@ -189,16 +233,11 @@ export const EnrollmentAnalytics = () => {
         </CardContent>
       </Card>
       
-      {/* Updated Detailed Student Enrollment Table */}
+      {/* Detailed Student Enrollment Table */}
       <Card className="bg-white">
         <CardHeader>
-            <CardTitle className="flex items-center text-lg">
-                <Users className="mr-2 h-5 w-5" />
-                Student Enrollment Details
-            </CardTitle>
-            <CardDescription>
-                A detailed list of all students and their current enrollments. Found {analyticsData.filteredStudents.length} students matching criteria.
-            </CardDescription>
+            <CardTitle className="flex items-center text-lg"><Users className="mr-2 h-5 w-5" />Student Enrollment Details</CardTitle>
+            <CardDescription>A detailed list of all students and their current enrollments. Found {analyticsData.filteredStudents.length} students matching criteria.</CardDescription>
         </CardHeader>
         <CardContent>
             <Table>
