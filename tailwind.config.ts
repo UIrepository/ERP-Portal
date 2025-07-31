@@ -8,7 +8,6 @@ export default {
 		"./src/**/*.{ts,tsx}",
 	],
 	prefix: "",
-	darkMode: "class",
 	theme: {
 		container: {
 			center: true,
