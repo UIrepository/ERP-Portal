@@ -98,7 +98,7 @@ export const EnrollmentAnalytics = () => {
       }
   });
 
-  // --- Data Processing ---
+  // --- Data Processing (No changes needed here) ---
   const analyticsData = useMemo(() => {
     const studentMap = new Map<string, StudentEnrollmentInfo>();
     enrollments.forEach(enrollment => {
@@ -147,7 +147,7 @@ export const EnrollmentAnalytics = () => {
   
   const isLoading = isLoadingEnrollments || isLoadingOptions;
 
-  // --- Rendering ---
+  // --- Rendering (No changes needed here) ---
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
