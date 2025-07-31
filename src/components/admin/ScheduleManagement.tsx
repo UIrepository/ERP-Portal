@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, getDay } from 'date-fns';
+import { format, getDay, startOfWeek, addDays, isSameDay } from 'date-fns';
 import { AlertTriangle } from 'lucide-react';
 
 // Interface for the schedule data
@@ -35,7 +35,7 @@ const ScheduleSkeleton = () => (
 );
 
 export const ScheduleManagement = () => {
-  const [currentTime] = useState(new Date());
+  const [currentDate] = useState(new Date());
   const queryClient = useQueryClient();
 
   // --- Real-time Subscription ---
@@ -71,6 +71,11 @@ export const ScheduleManagement = () => {
   });
 
   // --- Data Processing ---
+  const weekDates = useMemo(() => {
+    const start = startOfWeek(currentDate);
+    return Array.from({ length: 7 }).map((_, i) => addDays(start, i));
+  }, [currentDate]);
+
   const timeSlots = useMemo(() => {
     if (!schedules) return [];
     const slots = new Set<string>();
@@ -85,7 +90,7 @@ export const ScheduleManagement = () => {
     return format(date, 'h:mm a');
   };
 
-  const today = getDay(currentTime);
+  const today = new Date();
 
   // --- Rendering ---
   return (
@@ -114,9 +119,10 @@ export const ScheduleManagement = () => {
       <div className="bg-white p-4 rounded-2xl shadow-lg">
           <div className="grid grid-cols-8">
               <div className="text-center font-semibold text-gray-500 py-2">Time</div>
-              {DAYS.map((day, index) => (
-                  <div key={day} className={`text-center font-semibold py-2 ${index === today ? 'text-primary' : 'text-gray-500'}`}>
-                      {day}
+              {weekDates.map((date, index) => (
+                  <div key={index} className={`text-center font-semibold py-2 ${isSameDay(date, today) ? 'text-primary' : 'text-gray-500'}`}>
+                      <div>{DAYS[getDay(date)]}</div>
+                      <div className="text-xs font-normal">{format(date, 'MMM d')}</div>
                   </div>
               ))}
           </div>
@@ -124,10 +130,10 @@ export const ScheduleManagement = () => {
               {timeSlots.map(time => (
                   <div key={time} className="grid grid-cols-8 border-t">
                       <div className="text-center text-sm font-medium text-gray-700 py-4 px-2 border-r">{formatTime(time)}</div>
-                      {DAYS.map((day, dayIndex) => {
-                          const classInfo = schedules.filter(s => s.day_of_week === dayIndex && s.start_time === time);
+                      {weekDates.map((date, dayIndex) => {
+                          const classInfo = schedules.filter(s => s.day_of_week === getDay(date) && s.start_time === time);
                           return (
-                              <div key={`${day}-${time}`} className={`p-2 border-r last:border-r-0 ${dayIndex === today ? 'bg-blue-50' : ''}`}>
+                              <div key={dayIndex} className={`p-2 border-r last:border-r-0 ${isSameDay(date, today) ? 'bg-blue-50' : ''}`}>
                                   {classInfo.length > 0 && classInfo.map(info => (
                                     <Card key={info.id} className="bg-white shadow-md hover:shadow-lg transition-shadow mb-2">
                                         <CardContent className="p-3">
