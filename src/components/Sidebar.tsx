@@ -118,6 +118,13 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     { id: 'exams', label: 'Exams', icon: BookOpen },
   ];
 
+  const teacherTabs = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'schedule', label: 'Schedule', icon: Calendar },
+    { id: 'your-classes', label: 'Your Classes', icon: Clock },
+    { id: 'feedback', label: 'Feedback', icon: MessageSquare },
+  ];
+  
   const adminTabs = [
     { id: 'enrollment-analytics', label: 'Student Analytics', icon: BarChart2 },
     { id: 'schedules', label: 'Schedules', icon: Calendar },
@@ -129,6 +136,8 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     switch (profile?.role) {
       case 'student':
         return studentTabs;
+      case 'teacher':
+        return teacherTabs;
       case 'super_admin':
         return adminTabs;
       default:
@@ -142,6 +151,8 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
      switch (profile?.role) {
       case 'student':
         return 'Student Portal';
+      case 'teacher':
+        return 'Teacher Portal';
       case 'super_admin':
         return 'Admin Portal';
       default:
@@ -173,37 +184,37 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   };
 
   return (
-    <div className="w-64 bg-sidebar text-sidebar-foreground border-r border-sidebar-border h-full flex flex-col">
-      <div className="p-4 border-b border-sidebar-border">
-        <h2 className="font-semibold text-lg">
+    <div className="w-64 bg-white border-r border-gray-200 h-full flex flex-col">
+      <div className="p-4 border-b border-gray-200">
+        <h2 className="font-semibold text-gray-800 text-lg">
           {getPortalName()}
         </h2>
-        <p className="text-sm mt-1">{profile?.name}</p>
+        <p className="text-sm text-gray-500 mt-1">{profile?.name}</p>
         
         {/* Updated to display batches from availableBatches */}
         {profile?.role === 'student' && availableBatches.length > 0 && (
-          <p className="text-xs mt-1">Batch: {availableBatches.join(', ')}</p>
+          <p className="text-xs text-gray-500 mt-1">Batch: {availableBatches.join(', ')}</p>
         )}
         {/* Updated to display subjects from availableSubjects */}
         {profile?.role === 'student' && availableSubjects.length > 0 && (
-          <p className="text-xs mt-1">Subjects: {availableSubjects.join(', ')}</p>
+          <p className="text-xs text-gray-500 mt-1">Subjects: {availableSubjects.join(', ')}</p>
         )}
 
         {/* Display loading state for enrollments */}
         {profile?.role === 'student' && isLoadingEnrollments && (
-             <p className="text-xs mt-1 flex items-center gap-1">
+             <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
                 <span className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-gray-400"></span>
                 Loading enrollments...
              </p>
         )}
         {/* If no enrollments and not loading, display a message */}
         {profile?.role === 'student' && !isLoadingEnrollments && availableBatches.length === 0 && availableSubjects.length === 0 && (
-             <p className="text-xs mt-1">No enrollments found.</p>
+             <p className="text-xs text-gray-500 mt-1">No enrollments found.</p>
         )}
 
         {/* For Teacher/Admin roles, if profile.batch/subjects still exist in DB, keep old display */}
-        {(profile?.role === 'super_admin') && profile?.batch && (
-            <p className="text-xs mt-1">Batch: {formatArrayString(profile.batch)}</p>
+        {(profile?.role === 'teacher' || profile?.role === 'super_admin') && profile?.batch && (
+            <p className="text-xs text-gray-500 mt-1">Batch: {formatArrayString(profile.batch)}</p>
         )}
       </div>
       
@@ -214,8 +225,8 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
             variant={activeTab === tab.id ? 'default' : 'ghost'}
             className={`w-full justify-start ${
               activeTab === tab.id 
-                ? 'bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90' 
-                : 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
             }`}
             onClick={() => onTabChange(tab.id)}
           >
@@ -225,7 +236,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
         ))}
       </nav>
 
-      <div className="p-4 border-t border-sidebar-border">
+      <div className="p-4 border-t border-gray-200">
         <Button
           variant="destructive"
           className="w-full justify-center"
