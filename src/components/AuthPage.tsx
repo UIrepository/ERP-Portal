@@ -56,7 +56,7 @@ export const AuthPage = () => {
             Welcome to Unknown IITians
           </CardTitle>
           <CardDescription className="text-sm font-normal leading-relaxed px-4 text-center text-gray-700">
-            Sign in with the Google account you used during course registration to access your personalized learning dashboard.
+            Sign in with the Google account you used during batch enrollment to access your personalized ERP dashboard.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-6">
