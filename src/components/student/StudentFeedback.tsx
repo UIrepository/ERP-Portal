@@ -10,7 +10,7 @@ import { MessageSquare, Send, CheckCircle, Star, Sparkles, Timer } from 'lucide-
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { differenceInHours, format, addDays } from 'date-fns';
+import { differenceInHours, addDays, differenceInSeconds } from 'date-fns';
 
 // Interface for enrollment records
 interface UserEnrollment {
@@ -18,24 +18,50 @@ interface UserEnrollment {
     subject_name: string;
 }
 
-// --- Updated Cooldown Timer Component ---
-// This now shows the specific date when feedback will be available again.
+// --- New Dynamic Countdown Timer Component ---
 const CooldownTimer = ({ lastSubmissionDate }: { lastSubmissionDate: Date }) => {
-    const [availableOn, setAvailableOn] = useState('');
+    const [timeLeft, setTimeLeft] = useState('');
 
     useEffect(() => {
-        const cooldownEndDate = addDays(lastSubmissionDate, 3);
-        const formattedDate = format(cooldownEndDate, 'MMMM d'); // e.g., "August 3"
-        setAvailableOn(formattedDate);
+        const calculateTimeLeft = () => {
+            const cooldownEndDate = addDays(lastSubmissionDate, 3);
+            const totalSeconds = differenceInSeconds(cooldownEndDate, new Date());
+
+            if (totalSeconds <= 0) {
+                setTimeLeft("Available now!");
+                return;
+            }
+
+            const days = Math.floor(totalSeconds / (3600 * 24));
+            const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = Math.floor(totalSeconds % 60);
+
+            let parts = [];
+            if (days > 0) parts.push(`${days}d`);
+            if (hours > 0) parts.push(`${hours}h`);
+            if (minutes > 0) parts.push(`${minutes}m`);
+            if (days === 0 && hours === 0) { // Only show seconds if less than an hour remains
+                 parts.push(`${seconds}s`);
+            }
+            
+            setTimeLeft(`Available in ${parts.join(' ')}`);
+        };
+
+        calculateTimeLeft();
+        const intervalId = setInterval(calculateTimeLeft, 1000); // Update every second
+
+        return () => clearInterval(intervalId);
     }, [lastSubmissionDate]);
 
     return (
         <div className="flex items-center gap-2 text-amber-600 font-medium text-sm">
             <Timer className="h-4 w-4" />
-            <span>Available on {availableOn}</span>
+            <span>{timeLeft}</span>
         </div>
     );
 };
+
 
 // --- Star Rating Component ---
 const StarRating = ({ rating, setRating }: { rating: number, setRating: (rating: number) => void }) => (
