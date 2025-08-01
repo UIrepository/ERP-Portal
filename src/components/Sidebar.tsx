@@ -1,59 +1,48 @@
-// uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/student/StudentRecordings.tsx
-import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+// uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/Sidebar.tsx
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Video, Play, Search, ExternalLink } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
-import { format } from 'date-fns';
-import { Skeleton } from '@/components/ui/skeleton';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useMemo, useEffect } from 'react';
+import {
+  LayoutDashboard,
+  Calendar,
+  Clock,
+  Video,
+  FileText,
+  Target,
+  Crown,
+  MessageSquare,
+  BookOpen,
+  Users,
+  UserCheck,
+  Layers,
+  Link as LinkIcon,
+  Upload,
+  Plus,
+  Monitor,
+  BarChart2,
+  LogOut
+} from 'lucide-react';
 
-interface RecordingContent {
-  id: string;
-  date: string;
-  subject: string;
-  topic: string;
-  embed_link: string;
-  batch: string;
-  created_at: string;
+interface SidebarProps {
+  activeTab: string;
+  onTabChange: (tab: string) => void;
 }
 
+// Define the structure for an enrollment record from the user_enrollments table
 interface UserEnrollment {
     batch_name: string;
     subject_name: string;
 }
 
-const RecordingSkeleton = () => (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {[...Array(3)].map((_, i) => (
-            <Card key={i} className="overflow-hidden">
-                <Skeleton className="h-40 w-full" />
-                <div className="p-4 space-y-3">
-                    <Skeleton className="h-5 w-4/5" />
-                    <Skeleton className="h-4 w-1/2" />
-                    <div className="flex gap-2">
-                        <Skeleton className="h-5 w-20" />
-                        <Skeleton className="h-5 w-20" />
-                    </div>
-                </div>
-            </Card>
-        ))}
-    </div>
-);
+export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
+  const { profile, signOut } = useAuth();
+  const queryClient = useQueryClient();
 
-export const StudentRecordings = () => {
-  const { profile } = useAuth();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState('all');
-  const [selectedBatchFilter, setSelectedBatchFilter] = useState('all');
-
+  // Fetch user's specific enrollments for sidebar display
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
-    queryKey: ['userEnrollments', profile?.user_id],
+    queryKey: ['sidebarUserEnrollments', profile?.user_id],
     queryFn: async () => {
         if (!profile?.user_id) return [];
         const { data, error } = await supabase
@@ -61,7 +50,7 @@ export const StudentRecordings = () => {
             .select('batch_name, subject_name')
             .eq('user_id', profile.user_id);
         if (error) {
-            console.error("Error fetching user enrollments:", error);
+            console.error("Error fetching sidebar user enrollments:", error);
             return [];
         }
         return data || [];
@@ -69,242 +58,193 @@ export const StudentRecordings = () => {
     enabled: !!profile?.user_id
   });
 
-  const displayedBatches = useMemo(() => {
-    if (!userEnrollments) return [];
-    if (selectedSubjectFilter === 'all') {
-      return Array.from(new Set(userEnrollments.map(e => e.batch_name))).sort();
-    } else {
-      return Array.from(new Set(
-        userEnrollments
-          .filter(e => e.subject_name === selectedSubjectFilter)
-          .map(e => e.batch_name)
-      )).sort();
-    }
-  }, [userEnrollments, selectedSubjectFilter]);
+  // Extract unique batches and subjects from the fetched enrollments for display
+  const availableBatches = useMemo(() => {
+    return Array.from(new Set(userEnrollments?.map(e => e.batch_name) || [])).sort();
+  }, [userEnrollments]);
 
-  const displayedSubjects = useMemo(() => {
-    if (!userEnrollments) return [];
-    if (selectedBatchFilter !== 'all') {
-      return Array.from(new Set(
-        userEnrollments
-          .filter(e => e.batch_name === selectedBatchFilter)
-          .map(e => e.subject_name)
-      )).sort();
-    }
-    return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
-  }, [userEnrollments, selectedBatchFilter]);
+  const availableSubjects = useMemo(() => {
+    return Array.from(new Set(userEnrollments?.map(e => e.subject_name) || [])).sort();
+  }, [userEnrollments]);
 
-  if (selectedBatchFilter !== 'all' && !displayedBatches.includes(selectedBatchFilter)) {
-      setSelectedBatchFilter('all');
-  }
-  if (selectedSubjectFilter !== 'all' && !displayedSubjects.includes(selectedSubjectFilter)) {
-      setSelectedSubjectFilter('all');
-  }
-
-  const { data: recordings, isLoading: isLoadingRecordingsContent } = useQuery<RecordingContent[]>({
-    queryKey: ['student-recordings', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
-    queryFn: async (): Promise<RecordingContent[]> => {
-        if (!userEnrollments || userEnrollments.length === 0) return [];
-
-        let query = supabase.from('recordings').select('*');
-
-        const combinationFilters = userEnrollments
-            .filter(enrollment =>
-                (selectedBatchFilter === 'all' || enrollment.batch_name === selectedBatchFilter) &&
-                (selectedSubjectFilter === 'all' || enrollment.subject_name === selectedSubjectFilter)
-            )
-            .map(enrollment => `and(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
-
-        if (combinationFilters.length > 0) {
-            query = query.or(combinationFilters.join(','));
-        } else {
-            return [];
-        }
-        
-        query = query.order('date', { ascending: false });
-
-        const { data, error } = await query;
-      
-        if (error) {
-            console.error("Error fetching filtered Recording content:", error);
-            throw error;
-        }
-        return (data || []) as RecordingContent[];
-    },
-    enabled: !!userEnrollments && userEnrollments.length > 0
-  });
-
-  const filteredRecordings = recordings?.filter(recording => {
-    const matchesSearch = !searchTerm || 
-      recording.topic.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      recording.subject.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    return matchesSearch;
-  });
-
-  const logActivity = async (activityType: string, description: string, metadata?: any) => {
+  // Set up real-time subscriptions for sidebar data
+  useEffect(() => {
     if (!profile?.user_id) return;
-    
-    const availableBatchesForLog = Array.from(new Set(userEnrollments?.map(e => e.batch_name) || []));
-    await supabase.from('student_activities').insert({
-      user_id: profile.user_id,
-      activity_type: activityType,
-      description,
-      metadata,
-      batch: availableBatchesForLog.length > 0 ? availableBatchesForLog[0] : null,
-      subject: metadata.subject,
-    });
+
+    const channel = supabase
+      .channel('sidebar-realtime-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_enrollments',
+          filter: `user_id=eq.${profile.user_id}`
+        },
+        () => {
+          console.log('Real-time update: user_enrollments changed');
+          queryClient.invalidateQueries({ queryKey: ['sidebarUserEnrollments'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'profiles',
+          filter: `user_id=eq.${profile.user_id}`
+        },
+        () => {
+          console.log('Real-time update: profiles changed');
+          queryClient.invalidateQueries({ queryKey: ['sidebarUserEnrollments'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.user_id, queryClient]);
+
+  const studentTabs = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'schedule', label: 'Class Schedule', icon: Calendar },
+    { id: 'current-class', label: 'Ongoing Class', icon: Clock },
+    { id: 'recordings', label: 'Recordings', icon: Video },
+    { id: 'notes', label: 'Notes', icon: FileText },
+    { id: 'dpp', label: 'DPP Section', icon: Target },
+    { id: 'ui-ki-padhai', label: 'UI Ki Padhai', icon: Crown },
+    { id: 'feedback', label: 'Feedback', icon: MessageSquare },
+    { id: 'exams', label: 'Exams', icon: BookOpen },
+  ];
+
+  const teacherTabs = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'schedule', label: 'Schedule', icon: Calendar },
+    { id: 'your-classes', label: 'Your Classes', icon: Clock },
+    { id: 'feedback', label: 'Feedback', icon: MessageSquare },
+  ];
+  
+  const adminTabs = [
+    { id: 'enrollment-analytics', label: 'Student Analytics', icon: BarChart2 },
+    { id: 'schedules', label: 'Schedules', icon: Calendar },
+    { id: 'meeting-manager', label: 'Meeting Links', icon: LinkIcon },
+    { id: 'feedback-viewer', label: 'Feedback Viewer', icon: MessageSquare },
+  ];
+
+  const getTabs = () => {
+    switch (profile?.role) {
+      case 'student':
+        return studentTabs;
+      case 'teacher':
+        return teacherTabs;
+      case 'super_admin':
+        return adminTabs;
+      default:
+        return [];
+    }
   };
 
-  const handleWatchRecording = async (recording: any) => {
-    await logActivity('recording_watch', `Watched ${recording.topic}`, {
-      subject: recording.subject,
-      recordingId: recording.id,
-      topic: recording.topic
-    });
+  const tabs = getTabs();
+
+  const getPortalName = () => {
+     switch (profile?.role) {
+      case 'student':
+        return 'Student Portal';
+      case 'teacher':
+        return 'Teacher Portal';
+      case 'super_admin':
+        return 'Admin Portal';
+      default:
+        return 'Portal';
+    }
+  }
+
+  const formatArrayString = (arr: string | string[] | null | undefined) => {
+    if (!arr) return '';
+
+    if (Array.isArray(arr)) {
+      return arr.map(item =>
+        typeof item === 'string' ? item.replace(/[\\"]/g, '') : item
+      ).join(', ');
+    }
+
+    try {
+      const parsed = JSON.parse(arr);
+      if (Array.isArray(parsed)) {
+        return parsed.map(item =>
+          typeof item === 'string' ? item.replace(/[\\"]/g, '') : item
+        ).join(', ');
+      }
+    } catch (e) {
+      // JSON parsing failed, treat as a raw string and clean it
+    }
+
+    return String(arr).replace(/[\\"\\[\\]]/g, '');
   };
-
-  const WatermarkedPlayer = ({ recording }: { recording: any }) => (
-    <div
-      className="relative aspect-video"
-      onContextMenu={(e) => e.preventDefault()}
-      onKeyDown={(e) => {
-        if (e.ctrlKey && e.shiftKey && e.key === 'I') e.preventDefault();
-        if (e.ctrlKey && e.shiftKey && e.key === 'C') e.preventDefault();
-        if (e.ctrlKey && e.shiftKey && e.key === 'J') e.preventDefault();
-        if (e.ctrlKey && e.key === 'U') e.preventDefault();
-        if (e.key === 'F12') e.preventDefault();
-      }}
-    >
-      <iframe
-        src={recording.embed_link}
-        className="absolute top-0 left-0 w-full h-full rounded-lg"
-        frameBorder="0"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-        allowFullScreen
-        title={recording.topic}
-      />
-      <div className="absolute top-2 left-2 bg-black/30 text-white/80 text-xs px-2 py-1 rounded pointer-events-none backdrop-blur-sm">
-        {profile?.email}
-      </div>
-      <div className="absolute bottom-2 right-2 pointer-events-none">
-        <img src="/imagelogo.png" alt="Logo" className="h-10 w-auto opacity-50" />
-      </div>
-    </div>
-  );
-
-  const isLoading = isLoadingEnrollments || isLoadingRecordingsContent;
 
   return (
-    <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
-      {/* Header Section */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 flex items-center">
-            <Video className="mr-3 h-8 w-8 text-primary" />
-            Class Recordings
-          </h1>
-          <p className="text-gray-500 mt-1">Review past lectures and catch up on missed classes.</p>
-        </div>
-        <div className="flex gap-2">
-          {/* Display all enrolled batches */}
-          {displayedBatches.map(b => <Badge key={b} variant="outline">{b}</Badge>)}
-        </div>
-      </div>
-
-      {/* Filter and Search Section */}
-      <div className="flex gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search recordings by topic..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 h-10"
-          />
-        </div>
-        <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
-          <SelectTrigger className="w-48 h-10">
-            <SelectValue placeholder="Filter by batch" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Batches</SelectItem>
-            {displayedBatches.map((batch) => (
-              <SelectItem key={batch} value={batch}>{batch}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={selectedSubjectFilter}
-          onValueChange={setSelectedSubjectFilter}
-          disabled={selectedBatchFilter === 'all'} // Subject filter disabled if 'All Batches' is selected
-        >
-          <SelectTrigger className="w-48 h-10">
-            <SelectValue placeholder="Filter by subject" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Subjects</SelectItem>
-            {displayedSubjects.map((subject) => (
-              <SelectItem key={subject} value={subject}>{subject}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Recordings Grid */}
-      <div>
-        {isLoading ? (
-          <RecordingSkeleton />
-        ) : filteredRecordings && filteredRecordings.length > 0 ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {filteredRecordings.map((recording) => (
-              <Dialog key={recording.id}>
-                <Card className="bg-white hover:shadow-lg transition-shadow duration-300">
-                  <CardContent className="p-5 flex flex-col h-full">
-                    <div className="flex-grow">
-                      <div className="flex items-start gap-4">
-                        <div className="bg-primary/10 p-2 rounded-full">
-                          <Video className="h-6 w-6 text-primary" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-gray-800 truncate">{recording.topic}</h3>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {format(new Date(recording.date), 'PPP')}
-                          </p>
-                          <div className="flex gap-2 mt-3">
-                            <Badge variant="outline">{recording.subject}</Badge>
-                            <Badge variant="secondary">{recording.batch}</Badge>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <DialogTrigger asChild>
-                      <Button onClick={() => handleWatchRecording(recording)} className="w-full mt-5">
-                        <Play className="h-4 w-4 mr-2" />
-                        Watch Recording
-                      </Button>
-                    </DialogTrigger>
-                  </CardContent>
-                </Card>
-                <DialogContent className="max-w-4xl p-0 border-0">
-                  <DialogHeader>
-                    <DialogTitle className="sr-only">{recording.topic}</DialogTitle>
-                    <DialogDescription className="sr-only">
-                      Class recording for {recording.topic} on {format(new Date(recording.date), 'PPP')}
-                    </DialogDescription>
-                  </DialogHeader>
-                  <WatermarkedPlayer recording={recording} />
-                </DialogContent>
-              </Dialog>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-20 bg-white rounded-lg border-dashed border-2">
-            <Video className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-700">No Recordings Found</h3>
-            <p className="text-muted-foreground mt-2">Check back later or adjust your filters.</p>
-          </div>
+    <div className="w-64 bg-white border-r border-gray-200 h-full flex flex-col">
+      <div className="p-4 border-b border-gray-200">
+        <h2 className="font-semibold text-gray-800 text-lg">
+          {getPortalName()}
+        </h2>
+        <p className="text-sm text-gray-500 mt-1">{profile?.name}</p>
+        
+        {/* Updated to display batches from availableBatches */}
+        {profile?.role === 'student' && availableBatches.length > 0 && (
+          <p className="text-xs text-gray-500 mt-1">Batch: {availableBatches.join(', ')}</p>
         )}
+        {/* Updated to display subjects from availableSubjects */}
+        {profile?.role === 'student' && availableSubjects.length > 0 && (
+          <p className="text-xs text-gray-500 mt-1">Subjects: {availableSubjects.join(', ')}</p>
+        )}
+
+        {/* Display loading state for enrollments */}
+        {profile?.role === 'student' && isLoadingEnrollments && (
+             <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                <span className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-gray-400"></span>
+                Loading enrollments...
+             </p>
+        )}
+        {/* If no enrollments and not loading, display a message */}
+        {profile?.role === 'student' && !isLoadingEnrollments && availableBatches.length === 0 && availableSubjects.length === 0 && (
+             <p className="text-xs text-gray-500 mt-1">No enrollments found.</p>
+        )}
+
+        {/* For Teacher/Admin roles, if profile.batch/subjects still exist in DB, keep old display */}
+        {(profile?.role === 'teacher' || profile?.role === 'super_admin') && profile?.batch && (
+            <p className="text-xs text-gray-500 mt-1">Batch: {formatArrayString(profile.batch)}</p>
+        )}
+      </div>
+      
+      <nav className="p-4 space-y-2 flex-grow">
+        {tabs.map((tab) => (
+          <Button
+            key={tab.id}
+            variant={activeTab === tab.id ? 'default' : 'ghost'}
+            className={`w-full justify-start ${
+              activeTab === tab.id 
+                ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            }`}
+            onClick={() => onTabChange(tab.id)}
+          >
+            <tab.icon className="mr-3 h-4 w-4" />
+            {tab.label}
+          </Button>
+        ))}
+      </nav>
+
+      <div className="p-4 border-t border-gray-200">
+        <Button
+          variant="destructive"
+          className="w-full justify-center"
+          onClick={signOut}
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
+        </Button>
       </div>
     </div>
   );
