@@ -48,8 +48,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 // --- Custom Shape for selectively rounded corners ---
-const getPath = (x: number, y: number, width: number, height: number, radius: [number, number, number, number]) => {
-    const [tl, tr, br, bl] = radius;
+const getPath = (x: number, y: number, width: number, height: number, radius: number | [number, number, number, number]) => {
+    const r = Array.isArray(radius) ? radius : [radius, radius, radius, radius];
+    const [tl, tr, br, bl] = r;
     return `M${x + tl},${y}
             L${x + width - tr},${y}
             Q${x + width},${y} ${x + width},${y + tr}
@@ -107,7 +108,7 @@ export const EnrollmentAnalytics = () => {
           throw error;
       };
       
-      return data.filter(e => e.profiles) as Enrollment[];
+      return data.filter(e => e.profiles) as unknown as Enrollment[];
     },
   });
 
@@ -259,7 +260,7 @@ export const EnrollmentAnalytics = () => {
                                     const isFirst = index === 0;
                                     const isLast = index === arr.length - 1;
                                     const radius: [number, number, number, number] = [isFirst ? 8 : 0, isLast ? 8 : 0, isLast ? 8 : 0, isFirst ? 8 : 0];
-                                    return <Cell key={`cell-${entryIndex}`} fill={COLORS[analyticsData.allSubjects.indexOf(subject) % COLORS.length]} radius={radius}/>
+                                    return <Cell key={`cell-${entryIndex}`} fill={COLORS[analyticsData.allSubjects.indexOf(subject) % COLORS.length]} radius={radius as any}/>
                                 })}
                             </Bar>
                         ))}
