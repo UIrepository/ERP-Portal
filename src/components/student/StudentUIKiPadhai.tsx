@@ -18,9 +18,6 @@ interface UIKiPadhaiContent {
   link: string;
   is_active: boolean;
   created_at: string;
-  // Ensure these properties exist as per the database schema
-  batch: string;
-  subject: string;
 }
 
 interface UserEnrollment {
@@ -90,7 +87,7 @@ export const StudentUIKiPadhai = () => {
         
         const { data, error } = await supabase
             .from('ui_ki_padhai_content')
-            .select('id, title, description, category, link, is_active, created_at, batch, subject') // Ensure batch and subject are selected
+            .select('id, title, description, category, link, is_active, created_at')
             .eq('is_active', true)
             .order('created_at', { ascending: false });
 
@@ -101,36 +98,7 @@ export const StudentUIKiPadhai = () => {
 
         if (!data) return [];
 
-        // Filter content based on user enrollments and selected filters
-        const filteredContent = data.filter(content => {
-            // Add defensive checks for content.batch and content.subject
-            if (typeof content.batch !== 'string' || typeof content.subject !== 'string') {
-              console.warn('Skipping content due to missing or invalid batch/subject:', content);
-              return false;
-            }
-
-            // Check if user is enrolled in this batch/subject combination
-            const isEnrolled = userEnrollments.some(enrollment =>
-                enrollment.batch_name === content.batch &&
-                enrollment.subject_name === content.subject
-            );
-
-            if (!isEnrolled) return false;
-
-            // Apply batch filter
-            if (selectedBatchFilter !== 'all' && content.batch !== selectedBatchFilter) {
-                return false;
-            }
-
-            // Apply subject filter
-            if (selectedSubjectFilter !== 'all' && content.subject !== selectedSubjectFilter) {
-                return false;
-            }
-
-            return true;
-        });
-
-        return filteredContent as UIKiPadhaiContent[];
+        return data as UIKiPadhaiContent[];
     },
     enabled: !!userEnrollments && userEnrollments.length > 0
   });
@@ -227,8 +195,6 @@ export const StudentUIKiPadhai = () => {
                                 </div>
                             </div>
                             <div className="flex flex-wrap gap-2 mt-3 pl-12">
-                                <Badge variant="outline">{content.subject}</Badge>
-                                <Badge variant="secondary">{content.batch}</Badge>
                                 {content.category && (
                                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{content.category}</Badge>
                                 )}
