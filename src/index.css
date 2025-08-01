@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -57,13 +56,6 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
-    font-size: 14px;
-  }
-
-  @media (min-width: 640px) {
-    body {
-      font-size: 16px;
-    }
   }
 }
 
@@ -82,7 +74,7 @@ All colors MUST be HSL.
     height: 100vh;
     background-color: black;
     color: white;
-    font-size: 1.5rem;
+    font-size: 2rem;
     font-weight: bold;
     display: flex;
     justify-content: center;
@@ -90,45 +82,5 @@ All colors MUST be HSL.
     text-align: center;
     pointer-events: none;
     z-index: 9999;
-  }
-
-  @media (min-width: 640px) {
-    .screen-recording-protection-overlay {
-      font-size: 2rem;
-    }
-  }
-
-  /* Responsive text utilities */
-  .text-responsive-sm {
-    @apply text-xs sm:text-sm;
-  }
-  
-  .text-responsive-base {
-    @apply text-sm sm:text-base;
-  }
-  
-  .text-responsive-lg {
-    @apply text-base sm:text-lg;
-  }
-  
-  .text-responsive-xl {
-    @apply text-lg sm:text-xl;
-  }
-  
-  .text-responsive-2xl {
-    @apply text-xl sm:text-2xl;
-  }
-
-  /* Responsive padding utilities */
-  .p-responsive {
-    @apply p-4 sm:p-6 lg:p-8;
-  }
-  
-  .px-responsive {
-    @apply px-4 sm:px-6 lg:px-8;
-  }
-  
-  .py-responsive {
-    @apply py-4 sm:py-6 lg:py-8;
   }
 }

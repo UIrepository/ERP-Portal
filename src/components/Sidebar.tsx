@@ -24,19 +24,6 @@ import {
   BarChart2,
   LogOut
 } from 'lucide-react';
-import {
-  Sidebar as SidebarPrimitive,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  useSidebar,
-} from "@/components/ui/sidebar";
 
 interface SidebarProps {
   activeTab: string;
@@ -52,7 +39,6 @@ interface UserEnrollment {
 export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const { profile, signOut } = useAuth();
   const queryClient = useQueryClient();
-  const { state } = useSidebar();
 
   // Fetch user's specific enrollments for sidebar display
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
@@ -197,90 +183,69 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     return String(arr).replace(/[\\"\\[\\]]/g, '');
   };
 
-  const isCollapsed = state === 'collapsed';
-
   return (
-    <SidebarPrimitive collapsible="icon" className="border-r border-sidebar-border">
-      <SidebarHeader className="p-4 border-b border-sidebar-border">
-        <div className="flex flex-col">
-          <h2 className={`font-semibold text-sidebar-foreground text-base transition-opacity ${isCollapsed ? 'opacity-0 md:opacity-100' : 'opacity-100'}`}>
-            {getPortalName()}
-          </h2>
-          {!isCollapsed && (
-            <>
-              <p className="text-sm text-sidebar-foreground/70 mt-1 truncate">{profile?.name}</p>
-              
-              {/* Updated to display batches from availableBatches */}
-              {profile?.role === 'student' && availableBatches.length > 0 && (
-                <p className="text-xs text-sidebar-foreground/60 mt-1 truncate">Batch: {availableBatches.join(', ')}</p>
-              )}
-              {/* Updated to display subjects from availableSubjects */}
-              {profile?.role === 'student' && availableSubjects.length > 0 && (
-                <p className="text-xs text-sidebar-foreground/60 mt-1 truncate">Subjects: {availableSubjects.join(', ')}</p>
-              )}
+    <div className="w-64 bg-white border-r border-gray-200 h-full flex flex-col">
+      <div className="p-4 border-b border-gray-200">
+        <h2 className="font-semibold text-gray-800 text-lg">
+          {getPortalName()}
+        </h2>
+        <p className="text-sm text-gray-500 mt-1">{profile?.name}</p>
+        
+        {/* Updated to display batches from availableBatches */}
+        {profile?.role === 'student' && availableBatches.length > 0 && (
+          <p className="text-xs text-gray-500 mt-1">Batch: {availableBatches.join(', ')}</p>
+        )}
+        {/* Updated to display subjects from availableSubjects */}
+        {profile?.role === 'student' && availableSubjects.length > 0 && (
+          <p className="text-xs text-gray-500 mt-1">Subjects: {availableSubjects.join(', ')}</p>
+        )}
 
-              {/* Display loading state for enrollments */}
-              {profile?.role === 'student' && isLoadingEnrollments && (
-                   <p className="text-xs text-sidebar-foreground/60 mt-1 flex items-center gap-1">
-                      <span className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-sidebar-border"></span>
-                      Loading enrollments...
-                   </p>
-              )}
-              {/* If no enrollments and not loading, display a message */}
-              {profile?.role === 'student' && !isLoadingEnrollments && availableBatches.length === 0 && availableSubjects.length === 0 && (
-                   <p className="text-xs text-sidebar-foreground/60 mt-1">No enrollments found.</p>
-              )}
+        {/* Display loading state for enrollments */}
+        {profile?.role === 'student' && isLoadingEnrollments && (
+             <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                <span className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-gray-400"></span>
+                Loading enrollments...
+             </p>
+        )}
+        {/* If no enrollments and not loading, display a message */}
+        {profile?.role === 'student' && !isLoadingEnrollments && availableBatches.length === 0 && availableSubjects.length === 0 && (
+             <p className="text-xs text-gray-500 mt-1">No enrollments found.</p>
+        )}
 
-              {/* For Teacher/Admin roles, if profile.batch/subjects still exist in DB, keep old display */}
-              {(profile?.role === 'teacher' || profile?.role === 'super_admin') && profile?.batch && (
-                  <p className="text-xs text-sidebar-foreground/60 mt-1 truncate">Batch: {formatArrayString(profile.batch)}</p>
-              )}
-            </>
-          )}
-        </div>
-      </SidebarHeader>
+        {/* For Teacher/Admin roles, if profile.batch/subjects still exist in DB, keep old display */}
+        {(profile?.role === 'teacher' || profile?.role === 'super_admin') && profile?.batch && (
+            <p className="text-xs text-gray-500 mt-1">Batch: {formatArrayString(profile.batch)}</p>
+        )}
+      </div>
       
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {tabs.map((tab) => (
-                <SidebarMenuItem key={tab.id}>
-                  <SidebarMenuButton
-                    isActive={activeTab === tab.id}
-                    onClick={() => onTabChange(tab.id)}
-                    tooltip={isCollapsed ? tab.label : undefined}
-                    className="w-full"
-                  >
-                    <tab.icon className="h-4 w-4" />
-                    <span className={`transition-opacity ${isCollapsed ? 'opacity-0 md:opacity-100' : 'opacity-100'}`}>
-                      {tab.label}
-                    </span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
+      <nav className="p-4 space-y-2 flex-grow">
+        {tabs.map((tab) => (
+          <Button
+            key={tab.id}
+            variant={activeTab === tab.id ? 'default' : 'ghost'}
+            className={`w-full justify-start ${
+              activeTab === tab.id 
+                ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+            }`}
+            onClick={() => onTabChange(tab.id)}
+          >
+            <tab.icon className="mr-3 h-4 w-4" />
+            {tab.label}
+          </Button>
+        ))}
+      </nav>
 
-      <SidebarFooter className="p-4 border-t border-sidebar-border">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              onClick={signOut}
-              variant="outline"
-              tooltip={isCollapsed ? "Logout" : undefined}
-              className="w-full text-destructive hover:text-destructive-foreground hover:bg-destructive"
-            >
-              <LogOut className="h-4 w-4" />
-              <span className={`transition-opacity ${isCollapsed ? 'opacity-0 md:opacity-100' : 'opacity-100'}`}>
-                Logout
-              </span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
-    </SidebarPrimitive>
+      <div className="p-4 border-t border-gray-200">
+        <Button
+          variant="destructive"
+          className="w-full justify-center"
+          onClick={signOut}
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
+        </Button>
+      </div>
+    </div>
   );
 };
