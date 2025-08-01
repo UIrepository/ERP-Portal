@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { AuthPage } from '@/components/AuthPage';
 import { Layout } from '@/components/Layout';
-import { Sidebar } from '@/components/Sidebar';
+import { Sidebar, SidebarProvider } from '@/components/Sidebar';
 import { StudentDashboard } from '@/components/StudentDashboard';
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
 import { Loader2 } from 'lucide-react';
@@ -11,7 +11,7 @@ import { useRealtimeSync } from '@/hooks/useRealtimeSync'; // Import the hook
 
 const Index = () => {
   const { user, loading, profile } = useAuth();
-  
+
   // Call the centralized real-time hook
   useRealtimeSync();
 
@@ -21,7 +21,7 @@ const Index = () => {
     }
     return 'dashboard';
   };
-  
+
   const [activeTab, setActiveTab] = useState(getInitialTab());
 
   useEffect(() => {
@@ -58,14 +58,16 @@ const Index = () => {
   };
 
   return (
-    <Layout>
-      <div className="flex h-screen">
-        <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
-        <main className="flex-1 overflow-y-auto">
-          {renderDashboard()}
-        </main>
-      </div>
-    </Layout>
+    <SidebarProvider>
+      <Layout>
+        <div className="flex h-screen">
+          <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+          <main className="flex-1 overflow-y-auto">
+            {renderDashboard()}
+          </main>
+        </div>
+      </Layout>
+    </SidebarProvider>
   );
 };
 
