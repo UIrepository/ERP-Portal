@@ -1,13 +1,14 @@
-// uirepository/teachgrid-hub/teachgrid-hub-d9688224fef19a4774d713506784003cfd24ff67/src/pages/Index.tsx
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { AuthPage } from '@/components/AuthPage';
 import { Layout } from '@/components/Layout';
 import { Sidebar } from '@/components/Sidebar';
+import { SidebarInset } from '@/components/ui/sidebar';
 import { StudentDashboard } from '@/components/StudentDashboard';
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
 import { Loader2 } from 'lucide-react';
-import { useRealtimeSync } from '@/hooks/useRealtimeSync'; // Import the hook
+import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 
 const Index = () => {
   const { user, loading, profile } = useAuth();
@@ -49,9 +50,9 @@ const Index = () => {
       default:
         // No dashboard for 'teacher' role or other roles.
         return (
-          <div className="p-6 text-center">
-            <h1 className="text-2xl font-bold text-destructive">Access Denied</h1>
-            <p className="text-muted-foreground mt-2">You do not have a valid role to access the dashboard. Please contact administrator for assistance.</p>
+          <div className="p-4 sm:p-6 text-center">
+            <h1 className="text-xl sm:text-2xl font-bold text-destructive">Access Denied</h1>
+            <p className="text-muted-foreground mt-2 text-sm sm:text-base">You do not have a valid role to access the dashboard. Please contact administrator for assistance.</p>
           </div>
         );
     }
@@ -59,11 +60,13 @@ const Index = () => {
 
   return (
     <Layout>
-      <div className="flex h-screen">
+      <div className="flex h-screen w-full">
         <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
-        <main className="flex-1 overflow-y-auto">
-          {renderDashboard()}
-        </main>
+        <SidebarInset className="flex-1">
+          <main className="flex-1 overflow-y-auto">
+            {renderDashboard()}
+          </main>
+        </SidebarInset>
       </div>
     </Layout>
   );
