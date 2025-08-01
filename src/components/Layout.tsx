@@ -1,3 +1,5 @@
+// src/components/Layout.tsx
+
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -22,7 +24,7 @@ export const Layout = ({ children }: LayoutProps) => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-card">
-        <div className="flex h-16 items-center justify-between px-6">
+        <div className="flex h-16 items-center justify-between px-4 sm:px-6"> {/* Adjusted padding for mobile */}
           <div className="flex items-center space-x-4">
             <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-12 w-auto" />
           </div>
