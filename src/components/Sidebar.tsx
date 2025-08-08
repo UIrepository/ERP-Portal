@@ -185,7 +185,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
 
   return (
     <div className="w-full bg-white border-r border-gray-200 h-full flex flex-col">
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-gray-200 shrink-0">
         <img src="/logoofficial.png" alt="Unknown IITians Logo" className="h-16 w-auto mx-auto mb-4 md:hidden" />
         <h2 className="font-semibold text-gray-800 text-lg">
           {getPortalName()}
@@ -239,7 +239,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
         </nav>
       </div>
 
-      <div className="p-4 border-t border-gray-200 mt-auto">
+      <div className="p-4 border-t border-gray-200 shrink-0">
         <Button
           variant="destructive"
           className="w-full justify-center"
