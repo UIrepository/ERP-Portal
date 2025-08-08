@@ -1,9 +1,8 @@
-// src/components/Layout.tsx
-
+import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { LogOut } from 'lucide-react';
+import { LogOut, PanelLeft } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,21 +11,41 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sidebar } from './Sidebar';
 
 interface LayoutProps {
   children: React.ReactNode;
+  activeTab: string;
+  onTabChange: (tab: string) => void;
 }
 
-export const Layout = ({ children }: LayoutProps) => {
+export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
   const { profile, signOut } = useAuth();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card">
-        <div className="flex h-16 items-center justify-between px-4 sm:px-6"> {/* Adjusted padding for mobile */}
-          <div className="flex items-center space-x-4">
-            <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-12 w-auto" />
+    <div className="flex flex-col min-h-screen bg-background">
+      <header className="border-b bg-card sticky top-0 z-30">
+        <div className="flex h-16 items-center justify-between px-4 sm:px-6">
+          <div className="flex items-center gap-4">
+            {/* Mobile Sidebar Toggle */}
+            <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
+              <SheetTrigger asChild className="md:hidden">
+                <Button size="icon" variant="outline">
+                  <PanelLeft className="h-5 w-5" />
+                  <span className="sr-only">Toggle Menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="sm:max-w-xs p-0">
+                 <Sidebar activeTab={activeTab} onTabChange={(tab) => {
+                   onTabChange(tab);
+                   setIsSidebarOpen(false); // Close sidebar on tab change
+                 }} />
+              </SheetContent>
+            </Sheet>
+            
+            <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-12 w-auto hidden sm:block" />
           </div>
           
           <div className="flex items-center space-x-4">
@@ -60,8 +79,15 @@ export const Layout = ({ children }: LayoutProps) => {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main>{children}</main>
+      <div className="flex flex-1">
+        {/* Desktop Sidebar */}
+        <aside className="hidden md:block h-full">
+          <Sidebar activeTab={activeTab} onTabChange={onTabChange} />
+        </aside>
+        
+        {/* Main Content */}
+        <main className="flex-1 overflow-y-auto">{children}</main>
+      </div>
     </div>
   );
 };
