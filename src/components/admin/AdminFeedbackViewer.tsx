@@ -30,8 +30,8 @@ interface FeedbackEntry {
 
 // --- Helper component for displaying star ratings ---
 const RatingDisplay = ({ rating, label }: { rating: number, label: string }) => (
-  <div className="flex items-center justify-between py-2">
-    <p className="text-sm text-slate-600">{label}</p>
+  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between py-2">
+    <p className="text-sm text-slate-600 mb-1 sm:mb-0">{label}</p>
     <div className="flex items-center gap-1">
         {[...Array(5)].map((_, i) => (
         <Star
@@ -198,9 +198,9 @@ export const AdminFeedbackViewer = () => {
           filteredFeedback.map((item: FeedbackEntry) => (
             <Card key={item.id} className="bg-white shadow-md rounded-xl overflow-hidden">
                 <CardHeader className="bg-slate-50 p-4 border-b">
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div className="flex items-center gap-3">
-                             <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
+                             <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold shrink-0">
                                 {item.profile ? item.profile.name.charAt(0) : '?'}
                             </div>
                             <div>
@@ -208,7 +208,7 @@ export const AdminFeedbackViewer = () => {
                                 <p className="text-xs text-slate-500">{item.profile ? item.profile.email : 'No email available'}</p>
                             </div>
                         </div>
-                        <div className="text-right">
+                        <div className="w-full md:w-auto flex flex-col items-start md:items-end gap-2">
                             <div className="flex items-center gap-2 text-sm text-slate-500">
                                 <Calendar className="h-4 w-4" />
                                 <span>{format(new Date(item.created_at), 'PPP')}</span>
