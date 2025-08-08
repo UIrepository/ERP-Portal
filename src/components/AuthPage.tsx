@@ -39,6 +39,7 @@ export const AuthPage = () => {
       <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-200 rounded-full mix-blend-multiply filter blur-2xl opacity-50 animate-blob animation-delay-2000"></div>
       <div className="absolute -bottom-40 -left-20 w-80 h-80 bg-sky-200 rounded-full mix-blend-multiply filter blur-3xl opacity-50 animate-blob animation-delay-4000"></div>
 
+
       <div className="relative min-h-screen flex flex-col items-center justify-center p-4 md:grid md:grid-cols-2 md:gap-8">
         {/* Left Side: Logo and Title */}
         <div className="flex flex-col items-center justify-center space-y-4 text-center z-0 animate-slide-up-from-behind md:animate-slide-in-from-left-behind">
