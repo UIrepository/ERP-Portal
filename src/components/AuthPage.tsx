@@ -43,7 +43,7 @@ export const AuthPage = () => {
         {/* Left Side: Logo and Title */}
         <div className="flex flex-col items-center justify-center space-y-4 text-center z-0 animate-slide-up-from-behind md:animate-slide-in-from-left-behind">
           <img src="/logoofficial.png" alt="Unknown IITians Logo" className="h-20 w-20 md:h-24 md:w-24" />
-          <h2 className="text-xl md:text-2xl font-semibold text-slate-700">Student/Staff Services Portal</h2>
+          <h2 className="text-xl md:text-2xl font-semibold text-slate-700">Student Services Portal</h2>
         </div>
 
         {/* Right Side: Sign In Card */}
