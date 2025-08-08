@@ -126,21 +126,21 @@ export const StudentSchedule = () => {
   const today = getDay(currentTime);
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-2 sm:p-6 bg-gray-50 min-h-screen">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900">Class Schedule</h2>
-          <p className="text-gray-600 mt-1">Your weekly class timetable</p>
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Class Schedule</h2>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">Your weekly class timetable</p>
         </div>
-        <div className="text-right">
-            <p className="text-sm text-gray-500">{format(currentTime, 'PPPP')}</p>
-            <p className="text-lg font-semibold text-gray-900">{format(currentTime, 'p')}</p>
+        <div className="text-left sm:text-right w-full sm:w-auto">
+            <p className="text-xs sm:text-sm text-gray-500">{format(currentTime, 'PPPP')}</p>
+            <p className="text-base sm:text-lg font-semibold text-gray-900">{format(currentTime, 'p')}</p>
         </div>
       </div>
 
       <div className="flex gap-4 mb-6">
         <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
-          <SelectTrigger className="w-48 h-10 bg-white">
+          <SelectTrigger className="w-full sm:w-48 h-10 bg-white">
             <SelectValue placeholder="Filter by batch" />
           </SelectTrigger>
           <SelectContent>
@@ -153,43 +153,45 @@ export const StudentSchedule = () => {
       </div>
 
       {isLoading ? <ScheduleSkeleton /> : (
-      <div className="bg-white p-4 rounded-2xl shadow-lg">
-          <div className="grid grid-cols-8">
-              <div className="text-center font-semibold text-gray-500 py-2">Time</div>
-              {DAYS.map((day, index) => (
-                  <div key={day} className={`text-center font-semibold py-2 ${index === today ? 'text-primary' : 'text-gray-500'}`}>
-                      {day}
-                  </div>
-              ))}
-          </div>
-          <div className="relative">
-              {timeSlots.map(time => (
-                  <div key={time} className="grid grid-cols-8 border-t">
-                      <div className="text-center text-sm font-medium text-gray-700 py-4 px-2 border-r">{formatTime(time)}</div>
-                      {DAYS.map((day, dayIndex) => {
-                          const classInfo = schedules?.find(s => s.day_of_week === dayIndex && s.start_time === time);
-                          return (
-                              <div key={`${day}-${time}`} className={`p-2 border-r last:border-r-0 ${dayIndex === today ? 'bg-blue-50' : ''}`}>
-                                  {classInfo && (
-                                      <Card className="bg-white shadow-md hover:shadow-lg transition-shadow">
-                                          <CardContent className="p-3">
-                                              <p className="font-bold text-gray-800 text-sm">{classInfo.subject}</p>
-                                              <Badge variant="secondary" className="mt-1">{classInfo.batch}</Badge>
-                                              {classInfo.link && (
-                                                  <Button size="sm" asChild className="w-full mt-2">
-                                                      <a href={classInfo.link} target="_blank" rel="noopener noreferrer">
-                                                          <ExternalLink className="h-4 w-4 mr-1" /> Join
-                                                      </a>
-                                                  </Button>
-                                              )}
-                                          </CardContent>
-                                      </Card>
-                                  )}
-                              </div>
-                          );
-                      })}
-                  </div>
-              ))}
+      <div className="bg-white p-2 sm:p-4 rounded-2xl shadow-lg overflow-x-auto">
+          <div className="min-w-[800px]">
+            <div className="grid grid-cols-[minmax(100px,1fr)_repeat(7,minmax(120px,1fr))]">
+                <div className="text-center font-semibold text-gray-500 py-2 sticky left-0 bg-white z-10">Time</div>
+                {DAYS.map((day, index) => (
+                    <div key={day} className={`text-center font-semibold py-2 ${index === today ? 'text-primary' : 'text-gray-500'}`}>
+                        {day}
+                    </div>
+                ))}
+            </div>
+            <div className="relative">
+                {timeSlots.map(time => (
+                    <div key={time} className="grid grid-cols-[minmax(100px,1fr)_repeat(7,minmax(120px,1fr))] border-t">
+                        <div className="text-center text-sm font-medium text-gray-700 py-4 px-2 border-r sticky left-0 bg-white z-10">{formatTime(time)}</div>
+                        {DAYS.map((day, dayIndex) => {
+                            const classInfo = schedules?.find(s => s.day_of_week === dayIndex && s.start_time === time);
+                            return (
+                                <div key={`${day}-${time}`} className={`p-2 border-r last:border-r-0 ${dayIndex === today ? 'bg-blue-50' : ''}`}>
+                                    {classInfo && (
+                                        <Card className="bg-white shadow-md hover:shadow-lg transition-shadow">
+                                            <CardContent className="p-3">
+                                                <p className="font-bold text-gray-800 text-sm">{classInfo.subject}</p>
+                                                <Badge variant="secondary" className="mt-1">{classInfo.batch}</Badge>
+                                                {classInfo.link && (
+                                                    <Button size="sm" asChild className="w-full mt-2">
+                                                        <a href={classInfo.link} target="_blank" rel="noopener noreferrer">
+                                                            <ExternalLink className="h-4 w-4 mr-1" /> Join
+                                                        </a>
+                                                    </Button>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                ))}
+            </div>
           </div>
       </div>
       )}
