@@ -18,7 +18,7 @@ interface Schedule {
 }
 
 // Static data for rendering the schedule grid
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 // Skeleton component for a better loading experience
 const ScheduleSkeleton = () => (
@@ -101,13 +101,13 @@ export const ScheduleManagement = () => {
 
   // --- Rendering ---
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 md:p-6 bg-gray-50 min-h-screen">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
         <div>
           <h2 className="text-3xl font-bold text-gray-900">Full Class Schedule</h2>
           <p className="text-gray-600 mt-1">A real-time overview of all scheduled classes.</p>
         </div>
-        <div className="text-right">
+        <div className="text-left md:text-right">
             <p className="text-sm text-gray-500">{format(currentTime, 'PPPP')}</p>
             <p className="text-lg font-semibold text-gray-900">{format(currentTime, 'p')}</p>
         </div>
@@ -127,37 +127,39 @@ export const ScheduleManagement = () => {
             </p>
         </Card>
       ) : (
-      <div className="bg-white p-4 rounded-2xl shadow-lg">
-          <div className="grid grid-cols-8">
-              <div className="text-center font-semibold text-gray-500 py-2">Time</div>
-              {weekDates.map((date, index) => (
-                  <div key={index} className={`text-center font-semibold py-2 ${isSameDay(date, today) ? 'text-primary' : 'text-gray-500'}`}>
-                      <div>{DAYS[getDay(date)]}</div>
-                      <div className="text-xs font-normal">{format(date, 'MMM d')}</div>
-                  </div>
-              ))}
-          </div>
-          <div className="relative">
-              {timeSlots.map(time => (
-                  <div key={time} className="grid grid-cols-8 border-t">
-                      <div className="text-center text-sm font-medium text-gray-700 py-4 px-2 border-r">{formatTime(time)}</div>
-                      {weekDates.map((date, dayIndex) => {
-                          const classInfo = schedules.filter(s => s.day_of_week === getDay(date) && s.start_time === time);
-                          return (
-                              <div key={dayIndex} className={`p-2 border-r last:border-r-0 ${isSameDay(date, today) ? 'bg-blue-50' : ''}`}>
-                                  {classInfo.length > 0 && classInfo.map(info => (
-                                    <Card key={info.id} className="bg-white shadow-md hover:shadow-lg transition-shadow mb-2">
-                                        <CardContent className="p-3">
-                                            <p className="font-bold text-gray-800 text-sm">{info.subject}</p>
-                                            <Badge variant="secondary" className="mt-1">{info.batch}</Badge>
-                                        </CardContent>
-                                    </Card>
-                                  ))}
-                              </div>
-                          );
-                      })}
-                  </div>
-              ))}
+      <div className="bg-white p-4 rounded-2xl shadow-lg overflow-x-auto">
+          <div className="min-w-[1000px]">
+              <div className="grid grid-cols-[80px_repeat(7,1fr)]">
+                  <div className="text-center font-semibold text-gray-500 py-2">Time</div>
+                  {weekDates.map((date, index) => (
+                      <div key={index} className={`text-center font-semibold py-2 ${isSameDay(date, today) ? 'text-primary' : 'text-gray-500'}`}>
+                          <div>{DAYS[getDay(date)]}</div>
+                          <div className="text-xs font-normal">{format(date, 'MMM d')}</div>
+                      </div>
+                  ))}
+              </div>
+              <div className="relative">
+                  {timeSlots.map(time => (
+                      <div key={time} className="grid grid-cols-[80px_repeat(7,1fr)] border-t">
+                          <div className="text-center text-sm font-medium text-gray-700 py-4 px-2 border-r">{formatTime(time)}</div>
+                          {weekDates.map((date, dayIndex) => {
+                              const classInfo = schedules.filter(s => s.day_of_week === getDay(date) && s.start_time === time);
+                              return (
+                                  <div key={dayIndex} className={`p-2 border-r last:border-r-0 ${isSameDay(date, today) ? 'bg-blue-50' : ''}`}>
+                                      {classInfo.length > 0 && classInfo.map(info => (
+                                        <Card key={info.id} className="bg-white shadow-md hover:shadow-lg transition-shadow mb-2">
+                                            <CardContent className="p-3">
+                                                <p className="font-bold text-gray-800 text-sm">{info.subject}</p>
+                                                <Badge variant="secondary" className="mt-1">{info.batch}</Badge>
+                                            </CardContent>
+                                        </Card>
+                                      ))}
+                                  </div>
+                              );
+                          })}
+                      </div>
+                  ))}
+              </div>
           </div>
       </div>
       )}
