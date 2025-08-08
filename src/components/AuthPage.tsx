@@ -40,15 +40,15 @@ export const AuthPage = () => {
       <div className="absolute -bottom-40 -left-20 w-80 h-80 bg-slate-200 rounded-full mix-blend-multiply filter blur-2xl opacity-50 animate-blob animation-delay-4000"></div>
 
 
-      <div className="relative min-h-screen grid md:grid-cols-2">
-        {/* Left Side: Logo and Title */}
-        <div className="hidden md:flex flex-col items-center justify-center space-y-4 animate-slide-in-from-left">
-          <img src="/logoofficial.png" alt="Unknown IITians Logo" className="h-28 w-28" />
-          <h2 className="text-2xl font-semibold text-slate-700">Student/Admin ERP Portal</h2>
+      <div className="relative min-h-screen flex flex-col items-center justify-center gap-8 md:gap-12 p-4">
+        {/* Logo and Title */}
+        <div className="flex flex-col items-center justify-center space-y-4 text-center animate-fade-slide-up">
+          <img src="/logoofficial.png" alt="Unknown IITians Logo" className="h-24 w-24" />
+          <h2 className="text-2xl font-semibold text-slate-700">Student/Staff Services Portal</h2>
         </div>
         
-        {/* Right Side: Sign In Card */}
-        <div className="flex items-center justify-center p-4 animate-slide-in-from-right">
+        {/* Sign In Card */}
+        <div className="animate-fade-slide-up animation-delay-200">
           <Card className="w-full max-w-sm bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border-slate-200/50">
             <CardHeader className="text-center pt-8 pb-6">
               <CardTitle className="text-2xl font-bold text-slate-800">
