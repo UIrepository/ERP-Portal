@@ -329,7 +329,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
 
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          <Card className="bg-white border border-gray-200 rounded-2xl shadow-sm">
+          <Card className="bg-blue-50 border border-gray-200 rounded-2xl shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -341,7 +341,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
             </CardContent>
           </Card>
           
-          <Card className="bg-white border border-gray-200 rounded-2xl shadow-sm">
+          <Card className="bg-green-50 border border-gray-200 rounded-2xl shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -353,7 +353,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
             </CardContent>
           </Card>
           
-          <Card className="bg-white border border-gray-200 rounded-2xl shadow-sm">
+          <Card className="bg-yellow-50 border border-gray-200 rounded-2xl shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -365,7 +365,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
             </CardContent>
           </Card>
           
-          <Card className="bg-white border border-gray-200 rounded-2xl shadow-sm">
+          <Card className="bg-rose-50 border border-gray-200 rounded-2xl shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -381,7 +381,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
         {/* Quick Access Section */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           <Card 
-            className="bg-white border border-gray-200 rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-shadow duration-200" 
+            className="bg-violet-50 border border-gray-200 rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-shadow duration-200" 
             onClick={() => {
               logActivity('navigation', 'Accessed class schedule');
               onTabChange('schedule');
@@ -399,7 +399,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
           </Card>
           
           <Card 
-            className="bg-white border border-gray-200 rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-shadow duration-200" 
+            className="bg-sky-50 border border-gray-200 rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-shadow duration-200" 
             onClick={() => {
               logActivity('navigation', 'Joined current class');
               onTabChange('current-class');
@@ -417,7 +417,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
           </Card>
           
           <Card 
-            className="bg-white border border-gray-200 rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-shadow duration-200" 
+            className="bg-teal-50 border border-gray-200 rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-shadow duration-200" 
             onClick={() => {
               logActivity('navigation', 'Accessed recordings');
               onTabChange('recordings');
@@ -435,7 +435,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
           </Card>
           
           <Card 
-            className="bg-white border border-gray-200 rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-shadow duration-200" 
+            className="bg-fuchsia-50 border border-gray-200 rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-shadow duration-200" 
             onClick={() => {
               logActivity('navigation', 'Accessed notes');
               onTabChange('notes');
