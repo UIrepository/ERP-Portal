@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Video, Play, Search, ExternalLink } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -182,6 +182,7 @@ export const StudentRecordings = () => {
         frameBorder="0"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         allowFullScreen
+        title={recording.topic}
       />
       <div className="absolute top-2 left-2 bg-black/30 text-white/80 text-xs px-2 py-1 rounded pointer-events-none backdrop-blur-sm">
         {profile?.email}
@@ -286,6 +287,12 @@ export const StudentRecordings = () => {
                   </CardContent>
                 </Card>
                 <DialogContent className="max-w-4xl p-0 border-0">
+                  <DialogHeader className="sr-only">
+                    <DialogTitle>{recording.topic}</DialogTitle>
+                    <DialogDescription>
+                      Class recording for {recording.subject} on {format(new Date(recording.date), 'PPP')}.
+                    </DialogDescription>
+                  </DialogHeader>
                   <WatermarkedPlayer recording={recording} />
                 </DialogContent>
               </Dialog>
