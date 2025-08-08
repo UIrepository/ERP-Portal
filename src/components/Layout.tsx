@@ -37,7 +37,7 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
                   <span className="sr-only">Toggle Menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="sm:max-w-xs p-0">
+              <SheetContent side="left" className="w-72 p-0">
                  <Sidebar activeTab={activeTab} onTabChange={(tab) => {
                    onTabChange(tab);
                    setIsSidebarOpen(false); // Close sidebar on tab change
@@ -81,7 +81,7 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
 
       <div className="flex flex-1">
         {/* Desktop Sidebar */}
-        <aside className="hidden md:block h-full">
+        <aside className="hidden md:block h-full w-64">
           <Sidebar activeTab={activeTab} onTabChange={onTabChange} />
         </aside>
         
