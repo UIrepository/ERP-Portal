@@ -84,13 +84,13 @@ export default {
 						height: '0'
 					}
 				},
-        'slide-in-from-left': {
-          '0%': { transform: 'translateX(-100%)', opacity: '0' },
-          '100%': { transform: 'translateX(0)', opacity: '1' },
+        'unveil': {
+          '0%': { transform: 'scale(0.8)', opacity: '0' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
         },
-        'slide-in-from-right': {
-          '0%': { transform: 'translateX(100%)', opacity: '0' },
-          '100%': { transform: 'translateX(0)', opacity: '1' },
+        'fade-slide-up': {
+            '0%': { transform: 'translateY(20px)', opacity: '0' },
+            '100%': { transform: 'translateY(0)', opacity: '1' },
         },
         'blob': {
             '0%': { transform: 'translate(0px, 0px) scale(1)' },
@@ -102,11 +102,13 @@ export default {
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
-        'slide-in-from-left': 'slide-in-from-left 0.7s ease-out forwards',
-        'slide-in-from-right': 'slide-in-from-right 0.7s ease-out forwards',
+        'unveil': 'unveil 0.5s ease-out forwards',
+        'fade-slide-up': 'fade-slide-up 0.5s ease-out forwards',
         'blob': 'blob 7s infinite',
 			},
       animationDelay: {
+        '200': '200ms',
+        '400': '400ms',
         '2000': '2000ms',
         '4000': '4000ms',
       }
@@ -116,6 +118,12 @@ export default {
     require("tailwindcss-animate"),
     function({ addUtilities }: { addUtilities: any }) {
       const newUtilities = {
+        '.animation-delay-200': {
+          'animation-delay': '0.2s',
+        },
+        '.animation-delay-400': {
+            'animation-delay': '0.4s',
+        },
         '.animation-delay-2000': {
           'animation-delay': '2s',
         },
