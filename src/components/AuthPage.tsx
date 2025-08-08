@@ -41,13 +41,13 @@ export const AuthPage = () => {
 
       <div className="relative min-h-screen flex flex-col items-center justify-center p-4 md:grid md:grid-cols-2 md:gap-8">
         {/* Left Side: Logo and Title */}
-        <div className="flex flex-col items-center justify-center space-y-4 text-center z-0 md:animate-slide-in-from-left-behind">
+        <div className="flex flex-col items-center justify-center space-y-4 text-center z-0 animate-slide-up-from-behind md:animate-slide-in-from-left-behind">
           <img src="/logoofficial.png" alt="Unknown IITians Logo" className="h-20 w-20 md:h-24 md:w-24" />
           <h2 className="text-xl md:text-2xl font-semibold text-slate-700">Student/Staff Services Portal</h2>
         </div>
 
         {/* Right Side: Sign In Card */}
-        <div className="mt-8 md:mt-0 w-full max-w-sm z-10 md:animate-fade-in-fixed">
+        <div className="mt-8 md:mt-0 w-full max-w-sm z-10 animate-fade-in-fixed">
           <Card className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border-slate-200/50 mx-auto">
             <CardHeader className="text-center pt-8 pb-6">
               <CardTitle className="text-xl md:text-2xl font-bold text-slate-800">
