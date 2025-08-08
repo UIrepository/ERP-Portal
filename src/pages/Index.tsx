@@ -5,12 +5,12 @@ import { Layout } from '@/components/Layout';
 import { StudentDashboard } from '@/components/StudentDashboard';
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
 import { Loader2 } from 'lucide-react';
-import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 
 const Index = () => {
   const { user, loading, profile } = useAuth();
   
-  useRealtimeSync();
+  // The global real-time hook that was causing instability has been removed.
+  // Component-specific real-time hooks will handle updates more efficiently.
 
   const getInitialTab = () => {
     if (profile?.role === 'super_admin') {
