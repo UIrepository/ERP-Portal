@@ -292,186 +292,130 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
   const isDashboardLoading = isLoadingEnrollments || isLoadingAnalytics;
 
   const renderDashboardContent = () => (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-50/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header Section */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold text-gray-900 mb-3">
-            {profile?.name}
+        <div className="mb-10">
+          <h1 className="text-4xl font-bold text-gray-800 tracking-tight">
+            Welcome back, {profile?.name}!
           </h1>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
-            {isDashboardLoading ? (
-                <div className="text-gray-600 flex items-center gap-2">
-                    <span className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-gray-400"></span>
-                    <span className="font-medium">Loading Enrollments & Stats...</span>
-                </div>
-            ) : (
-                <>
-                    {availableBatches.length > 0 && (
-                    <div className="text-gray-600">
-                        <span className="font-medium">Batches:</span> {availableBatches.join(', ')} 
-                    </div>
-                    )}
-                    {availableSubjects.length > 0 && (
-                    <div className="text-gray-600">
-                        <span className="font-medium">Subjects:</span> {availableSubjects.join(', ')}
-                    </div>
-                    )}
-                    {availableBatches.length === 0 && availableSubjects.length === 0 && (
-                        <div className="text-gray-600">
-                            <span className="font-medium">Enrollments:</span> No batches or subjects assigned.
-                        </div>
-                    )}
-                </>
-            )}
-          </div>
+          <p className="text-lg text-gray-500 mt-2">Here's a snapshot of your learning journey today.</p>
         </div>
 
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          <Card className="bg-blue-50 border border-gray-200 rounded-2xl shadow-sm">
+          {/* Notes Card */}
+          <Card className="transform hover:-translate-y-1 transition-transform duration-300 ease-in-out bg-gradient-to-br from-blue-100 to-blue-200 border-blue-200 shadow-lg rounded-xl">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 mb-1">Notes Downloaded</p>
-                  <p className="text-3xl font-semibold text-gray-900">{isDashboardLoading ? <Skeleton className="h-8 w-16"/> : analyticsData?.totalNotes || 0}</p>
+                  <p className="text-sm font-medium text-blue-800">Notes Downloaded</p>
+                  <p className="text-3xl font-bold text-blue-900 mt-1">{isDashboardLoading ? <Skeleton className="h-8 w-16 bg-blue-200"/> : analyticsData?.totalNotes || 0}</p>
                 </div>
-                <FileText className="h-8 w-8 text-gray-400" />
+                <div className="p-3 bg-white/50 rounded-full">
+                  <FileText className="h-6 w-6 text-blue-600" />
+                </div>
               </div>
             </CardContent>
           </Card>
           
-          <Card className="bg-green-50 border border-gray-200 rounded-2xl shadow-sm">
+          {/* Recordings Card */}
+          <Card className="transform hover:-translate-y-1 transition-transform duration-300 ease-in-out bg-gradient-to-br from-green-100 to-green-200 border-green-200 shadow-lg rounded-xl">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 mb-1">Recordings Watched</p>
-                  <p className="text-3xl font-semibold text-gray-900">{isDashboardLoading ? <Skeleton className="h-8 w-16"/> : analyticsData?.totalRecordings || 0}</p>
+                  <p className="text-sm font-medium text-green-800">Recordings Watched</p>
+                  <p className="text-3xl font-bold text-green-900 mt-1">{isDashboardLoading ? <Skeleton className="h-8 w-16 bg-green-200"/> : analyticsData?.totalRecordings || 0}</p>
                 </div>
-                <Video className="h-8 w-8 text-gray-400" />
+                 <div className="p-3 bg-white/50 rounded-full">
+                  <Video className="h-6 w-6 text-green-600" />
+                </div>
               </div>
             </CardContent>
           </Card>
           
-          <Card className="bg-yellow-50 border border-gray-200 rounded-2xl shadow-sm">
+          {/* DPPs Card */}
+          <Card className="transform hover:-translate-y-1 transition-transform duration-300 ease-in-out bg-gradient-to-br from-yellow-100 to-yellow-200 border-yellow-200 shadow-lg rounded-xl">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 mb-1">DPPs Attempted</p>
-                  <p className="text-3xl font-semibold text-gray-900">{isDashboardLoading ? <Skeleton className="h-8 w-16"/> : analyticsData?.totalDPP || 0}</p>
+                  <p className="text-sm font-medium text-yellow-800">DPPs Attempted</p>
+                  <p className="text-3xl font-bold text-yellow-900 mt-1">{isDashboardLoading ? <Skeleton className="h-8 w-16 bg-yellow-200"/> : analyticsData?.totalDPP || 0}</p>
                 </div>
-                <Target className="h-8 w-8 text-gray-400" />
+                 <div className="p-3 bg-white/50 rounded-full">
+                  <Target className="h-6 w-6 text-yellow-600" />
+                </div>
               </div>
             </CardContent>
           </Card>
           
-          <Card className="bg-rose-50 border border-gray-200 rounded-2xl shadow-sm">
+          {/* Feedback Card */}
+          <Card className="transform hover:-translate-y-1 transition-transform duration-300 ease-in-out bg-gradient-to-br from-rose-100 to-rose-200 border-rose-200 shadow-lg rounded-xl">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 mb-1">Feedback Submitted</p>
-                  <p className="text-3xl font-semibold text-gray-900">{isDashboardLoading ? <Skeleton className="h-8 w-16"/> : analyticsData?.feedbackSubmitted || 0}</p>
+                  <p className="text-sm font-medium text-rose-800">Feedback Submitted</p>
+                  <p className="text-3xl font-bold text-rose-900 mt-1">{isDashboardLoading ? <Skeleton className="h-8 w-16 bg-rose-200"/> : analyticsData?.feedbackSubmitted || 0}</p>
                 </div>
-                <MessageSquare className="h-8 w-8 text-gray-400" />
+                 <div className="p-3 bg-white/50 rounded-full">
+                  <MessageSquare className="h-6 w-6 text-rose-600" />
+                </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Quick Access Section */}
+        <h2 className="text-2xl font-semibold text-gray-700 mb-6">Quick Links</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          <Card 
-            className="bg-violet-50 border border-gray-200 rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-shadow duration-200" 
-            onClick={() => {
-              logActivity('navigation', 'Accessed class schedule');
-              onTabChange('schedule');
-            }}
-          >
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Calendar className="h-8 w-8 text-gray-400 mr-4" />
-                <div>
-                  <p className="font-medium text-gray-900">Class Schedule</p>
-                  <p className="text-sm text-gray-600">View your classes</p>
+          {[
+            { title: 'Class Schedule', subtitle: 'View your classes', icon: Calendar, tab: 'schedule', color: 'blue' },
+            { title: 'Current Class', subtitle: 'Join ongoing class', icon: Clock, tab: 'current-class', color: 'green' },
+            { title: 'Recordings', subtitle: 'Watch past lectures', icon: Video, tab: 'recordings', color: 'yellow' },
+            { title: 'Notes', subtitle: 'Download materials', icon: FileText, tab: 'notes', color: 'rose' }
+          ].map((item, index) => (
+            <Card 
+              key={index}
+              className="group bg-white border border-gray-200 rounded-xl shadow-sm cursor-pointer hover:shadow-xl hover:border-primary/50 transition-all duration-300" 
+              onClick={() => {
+                logActivity('navigation', `Accessed ${item.title}`);
+                onTabChange(item.tab);
+              }}
+            >
+              <CardContent className="p-6 flex items-center gap-5">
+                <div className={`p-3 bg-${item.color}-100 rounded-lg`}>
+                  <item.icon className={`h-6 w-6 text-${item.color}-600`} />
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card 
-            className="bg-sky-50 border border-gray-200 rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-shadow duration-200" 
-            onClick={() => {
-              logActivity('navigation', 'Joined current class');
-              onTabChange('current-class');
-            }}
-          >
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Clock className="h-8 w-8 text-gray-400 mr-4" />
                 <div>
-                  <p className="font-medium text-gray-900">Current Class</p>
-                  <p className="text-sm text-gray-600">Join ongoing class</p>
+                  <p className="font-semibold text-gray-800 text-lg">{item.title}</p>
+                  <p className="text-sm text-gray-500">{item.subtitle}</p>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card 
-            className="bg-teal-50 border border-gray-200 rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-shadow duration-200" 
-            onClick={() => {
-              logActivity('navigation', 'Accessed recordings');
-              onTabChange('recordings');
-            }}
-          >
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Video className="h-8 w-8 text-gray-400 mr-4" />
-                <div>
-                  <p className="font-medium text-gray-900">Recordings</p>
-                  <p className="text-sm text-gray-600">Watch recordings</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card 
-            className="bg-fuchsia-50 border border-gray-200 rounded-2xl shadow-sm cursor-pointer hover:shadow-md transition-shadow duration-200" 
-            onClick={() => {
-              logActivity('navigation', 'Accessed notes');
-              onTabChange('notes');
-            }}
-          >
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <FileText className="h-8 w-8 text-gray-400 mr-4" />
-                <div>
-                  <p className="font-medium text-gray-900">Notes</p>
-                  <p className="text-sm text-gray-600">Download notes</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
         {/* Recent Activity Section */}
-        <Card className="bg-white border border-gray-200 rounded-2xl shadow-sm">
-          <CardContent className="p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">Recent Activity</h2>
-            <div className="space-y-4">
+        <Card className="bg-white border-gray-200 rounded-xl shadow-sm">
+          <CardHeader>
+            <h2 className="text-xl font-semibold text-gray-800">Recent Activity</h2>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
               {recentActivities && recentActivities.length > 0 ? (
                 recentActivities.map((activity) => (
-                  <div key={activity.id} className="flex items-start gap-4 py-3 border-b border-gray-100 last:border-0">
+                  <div key={activity.id} className="flex items-start gap-4 p-3 hover:bg-gray-50 rounded-lg">
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">{activity.description}</p>
-                      <p className="text-xs text-gray-500 mt-1">
+                      <p className="text-sm font-medium text-gray-800">{activity.description}</p>
+                      <p className="text-xs text-gray-400 mt-1">
                         {format(new Date(activity.created_at), 'MMM d, yyyy • h:mm a')}
                       </p>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="text-center py-8">
-                  <p className="text-gray-500 text-sm">No recent activity</p>
+                <div className="text-center py-10">
+                  <p className="text-gray-500">No recent activity</p>
                 </div>
               )}
             </div>
@@ -482,7 +426,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
   );
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-50/50">
       {renderTabContent()}
     </div>
   );
