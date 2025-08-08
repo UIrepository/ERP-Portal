@@ -44,15 +44,15 @@ export const AuthPage = () => {
         <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16">
           {/* Left Side: Logo and Title */}
           <div className="flex flex-col items-center justify-center space-y-4 text-center">
-            <img src="/logoofficial.png" alt="Unknown IITians Logo" className="h-24 w-24 animate-unveil" />
-            <h2 className="text-2xl font-semibold text-slate-700 animate-fade-slide-up animation-delay-200">Student Services Portal</h2>
+            <img src="/logoofficial.png" alt="Unknown IITians Logo" className="h-20 w-20 md:h-24 md:w-24 animate-unveil" />
+            <h2 className="text-xl md:text-2xl font-semibold text-slate-700 animate-fade-slide-up animation-delay-200">Student/Staff Services Portal</h2>
           </div>
           
           {/* Right Side: Sign In Card */}
           <div className="animate-fade-slide-up animation-delay-400">
             <Card className="w-full max-w-sm bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border-slate-200/50">
               <CardHeader className="text-center pt-8 pb-6">
-                <CardTitle className="text-2xl font-bold text-slate-800">
+                <CardTitle className="text-xl md:text-2xl font-bold text-slate-800">
                   Sign in
                 </CardTitle>
                 <CardDescription className="text-sm text-slate-600 pt-2">
