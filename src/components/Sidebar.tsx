@@ -186,6 +186,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   return (
     <div className="w-full bg-white border-r border-gray-200 h-full flex flex-col">
       <div className="p-4 border-b border-gray-200">
+        <img src="/logoofficial.png" alt="Unknown IITians Logo" className="h-16 w-auto mx-auto mb-4" />
         <h2 className="font-semibold text-gray-800 text-lg">
           {getPortalName()}
         </h2>
