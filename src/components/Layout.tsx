@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from './Sidebar';
 
 interface LayoutProps {
@@ -38,6 +38,12 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-72 p-0">
+                 <SheetHeader className="sr-only">
+                    <SheetTitle>Sidebar Menu</SheetTitle>
+                    <SheetDescription>
+                        Navigate through the portal sections.
+                    </SheetDescription>
+                 </SheetHeader>
                  <Sidebar activeTab={activeTab} onTabChange={(tab) => {
                    onTabChange(tab);
                    setIsSidebarOpen(false); // Close sidebar on tab change
