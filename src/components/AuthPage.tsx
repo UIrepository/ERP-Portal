@@ -44,7 +44,7 @@ export const AuthPage = () => {
         <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16">
           {/* Left Side: Logo and Title */}
           <div className="flex flex-col items-center justify-center space-y-4 text-center">
-            <img src="/logoofficial.png" alt="Unknown IITians Logo" className="h-24 w-24 animate-fade-in" />
+            <img src="/logoofficial.png" alt="Unknown IITians Logo" className="h-24 w-24 animate-unveil" />
             <h2 className="text-2xl font-semibold text-slate-700 animate-fade-slide-up animation-delay-200">Student/Staff Services Portal</h2>
           </div>
           
