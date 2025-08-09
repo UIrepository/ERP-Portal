@@ -22,46 +22,53 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const fetchSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+      setUser(session?.user ?? null);
+
+      if (session?.user) {
+        try {
+          const { data: profileData, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .single();
+
+          if (error) {
+            console.error("Error fetching profile on initial load:", error);
+            setProfile(null);
+          } else {
+            setProfile(profileData);
+          }
+        } catch (e) {
+          console.error("Caught exception fetching profile on initial load:", e);
+          setProfile(null);
+        }
+      }
+      setLoading(false); // Stop loading after the initial check
+    };
+
+    fetchSession();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          try {
-            // Fetch user profile
-            const { data: profileData, error } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('user_id', session.user.id)
-              .single();
-
-            if (error) {
-              console.error("Error fetching profile:", error);
-              setProfile(null);
-            } else {
-              setProfile(profileData);
-            }
-          } catch (e) {
-            console.error("Caught exception fetching profile:", e);
-            setProfile(null);
-          } finally {
-            setLoading(false); // This will now always run
-          }
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .single();
+          setProfile(profileData);
         } else {
           setProfile(null);
-          setLoading(false);
         }
+        // No need to set loading here, as the listener handles subsequent changes
       }
     );
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (!session) {
-        setLoading(false);
-      }
-    });
 
     return () => subscription.unsubscribe();
   }, []);
