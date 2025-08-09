@@ -101,7 +101,21 @@ export default {
             '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
             '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
             '100%': { transform: 'translate(0px, 0px) scale(1)' },
-        }
+        },
+        'bounce-slow': {
+          '0%, 100%': {
+            transform: 'translateY(-5%)',
+            animationTimingFunction: 'cubic-bezier(0.8, 0, 1, 1)',
+          },
+          '50%': {
+            transform: 'translateY(0)',
+            animationTimingFunction: 'cubic-bezier(0, 0, 0.2, 1)',
+          },
+        },
+        'spin-slow': {
+          '0%': { transform: 'rotate(0deg)' },
+          '100%': { transform: 'rotate(360deg)' },
+        },
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
@@ -110,6 +124,8 @@ export default {
         'fade-in-fixed': 'fade-in-fixed 0.7s ease-out forwards',
         'slide-up-from-behind': 'slide-up-from-behind 0.7s ease-out forwards',
         'blob': 'blob 7s infinite',
+        'bounce-slow': 'bounce-slow 2s infinite',
+        'spin-slow': 'spin-slow 2s linear infinite',
 			},
       animationDelay: {
         '2000': '2000ms',
