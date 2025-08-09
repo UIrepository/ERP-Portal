@@ -1,4 +1,3 @@
-// src/hooks/useAuth.tsx
 import { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,31 +21,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const minLoadingTime = 2500; // 2.5 seconds
-    const startTime = Date.now();
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('user_id', session.user.id)
-            .single();
-          setProfile(profileData);
+          // Fetch user profile
+          setTimeout(async () => {
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('user_id', session.user.id)
+              .single();
+            setProfile(profileData);
+            setLoading(false);
+          }, 0);
         } else {
           setProfile(null);
-        }
-        
-        const elapsedTime = Date.now() - startTime;
-        const remainingTime = minLoadingTime - elapsedTime;
-
-        if (remainingTime > 0) {
-          setTimeout(() => setLoading(false), remainingTime);
-        } else {
           setLoading(false);
         }
       }
@@ -56,14 +48,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (!session) {
-        const elapsedTime = Date.now() - startTime;
-        const remainingTime = minLoadingTime - elapsedTime;
-
-        if (remainingTime > 0) {
-          setTimeout(() => setLoading(false), remainingTime);
-        } else {
-          setLoading(false);
-        }
+        setLoading(false);
       }
     });
 
