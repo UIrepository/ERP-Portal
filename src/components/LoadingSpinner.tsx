@@ -23,7 +23,7 @@ export const LoadingSpinner = () => {
 
         {/* Horizontal Loading Bar */}
         <div className="w-48 h-1.5 bg-primary/10 rounded-full overflow-hidden">
-          <div className="w-full h-full bg-gradient-to-r from-blue-400 via-indigo-500 to-sky-400 animate-fill-bar"></div>
+          <div className="w-full h-full bg-gradient-to-r from-blue-400 via-indigo-500 to-sky-400 animate-loading-bar-indeterminate"></div>
         </div>
       </div>
     </div>
