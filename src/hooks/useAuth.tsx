@@ -1,3 +1,4 @@
+// src/hooks/useAuth.tsx
 import { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,36 +22,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // onAuthStateChange handles the initial session check and any subsequent changes.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch user profile
-          setTimeout(async () => {
-            const { data: profileData } = await supabase
+          try {
+            const { data: profileData, error } = await supabase
               .from('profiles')
               .select('*')
               .eq('user_id', session.user.id)
               .single();
-            setProfile(profileData);
-            setLoading(false);
-          }, 0);
+
+            if (error) {
+              console.error("Error fetching profile:", error);
+              setProfile(null);
+            } else {
+              setProfile(profileData);
+            }
+          } catch (e) {
+            console.error("Caught exception fetching profile:", e);
+            setProfile(null);
+          }
         } else {
           setProfile(null);
-          setLoading(false);
         }
-      }
-    );
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (!session) {
+        // Crucially, stop loading after the first auth event is handled.
         setLoading(false);
       }
-    });
+    );
 
     return () => subscription.unsubscribe();
   }, []);
