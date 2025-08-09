@@ -9,14 +9,14 @@ import { LoadingSpinner } from '@/components/LoadingSpinner'; // Import the new 
 
 const Index = () => {
   const { user, loading, profile } = useAuth();
-  
+
   const getInitialTab = () => {
     if (profile?.role === 'super_admin') {
       return 'enrollment-analytics';
     }
     return 'dashboard';
   };
-  
+
   const [activeTab, setActiveTab] = useState(getInitialTab());
 
   useEffect(() => {
