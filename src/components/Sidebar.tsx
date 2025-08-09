@@ -118,13 +118,6 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     { id: 'exams', label: 'Exams', icon: BookOpen },
   ];
 
-  const teacherTabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'schedule', label: 'Schedule', icon: Calendar },
-    { id: 'your-classes', label: 'Your Classes', icon: Clock },
-    { id: 'feedback', label: 'Feedback', icon: MessageSquare },
-  ];
-  
   const adminTabs = [
     { id: 'enrollment-analytics', label: 'Student Analytics', icon: BarChart2 },
     { id: 'schedules', label: 'Schedules', icon: Calendar },
@@ -136,8 +129,6 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     switch (profile?.role) {
       case 'student':
         return studentTabs;
-      case 'teacher':
-        return teacherTabs;
       case 'super_admin':
         return adminTabs;
       default:
@@ -151,8 +142,6 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
      switch (profile?.role) {
       case 'student':
         return 'Student Portal';
-      case 'teacher':
-        return 'Teacher Portal';
       case 'super_admin':
         return 'Admin Portal';
       default:
@@ -214,13 +203,13 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
         )}
 
         {/* For Teacher/Admin roles, if profile.batch/subjects still exist in DB, keep old display */}
-        {(profile?.role === 'teacher' || profile?.role === 'super_admin') && profile?.batch && (
+        {(profile?.role === 'super_admin') && profile?.batch && (
             <p className="text-xs text-gray-500 mt-1">Batch: {formatArrayString(profile.batch)}</p>
         )}
       </div>
       
       <div className="flex flex-col flex-grow">
-          <nav className="flex-grow overflow-y-auto p-4 space-y-2">
+          <nav className="overflow-y-auto p-4 space-y-2">
               {tabs.map((tab) => (
               <Button
                   key={tab.id}
