@@ -110,9 +110,10 @@ export default {
           '0%, 100%': { transform: 'scale(1)', opacity: '0.3' },
           '50%': { transform: 'scale(1.1)', opacity: '0.7' },
         },
-        'loading-bar': {
-          '0%': { transform: 'translateX(-100%)' },
-          '100%': { transform: 'translateX(100%)' },
+        'loading-bar-indeterminate': {
+          '0%': { transform: 'translateX(-100%) scaleX(0.5)' },
+          '50%': { transform: 'translateX(0) scaleX(1)' },
+          '100%': { transform: 'translateX(100%) scaleX(0.5)' },
         },
 			},
 			animation: {
@@ -124,7 +125,7 @@ export default {
         'blob': 'blob 7s infinite',
         'pulse-slow': 'pulse-slow 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'pulse-slower': 'pulse-slower 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-        'loading-bar': 'loading-bar 2.5s ease-in-out infinite',
+        'loading-bar-indeterminate': 'loading-bar-indeterminate 2s ease-in-out infinite',
 			},
       animationDelay: {
         '2000': '2000ms',

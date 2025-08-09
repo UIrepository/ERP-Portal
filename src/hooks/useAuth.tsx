@@ -22,37 +22,50 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // onAuthStateChange handles the initial session check and any subsequent changes.
+    const minLoadingTime = 2500; // 2.5 seconds
+    const startTime = Date.now();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          try {
-            const { data: profileData, error } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('user_id', session.user.id)
-              .single();
-
-            if (error) {
-              console.error("Error fetching profile:", error);
-              setProfile(null);
-            } else {
-              setProfile(profileData);
-            }
-          } catch (e) {
-            console.error("Caught exception fetching profile:", e);
-            setProfile(null);
-          }
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .single();
+          setProfile(profileData);
         } else {
           setProfile(null);
         }
-        // Crucially, stop loading after the first auth event is handled.
-        setLoading(false);
+        
+        const elapsedTime = Date.now() - startTime;
+        const remainingTime = minLoadingTime - elapsedTime;
+
+        if (remainingTime > 0) {
+          setTimeout(() => setLoading(false), remainingTime);
+        } else {
+          setLoading(false);
+        }
       }
     );
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (!session) {
+        const elapsedTime = Date.now() - startTime;
+        const remainingTime = minLoadingTime - elapsedTime;
+
+        if (remainingTime > 0) {
+          setTimeout(() => setLoading(false), remainingTime);
+        } else {
+          setLoading(false);
+        }
+      }
+    });
 
     return () => subscription.unsubscribe();
   }, []);
