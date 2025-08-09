@@ -28,14 +28,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch user profile
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('user_id', session.user.id)
-            .single();
-          setProfile(profileData);
-          setLoading(false);
+          try {
+            // Fetch user profile
+            const { data: profileData, error } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('user_id', session.user.id)
+              .single();
+
+            if (error) {
+              console.error("Error fetching profile:", error);
+              setProfile(null);
+            } else {
+              setProfile(profileData);
+            }
+          } catch (e) {
+            console.error("Caught exception fetching profile:", e);
+            setProfile(null);
+          } finally {
+            setLoading(false); // This will now always run
+          }
         } else {
           setProfile(null);
           setLoading(false);
