@@ -14,10 +14,10 @@ export const LoadingSpinner = () => {
         <div className="relative w-32 h-32 flex items-center justify-center">
           <div className="absolute w-full h-full rounded-full bg-primary/10 animate-pulse-slow"></div>
           <div className="absolute w-2/3 h-2/3 rounded-full bg-primary/20 animate-pulse-slower"></div>
-          <img 
-            src="/logoofficial.png" 
-            alt="UI Logo" 
-            className="relative h-16 w-16" 
+          <img
+            src="/logoofficial.png"
+            alt="UI Logo"
+            className="relative h-16 w-16"
           />
         </div>
 
