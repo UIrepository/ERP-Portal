@@ -22,31 +22,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const minLoadingTime = 2500; // 2.5 seconds
-    const startTime = Date.now();
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
+          // Fetch user profile
           const { data: profileData } = await supabase
             .from('profiles')
             .select('*')
             .eq('user_id', session.user.id)
             .single();
           setProfile(profileData);
+          setLoading(false);
         } else {
           setProfile(null);
-        }
-        
-        const elapsedTime = Date.now() - startTime;
-        const remainingTime = minLoadingTime - elapsedTime;
-
-        if (remainingTime > 0) {
-          setTimeout(() => setLoading(false), remainingTime);
-        } else {
           setLoading(false);
         }
       }
@@ -56,14 +47,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (!session) {
-        const elapsedTime = Date.now() - startTime;
-        const remainingTime = minLoadingTime - elapsedTime;
-
-        if (remainingTime > 0) {
-          setTimeout(() => setLoading(false), remainingTime);
-        } else {
-          setLoading(false);
-        }
+        setLoading(false);
       }
     });
 
