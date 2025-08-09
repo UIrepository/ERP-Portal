@@ -219,35 +219,34 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
         )}
       </div>
       
-      <div className="flex-grow overflow-y-auto">
-        <nav className="p-4 space-y-2">
-            {tabs.map((tab) => (
+      <div className="flex flex-col flex-grow">
+          <nav className="flex-grow overflow-y-auto p-4 space-y-2">
+              {tabs.map((tab) => (
+              <Button
+                  key={tab.id}
+                  variant={activeTab === tab.id ? 'default' : 'ghost'}
+                  className={`w-full justify-start ${
+                  activeTab === tab.id 
+                      ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                  onClick={() => onTabChange(tab.id)}
+              >
+                  <tab.icon className="mr-3 h-4 w-4" />
+                  {tab.label}
+              </Button>
+              ))}
+          </nav>
+          <div className="p-4 border-t border-gray-200 mt-auto">
             <Button
-                key={tab.id}
-                variant={activeTab === tab.id ? 'default' : 'ghost'}
-                className={`w-full justify-start ${
-                activeTab === tab.id 
-                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                }`}
-                onClick={() => onTabChange(tab.id)}
+              variant="destructive"
+              className="w-full justify-center"
+              onClick={signOut}
             >
-                <tab.icon className="mr-3 h-4 w-4" />
-                {tab.label}
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
             </Button>
-            ))}
-        </nav>
-      </div>
-
-      <div className="p-4 border-t border-gray-200 shrink-0">
-        <Button
-          variant="destructive"
-          className="w-full justify-center"
-          onClick={signOut}
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          Logout
-        </Button>
+          </div>
       </div>
     </div>
   );
