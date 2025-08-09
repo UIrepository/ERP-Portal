@@ -102,19 +102,18 @@ export default {
             '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
             '100%': { transform: 'translate(0px, 0px) scale(1)' },
         },
-        'bounce-slow': {
-          '0%, 100%': {
-            transform: 'translateY(-5%)',
-            animationTimingFunction: 'cubic-bezier(0.8, 0, 1, 1)',
-          },
-          '50%': {
-            transform: 'translateY(0)',
-            animationTimingFunction: 'cubic-bezier(0, 0, 0.2, 1)',
-          },
+        'pulse-slow': {
+          '0%, 100%': { transform: 'scale(1)', opacity: '0.5' },
+          '50%': { transform: 'scale(1.05)', opacity: '1' },
         },
-        'spin-slow': {
-          '0%': { transform: 'rotate(0deg)' },
-          '100%': { transform: 'rotate(360deg)' },
+        'pulse-slower': {
+          '0%, 100%': { transform: 'scale(1)', opacity: '0.3' },
+          '50%': { transform: 'scale(1.1)', opacity: '0.7' },
+        },
+        'loading-bar': {
+          '0%': { transform: 'translateX(-100%)' },
+          '50%': { transform: 'translateX(0%)' },
+          '100%': { transform: 'translateX(100%)' },
         },
 			},
 			animation: {
@@ -124,8 +123,9 @@ export default {
         'fade-in-fixed': 'fade-in-fixed 0.7s ease-out forwards',
         'slide-up-from-behind': 'slide-up-from-behind 0.7s ease-out forwards',
         'blob': 'blob 7s infinite',
-        'bounce-slow': 'bounce-slow 2s infinite',
-        'spin-slow': 'spin-slow 2s linear infinite',
+        'pulse-slow': 'pulse-slow 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'pulse-slower': 'pulse-slower 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'loading-bar': 'loading-bar 1.5s ease-in-out infinite',
 			},
       animationDelay: {
         '2000': '2000ms',
