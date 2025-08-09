@@ -5,8 +5,7 @@ import { AuthPage } from '@/components/AuthPage';
 import { Layout } from '@/components/Layout';
 import { StudentDashboard } from '@/components/StudentDashboard';
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
-import { Loader2 } from 'lucide-react';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { LoadingSpinner } from '@/components/LoadingSpinner'; // Import the new component
 
 const Index = () => {
   const { user, loading, profile } = useAuth();
@@ -25,18 +24,7 @@ const Index = () => {
   }, [profile?.role]);
 
   if (loading) {
-    // If a user session exists but we're still loading profile data (e.g., after login or on refresh), show the premium spinner.
-    if (user) {
-      return <LoadingSpinner />;
-    }
-    
-    // Otherwise, it's the initial app load before we know the auth state.
-    // Show a minimal loader to prevent flashing the full premium experience before the auth page.
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
+    return <LoadingSpinner />; // Use the new loading spinner
   }
 
   if (!user) {
