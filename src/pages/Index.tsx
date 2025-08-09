@@ -1,17 +1,15 @@
+// src/pages/Index.tsx
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { AuthPage } from '@/components/AuthPage';
 import { Layout } from '@/components/Layout';
 import { StudentDashboard } from '@/components/StudentDashboard';
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
-import { Loader2 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/LoadingSpinner'; // Import the new component
 
 const Index = () => {
   const { user, loading, profile } = useAuth();
   
-  // The global real-time hook that was causing instability has been removed.
-  // Component-specific real-time hooks will handle updates more efficiently.
-
   const getInitialTab = () => {
     if (profile?.role === 'super_admin') {
       return 'enrollment-analytics';
@@ -26,11 +24,7 @@ const Index = () => {
   }, [profile?.role]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
+    return <LoadingSpinner />; // Use the new loading spinner
   }
 
   if (!user) {
