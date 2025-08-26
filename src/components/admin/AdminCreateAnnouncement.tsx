@@ -66,10 +66,24 @@ export const AdminCreateAnnouncement = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <h2 className="text-3xl font-bold flex items-center"><Megaphone className="mr-3 h-8 w-8 text-primary" />Create Announcement</h2>
+    <div className="p-6 space-y-6 bg-gray-50/50 min-h-full">
+        <div className="relative p-8 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-r from-primary to-indigo-600 text-white animate-fade-in-up">
+            <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/10 rounded-full animate-pulse-slow"></div>
+            <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-white/10 rounded-full animate-pulse-slow animation-delay-500"></div>
+            <div className="relative z-10 text-center">
+                <div className="flex items-center justify-center mb-4">
+                    <Megaphone className="h-16 w-16 text-white drop-shadow-md" />
+                </div>
+                <h1 className="text-4xl md:text-5xl font-bold mb-2 tracking-tight drop-shadow-lg">
+                    Create Announcement
+                </h1>
+                <p className="text-xl md:text-2xl text-indigo-100 drop-shadow-sm font-semibold">
+                    Broadcast important messages to students.
+                </p>
+            </div>
+        </div>
       
-      <Card>
+      <Card className="shadow-lg rounded-2xl">
         <CardHeader>
           <CardTitle>Announcement Details</CardTitle>
           <CardDescription>Compose and target your announcement to specific student groups.</CardDescription>
