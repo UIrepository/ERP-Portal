@@ -1,4 +1,5 @@
-// uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/Sidebar.tsx
+// src/components/Sidebar.tsx
+
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -23,7 +24,8 @@ import {
   Monitor,
   BarChart2,
   LogOut,
-  Megaphone // New icon
+  Megaphone,
+  History // New Icon
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -31,7 +33,6 @@ interface SidebarProps {
   onTabChange: (tab: string) => void;
 }
 
-// Define the structure for an enrollment record from the user_enrollments table
 interface UserEnrollment {
     batch_name: string;
     subject_name: string;
@@ -41,7 +42,6 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const { profile, signOut } = useAuth();
   const queryClient = useQueryClient();
 
-  // Fetch user's specific enrollments for sidebar display
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['sidebarUserEnrollments', profile?.user_id],
     queryFn: async () => {
@@ -59,7 +59,6 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     enabled: !!profile?.user_id
   });
 
-  // Extract unique batches and subjects from the fetched enrollments for display
   const availableBatches = useMemo(() => {
     return Array.from(new Set(userEnrollments?.map(e => e.batch_name) || [])).sort();
   }, [userEnrollments]);
@@ -68,43 +67,16 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     return Array.from(new Set(userEnrollments?.map(e => e.subject_name) || [])).sort();
   }, [userEnrollments]);
 
-  // Set up real-time subscriptions for sidebar data
   useEffect(() => {
     if (!profile?.user_id) return;
-
     const channel = supabase
       .channel('sidebar-realtime-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_enrollments',
-          filter: `user_id=eq.${profile.user_id}`
-        },
-        () => {
-          console.log('Real-time update: user_enrollments changed');
-          queryClient.invalidateQueries({ queryKey: ['sidebarUserEnrollments'] });
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'profiles',
-          filter: `user_id=eq.${profile.user_id}`
-        },
-        () => {
-          console.log('Real-time update: profiles changed');
-          queryClient.invalidateQueries({ queryKey: ['sidebarUserEnrollments'] });
-        }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_enrollments', filter: `user_id=eq.${profile.user_id}`},
+        () => queryClient.invalidateQueries({ queryKey: ['sidebarUserEnrollments'] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `user_id=eq.${profile.user_id}`},
+        () => queryClient.invalidateQueries({ queryKey: ['sidebarUserEnrollments'] }))
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [profile?.user_id, queryClient]);
 
   const studentTabs = [
@@ -126,16 +98,14 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     { id: 'meeting-manager', label: 'Meeting Links', icon: LinkIcon },
     { id: 'feedback-viewer', label: 'Feedback Viewer', icon: MessageSquare },
     { id: 'create-announcement', label: 'Create Announcement', icon: Megaphone },
+    { id: 'view-announcements', label: 'Sent Announcements', icon: History },
   ];
 
   const getTabs = () => {
     switch (profile?.role) {
-      case 'student':
-        return studentTabs;
-      case 'super_admin':
-        return adminTabs;
-      default:
-        return [];
+      case 'student': return studentTabs;
+      case 'super_admin': return adminTabs;
+      default: return [];
     }
   };
 
@@ -143,35 +113,15 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
 
   const getPortalName = () => {
      switch (profile?.role) {
-      case 'student':
-        return 'Student Portal';
-      case 'super_admin':
-        return 'Admin Portal';
-      default:
-        return 'Portal';
+      case 'student': return 'Student Portal';
+      case 'super_admin': return 'Admin Portal';
+      default: return 'Portal';
     }
   }
 
   const formatArrayString = (arr: string | string[] | null | undefined) => {
     if (!arr) return '';
-
-    if (Array.isArray(arr)) {
-      return arr.map(item =>
-        typeof item === 'string' ? item.replace(/[\\"]/g, '') : item
-      ).join(', ');
-    }
-
-    try {
-      const parsed = JSON.parse(arr);
-      if (Array.isArray(parsed)) {
-        return parsed.map(item =>
-          typeof item === 'string' ? item.replace(/[\\"]/g, '') : item
-        ).join(', ');
-      }
-    } catch (e) {
-      // JSON parsing failed, treat as a raw string and clean it
-    }
-
+    if (Array.isArray(arr)) return arr.join(', ');
     return String(arr).replace(/[\\"\\[\\]]/g, '');
   };
 
@@ -179,33 +129,17 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     <div className="w-full bg-white border-r border-gray-200 h-full flex flex-col">
       <div className="p-4 border-b border-gray-200 shrink-0">
         <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-16 w-auto mx-auto mb-4 md:hidden" />
-        <h2 className="font-semibold text-gray-800 text-lg">
-          {getPortalName()}
-        </h2>
+        <h2 className="font-semibold text-gray-800 text-lg">{getPortalName()}</h2>
         <p className="text-sm text-gray-500 mt-1">{profile?.name}</p>
-        
-        {/* Updated to display batches from availableBatches */}
         {profile?.role === 'student' && availableBatches.length > 0 && (
           <p className="text-xs text-gray-500 mt-1">Batch: {availableBatches.join(', ')}</p>
         )}
-        {/* Updated to display subjects from availableSubjects */}
         {profile?.role === 'student' && availableSubjects.length > 0 && (
           <p className="text-xs text-gray-500 mt-1">Subjects: {availableSubjects.join(', ')}</p>
         )}
-
-        {/* Display loading state for enrollments */}
         {profile?.role === 'student' && isLoadingEnrollments && (
-             <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                <span className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-gray-400"></span>
-                Loading enrollments...
-             </p>
+             <p className="text-xs text-gray-500 mt-1">Loading enrollments...</p>
         )}
-        {/* If no enrollments and not loading, display a message */}
-        {profile?.role === 'student' && !isLoadingEnrollments && availableBatches.length === 0 && availableSubjects.length === 0 && (
-             <p className="text-xs text-gray-500 mt-1">No enrollments found.</p>
-        )}
-
-        {/* For Teacher/Admin roles, if profile.batch/subjects still exist in DB, keep old display */}
         {(profile?.role === 'super_admin') && profile?.batch && (
             <p className="text-xs text-gray-500 mt-1">Batch: {formatArrayString(profile.batch)}</p>
         )}
@@ -217,11 +151,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
               <Button
                   key={tab.id}
                   variant={activeTab === tab.id ? 'default' : 'ghost'}
-                  className={`w-full justify-start ${
-                  activeTab === tab.id 
-                      ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                  }`}
+                  className={`w-full justify-start ${ activeTab === tab.id ? 'bg-blue-600 text-white hover:bg-blue-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'}`}
                   onClick={() => onTabChange(tab.id)}
               >
                   <tab.icon className="mr-3 h-4 w-4" />
@@ -230,16 +160,71 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
               ))}
           </nav>
           <div className="p-4 border-t border-gray-200 mt-auto">
-            <Button
-              variant="destructive"
-              className="w-full justify-center"
-              onClick={signOut}
-            >
+            <Button variant="destructive" className="w-full justify-center" onClick={signOut}>
               <LogOut className="mr-2 h-4 w-4" />
               Logout
             </Button>
           </div>
       </div>
+    </div>
+  );
+};
+
+// src/components/admin/AdminDashboard.tsx
+
+import { useAuth } from '@/hooks/useAuth';
+import { ScheduleManagement } from './ScheduleManagement';
+import { MonitoringDashboard } from './MonitoringDashboard';
+import { AdminMeetingManager } from './AdminMeetingManager';
+import { AdminFeedbackViewer } from './AdminFeedbackViewer';
+import { EnrollmentAnalytics } from './EnrollmentAnalytics';
+import { TeacherAnalytics } from './TeacherAnalytics';
+import { AdminCreateAnnouncement } from './AdminCreateAnnouncement';
+import { AdminAnnouncementsViewer } from './AdminAnnouncementsViewer'; // Import new component
+
+interface AdminDashboardProps {
+  activeTab: string;
+  onTabChange: (tab: string) => void;
+}
+
+export const AdminDashboard = ({ activeTab, onTabChange }: AdminDashboardProps) => {
+  const { profile } = useAuth();
+
+  if (profile?.role !== 'super_admin') {
+    return (
+      <div className="p-6 text-center">
+        <h1 className="text-2xl font-bold text-destructive">Access Denied</h1>
+        <p className="text-muted-foreground mt-2">Please contact administrator for access.</p>
+      </div>
+    );
+  }
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'enrollment-analytics':
+        return <EnrollmentAnalytics />;
+      case 'teacher-analytics':
+        return <TeacherAnalytics />;
+      case 'schedules':
+        return <ScheduleManagement />;
+      case 'meeting-manager':
+        return <AdminMeetingManager />;
+      case 'feedback-viewer':
+        return <AdminFeedbackViewer />;
+      case 'create-announcement':
+        return <AdminCreateAnnouncement />;
+      case 'view-announcements':
+        return <AdminAnnouncementsViewer />;
+      case 'monitoring':
+        return <MonitoringDashboard />;
+      default:
+        return <EnrollmentAnalytics />;
+    }
+  };
+
+  return (
+    <div className="p-6">
+      {renderTabContent()}
     </div>
   );
 };
