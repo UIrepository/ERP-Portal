@@ -61,22 +61,28 @@ export const StudentAnnouncements = () => {
 
     return (
         <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
-            {/* Header Section */}
-            <div>
-                <h1 className="text-3xl font-bold text-gray-800 flex items-center">
-                    <Megaphone className="mr-3 h-8 w-8 text-primary" />
-                    Announcements
-                </h1>
-                <p className="text-gray-500 mt-1">Important updates and notices from the administration.</p>
+            <div className="relative p-8 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-r from-primary to-indigo-600 text-white animate-fade-in-up">
+                <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/10 rounded-full animate-pulse-slow"></div>
+                <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-white/10 rounded-full animate-pulse-slow animation-delay-500"></div>
+                <div className="relative z-10 text-center">
+                    <div className="flex items-center justify-center mb-4">
+                        <Megaphone className="h-16 w-16 text-white drop-shadow-md" />
+                    </div>
+                    <h1 className="text-4xl md:text-5xl font-bold mb-2 tracking-tight drop-shadow-lg">
+                        Announcements
+                    </h1>
+                    <p className="text-xl md:text-2xl text-indigo-100 drop-shadow-sm font-semibold">
+                        Important updates and notices.
+                    </p>
+                </div>
             </div>
 
-            {/* Announcements List */}
             <div className="space-y-6">
                 {isLoading ? (
                     <AnnouncementSkeleton />
                 ) : announcements && announcements.length > 0 ? (
                     announcements.map((announcement) => (
-                        <Card key={announcement.id} className="bg-white shadow-md rounded-xl overflow-hidden">
+                        <Card key={announcement.id} className="bg-white shadow-md rounded-xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:border-primary/20 border-transparent border">
                              <CardHeader className="bg-slate-50 p-4 border-b">
                                 <CardTitle className="text-lg font-semibold text-slate-800">{announcement.title}</CardTitle>
                              </CardHeader>
