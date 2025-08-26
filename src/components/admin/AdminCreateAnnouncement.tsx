@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
-import { Megaphone, Send } from 'lucide-react';
+import { Megaphone, Send, Users, Book, Loader2 } from 'lucide-react';
 import { Combobox } from '@/components/ui/combobox';
+import { Separator } from '@/components/ui/separator';
 
 export const AdminCreateAnnouncement = () => {
   const { profile } = useAuth();
@@ -66,77 +67,101 @@ export const AdminCreateAnnouncement = () => {
   };
 
   return (
-    <div className="p-6 space-y-6 bg-gray-50/50 min-h-full">
-        <div className="relative p-8 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-r from-primary to-indigo-600 text-white animate-fade-in-up">
-            <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/10 rounded-full animate-pulse-slow"></div>
-            <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-white/10 rounded-full animate-pulse-slow animation-delay-500"></div>
-            <div className="relative z-10 text-center">
-                <div className="flex items-center justify-center mb-4">
-                    <Megaphone className="h-16 w-16 text-white drop-shadow-md" />
-                </div>
-                <h1 className="text-4xl md:text-5xl font-bold mb-2 tracking-tight drop-shadow-lg">
-                    Create Announcement
-                </h1>
-                <p className="text-xl md:text-2xl text-indigo-100 drop-shadow-sm font-semibold">
-                    Broadcast important messages to students.
-                </p>
-            </div>
+    <div className="p-4 md:p-6 space-y-8 bg-slate-50 min-h-full animate-fade-in-up">
+        <div className="flex flex-col space-y-1">
+            <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Broadcast Center</h1>
+            <p className="text-slate-500">Compose and dispatch announcements to your students.</p>
         </div>
       
-      <Card className="shadow-lg rounded-2xl">
-        <CardHeader>
-          <CardTitle>Announcement Details</CardTitle>
-          <CardDescription>Compose and target your announcement to specific student groups.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <label className="font-medium">Title</label>
-            <Input 
-              placeholder="E.g., Extra Class for Physics" 
-              value={title} 
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="font-medium">Message</label>
-            <Textarea 
-              placeholder="Enter the full announcement details here..." 
-              value={message} 
-              onChange={(e) => setMessage(e.target.value)}
-              rows={5}
-            />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-                <label className="font-medium">Target Batches (Optional)</label>
-                <Combobox
-                    options={batchOptions}
-                    selected={selectedBatches}
-                    onChange={setSelectedBatches}
-                    placeholder="All Batches"
-                />
-            </div>
-            <div className="space-y-2">
-                <label className="font-medium">Target Subjects (Optional)</label>
-                <Combobox
-                    options={subjectOptions}
-                    selected={selectedSubjects}
-                    onChange={setSelectedSubjects}
-                    placeholder="All Subjects"
-                />
-            </div>
-          </div>
+      <div className="space-y-8">
+        {/* Step 1: Compose Message */}
+        <Card className="shadow-lg rounded-2xl border-slate-200">
+            <CardHeader>
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Megaphone className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                        <CardTitle>Compose Message</CardTitle>
+                        <CardDescription>Craft the title and content of your announcement.</CardDescription>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-6 pt-2">
+                <div className="space-y-2">
+                    <label className="font-medium text-slate-700">Title</label>
+                    <Input 
+                    placeholder="E.g., Important Update: Physics Extra Class" 
+                    value={title} 
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="text-base"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <label className="font-medium text-slate-700">Message</label>
+                    <Textarea 
+                    placeholder="Enter the full announcement details here. You can use markdown for formatting." 
+                    value={message} 
+                    onChange={(e) => setMessage(e.target.value)}
+                    rows={6}
+                    className="text-base"
+                    />
+                </div>
+            </CardContent>
+        </Card>
+
+        {/* Step 2: Targeting */}
+        <Card className="shadow-lg rounded-2xl border-slate-200">
+            <CardHeader>
+                <div className="flex items-center gap-4">
+                     <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Users className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                        <CardTitle>Target Audience</CardTitle>
+                        <CardDescription>Select batches and subjects to target. Leave blank to send to all.</CardDescription>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                <div className="space-y-2">
+                    <label className="font-medium text-slate-700 flex items-center gap-2"><Users className="h-4 w-4"/> Batches</label>
+                    <Combobox
+                        options={batchOptions}
+                        selected={selectedBatches}
+                        onChange={setSelectedBatches}
+                        placeholder="All Batches"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <label className="font-medium text-slate-700 flex items-center gap-2"><Book className="h-4 w-4"/> Subjects</label>
+                    <Combobox
+                        options={subjectOptions}
+                        selected={selectedSubjects}
+                        onChange={setSelectedSubjects}
+                        placeholder="All Subjects"
+                    />
+                </div>
+            </CardContent>
+        </Card>
+
+        {/* Step 3: Send */}
+        <div className="flex justify-end">
           <Button 
             onClick={handleSendAnnouncement} 
             disabled={createAnnouncementMutation.isPending}
-            className="w-full"
+            className="w-full md:w-auto bg-primary hover:bg-primary/90 text-white font-semibold transition-all transform hover:scale-105 active:scale-95"
             size="lg"
           >
-            <Send className="mr-2 h-5 w-5" />
+            {createAnnouncementMutation.isPending ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+            ) : (
+                <Send className="mr-2 h-5 w-5" />
+            )}
             {createAnnouncementMutation.isPending ? 'Sending...' : 'Send Announcement'}
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 };
