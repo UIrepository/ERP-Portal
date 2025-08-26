@@ -3,13 +3,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export const AuthPage = () => {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const { authError } = useAuth(); 
+  // signIn and signUp are not directly used but kept for AuthContext compatibility
+  const { signIn, signUp } = useAuth(); 
 
   const handleGoogleAuth = async () => {
     setIsGoogleLoading(true);
@@ -58,17 +58,6 @@ export const AuthPage = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="p-6 pt-0">
-               {authError && (
-                <div className="mb-4">
-                  <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Access Denied</AlertTitle>
-                    <AlertDescription>
-                      {authError}
-                    </AlertDescription>
-                  </Alert>
-                </div>
-              )}
               <div className="space-y-4">
                 <Button 
                   type="button" 
