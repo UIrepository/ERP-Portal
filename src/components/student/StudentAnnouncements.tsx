@@ -71,9 +71,9 @@ export const StudentAnnouncements = () => {
             <div>
                 <h1 className="text-3xl font-bold text-gray-800 flex items-center">
                     <Megaphone className="mr-3 h-8 w-8 text-primary" />
-                    Announcements
+                    Notice Board
                 </h1>
-                <p className="text-gray-500 mt-1">Important updates and notices from the administration.</p>
+                <p className="text-gray-500 mt-1">All important updates from the team, right here in one place.</p>
             </div>
 
             {/* Announcements List */}
