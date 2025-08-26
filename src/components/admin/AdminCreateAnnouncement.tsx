@@ -7,47 +7,94 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
-import { Megaphone, Send, Users, Book, Loader2 } from 'lucide-react';
+import { Megaphone, Send, Users, Book, Loader2, Plus, X } from 'lucide-react';
 import { Combobox } from '@/components/ui/combobox';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+
+// New interface for defining a target combination of batch and subject
+interface TargetCombination {
+  batch: string | null;
+  subject: string | null;
+}
 
 export const AdminCreateAnnouncement = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
-  const [selectedBatches, setSelectedBatches] = useState<string[]>([]);
-  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+  // State to hold multiple target combinations
+  const [targets, setTargets] = useState<TargetCombination[]>([]);
+  // State for the current selection in the dropdowns
+  const [currentBatch, setCurrentBatch] = useState<string | null>(null);
+  const [currentSubject, setCurrentSubject] = useState<string | null>(null);
 
-  const { data: options = [] } = useQuery({
-    queryKey: ['available-options-announcements'],
+  // Fetch all enrollments to understand batch-subject relationships
+  const { data: enrollments = [] } = useQuery({
+    queryKey: ['all-enrollments-for-announcements'],
     queryFn: async () => {
-      const { data } = await supabase.rpc('get_all_options');
+      const { data } = await supabase.from('user_enrollments').select('batch_name, subject_name');
       return data || [];
     }
   });
 
-  const { batchOptions, subjectOptions } = useMemo(() => ({
-    batchOptions: options.filter((o: any) => o.type === 'batch').map((o: any) => o.name),
-    subjectOptions: options.filter((o: any) => o.type === 'subject').map((o: any) => o.name)
-  }), [options]);
+  // Memoized derivation of unique batches and subjects based on enrollments
+  const { allBatches, subjectsForSelectedBatch } = useMemo(() => {
+    const uniqueBatches = Array.from(new Set(enrollments.map(e => e.batch_name))).sort();
+    let subjectsForBatch: string[] = [];
+    if (currentBatch) {
+      subjectsForBatch = Array.from(
+        new Set(enrollments.filter(e => e.batch_name === currentBatch).map(e => e.subject_name))
+      ).sort();
+    } else {
+        // If no batch is selected, show all unique subjects across all batches.
+        subjectsForBatch = Array.from(new Set(enrollments.map(e => e.subject_name))).sort()
+    }
+    return { allBatches: uniqueBatches, subjectsForSelectedBatch: subjectsForBatch };
+  }, [enrollments, currentBatch]);
+
 
   const createAnnouncementMutation = useMutation({
     mutationFn: async (announcementData: any) => {
-      const { error } = await supabase.from('notifications').insert([announcementData]);
+        // The announcements are now inserted as an array
+      const { error } = await supabase.from('notifications').insert(announcementData);
       if (error) throw error;
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Announcement has been sent." });
       setTitle('');
       setMessage('');
-      setSelectedBatches([]);
-      setSelectedSubjects([]);
+      setTargets([]);
+      setCurrentBatch(null);
+      setCurrentSubject(null);
     },
     onError: (error: any) => {
       toast({ title: "Error", description: `Failed to send announcement: ${error.message}`, variant: "destructive" });
     },
   });
+
+  // Adds the currently selected combination to the list of targets
+  const handleAddTarget = () => {
+    if (!currentBatch && !currentSubject) {
+      toast({ title: "Info", description: "Select a batch and/or a subject to add a target.", variant: "default" });
+      return;
+    }
+    const newTarget = { batch: currentBatch, subject: currentSubject };
+    // Avoid adding duplicate targets
+    if (!targets.some(t => t.batch === newTarget.batch && t.subject === newTarget.subject)) {
+      setTargets([...targets, newTarget]);
+      setCurrentBatch(null)
+      setCurrentSubject(null)
+    } else {
+        toast({title: "Duplicate Target", description: "This batch/subject combination has already been added.", variant: "default"})
+    }
+  };
+
+    // Removes a target from the list
+  const handleRemoveTarget = (index: number) => {
+    setTargets(targets.filter((_, i) => i !== index));
+  };
+
 
   const handleSendAnnouncement = () => {
     if (!title.trim() || !message.trim()) {
@@ -55,15 +102,32 @@ export const AdminCreateAnnouncement = () => {
       return;
     }
 
-    createAnnouncementMutation.mutate({
-      title,
-      message,
-      target_batch: selectedBatches.length > 0 ? selectedBatches[0] : null, // Simplified for now
-      target_subject: selectedSubjects.length > 0 ? selectedSubjects[0] : null, // Simplified for now
-      created_by: profile?.user_id,
-      is_active: true,
-      target_role: 'student'
-    });
+    let announcementsToSend = [];
+    // If no specific targets, send a single global announcement.
+    if (targets.length === 0) {
+        announcementsToSend.push({
+            title,
+            message,
+            target_batch: null,
+            target_subject: null,
+            created_by: profile?.user_id,
+            is_active: true,
+            target_role: 'student'
+        })
+    } else {
+        // Otherwise, create an announcement for each target combination
+        announcementsToSend = targets.map(target => ({
+             title,
+            message,
+            target_batch: target.batch,
+            target_subject: target.subject,
+            created_by: profile?.user_id,
+            is_active: true,
+            target_role: 'student'
+        }))
+    }
+
+    createAnnouncementMutation.mutate(announcementsToSend);
   };
 
   return (
@@ -123,24 +187,47 @@ export const AdminCreateAnnouncement = () => {
                     </div>
                 </div>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                <div className="space-y-2">
-                    <label className="font-medium text-slate-700 flex items-center gap-2"><Users className="h-4 w-4"/> Batches</label>
-                    <Combobox
-                        options={batchOptions}
-                        selected={selectedBatches}
-                        onChange={setSelectedBatches}
-                        placeholder="All Batches"
-                    />
+            <CardContent className="pt-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                        <label className="font-medium text-slate-700 flex items-center gap-2"><Users className="h-4 w-4"/> Batches</label>
+                        <Combobox
+                            options={allBatches}
+                            selected={currentBatch ? [currentBatch] : []}
+                            onChange={(batches) => setCurrentBatch(batches[0] || null)}
+                            placeholder="All Batches"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="font-medium text-slate-700 flex items-center gap-2"><Book className="h-4 w-4"/> Subjects</label>
+                        <Combobox
+                            options={subjectsForSelectedBatch}
+                            selected={currentSubject ? [currentSubject] : []}
+                            onChange={(subjects) => setCurrentSubject(subjects[0] || null)}
+                            placeholder="All Subjects"
+                        />
+                    </div>
                 </div>
-                <div className="space-y-2">
-                    <label className="font-medium text-slate-700 flex items-center gap-2"><Book className="h-4 w-4"/> Subjects</label>
-                    <Combobox
-                        options={subjectOptions}
-                        selected={selectedSubjects}
-                        onChange={setSelectedSubjects}
-                        placeholder="All Subjects"
-                    />
+                <div className="flex justify-end mt-4">
+                    <Button onClick={handleAddTarget} size="sm">
+                        <Plus className="h-4 w-4 mr-2"/>
+                        Add Target Combination
+                    </Button>
+                </div>
+                <Separator className="my-6"/>
+                 <div>
+                    <h4 className="font-medium text-slate-700 mb-3">Selected Targets:</h4>
+                    <div className="flex flex-wrap gap-2">
+                    {targets.length === 0 && <p className="text-sm text-slate-500">No specific targets added. Announcement will be sent to all students.</p>}
+                    {targets.map((target, index) => (
+                        <Badge key={index} variant="outline" className="text-base py-1 px-3">
+                        {target.batch || 'All Batches'} / {target.subject || 'All Subjects'}
+                        <button onClick={() => handleRemoveTarget(index)} className="ml-2 hover:text-red-500">
+                            <X className="h-4 w-4"/>
+                        </button>
+                        </Badge>
+                    ))}
+                    </div>
                 </div>
             </CardContent>
         </Card>
