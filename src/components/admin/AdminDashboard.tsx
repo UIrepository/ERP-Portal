@@ -5,7 +5,8 @@ import { AdminMeetingManager } from './AdminMeetingManager';
 import { AdminFeedbackViewer } from './AdminFeedbackViewer';
 import { EnrollmentAnalytics } from './EnrollmentAnalytics';
 import { TeacherAnalytics } from './TeacherAnalytics';
-import { AdminCreateAnnouncement } from './AdminCreateAnnouncement'; // Import new component
+import { AdminCreateAnnouncement } from './AdminCreateAnnouncement';
+import { AdminAnnouncementsViewer } from './AdminAnnouncementsViewer';
 
 interface AdminDashboardProps {
   activeTab: string;
@@ -38,6 +39,8 @@ export const AdminDashboard = ({ activeTab, onTabChange }: AdminDashboardProps) 
         return <AdminFeedbackViewer />;
       case 'create-announcement':
         return <AdminCreateAnnouncement />;
+      case 'view-announcements':
+        return <AdminAnnouncementsViewer />;
       case 'monitoring':
         return <MonitoringDashboard />;
       default:
