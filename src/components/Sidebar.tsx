@@ -23,7 +23,8 @@ import {
   Monitor,
   BarChart2,
   LogOut,
-  Megaphone // New icon
+  Megaphone, // New icon
+  History,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -126,6 +127,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     { id: 'meeting-manager', label: 'Meeting Links', icon: LinkIcon },
     { id: 'feedback-viewer', label: 'Feedback Viewer', icon: MessageSquare },
     { id: 'create-announcement', label: 'Create Announcement', icon: Megaphone },
+    { id: 'announcement-history', label: 'Announcement History', icon: History },
   ];
 
   const getTabs = () => {
