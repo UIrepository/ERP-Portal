@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
 import { Megaphone, Send, Users, Book, Loader2 } from 'lucide-react';
 import { Combobox } from '@/components/ui/combobox';
+import { Separator } from '@/components/ui/separator';
 
 export const AdminCreateAnnouncement = () => {
   const { profile } = useAuth();
@@ -57,8 +58,8 @@ export const AdminCreateAnnouncement = () => {
     createAnnouncementMutation.mutate({
       title,
       message,
-      target_batch: selectedBatches.length > 0 ? selectedBatches[0] : null,
-      target_subject: selectedSubjects.length > 0 ? selectedSubjects[0] : null,
+      target_batch: selectedBatches.length > 0 ? selectedBatches[0] : null, // Simplified for now
+      target_subject: selectedSubjects.length > 0 ? selectedSubjects[0] : null, // Simplified for now
       created_by: profile?.user_id,
       is_active: true,
       target_role: 'student'
@@ -73,6 +74,7 @@ export const AdminCreateAnnouncement = () => {
         </div>
       
       <div className="space-y-8">
+        {/* Step 1: Compose Message */}
         <Card className="shadow-lg rounded-2xl border-slate-200">
             <CardHeader>
                 <div className="flex items-center gap-4">
@@ -89,25 +91,26 @@ export const AdminCreateAnnouncement = () => {
                 <div className="space-y-2">
                     <label className="font-medium text-slate-700">Title</label>
                     <Input 
-                      placeholder="E.g., Important Update: Physics Extra Class" 
-                      value={title} 
-                      onChange={(e) => setTitle(e.target.value)}
-                      className="text-base"
+                    placeholder="E.g., Important Update: Physics Extra Class" 
+                    value={title} 
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="text-base"
                     />
                 </div>
                 <div className="space-y-2">
                     <label className="font-medium text-slate-700">Message</label>
                     <Textarea 
-                      placeholder="Enter the full announcement details here. You can use markdown for formatting." 
-                      value={message} 
-                      onChange={(e) => setMessage(e.target.value)}
-                      rows={6}
-                      className="text-base"
+                    placeholder="Enter the full announcement details here. You can use markdown for formatting." 
+                    value={message} 
+                    onChange={(e) => setMessage(e.target.value)}
+                    rows={6}
+                    className="text-base"
                     />
                 </div>
             </CardContent>
         </Card>
 
+        {/* Step 2: Targeting */}
         <Card className="shadow-lg rounded-2xl border-slate-200">
             <CardHeader>
                 <div className="flex items-center gap-4">
@@ -142,6 +145,7 @@ export const AdminCreateAnnouncement = () => {
             </CardContent>
         </Card>
 
+        {/* Step 3: Send */}
         <div className="flex justify-end">
           <Button 
             onClick={handleSendAnnouncement} 
