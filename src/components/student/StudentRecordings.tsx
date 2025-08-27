@@ -49,10 +49,11 @@ const RecordingListSkeleton = () => (
 // Component for the watermarked video player
 const WatermarkedPlayer = ({ recording }: { recording: RecordingContent }) => {
     const { profile } = useAuth();
+    const embedUrl = recording.embed_link.replace("/view", "/preview");
     return (
         <div className="relative aspect-video" onContextMenu={(e) => e.preventDefault()}>
             <iframe
-                src={recording.embed_link}
+                src={embedUrl}
                 className="absolute top-0 left-0 w-full h-full"
                 frameBorder="0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
