@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Video, Play, Search, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 
 // Interfaces
@@ -185,6 +185,10 @@ export const StudentRecordings = () => {
     {selectedRecording && (
         <Dialog open={!!selectedRecording} onOpenChange={() => setSelectedRecording(null)}>
             <DialogContent className="max-w-4xl h-[80vh]">
+                <DialogTitle className="sr-only">{selectedRecording.topic}</DialogTitle>
+                <DialogDescription className="sr-only">
+                    A video recording of {selectedRecording.topic} from {format(new Date(selectedRecording.date), 'PPP')}.
+                </DialogDescription>
                 <iframe
                     src={selectedRecording.embed_link.replace('/view', '/preview')}
                     className="w-full h-full"
