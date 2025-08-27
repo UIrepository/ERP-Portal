@@ -2,12 +2,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader } from '@/components/ui/card'; // Fixed import
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Clock, ExternalLink, Users } from 'lucide-react';
-import { format, getDay } from 'date-fns';
+import { Calendar, Clock, ExternalLink } from 'lucide-react';
+import { format, getDay, startOfWeek, addDays, isSameDay } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface Schedule {
@@ -18,6 +18,7 @@ interface Schedule {
   start_time: string;
   end_time: string;
   link?: string;
+  date?: string; // Optional date for specific, non-recurring classes
 }
 
 interface UserEnrollment {
@@ -95,7 +96,7 @@ export const StudentSchedule = () => {
             : [selectedBatchFilter];
         if (batchesToFilter.length === 0) return [];
         query = query.in('batch', batchesToFilter);
-        query = query.order('day_of_week').order('start_time');
+        query = query.order('date', { nullsFirst: false }).order('day_of_week').order('start_time');
         const { data, error } = await query;
         if (error) {
             console.error("Error fetching schedules directly:", error);
@@ -107,6 +108,11 @@ export const StudentSchedule = () => {
   });
 
   const isLoading = isLoadingEnrollments || isLoadingSchedules;
+
+  const weekDates = useMemo(() => {
+    const start = startOfWeek(currentTime);
+    return Array.from({ length: 7 }).map((_, i) => addDays(start, i));
+  }, [currentTime]);
 
   const timeSlots = useMemo(() => {
     const slots = new Set<string>();
@@ -123,7 +129,7 @@ export const StudentSchedule = () => {
     return format(date, 'h:mm a');
   };
 
-  const today = getDay(currentTime);
+  const today = new Date();
 
   return (
     <div className="p-2 sm:p-6 bg-gray-50 min-h-screen">
@@ -157,9 +163,10 @@ export const StudentSchedule = () => {
           <div className="min-w-[800px]">
             <div className="grid grid-cols-[minmax(100px,1fr)_repeat(7,minmax(120px,1fr))]">
                 <div className="text-center font-semibold text-gray-500 py-2 sticky left-0 bg-white z-10">Time</div>
-                {DAYS.map((day, index) => (
-                    <div key={day} className={`text-center font-semibold py-2 ${index === today ? 'text-primary' : 'text-gray-500'}`}>
-                        {day}
+                {weekDates.map((date, index) => (
+                    <div key={index} className={`text-center font-semibold py-2 ${isSameDay(date, today) ? 'text-primary' : 'text-gray-500'}`}>
+                        <div>{DAYS[getDay(date)]}</div>
+                        <div className="text-xs font-normal">{format(date, 'MMM d')}</div>
                     </div>
                 ))}
             </div>
@@ -167,15 +174,18 @@ export const StudentSchedule = () => {
                 {timeSlots.map(time => (
                     <div key={time} className="grid grid-cols-[minmax(100px,1fr)_repeat(7,minmax(120px,1fr))] border-t">
                         <div className="text-center text-sm font-medium text-gray-700 py-4 px-2 border-r sticky left-0 bg-white z-10">{formatTime(time)}</div>
-                        {DAYS.map((day, dayIndex) => {
-                            const classInfo = schedules?.find(s => s.day_of_week === dayIndex && s.start_time === time);
+                        {weekDates.map((date, dayIndex) => {
+                            const recurringClass = schedules?.find(s => !s.date && s.day_of_week === getDay(date) && s.start_time === time);
+                            const dateSpecificClass = schedules?.find(s => s.date && isSameDay(new Date(s.date), date) && s.start_time === time);
+                            const classInfo = dateSpecificClass || recurringClass;
                             return (
-                                <div key={`${day}-${time}`} className={`p-2 border-r last:border-r-0 ${dayIndex === today ? 'bg-blue-50' : ''}`}>
+                                <div key={`${dayIndex}-${time}`} className={`p-2 border-r last:border-r-0 ${isSameDay(date, today) ? 'bg-blue-50' : ''}`}>
                                     {classInfo && (
                                         <Card className="bg-white shadow-md hover:shadow-lg transition-shadow">
                                             <CardContent className="p-3">
                                                 <p className="font-bold text-gray-800 text-sm">{classInfo.subject}</p>
                                                 <Badge variant="secondary" className="mt-1">{classInfo.batch}</Badge>
+                                                {classInfo.date && <Badge variant="outline" className="mt-1 ml-1">{format(new Date(classInfo.date), 'MMM d')}</Badge>}
                                                 {classInfo.link && (
                                                     <Button size="sm" asChild className="w-full mt-2">
                                                         <a href={classInfo.link} target="_blank" rel="noopener noreferrer">
