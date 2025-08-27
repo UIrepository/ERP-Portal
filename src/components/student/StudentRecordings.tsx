@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Video, Play, Search, ArrowLeft, PlayCircle } from 'lucide-react';
+import { Video, Play, Search, ArrowLeft, PlayCircle, Home, Calendar, Book, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useIsMobile } from '@/hooks/use-mobile';
 
-// Interfaces
+
 interface RecordingContent {
   id: string;
   date: string;
@@ -27,8 +28,7 @@ interface UserEnrollment {
     subject_name: string;
 }
 
-// Skeleton for the main list view
-const RecordingListSkeleton = () => (
+const RecordingSkeleton = () => (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {[...Array(8)].map((_, i) => (
             <div key={i} className="bg-white rounded-xl shadow-lg overflow-hidden">
@@ -46,7 +46,6 @@ const RecordingListSkeleton = () => (
     </div>
 );
 
-// Component for the watermarked video player
 const WatermarkedPlayer = ({ recording }: { recording: RecordingContent }) => {
     const { profile } = useAuth();
     return (
@@ -69,7 +68,6 @@ const WatermarkedPlayer = ({ recording }: { recording: RecordingContent }) => {
     );
 };
 
-// The main component for the recordings page
 export const StudentRecordings = () => {
     const { profile } = useAuth();
     const queryClient = useQueryClient();
@@ -77,8 +75,8 @@ export const StudentRecordings = () => {
     const [selectedSubjectFilter, setSelectedSubjectFilter] = useState('all');
     const [selectedBatchFilter, setSelectedBatchFilter] = useState('all');
     const [selectedRecording, setSelectedRecording] = useState<RecordingContent | null>(null);
+    const isMobile = useIsMobile();
 
-    // Fetch user enrollments to determine which recordings to show
     const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
         queryKey: ['userEnrollments', profile?.user_id],
         queryFn: async () => {
@@ -93,7 +91,6 @@ export const StudentRecordings = () => {
         enabled: !!profile?.user_id
     });
     
-    // Logic for cascading filters
     const displayedBatches = useMemo(() => {
         if (!userEnrollments) return [];
         if (selectedSubjectFilter === 'all') return Array.from(new Set(userEnrollments.map(e => e.batch_name))).sort();
@@ -114,7 +111,6 @@ export const StudentRecordings = () => {
         if (selectedSubjectFilter !== 'all' && !displayedSubjects.includes(selectedSubjectFilter)) setSelectedSubjectFilter('all');
     }, [selectedSubjectFilter, displayedSubjects]);
 
-    // Fetch the recordings based on enrollments and filters
     const { data: recordings, isLoading: isLoadingRecordingsContent } = useQuery<RecordingContent[]>({
         queryKey: ['student-recordings', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
         queryFn: async (): Promise<RecordingContent[]> => {
@@ -132,7 +128,6 @@ export const StudentRecordings = () => {
         enabled: !!userEnrollments && userEnrollments.length > 0
     });
 
-    // Client-side search filtering
     const filteredRecordings = useMemo(() => recordings?.filter(rec =>
         rec.topic.toLowerCase().includes(searchTerm.toLowerCase()) ||
         rec.subject.toLowerCase().includes(searchTerm.toLowerCase())
@@ -140,7 +135,6 @@ export const StudentRecordings = () => {
 
     const isLoading = isLoadingEnrollments || isLoadingRecordingsContent;
     
-    // If a recording is selected, render the player view
     if (selectedRecording) {
         const upNextRecordings = recordings?.filter(rec => rec.id !== selectedRecording.id).slice(0, 10) || [];
         return (
@@ -188,7 +182,86 @@ export const StudentRecordings = () => {
         )
     }
 
-    // Main view with the list of recordings
+    if (isMobile) {
+        return (
+            <div className="min-h-screen bg-gray-50 text-gray-800">
+                <header className="bg-white shadow-sm p-4 flex justify-between items-center">
+                    <div className="flex items-center space-x-2">
+                        <span className="material-icons text-indigo-600">menu</span>
+                        <h1 className="text-xl font-bold text-gray-900">Class Recordings</h1>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                        <span className="material-icons text-gray-500">notifications_none</span>
+                        <img alt="User avatar" className="w-8 h-8 rounded-full" src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${profile?.name}&background=random`} />
+                    </div>
+                </header>
+                <main className="p-4">
+                    <div className="mb-6">
+                        <h2 className="text-lg font-semibold text-gray-900">Welcome back!</h2>
+                        <p className="text-gray-500 text-sm">Review past lectures and catch up on missed classes.</p>
+                    </div>
+                    <div className="relative mb-6">
+                        <input className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Search recordings..." type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                        <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">search</span>
+                    </div>
+                    <div className="space-y-4">
+                        {isLoading ? <RecordingSkeleton /> : (
+                            filteredRecordings && filteredRecordings.length > 0 ? (
+                                filteredRecordings.map((recording) => (
+                                    <div key={recording.id} onClick={() => setSelectedRecording(recording)} className="bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer">
+                                        <div className="relative">
+                                            <div className="w-full h-40 bg-gray-800 flex items-center justify-center">
+                                                <button className="w-14 h-14 bg-white bg-opacity-30 rounded-full flex items-center justify-center backdrop-blur-sm">
+                                                    <span className="material-icons text-white text-4xl">play_arrow</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="p-4">
+                                            <h3 className="font-semibold text-gray-900 text-lg">{recording.topic}</h3>
+                                            <p className="text-sm text-gray-500 mb-3">{format(new Date(recording.date), 'PPP')}</p>
+                                            <div className="flex items-center space-x-2">
+                                                <span className="inline-block bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">{recording.subject}</span>
+                                                <span className="inline-block bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">{recording.batch}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="text-center py-20">
+                                    <Video className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                                    <h3 className="text-xl font-semibold text-gray-700">No Recordings Found</h3>
+                                    <p className="text-muted-foreground mt-2">Check back later or adjust your filters.</p>
+                                </div>
+                            )
+                        )}
+                    </div>
+                </main>
+                <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-2">
+                    <a className="flex flex-col items-center text-gray-500 hover:text-indigo-600" href="#">
+                        <Home/>
+                        <span className="text-xs">Home</span>
+                    </a>
+                    <a className="flex flex-col items-center text-indigo-600" href="#">
+                        <PlayCircle />
+                        <span className="text-xs">Recordings</span>
+                    </a>
+                    <a className="flex flex-col items-center text-gray-500 hover:text-indigo-600" href="#">
+                        <Calendar />
+                        <span className="text-xs">Schedule</span>
+                    </a>
+                    <a className="flex flex-col items-center text-gray-500 hover:text-indigo-600" href="#">
+                        <Book />
+                        <span className="text-xs">Notes</span>
+                    </a>
+                    <a className="flex flex-col items-center text-gray-500 hover:text-indigo-600" href="#">
+                        <User />
+                        <span className="text-xs">Profile</span>
+                    </a>
+                </nav>
+            </div>
+        )
+    }
+
     return (
         <main className="flex-1 flex flex-col">
             <header className="flex items-center justify-between p-6 border-b border-gray-200 bg-white">
