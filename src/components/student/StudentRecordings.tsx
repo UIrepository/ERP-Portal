@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Video, Play, Search, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+
 
 // Interfaces
 interface RecordingContent {
@@ -45,58 +47,6 @@ const RecordingListSkeleton = () => (
         ))}
     </div>
 );
-
-const getGoogleDriveEmbedUrl = (url: string) => {
-    let fileId = null;
-    const regex1 = /drive\.google\.com\/file\/d\/([^/]+)/;
-    const regex2 = /drive\.google\.com\/open\?id=([^&]+)/;
-    const regex3 = /drive\.google\.com\/uc\?id=([^&]+)/;
-
-    let match = url.match(regex1);
-    if (match) {
-        fileId = match[1];
-    } else {
-        match = url.match(regex2);
-        if (match) {
-            fileId = match[1];
-        } else {
-            match = url.match(regex3);
-            if (match) {
-                fileId = match[1];
-            }
-        }
-    }
-
-    if (fileId) {
-        return `https://drive.google.com/file/d/${fileId}/preview`;
-    }
-    return url;
-};
-
-
-// Component for the watermarked video player
-const WatermarkedPlayer = ({ recording }: { recording: RecordingContent }) => {
-    const { profile } = useAuth();
-    const embedUrl = getGoogleDriveEmbedUrl(recording.embed_link);
-    return (
-        <div className="relative aspect-video" onContextMenu={(e) => e.preventDefault()}>
-            <iframe
-                src={embedUrl}
-                className="absolute top-0 left-0 w-full h-full"
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                title={recording.topic}
-            />
-            <div className="absolute top-2 left-2 bg-black/50 text-white/80 text-xs px-2 py-1 rounded-full pointer-events-none backdrop-blur-sm">
-                {profile?.email}
-            </div>
-             <div className="absolute bottom-2 right-2 pointer-events-none">
-                <img src="/logoofficial.png" alt="Logo" className="h-10 w-auto opacity-40" />
-            </div>
-        </div>
-    );
-};
 
 // The main component for the recordings page
 export const StudentRecordings = () => {
@@ -169,56 +119,9 @@ export const StudentRecordings = () => {
 
     const isLoading = isLoadingEnrollments || isLoadingRecordingsContent;
     
-    // If a recording is selected, render the player view
-    if (selectedRecording) {
-        const upNextRecordings = recordings?.filter(rec => rec.id !== selectedRecording.id).slice(0, 10) || [];
-        return (
-            <div className="p-4 md:p-6 space-y-6 bg-slate-100 min-h-full">
-                <Button variant="outline" onClick={() => setSelectedRecording(null)} className="mb-4">
-                    <ArrowLeft className="h-4 w-4 mr-2"/>
-                    Back to Recordings
-                </Button>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2">
-                        <Card className="bg-black rounded-2xl overflow-hidden shadow-2xl">
-                            <CardContent className="p-0">
-                                <WatermarkedPlayer recording={selectedRecording} />
-                            </CardContent>
-                        </Card>
-                         <div className="mt-6">
-                            <h1 className="text-2xl font-bold text-slate-800">{selectedRecording.topic}</h1>
-                            <div className="flex items-center gap-4 text-slate-500 mt-2">
-                               <span>{format(new Date(selectedRecording.date), 'PPP')}</span>
-                               <Badge variant="secondary">{selectedRecording.batch}</Badge>
-                               <Badge variant="outline">{selectedRecording.subject}</Badge>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="space-y-4">
-                        <h2 className="text-xl font-semibold text-slate-700">Up Next</h2>
-                         {upNextRecordings.map(rec => (
-                             <Card key={rec.id} className="p-3 cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setSelectedRecording(rec)}>
-                                 <div className="flex gap-4 items-center">
-                                     <div className="w-24 h-16 bg-slate-200 rounded-md flex-shrink-0 relative">
-                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                            <Play className="h-6 w-6 text-white"/>
-                                        </div>
-                                     </div>
-                                     <div>
-                                         <p className="font-semibold text-sm line-clamp-2">{rec.topic}</p>
-                                         <p className="text-xs text-slate-500">{rec.subject}</p>
-                                     </div>
-                                 </div>
-                             </Card>
-                         ))}
-                    </div>
-                </div>
-            </div>
-        )
-    }
-
     // Main view with the list of recordings
     return (
+    <>
     <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
       <div>
         <h1 className="text-3xl font-bold text-gray-800 flex items-center">
@@ -279,5 +182,20 @@ export const StudentRecordings = () => {
         )}
       </div>
     </div>
+    {selectedRecording && (
+        <Dialog open={!!selectedRecording} onOpenChange={() => setSelectedRecording(null)}>
+            <DialogContent className="max-w-4xl h-[80vh]">
+                <iframe
+                    src={selectedRecording.embed_link.replace('/view', '/preview')}
+                    className="w-full h-full"
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    title={selectedRecording.topic}
+                />
+            </DialogContent>
+        </Dialog>
+    )}
+    </>
   );
 };
