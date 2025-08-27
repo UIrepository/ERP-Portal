@@ -6,8 +6,8 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Clock, ExternalLink } from 'lucide-react';
-import { format, getDay, startOfWeek, addDays, isSameDay } from 'date-fns';
+import { Calendar, Clock, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
+import { format, getDay, startOfWeek, addDays, isSameDay, subDays } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface Schedule {
@@ -53,6 +53,7 @@ export const StudentSchedule = () => {
   const { profile } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
+  const [displayDate, setDisplayDate] = useState(new Date());
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -110,9 +111,9 @@ export const StudentSchedule = () => {
   const isLoading = isLoadingEnrollments || isLoadingSchedules;
 
   const weekDates = useMemo(() => {
-    const start = startOfWeek(currentTime);
+    const start = startOfWeek(displayDate);
     return Array.from({ length: 7 }).map((_, i) => addDays(start, i));
-  }, [currentTime]);
+  }, [displayDate]);
 
   const timeSlots = useMemo(() => {
     const slots = new Set<string>();
@@ -131,6 +132,14 @@ export const StudentSchedule = () => {
 
   const today = new Date();
 
+  const handlePreviousWeek = () => {
+    setDisplayDate(subDays(displayDate, 7));
+  };
+
+  const handleNextWeek = () => {
+    setDisplayDate(addDays(displayDate, 7));
+  };
+
   return (
     <div className="p-2 sm:p-6 bg-gray-50 min-h-screen">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
@@ -138,9 +147,16 @@ export const StudentSchedule = () => {
           <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Class Schedule</h2>
           <p className="text-gray-600 mt-1 text-sm sm:text-base">Your weekly class timetable</p>
         </div>
-        <div className="text-left sm:text-right w-full sm:w-auto">
-            <p className="text-xs sm:text-sm text-gray-500">{format(currentTime, 'PPPP')}</p>
-            <p className="text-base sm:text-lg font-semibold text-gray-900">{format(currentTime, 'p')}</p>
+        <div className="flex items-center gap-4">
+            <Button variant="outline" size="icon" onClick={handlePreviousWeek}>
+                <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="text-center">
+                <p className="text-sm text-gray-500">{format(weekDates[0], 'MMM d')} - {format(weekDates[6], 'MMM d, yyyy')}</p>
+            </div>
+            <Button variant="outline" size="icon" onClick={handleNextWeek}>
+                <ChevronRight className="h-4 w-4" />
+            </Button>
         </div>
       </div>
 
