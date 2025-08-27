@@ -56,7 +56,7 @@ export const StudentSchedule = () => {
   const [displayDate, setDisplayDate] = useState(new Date());
 
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000); // Update every second
     return () => clearInterval(timer);
   }, []);
 
@@ -147,16 +147,21 @@ export const StudentSchedule = () => {
           <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Class Schedule</h2>
           <p className="text-gray-600 mt-1 text-sm sm:text-base">Your weekly class timetable</p>
         </div>
-        <div className="flex items-center gap-4">
-            <Button variant="outline" size="icon" onClick={handlePreviousWeek}>
-                <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <div className="text-center">
-                <p className="text-sm text-gray-500">{format(weekDates[0], 'MMM d')} - {format(weekDates[6], 'MMM d, yyyy')}</p>
-            </div>
-            <Button variant="outline" size="icon" onClick={handleNextWeek}>
-                <ChevronRight className="h-4 w-4" />
-            </Button>
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex items-center gap-4">
+              <Button variant="outline" size="icon" onClick={handlePreviousWeek}>
+                  <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="text-center">
+                  <p className="text-sm text-gray-500">{format(weekDates[0], 'MMM d')} - {format(weekDates[6], 'MMM d, yyyy')}</p>
+              </div>
+              <Button variant="outline" size="icon" onClick={handleNextWeek}>
+                  <ChevronRight className="h-4 w-4" />
+              </Button>
+          </div>
+          <div className="text-right">
+                <p className="text-base sm:text-lg font-semibold text-gray-900">{format(currentTime, 'p')}</p>
+          </div>
         </div>
       </div>
 
