@@ -46,10 +46,38 @@ const RecordingListSkeleton = () => (
     </div>
 );
 
+const getGoogleDriveEmbedUrl = (url: string) => {
+    let fileId = null;
+    const regex1 = /drive\.google\.com\/file\/d\/([^/]+)/;
+    const regex2 = /drive\.google\.com\/open\?id=([^&]+)/;
+    const regex3 = /drive\.google\.com\/uc\?id=([^&]+)/;
+
+    let match = url.match(regex1);
+    if (match) {
+        fileId = match[1];
+    } else {
+        match = url.match(regex2);
+        if (match) {
+            fileId = match[1];
+        } else {
+            match = url.match(regex3);
+            if (match) {
+                fileId = match[1];
+            }
+        }
+    }
+
+    if (fileId) {
+        return `https://drive.google.com/file/d/${fileId}/preview`;
+    }
+    return url;
+};
+
+
 // Component for the watermarked video player
 const WatermarkedPlayer = ({ recording }: { recording: RecordingContent }) => {
     const { profile } = useAuth();
-    const embedUrl = recording.embed_link.replace("/view", "/preview");
+    const embedUrl = getGoogleDriveEmbedUrl(recording.embed_link);
     return (
         <div className="relative aspect-video" onContextMenu={(e) => e.preventDefault()}>
             <iframe
