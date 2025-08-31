@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,7 +10,6 @@ import { Video, Play, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-
 
 // Interfaces
 interface RecordingContent {
@@ -55,7 +54,6 @@ export const StudentRecordings = () => {
     const [selectedBatchFilter, setSelectedBatchFilter] = useState('all');
     const [selectedRecording, setSelectedRecording] = useState<RecordingContent | null>(null);
 
-    // Fetch user enrollments to determine which recordings to show
     const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
         queryKey: ['userEnrollments', profile?.user_id],
         queryFn: async () => {
@@ -70,7 +68,6 @@ export const StudentRecordings = () => {
         enabled: !!profile?.user_id
     });
     
-    // Logic for cascading filters
     const displayedBatches = useMemo(() => {
         if (!userEnrollments) return [];
         if (selectedSubjectFilter === 'all') return Array.from(new Set(userEnrollments.map(e => e.batch_name))).sort();
@@ -91,7 +88,6 @@ export const StudentRecordings = () => {
         if (selectedSubjectFilter !== 'all' && !displayedSubjects.includes(selectedSubjectFilter)) setSelectedSubjectFilter('all');
     }, [selectedSubjectFilter, displayedSubjects]);
 
-    // Fetch the recordings based on enrollments and filters
     const { data: recordings, isLoading: isLoadingRecordingsContent } = useQuery<RecordingContent[]>({
         queryKey: ['student-recordings', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
         queryFn: async (): Promise<RecordingContent[]> => {
@@ -109,7 +105,6 @@ export const StudentRecordings = () => {
         enabled: !!userEnrollments && userEnrollments.length > 0
     });
 
-    // Client-side search filtering
     const filteredRecordings = useMemo(() => recordings?.filter(rec =>
         rec.topic.toLowerCase().includes(searchTerm.toLowerCase()) ||
         rec.subject.toLowerCase().includes(searchTerm.toLowerCase())
@@ -123,7 +118,6 @@ export const StudentRecordings = () => {
 
     const isLoading = isLoadingEnrollments || isLoadingRecordingsContent;
     
-    // Main view with the list of recordings
     return (
     <>
     <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
