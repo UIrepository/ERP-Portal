@@ -117,6 +117,12 @@ export const StudentRecordings = () => {
         rec.subject.toLowerCase().includes(searchTerm.toLowerCase())
     ), [recordings, searchTerm]);
 
+    const upNextRecordings = useMemo(() => {
+        if (!selectedRecording || !recordings) return [];
+        return recordings.filter(rec => rec.id !== selectedRecording.id && rec.subject === selectedRecording.subject && rec.batch === selectedRecording.batch);
+    }, [selectedRecording, recordings]);
+
+
     const isLoading = isLoadingEnrollments || isLoadingRecordingsContent;
     
     // Main view with the list of recordings
@@ -184,19 +190,38 @@ export const StudentRecordings = () => {
     </div>
     {selectedRecording && (
         <Dialog open={!!selectedRecording} onOpenChange={() => setSelectedRecording(null)}>
-            <DialogContent className="max-w-4xl h-[80vh]">
-                <DialogTitle className="sr-only">{selectedRecording.topic}</DialogTitle>
-                <DialogDescription className="sr-only">
-                    A video recording of {selectedRecording.topic} from {format(new Date(selectedRecording.date), 'PPP')}.
-                </DialogDescription>
-                <iframe
-                    src={selectedRecording.embed_link.replace('/view', '/preview')}
-                    className="w-full h-full"
-                    frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    title={selectedRecording.topic}
-                />
+            <DialogContent className="max-w-6xl h-[90vh] flex flex-col md:flex-row p-0">
+                <div className="w-full md:w-3/4 h-1/2 md:h-full flex flex-col">
+                    <div className="p-4 border-b">
+                        <DialogTitle>{selectedRecording.topic}</DialogTitle>
+                        <DialogDescription>
+                            {selectedRecording.subject} - {selectedRecording.batch} | {format(new Date(selectedRecording.date), 'PPP')}
+                        </DialogDescription>
+                    </div>
+                    <div className="flex-grow">
+                        <iframe
+                            src={selectedRecording.embed_link.replace('/view', '/preview')}
+                            className="w-full h-full"
+                            frameBorder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                            title={selectedRecording.topic}
+                        />
+                    </div>
+                </div>
+                <div className="w-full md:w-1/4 h-1/2 md:h-full border-l overflow-y-auto">
+                    <div className="p-4 border-b">
+                        <h3 className="font-semibold">Up Next</h3>
+                    </div>
+                    <div className="p-2 space-y-2">
+                        {upNextRecordings.map(rec => (
+                            <button key={rec.id} onClick={() => setSelectedRecording(rec)} className="w-full text-left p-2 rounded-md hover:bg-muted">
+                                <p className="font-semibold text-sm">{rec.topic}</p>
+                                <p className="text-xs text-muted-foreground">{format(new Date(rec.date), 'PPP')}</p>
+                            </button>
+                        ))}
+                    </div>
+                </div>
             </DialogContent>
         </Dialog>
     )}
