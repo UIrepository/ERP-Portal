@@ -180,9 +180,12 @@ export const StudentRecordings = () => {
         )}
       </div>
     </div>
+
+    {/* This Dialog is the YouTube-like player that opens on the same page */}
     {selectedRecording && (
         <Dialog open={!!selectedRecording} onOpenChange={() => setSelectedRecording(null)}>
-            <DialogContent className="max-w-6xl h-[90vh] flex flex-col md:flex-row p-0">
+            <DialogContent className="max-w-6xl h-[90vh] flex flex-col md:flex-row p-0 gap-0">
+                {/* Main Video Player Section */}
                 <div className="w-full md:w-3/4 h-1/2 md:h-full flex flex-col">
                     <div className="p-4 border-b">
                         <DialogTitle>{selectedRecording.topic}</DialogTitle>
@@ -201,8 +204,9 @@ export const StudentRecordings = () => {
                         />
                     </div>
                 </div>
+                {/* "Up Next" Playlist Section */}
                 <div className="w-full md:w-1/4 h-1/2 md:h-full border-l overflow-y-auto">
-                    <div className="p-4 border-b">
+                    <div className="p-4 border-b sticky top-0 bg-background">
                         <h3 className="font-semibold">Up Next</h3>
                     </div>
                     <div className="p-2 space-y-2">
