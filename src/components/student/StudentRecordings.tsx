@@ -3,11 +3,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Video, Play, Search, ArrowLeft } from 'lucide-react';
+import { Video, Play, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -51,7 +50,6 @@ const RecordingListSkeleton = () => (
 // The main component for the recordings page
 export const StudentRecordings = () => {
     const { profile } = useAuth();
-    const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedSubjectFilter, setSelectedSubjectFilter] = useState('all');
     const [selectedBatchFilter, setSelectedBatchFilter] = useState('all');
@@ -198,7 +196,7 @@ export const StudentRecordings = () => {
                             {selectedRecording.subject} - {selectedRecording.batch} | {format(new Date(selectedRecording.date), 'PPP')}
                         </DialogDescription>
                     </div>
-                    <div className="flex-grow">
+                    <div className="flex-grow bg-black">
                         <iframe
                             src={selectedRecording.embed_link.replace('/view', '/preview')}
                             className="w-full h-full"
@@ -215,8 +213,8 @@ export const StudentRecordings = () => {
                     </div>
                     <div className="p-2 space-y-2">
                         {upNextRecordings.map(rec => (
-                            <button key={rec.id} onClick={() => setSelectedRecording(rec)} className="w-full text-left p-2 rounded-md hover:bg-muted">
-                                <p className="font-semibold text-sm">{rec.topic}</p>
+                            <button key={rec.id} onClick={() => setSelectedRecording(rec)} className="w-full text-left p-2 rounded-md hover:bg-muted transition-colors">
+                                <p className="font-semibold text-sm line-clamp-2">{rec.topic}</p>
                                 <p className="text-xs text-muted-foreground">{format(new Date(rec.date), 'PPP')}</p>
                             </button>
                         ))}
