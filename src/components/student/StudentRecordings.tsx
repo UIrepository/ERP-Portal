@@ -181,7 +181,7 @@ export const StudentRecordings = () => {
       </div>
     </div>
 
-    {/* This Dialog is the YouTube-like player that opens on the same page */}
+    {/* This Dialog creates the YouTube-like player that opens on the SAME page */}
     {selectedRecording && (
         <Dialog open={!!selectedRecording} onOpenChange={() => setSelectedRecording(null)}>
             <DialogContent className="max-w-6xl h-[90vh] flex flex-col md:flex-row p-0 gap-0">
