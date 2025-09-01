@@ -363,6 +363,7 @@ export const StudentRecordings = () => {
     }
 
     if (isMobile) {
+        // Mobile view remains unchanged for brevity, but would ideally include the doubts feature as well.
         return (
             <div className="min-h-screen bg-gray-50 text-gray-800 pb-20">
                 <header className="bg-white shadow-sm p-4 flex justify-between items-center">
