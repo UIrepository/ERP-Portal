@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Video, Play, Search, ArrowLeft, PlayCircle, Home, Calendar, Book, User, Menu, Bell, MessageSquare, Send } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useIsMobile } from '@/hooks/use-is-mobile';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { toast } from '@/hooks/use-toast';
@@ -96,24 +96,24 @@ const WatermarkedPlayer = ({ recording }: { recording: RecordingContent }) => {
 };
 
 // Doubts Section Component
-const DoubtsSection = ({ recordingId }: { recordingId: string }) => {
+const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
     const { user } = useAuth();
     const queryClient = useQueryClient();
     const [newDoubt, setNewDoubt] = useState('');
     const [newAnswers, setNewAnswers] = useState<Record<string, string>>({});
 
     const { data: doubts = [], isLoading: isLoadingDoubts } = useQuery<Doubt[]>({
-        queryKey: ['doubts', recordingId],
+        queryKey: ['doubts', recording.id],
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('doubts')
                 .select(`id, question_text, created_at, user_id, profiles(name)`)
-                .eq('recording_id', recordingId)
-                .order('created_at', { ascending: false }); // CORRECTED LINE
+                .eq('recording_id', recording.id)
+                .order('created_at', { ascending: false });
             if (error) throw error;
             return data as any[];
         },
-        enabled: !!recordingId,
+        enabled: !!recording.id,
     });
 
     const doubtIds = useMemo(() => doubts.map(d => d.id), [doubts]);
@@ -143,7 +143,13 @@ const DoubtsSection = ({ recordingId }: { recordingId: string }) => {
     const addDoubtMutation = useMutation({
         mutationFn: async (question_text: string) => {
             if (!user) throw new Error("You must be logged in to ask a question.");
-            const { error } = await supabase.from('doubts').insert({ recording_id: recordingId, user_id: user.id, question_text });
+            const { error } = await supabase.from('doubts').insert({ 
+                recording_id: recording.id, 
+                user_id: user.id, 
+                question_text,
+                batch: recording.batch,
+                subject: recording.subject,
+            });
             if (error) throw error;
         },
         onSuccess: () => {
@@ -167,9 +173,9 @@ const DoubtsSection = ({ recordingId }: { recordingId: string }) => {
     });
 
     useEffect(() => {
-        const channel = supabase.channel(`recording-doubts-${recordingId}`)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'doubts', filter: `recording_id=eq.${recordingId}` }, () => {
-                queryClient.invalidateQueries({ queryKey: ['doubts', recordingId] });
+        const channel = supabase.channel(`recording-doubts-${recording.id}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'doubts', filter: `recording_id=eq.${recording.id}` }, () => {
+                queryClient.invalidateQueries({ queryKey: ['doubts', recording.id] });
             })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'doubt_answers' }, (payload) => {
                 if(doubtIds.includes((payload.new as any)?.doubt_id)) {
@@ -181,7 +187,7 @@ const DoubtsSection = ({ recordingId }: { recordingId: string }) => {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [supabase, recordingId, queryClient, doubtIds]);
+    }, [supabase, recording.id, queryClient, doubtIds]);
 
     return (
         <Card className="mt-6">
@@ -337,7 +343,7 @@ export const StudentRecordings = () => {
                                 <Badge variant="outline">{selectedRecording.subject}</Badge>
                             </div>
                         </div>
-                        <DoubtsSection recordingId={selectedRecording.id} />
+                        <DoubtsSection recording={selectedRecording} />
                     </div>
                     <div className="space-y-4">
                         <h2 className="text-xl font-semibold text-slate-700">Up Next</h2>
