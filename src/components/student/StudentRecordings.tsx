@@ -220,61 +220,66 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
                 
                 <div className="mt-8 space-y-6">
                     {isLoadingDoubts ? <Skeleton className="h-20 w-full" /> : (
-                        doubts.map(doubt => (
-                            <div key={doubt.id} className="flex items-start space-x-4">
-                                <Avatar>
-                                    <AvatarFallback>{doubt.profiles?.name?.charAt(0) || '?'}</AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1">
-                                    <div className="bg-gray-100 rounded-lg p-4">
-                                        <div className="flex justify-between items-center">
-                                            <p className="font-semibold text-gray-800">{doubt.profiles?.name || 'A student'}</p>
-                                            <p className="text-xs text-gray-500">{formatDistanceToNow(new Date(doubt.created_at), { addSuffix: true })}</p>
-                                        </div>
-                                        <p className="mt-2 text-gray-700">{doubt.question_text}</p>
-                                    </div>
-                                    
-                                    <div className="mt-4 space-y-4 pl-6 border-l-2 border-gray-200">
-                                        {(answersByDoubtId[doubt.id] || []).map(answer => (
-                                            <div key={answer.id} className="flex items-start space-x-3">
-                                                <Avatar className="h-8 w-8">
-                                                    <AvatarFallback>{answer.profiles?.name?.charAt(0) || '?'}</AvatarFallback>
-                                                </Avatar>
-                                                <div className="flex-1 bg-gray-50 rounded-lg p-3">
-                                                    <div className="flex justify-between items-center">
-                                                        <p className="font-semibold text-sm text-gray-800">{answer.profiles?.name || 'A student'}</p>
-                                                        <p className="text-xs text-gray-500">{formatDistanceToNow(new Date(answer.created_at), { addSuffix: true })}</p>
-                                                    </div>
-                                                    <p className="mt-1 text-sm text-gray-700">{answer.answer_text}</p>
-                                                </div>
+                        <Accordion type="single" collapsible className="w-full">
+                            {doubts.map(doubt => (
+                                <AccordionItem key={doubt.id} value={doubt.id} className="border-b-0">
+                                    <AccordionTrigger className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100">
+                                        <div className="flex items-center gap-3 text-left w-full">
+                                            <Avatar className="h-9 w-9">
+                                                <AvatarFallback>{doubt.profiles?.name?.charAt(0) || '?'}</AvatarFallback>
+                                            </Avatar>
+                                            <div className="flex-1">
+                                                <div className="font-semibold text-gray-800">{doubt.profiles?.name || 'A student'}</div>
+                                                <div className="font-normal text-sm text-gray-600 truncate">{doubt.question_text}</div>
                                             </div>
-                                        ))}
-                                    </div>
-
-                                    <div className="mt-4 pl-6 flex items-start space-x-3">
-                                        <Avatar className="h-8 w-8">
-                                             <AvatarFallback>{user?.email?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
-                                        </Avatar>
-                                        <div className="flex-1">
-                                            <Textarea 
-                                                placeholder="Write an answer..." 
-                                                value={newAnswers[doubt.id] || ''} 
-                                                onChange={e => setNewAnswers(prev => ({...prev, [doubt.id]: e.target.value}))} 
-                                                className="text-sm"
-                                            />
-                                            <Button 
-                                                size="sm" 
-                                                onClick={() => addAnswerMutation.mutate({ doubt_id: doubt.id, answer_text: newAnswers[doubt.id] })} 
-                                                disabled={!newAnswers[doubt.id]?.trim() || addAnswerMutation.isPending}
-                                                className="mt-2"
-                                            >
-                                                <CornerDownRight className="mr-2 h-4 w-4" /> Reply
-                                            </Button>
+                                            <div className="text-xs text-gray-400 ml-4 flex-shrink-0">
+                                                {formatDistanceToNow(new Date(doubt.created_at), { addSuffix: true })}
+                                            </div>
                                         </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ))
+                                    </AccordionTrigger>
+                                    <AccordionContent className="pt-4 pb-2 pl-16">
+                                        <div className="space-y-4">
+                                            {(answersByDoubtId[doubt.id] || []).map(answer => (
+                                                <div key={answer.id} className="flex items-start space-x-3">
+                                                    <Avatar className="h-8 w-8">
+                                                        <AvatarFallback>{answer.profiles?.name?.charAt(0) || '?'}</AvatarFallback>
+                                                    </Avatar>
+                                                    <div className="flex-1 bg-gray-50 rounded-lg p-3">
+                                                        <div className="flex justify-between items-center">
+                                                            <p className="font-semibold text-sm text-gray-800">{answer.profiles?.name || 'A student'}</p>
+                                                            <p className="text-xs text-gray-500">{formatDistanceToNow(new Date(answer.created_at), { addSuffix: true })}</p>
+                                                        </div>
+                                                        <p className="mt-1 text-sm text-gray-700">{answer.answer_text}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className="mt-4 flex items-start space-x-3">
+                                            <Avatar className="h-8 w-8">
+                                                 <AvatarFallback>{user?.email?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
+                                            </Avatar>
+                                            <div className="flex-1">
+                                                <Textarea 
+                                                    placeholder="Write an answer..." 
+                                                    value={newAnswers[doubt.id] || ''} 
+                                                    onChange={e => setNewAnswers(prev => ({...prev, [doubt.id]: e.target.value}))} 
+                                                    className="text-sm bg-white"
+                                                />
+                                                <Button 
+                                                    size="sm" 
+                                                    onClick={() => addAnswerMutation.mutate({ doubt_id: doubt.id, answer_text: newAnswers[doubt.id] })} 
+                                                    disabled={!newAnswers[doubt.id]?.trim() || addAnswerMutation.isPending}
+                                                    className="mt-2"
+                                                >
+                                                    <CornerDownRight className="mr-2 h-4 w-4" /> Reply
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            ))}
+                        </Accordion>
                     )}
                     {doubts.length === 0 && !isLoadingDoubts && (
                         <div className="text-center py-10 text-gray-500">
@@ -288,7 +293,6 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
         </div>
     );
 };
-
 
 // Main Component
 export const StudentRecordings = () => {
