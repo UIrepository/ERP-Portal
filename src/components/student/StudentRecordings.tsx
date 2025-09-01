@@ -107,7 +107,7 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('doubts')
-                .select(`id, question_text, created_at, user_id, profiles(name)`) // CORRECTED SYNTAX
+                .select(`id, question_text, created_at, user_id, profiles!inner(name)`) // CORRECTED SYNTAX
                 .eq('recording_id', recording.id)
                 .order('created_at', { ascending: false });
             if (error) throw error;
@@ -124,7 +124,7 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
             if (doubtIds.length === 0) return [];
             const { data, error } = await supabase
                 .from('doubt_answers')
-                .select(`id, answer_text, created_at, user_id, doubt_id, profiles(name)`) // CORRECTED SYNTAX
+                .select(`id, answer_text, created_at, user_id, doubt_id, profiles!inner(name)`) // CORRECTED SYNTAX
                 .in('doubt_id', doubtIds)
                 .order('created_at', { ascending: true });
             if (error) throw error;
