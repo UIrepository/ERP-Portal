@@ -175,6 +175,90 @@ export type Database = {
         }
         Relationships: []
       }
+      doubts: {
+        Row: {
+          id: string;
+          recording_id: string;
+          user_id: string;
+          question_text: string;
+          created_at: string;
+          batch: string;
+          subject: string;
+        };
+        Insert: {
+          id?: string;
+          recording_id: string;
+          user_id: string;
+          question_text: string;
+          created_at?: string;
+          batch: string;
+          subject: string;
+        };
+        Update: {
+          id?: string;
+          recording_id?: string;
+          user_id?: string;
+          question_text?: string;
+          created_at?: string;
+          batch?: string;
+          subject?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "doubts_recording_id_fkey";
+            columns: ["recording_id"];
+            isOneToOne: false;
+            referencedRelation: "recordings";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "doubts_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["user_id"];
+          }
+        ];
+      };
+      doubt_answers: {
+        Row: {
+          id: string;
+          doubt_id: string;
+          user_id: string;
+          answer_text: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          doubt_id: string;
+          user_id: string;
+          answer_text: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          doubt_id?: string;
+          user_id?: string;
+          answer_text?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "doubt_answers_doubt_id_fkey";
+            columns: ["doubt_id"];
+            isOneToOne: false;
+            referencedRelation: "doubts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "doubt_answers_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["user_id"];
+          }
+        ];
+      };
       dpp_content: {
         Row: {
           batch: string
