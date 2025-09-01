@@ -4,6 +4,8 @@ CREATE TABLE public.doubts (
     recording_id UUID NOT NULL REFERENCES public.recordings(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     question_text TEXT NOT NULL,
+    batch TEXT NOT NULL,
+    subject TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
