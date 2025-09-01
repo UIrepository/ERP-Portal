@@ -109,7 +109,7 @@ const DoubtsSection = ({ recordingId }: { recordingId: string }) => {
                 .from('doubts')
                 .select(`id, question_text, created_at, user_id, profiles(name)`)
                 .eq('recording_id', recordingId)
-                .order('created_at', { ascending: false, nullsFirst: false }); // Corrected order clause
+                .order('created_at', { ascending: false }); // CORRECTED LINE
             if (error) throw error;
             return data as any[];
         },
