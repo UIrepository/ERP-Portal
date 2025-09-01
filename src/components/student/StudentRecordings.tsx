@@ -530,4 +530,3 @@ export const StudentRecordings = () => {
         </main>
     );
 };
-
