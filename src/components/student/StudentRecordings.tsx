@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Video, Play, Search, ArrowLeft, PlayCircle, Home, Calendar, Book, User, Menu, Bell, MessageSquare, Send } from 'lucide-react';
+import { Video, Play, Search, ArrowLeft, PlayCircle, MessageSquare, Send } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -368,17 +368,7 @@ export const StudentRecordings = () => {
 
     if (isMobile) {
         return (
-            <div className="min-h-screen bg-gray-50 text-gray-800 pb-20">
-                <header className="bg-white shadow-sm p-4 flex justify-between items-center">
-                    <div className="flex items-center space-x-2">
-                        <Menu className="text-indigo-600" />
-                        <h1 className="text-xl font-bold text-gray-900">Class Recordings</h1>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                        <Bell className="text-gray-500" />
-                        <img alt="User avatar" className="w-8 h-8 rounded-full" src={`https://ui-avatars.com/api/?name=${profile?.name}&background=random`} />
-                    </div>
-                </header>
+            <div className="min-h-screen bg-gray-50 text-gray-800">
                 <main className="p-4">
                     <div className="mb-6">
                         <h2 className="text-lg font-semibold text-gray-900">Welcome back!</h2>
