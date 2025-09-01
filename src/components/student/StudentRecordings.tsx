@@ -102,13 +102,12 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
     const [newDoubt, setNewDoubt] = useState('');
     const [newAnswers, setNewAnswers] = useState<Record<string, string>>({});
 
-    // THIS QUERY IS NOW CORRECT (Returns 200 OK)
     const { data: doubts = [], isLoading: isLoadingDoubts } = useQuery<Doubt[]>({
         queryKey: ['doubts', recording.id],
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('doubts')
-                .select(`id, question_text, created_at, user_id, profiles:user_id(name)`)
+                .select(`id, question_text, created_at, user_id, profiles(name)`) // CORRECTED SYNTAX
                 .eq('recording_id', recording.id)
                 .order('created_at', { ascending: false });
             if (error) throw error;
@@ -119,15 +118,13 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
 
     const doubtIds = useMemo(() => doubts.map(d => d.id), [doubts]);
 
-    // THIS QUERY NEEDS TO BE FIXED (Returns 400 Bad Request)
     const { data: answers = [] } = useQuery<DoubtAnswer[]>({
         queryKey: ['doubt_answers', doubtIds],
         queryFn: async () => {
             if (doubtIds.length === 0) return [];
             const { data, error } = await supabase
                 .from('doubt_answers')
-                // This is the line that needs the fix
-                .select(`id, answer_text, created_at, user_id, doubt_id, profiles:user_id(name)`)
+                .select(`id, answer_text, created_at, user_id, doubt_id, profiles(name)`) // CORRECTED SYNTAX
                 .in('doubt_id', doubtIds)
                 .order('created_at', { ascending: true });
             if (error) throw error;
@@ -252,6 +249,7 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
         </Card>
     );
 };
+
 
 // Main Component
 export const StudentRecordings = () => {
