@@ -218,12 +218,12 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
                     </div>
                 </div>
                 
-                <div className="mt-8 space-y-6">
+                <div className="mt-8 space-y-2">
                     {isLoadingDoubts ? <Skeleton className="h-20 w-full" /> : (
                         <Accordion type="single" collapsible className="w-full">
                             {doubts.map(doubt => (
-                                <AccordionItem key={doubt.id} value={doubt.id} className="border-b-0">
-                                    <AccordionTrigger className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100">
+                                <AccordionItem key={doubt.id} value={doubt.id} className="border-b-0 mb-2">
+                                    <AccordionTrigger className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                                         <div className="flex items-center gap-3 text-left w-full">
                                             <Avatar className="h-9 w-9">
                                                 <AvatarFallback>{doubt.profiles?.name?.charAt(0) || '?'}</AvatarFallback>
@@ -293,6 +293,7 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
         </div>
     );
 };
+
 
 // Main Component
 export const StudentRecordings = () => {
