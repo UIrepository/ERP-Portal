@@ -107,7 +107,7 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('doubts')
-                .select(`id, question_text, created_at, user_id, profiles(name)`)
+                .select(`id, question_text, created_at, user_id`)
                 .eq('recording_id', recording.id)
                 .order('created_at', { ascending: false });
             if (error) throw error;
