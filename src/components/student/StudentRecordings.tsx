@@ -107,7 +107,7 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('doubts')
-                .select(`id, question_text, created_at, user_id, profiles(name)`)
+                .select(`id, question_text, created_at, user_id, profiles:user_id(name)`)
                 .eq('recording_id', recording.id)
                 .order('created_at', { ascending: false });
             if (error) throw error;
@@ -124,7 +124,7 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
             if (doubtIds.length === 0) return [];
             const { data, error } = await supabase
                 .from('doubt_answers')
-                .select(`id, answer_text, created_at, user_id, doubt_id, profiles(name)`)
+                .select(`id, answer_text, created_at, user_id, doubt_id, profiles:user_id(name)`)
                 .in('doubt_id', doubtIds)
                 .order('created_at', { ascending: true });
             if (error) throw error;
@@ -147,8 +147,6 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
                 recording_id: recording.id, 
                 user_id: user.id, 
                 question_text,
-                batch: recording.batch,
-                subject: recording.subject,
             });
             if (error) throw error;
         },
@@ -532,3 +530,4 @@ export const StudentRecordings = () => {
         </main>
     );
 };
+
