@@ -8,11 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Video, Play, Search, ArrowLeft, PlayCircle, MessageSquare, Send } from 'lucide-react';
+import { Video, Play, Search, ArrowLeft, PlayCircle, MessageSquare, Send, CornerDownRight } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { toast } from '@/hooks/use-toast';
 
@@ -95,7 +94,7 @@ const WatermarkedPlayer = ({ recording }: { recording: RecordingContent }) => {
     );
 };
 
-// Doubts Section Component
+// Doubts Section Component - REDESIGNED
 const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
     const { user } = useAuth();
     const queryClient = useQueryClient();
@@ -147,6 +146,8 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
                 recording_id: recording.id, 
                 user_id: user.id, 
                 question_text,
+                batch: recording.batch, // Added batch
+                subject: recording.subject // Added subject
             });
             if (error) throw error;
         },
@@ -188,65 +189,102 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
     }, [supabase, recording.id, queryClient, doubtIds]);
 
     return (
-        <Card className="mt-6">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <MessageSquare /> Doubts & Discussions
-                </CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="space-y-4">
-                    <Textarea placeholder="Ask a question about this recording..." value={newDoubt} onChange={e => setNewDoubt(e.target.value)} />
-                    <Button onClick={() => addDoubtMutation.mutate(newDoubt)} disabled={!newDoubt.trim() || addDoubtMutation.isPending}>
-                        <Send className="mr-2 h-4 w-4" /> Ask Question
-                    </Button>
+        <div className="mt-8 bg-white rounded-2xl shadow-lg">
+            <div className="p-6 border-b">
+                <h2 className="text-xl font-bold text-gray-800 flex items-center">
+                    <MessageSquare className="mr-3 text-indigo-500" /> Doubts & Discussions
+                </h2>
+            </div>
+            <div className="p-6">
+                <div className="flex items-start space-x-4">
+                    <Avatar>
+                        <AvatarFallback>{user?.email?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                        <Textarea 
+                            placeholder="Ask a question about this recording..." 
+                            value={newDoubt} 
+                            onChange={e => setNewDoubt(e.target.value)} 
+                            className="bg-gray-50 focus:bg-white"
+                        />
+                        <Button 
+                            onClick={() => addDoubtMutation.mutate(newDoubt)} 
+                            disabled={!newDoubt.trim() || addDoubtMutation.isPending}
+                            className="mt-3"
+                        >
+                            <Send className="mr-2 h-4 w-4" /> Ask Question
+                        </Button>
+                    </div>
                 </div>
-                <div className="mt-6 space-y-4">
-                    {isLoadingDoubts ? <p>Loading doubts...</p> : (
-                        <Accordion type="single" collapsible className="w-full">
-                            {doubts.map(doubt => (
-                                <AccordionItem key={doubt.id} value={doubt.id}>
-                                    <AccordionTrigger>
-                                        <div className="flex items-center gap-2 text-left w-full">
-                                            <Avatar className="h-8 w-8">
-                                                <AvatarFallback>{doubt.profiles?.name?.charAt(0) || '?'}</AvatarFallback>
-                                            </Avatar>
-                                            <div>
-                                                <div className="font-semibold">{doubt.profiles?.name || 'A student'}</div>
-                                                <div className="font-normal text-sm text-gray-600">{doubt.question_text}</div>
-                                            </div>
-                                            <div className="text-xs text-gray-400 ml-auto flex-shrink-0">
-                                                {formatDistanceToNow(new Date(doubt.created_at), { addSuffix: true })}
-                                            </div>
+                
+                <div className="mt-8 space-y-6">
+                    {isLoadingDoubts ? <Skeleton className="h-20 w-full" /> : (
+                        doubts.map(doubt => (
+                            <div key={doubt.id} className="flex items-start space-x-4">
+                                <Avatar>
+                                    <AvatarFallback>{doubt.profiles?.name?.charAt(0) || '?'}</AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1">
+                                    <div className="bg-gray-100 rounded-lg p-4">
+                                        <div className="flex justify-between items-center">
+                                            <p className="font-semibold text-gray-800">{doubt.profiles?.name || 'A student'}</p>
+                                            <p className="text-xs text-gray-500">{formatDistanceToNow(new Date(doubt.created_at), { addSuffix: true })}</p>
                                         </div>
-                                    </AccordionTrigger>
-                                    <AccordionContent className="pl-12">
+                                        <p className="mt-2 text-gray-700">{doubt.question_text}</p>
+                                    </div>
+                                    
+                                    <div className="mt-4 space-y-4 pl-6 border-l-2 border-gray-200">
                                         {(answersByDoubtId[doubt.id] || []).map(answer => (
-                                            <div key={answer.id} className="py-3 border-b">
-                                                <div className="flex items-center gap-2 text-sm mb-2">
-                                                    <Avatar className="h-6 w-6">
-                                                        <AvatarFallback>{answer.profiles?.name?.charAt(0) || '?'}</AvatarFallback>
-                                                    </Avatar>
-                                                    <span className="font-semibold">{answer.profiles?.name || 'A student'}</span>
-                                                    <span className="text-gray-500 text-xs">
-                                                        {formatDistanceToNow(new Date(answer.created_at), { addSuffix: true })}
-                                                    </span>
+                                            <div key={answer.id} className="flex items-start space-x-3">
+                                                <Avatar className="h-8 w-8">
+                                                    <AvatarFallback>{answer.profiles?.name?.charAt(0) || '?'}</AvatarFallback>
+                                                </Avatar>
+                                                <div className="flex-1 bg-gray-50 rounded-lg p-3">
+                                                    <div className="flex justify-between items-center">
+                                                        <p className="font-semibold text-sm text-gray-800">{answer.profiles?.name || 'A student'}</p>
+                                                        <p className="text-xs text-gray-500">{formatDistanceToNow(new Date(answer.created_at), { addSuffix: true })}</p>
+                                                    </div>
+                                                    <p className="mt-1 text-sm text-gray-700">{answer.answer_text}</p>
                                                 </div>
-                                                <p className="pl-8 text-sm">{answer.answer_text}</p>
                                             </div>
                                         ))}
-                                        <div className="mt-4 space-y-2">
-                                            <Textarea placeholder="Write an answer..." value={newAnswers[doubt.id] || ''} onChange={e => setNewAnswers(prev => ({...prev, [doubt.id]: e.target.value}))} />
-                                            <Button size="sm" onClick={() => addAnswerMutation.mutate({ doubt_id: doubt.id, answer_text: newAnswers[doubt.id] })} disabled={!newAnswers[doubt.id]?.trim() || addAnswerMutation.isPending}>Reply</Button>
+                                    </div>
+
+                                    <div className="mt-4 pl-6 flex items-start space-x-3">
+                                        <Avatar className="h-8 w-8">
+                                             <AvatarFallback>{user?.email?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex-1">
+                                            <Textarea 
+                                                placeholder="Write an answer..." 
+                                                value={newAnswers[doubt.id] || ''} 
+                                                onChange={e => setNewAnswers(prev => ({...prev, [doubt.id]: e.target.value}))} 
+                                                className="text-sm"
+                                            />
+                                            <Button 
+                                                size="sm" 
+                                                onClick={() => addAnswerMutation.mutate({ doubt_id: doubt.id, answer_text: newAnswers[doubt.id] })} 
+                                                disabled={!newAnswers[doubt.id]?.trim() || addAnswerMutation.isPending}
+                                                className="mt-2"
+                                            >
+                                                <CornerDownRight className="mr-2 h-4 w-4" /> Reply
+                                            </Button>
                                         </div>
-                                    </AccordionContent>
-                                </AccordionItem>
-                            ))}
-                        </Accordion>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                    {doubts.length === 0 && !isLoadingDoubts && (
+                        <div className="text-center py-10 text-gray-500">
+                            <MessageSquare className="mx-auto h-12 w-12 text-gray-300" />
+                            <p className="mt-4">No questions have been asked for this recording yet.</p>
+                            <p>Be the first to start a discussion!</p>
+                        </div>
                     )}
                 </div>
-            </CardContent>
-        </Card>
+            </div>
+        </div>
     );
 };
 
