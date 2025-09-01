@@ -1,17 +1,22 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Video, Play, Search, ArrowLeft, PlayCircle, Home, Calendar, Book, User, Menu, Bell } from 'lucide-react';
+import { Video, Play, Search, ArrowLeft, PlayCircle, Home, Calendar, Book, User, Menu, Bell, MessageSquare, Send } from 'lucide-react';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { toast } from '@/hooks/use-toast';
 
+// Interfaces
 interface RecordingContent {
     id: string;
     date: string;
@@ -27,6 +32,25 @@ interface UserEnrollment {
     subject_name: string;
 }
 
+interface Profile {
+    name: string;
+}
+
+interface Doubt {
+    id: string;
+    question_text: string;
+    created_at: string;
+    profiles: Profile;
+}
+
+interface DoubtAnswer {
+    id: string;
+    answer_text: string;
+    created_at: string;
+    profiles: Profile;
+}
+
+// Skeletons
 const RecordingSkeleton = () => (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {[...Array(8)].map((_, i) => (
@@ -45,6 +69,7 @@ const RecordingSkeleton = () => (
     </div>
 );
 
+// Player Component
 const WatermarkedPlayer = ({ recording }: { recording: RecordingContent }) => {
     const { profile } = useAuth();
     return (
@@ -66,6 +91,135 @@ const WatermarkedPlayer = ({ recording }: { recording: RecordingContent }) => {
         </div>
     );
 };
+
+// Doubts Section Component
+const DoubtsSection = ({ recordingId }: { recordingId: string }) => {
+    const { profile } = useAuth();
+    const queryClient = useQueryClient();
+    const [newDoubt, setNewDoubt] = useState('');
+    const [newAnswers, setNewAnswers] = useState<Record<string, string>>({});
+
+    const { data: doubts = [], isLoading: isLoadingDoubts } = useQuery<Doubt[]>({
+        queryKey: ['doubts', recordingId],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('doubts')
+                .select(`*, profiles(name)`)
+                .eq('recording_id', recordingId)
+                .order('created_at', { ascending: true });
+            if (error) throw error;
+            return data as Doubt[];
+        },
+        enabled: !!recordingId,
+    });
+
+    const { data: answers = [], isLoading: isLoadingAnswers } = useQuery<DoubtAnswer[]>({
+        queryKey: ['doubt_answers', doubts.map(d => d.id)],
+        queryFn: async () => {
+            if (doubts.length === 0) return [];
+            const doubtIds = doubts.map(d => d.id);
+            const { data, error } = await supabase
+                .from('doubt_answers')
+                .select(`*, doubt_id, profiles(name)`)
+                .in('doubt_id', doubtIds)
+                .order('created_at', { ascending: true });
+            if (error) throw error;
+            return data as DoubtAnswer[];
+        },
+        enabled: doubts.length > 0,
+    });
+    
+    const answersByDoubtId = useMemo(() => {
+        const map = new Map<string, DoubtAnswer[]>();
+        answers.forEach(answer => {
+            const existing = map.get(answer.doubt_id) || [];
+            map.set(answer.doubt_id, [...existing, answer]);
+        });
+        return map;
+    }, [answers]);
+
+    const addDoubtMutation = useMutation({
+        mutationFn: async (question_text: string) => {
+            const { error } = await supabase.from('doubts').insert({ recording_id: recordingId, user_id: profile?.user_id, question_text });
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['doubts', recordingId] });
+            setNewDoubt('');
+            toast({ title: 'Success', description: 'Your question has been posted.' });
+        },
+        onError: (e: any) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+    });
+
+    const addAnswerMutation = useMutation({
+        mutationFn: async ({ doubt_id, answer_text }: { doubt_id: string, answer_text: string }) => {
+            const { error } = await supabase.from('doubt_answers').insert({ doubt_id, user_id: profile?.user_id, answer_text });
+            if (error) throw error;
+        },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['doubt_answers', doubts.map(d => d.id)] });
+            setNewAnswers(prev => ({ ...prev, [variables.doubt_id]: '' }));
+            toast({ title: 'Success', description: 'Your answer has been posted.' });
+        },
+        onError: (e: any) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+    });
+
+    return (
+        <Card className="mt-6">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <MessageSquare /> Doubts & Discussions
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="space-y-4">
+                    <Textarea placeholder="Ask a question about this recording..." value={newDoubt} onChange={e => setNewDoubt(e.target.value)} />
+                    <Button onClick={() => addDoubtMutation.mutate(newDoubt)} disabled={!newDoubt.trim() || addDoubtMutation.isPending}>
+                        <Send className="mr-2 h-4 w-4" /> Ask Question
+                    </Button>
+                </div>
+                <div className="mt-6 space-y-4">
+                    {isLoadingDoubts ? <p>Loading doubts...</p> : (
+                        <Accordion type="single" collapsible className="w-full">
+                            {doubts.map(doubt => (
+                                <AccordionItem key={doubt.id} value={doubt.id}>
+                                    <AccordionTrigger>
+                                        <div className="flex items-center gap-2">
+                                            <Avatar className="h-6 w-6">
+                                                <AvatarFallback>{doubt.profiles.name.charAt(0)}</AvatarFallback>
+                                            </Avatar>
+                                            <span className="font-semibold">{doubt.profiles.name}</span>
+                                            <span className="font-normal text-left flex-1 pl-2">{doubt.question_text}</span>
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="pl-8">
+                                        {answersByDoubtId.get(doubt.id)?.map(answer => (
+                                            <div key={answer.id} className="py-2 border-b">
+                                                <div className="flex items-center gap-2 text-sm">
+                                                    <Avatar className="h-6 w-6">
+                                                        <AvatarFallback>{answer.profiles.name.charAt(0)}</AvatarFallback>
+                                                    </Avatar>
+                                                    <span className="font-semibold">{answer.profiles.name}</span>
+                                                    <span className="text-gray-500">{format(new Date(answer.created_at), 'PPP')}</span>
+                                                </div>
+                                                <p className="pt-2 pl-8">{answer.answer_text}</p>
+                                            </div>
+                                        ))}
+                                        <div className="mt-4 space-y-2">
+                                            <Textarea placeholder="Write an answer..." value={newAnswers[doubt.id] || ''} onChange={e => setNewAnswers(prev => ({...prev, [doubt.id]: e.target.value}))} />
+                                            <Button size="sm" onClick={() => addAnswerMutation.mutate({ doubt_id: doubt.id, answer_text: newAnswers[doubt.id] })} disabled={!newAnswers[doubt.id] || addAnswerMutation.isPending}>Reply</Button>
+                                        </div>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            ))}
+                        </Accordion>
+                    )}
+                </div>
+            </CardContent>
+        </Card>
+    );
+};
+
 
 export const StudentRecordings = () => {
     const { profile } = useAuth();
@@ -156,6 +310,7 @@ export const StudentRecordings = () => {
                                 <Badge variant="outline">{selectedRecording.subject}</Badge>
                             </div>
                         </div>
+                        <DoubtsSection recordingId={selectedRecording.id} />
                     </div>
                     <div className="space-y-4">
                         <h2 className="text-xl font-semibold text-slate-700">Up Next</h2>
