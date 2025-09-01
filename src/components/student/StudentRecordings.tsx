@@ -107,7 +107,7 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('doubts')
-                .select(`id, question_text, created_at, user_id, profiles!inner(name)`) // CORRECTED SYNTAX
+                .select(`id, question_text, created_at, user_id, profiles!inner(name)`)
                 .eq('recording_id', recording.id)
                 .order('created_at', { ascending: false });
             if (error) throw error;
@@ -124,7 +124,7 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
             if (doubtIds.length === 0) return [];
             const { data, error } = await supabase
                 .from('doubt_answers')
-                .select(`id, answer_text, created_at, user_id, doubt_id, profiles!inner(name)`) // CORRECTED SYNTAX
+                .select(`id, answer_text, created_at, user_id, doubt_id, profiles!inner(name)`)
                 .in('doubt_id', doubtIds)
                 .order('created_at', { ascending: true });
             if (error) throw error;
@@ -367,7 +367,6 @@ export const StudentRecordings = () => {
     }
 
     if (isMobile) {
-        // Mobile view remains unchanged for brevity, but would ideally include the doubts feature as well.
         return (
             <div className="min-h-screen bg-gray-50 text-gray-800 pb-20">
                 <header className="bg-white shadow-sm p-4 flex justify-between items-center">
@@ -421,28 +420,6 @@ export const StudentRecordings = () => {
                         )}
                     </div>
                 </main>
-                <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-2">
-                    <a className="flex flex-col items-center text-gray-500 hover:text-indigo-600" href="#">
-                        <Home />
-                        <span className="text-xs">Home</span>
-                    </a>
-                    <a className="flex flex-col items-center text-indigo-600" href="#">
-                        <PlayCircle />
-                        <span className="text-xs">Recordings</span>
-                    </a>
-                    <a className="flex flex-col items-center text-gray-500 hover:text-indigo-600" href="#">
-                        <Calendar />
-                        <span className="text-xs">Schedule</span>
-                    </a>
-                    <a className="flex flex-col items-center text-gray-500 hover:text-indigo-600" href="#">
-                        <Book />
-                        <span className="text-xs">Notes</span>
-                    </a>
-                    <a className="flex flex-col items-center text-gray-500 hover:text-indigo-600" href="#">
-                        <User />
-                        <span className="text-xs">Profile</span>
-                    </a>
-                </nav>
             </div>
         )
     }
