@@ -75,50 +75,49 @@ export const StudentDPP = () => {
 
   const displayedBatches = useMemo(() => {
     if (!userEnrollments) return [];
-    if (selectedSubjectFilter === 'all') {
-      return Array.from(new Set(userEnrollments.map(e => e.batch_name))).sort();
-    }
-    return Array.from(new Set(userEnrollments.filter(e => e.subject_name === selectedSubjectFilter).map(e => e.batch_name))).sort();
-  }, [userEnrollments, selectedSubjectFilter]);
+    return Array.from(new Set(userEnrollments.map(e => e.batch_name))).sort();
+  }, [userEnrollments]);
 
   const displayedSubjects = useMemo(() => {
     if (!userEnrollments) return [];
     if (selectedBatchFilter !== 'all') {
-      return Array.from(new Set(userEnrollments.filter(e => e.batch_name === selectedBatchFilter).map(e => e.subject_name))).sort();
+      return Array.from(new Set(
+        userEnrollments
+          .filter(e => e.batch_name === selectedBatchFilter)
+          .map(e => e.subject_name)
+      )).sort();
     }
     return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
   }, [userEnrollments, selectedBatchFilter]);
 
   useEffect(() => {
-    if (selectedBatchFilter !== 'all' && !displayedBatches.includes(selectedBatchFilter)) {
-        setSelectedBatchFilter('all');
+    if (selectedBatchFilter === 'all') {
+      setSelectedSubjectFilter('all');
     }
-  }, [selectedBatchFilter, displayedBatches]);
-
-  useEffect(() => {
-    if (selectedSubjectFilter !== 'all' && !displayedSubjects.includes(selectedSubjectFilter)) {
-        setSelectedSubjectFilter('all');
-    }
-  }, [selectedSubjectFilter, displayedSubjects]);
+  }, [selectedBatchFilter]);
 
   const { data: dppContent, isLoading: isLoadingDPPContent } = useQuery<DPPContent[]>({
     queryKey: ['student-dpp', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
     queryFn: async (): Promise<DPPContent[]> => {
         if (!userEnrollments || userEnrollments.length === 0) return [];
 
-        let query = supabase
-            .from('dpp_content')
-            .select('*')
-            .eq('is_active', true);
+        let query = supabase.from('dpp_content').select('*').eq('is_active', true);
 
-        // Apply UI filters. RLS will automatically handle security.
-        if (selectedBatchFilter !== 'all') {
-            query = query.eq('batch', selectedBatchFilter);
+        const activeEnrollments = userEnrollments
+            .filter(enrollment =>
+                (selectedBatchFilter === 'all' || enrollment.batch_name === selectedBatchFilter) &&
+                (selectedSubjectFilter === 'all' || enrollment.subject_name === selectedSubjectFilter)
+            );
+
+        if (activeEnrollments.length > 0) {
+            const orFilterString = activeEnrollments
+                .map(e => `and(batch.eq.${e.batch_name},subject.eq.${e.subject_name})`)
+                .join(',');
+            query = query.or(orFilterString);
+        } else {
+            return [];
         }
-        if (selectedSubjectFilter !== 'all') {
-            query = query.eq('subject', selectedSubjectFilter);
-        }
-        
+            
         query = query.order('created_at', { ascending: false });
         
         const { data, error } = await query;
