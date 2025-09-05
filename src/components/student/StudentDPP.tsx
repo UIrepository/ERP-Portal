@@ -52,6 +52,7 @@ const DPPSkeleton = () => (
 export const StudentDPP = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
   const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
 
@@ -72,35 +73,22 @@ export const StudentDPP = () => {
     enabled: !!profile?.user_id
   });
 
-  // Derived state for filter options, implementing cascading logic
   const displayedBatches = useMemo(() => {
     if (!userEnrollments) return [];
     if (selectedSubjectFilter === 'all') {
       return Array.from(new Set(userEnrollments.map(e => e.batch_name))).sort();
-    } else {
-      return Array.from(new Set(
-        userEnrollments
-          .filter(e => e.subject_name === selectedSubjectFilter)
-          .map(e => e.batch_name)
-      )).sort();
     }
+    return Array.from(new Set(userEnrollments.filter(e => e.subject_name === selectedSubjectFilter).map(e => e.batch_name))).sort();
   }, [userEnrollments, selectedSubjectFilter]);
 
   const displayedSubjects = useMemo(() => {
     if (!userEnrollments) return [];
-    // If a specific batch is selected, only show subjects associated with that batch
     if (selectedBatchFilter !== 'all') {
-      return Array.from(new Set(
-        userEnrollments
-          .filter(e => e.batch_name === selectedBatchFilter)
-          .map(e => e.subject_name)
-      )).sort();
+      return Array.from(new Set(userEnrollments.filter(e => e.batch_name === selectedBatchFilter).map(e => e.subject_name))).sort();
     }
-    // Otherwise (if 'All Batches' is selected), show all subjects available across all enrollments
     return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
   }, [userEnrollments, selectedBatchFilter]);
 
-  // Ensure selected filters are still valid when options change
   useEffect(() => {
     if (selectedBatchFilter !== 'all' && !displayedBatches.includes(selectedBatchFilter)) {
         setSelectedBatchFilter('all');
@@ -118,28 +106,19 @@ export const StudentDPP = () => {
     queryFn: async (): Promise<DPPContent[]> => {
         if (!userEnrollments || userEnrollments.length === 0) return [];
 
-        let query = supabase.from('dpp_content').select('*').eq('is_active', true);
+        let query = supabase
+            .from('dpp_content')
+            .select('*')
+            .eq('is_active', true);
 
-        const activeEnrollments = userEnrollments
-            .filter(enrollment =>
-                (selectedBatchFilter === 'all' || enrollment.batch_name === selectedBatchFilter) &&
-                (selectedSubjectFilter === 'all' || enrollment.subject_name === selectedSubjectFilter)
-            );
-
-        if (activeEnrollments.length > 0) {
-            if (activeEnrollments.length === 1) {
-                const { batch_name, subject_name } = activeEnrollments[0];
-                query = query.eq('batch', batch_name).eq('subject', subject_name);
-            } else {
-                const orFilterString = activeEnrollments
-                    .map(e => `and(batch.eq.${e.batch_name},subject.eq.${e.subject_name})`)
-                    .join(',');
-                query = query.or(orFilterString);
-            }
-        } else {
-            return [];
+        // Apply UI filters. RLS will automatically handle security.
+        if (selectedBatchFilter !== 'all') {
+            query = query.eq('batch', selectedBatchFilter);
         }
-            
+        if (selectedSubjectFilter !== 'all') {
+            query = query.eq('subject', selectedSubjectFilter);
+        }
+        
         query = query.order('created_at', { ascending: false });
         
         const { data, error } = await query;
@@ -153,43 +132,27 @@ export const StudentDPP = () => {
     enabled: !!userEnrollments && userEnrollments.length > 0
   });
 
-  // Set up real-time subscriptions for DPP data
   useEffect(() => {
     if (!profile?.user_id) return;
-
     const dppChannel = supabase
       .channel('dpp-realtime-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'dpp_content'
-        },
-        () => {
-          console.log('Real-time update: dpp_content changed');
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dpp_content' }, () => {
           queryClient.invalidateQueries({ queryKey: ['student-dpp'] });
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_enrollments',
-          filter: `user_id=eq.${profile.user_id}`
-        },
-        () => {
-          console.log('Real-time update: user_enrollments changed');
+        })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_enrollments', filter: `user_id=eq.${profile.user_id}` }, () => {
           queryClient.invalidateQueries({ queryKey: ['userEnrollments'] });
-        }
-      )
+        })
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(dppChannel);
-    };
+    return () => { supabase.removeChannel(dppChannel); };
   }, [profile?.user_id, queryClient]);
+
+  const filteredAndSearchedContent = useMemo(() => {
+    if (!dppContent) return [];
+    return dppContent.filter(item => 
+      item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.description && item.description.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+  }, [dppContent, searchTerm]);
 
   const handleAccessDPP = (dpp: DPPContent) => {
     window.open(dpp.link, '_blank');
@@ -199,7 +162,6 @@ export const StudentDPP = () => {
 
   return (
     <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
-      {/* Header Section */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-800 flex items-center">
@@ -213,14 +175,14 @@ export const StudentDPP = () => {
         </div>
       </div>
 
-
-      {/* Filters and Search Section */}
       <div className="flex gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search DPP content..."
               className="pl-10 h-10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
@@ -234,11 +196,7 @@ export const StudentDPP = () => {
               ))}
             </SelectContent>
           </Select>
-          <Select
-            value={selectedSubjectFilter}
-            onValueChange={setSelectedSubjectFilter}
-            disabled={selectedBatchFilter === 'all'}
-          >
+          <Select value={selectedSubjectFilter} onValueChange={setSelectedSubjectFilter}>
             <SelectTrigger className="w-48 h-10">
               <SelectValue placeholder="Filter by subject" />
             </SelectTrigger>
@@ -251,13 +209,12 @@ export const StudentDPP = () => {
           </Select>
       </div>
 
-      {/* Content Grid */}
       <div>
         {isLoading ? (
           <DPPSkeleton />
-        ) : dppContent && dppContent.length > 0 ? (
+        ) : filteredAndSearchedContent && filteredAndSearchedContent.length > 0 ? (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {dppContent.map((dpp) => (
+            {filteredAndSearchedContent.map((dpp) => (
               <Card key={dpp.id} className="bg-white hover:shadow-lg transition-shadow duration-300 flex flex-col rounded-xl overflow-hidden">
                 <CardContent className="p-5 flex flex-col flex-grow">
                   <div className="flex-grow">
