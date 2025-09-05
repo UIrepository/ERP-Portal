@@ -118,18 +118,24 @@ export const StudentDPP = () => {
     queryFn: async (): Promise<DPPContent[]> => {
         if (!userEnrollments || userEnrollments.length === 0) return [];
 
-        let query = supabase.from('dpp_content').select('*')
-                            .eq('is_active', true); // Filter by is_active (assuming column exists)
+        let query = supabase.from('dpp_content').select('*').eq('is_active', true);
 
-        const combinationFilters = userEnrollments
+        const activeEnrollments = userEnrollments
             .filter(enrollment =>
                 (selectedBatchFilter === 'all' || enrollment.batch_name === selectedBatchFilter) &&
                 (selectedSubjectFilter === 'all' || enrollment.subject_name === selectedSubjectFilter)
-            )
-            .map(enrollment => `and(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
+            );
 
-        if (combinationFilters.length > 0) {
-            query = query.or(combinationFilters.join(','));
+        if (activeEnrollments.length > 0) {
+            if (activeEnrollments.length === 1) {
+                const { batch_name, subject_name } = activeEnrollments[0];
+                query = query.eq('batch', batch_name).eq('subject', subject_name);
+            } else {
+                const orFilterString = activeEnrollments
+                    .map(e => `and(batch.eq.${e.batch_name},subject.eq.${e.subject_name})`)
+                    .join(',');
+                query = query.or(orFilterString);
+            }
         } else {
             return [];
         }
