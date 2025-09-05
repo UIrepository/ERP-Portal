@@ -87,14 +87,15 @@ export const StudentDPP = () => {
           .map(e => e.subject_name)
       )).sort();
     }
+    // If no batch is selected, show all unique subjects the user is enrolled in
     return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
   }, [userEnrollments, selectedBatchFilter]);
-
+  
+  // When the batch filter changes, reset the subject filter
   useEffect(() => {
-    if (selectedBatchFilter === 'all') {
-      setSelectedSubjectFilter('all');
-    }
+    setSelectedSubjectFilter('all');
   }, [selectedBatchFilter]);
+
 
   const { data: dppContent, isLoading: isLoadingDPPContent } = useQuery<DPPContent[]>({
     queryKey: ['student-dpp', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
@@ -115,6 +116,7 @@ export const StudentDPP = () => {
                 .join(',');
             query = query.or(orFilterString);
         } else {
+            // This case handles when filters result in no valid enrollments, so no query should be made.
             return [];
         }
             
@@ -195,7 +197,11 @@ export const StudentDPP = () => {
               ))}
             </SelectContent>
           </Select>
-          <Select value={selectedSubjectFilter} onValueChange={setSelectedSubjectFilter}>
+          <Select
+            value={selectedSubjectFilter}
+            onValueChange={setSelectedSubjectFilter}
+            disabled={selectedBatchFilter === 'all'} // Subject is only enabled when a specific batch is chosen
+          >
             <SelectTrigger className="w-48 h-10">
               <SelectValue placeholder="Filter by subject" />
             </SelectTrigger>
