@@ -7,6 +7,7 @@ import type { Database } from './types';
 const SUPABASE_URL = "https://lcfzfdjeidinenxcucvj.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_WnbiNgZi5Q6837SJzMQeew_gUTOxMKh";
 
+// Updated createClient call to use a single options object to address the deprecation warning.
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
