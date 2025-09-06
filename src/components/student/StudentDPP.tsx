@@ -2,11 +2,11 @@ import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Target, ExternalLink, Search } from 'lucide-react';
+import { Target, ExternalLink, Search, ArrowLeft, Download } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 
@@ -49,12 +49,67 @@ const DPPSkeleton = () => (
     </div>
 );
 
+const DPPViewer = ({ dpp, onBack, onDownload, allDPPs, onDPPSelect }: { dpp: DPPContent, onBack: () => void, onDownload: (dpp: DPPContent) => void, allDPPs: DPPContent[], onDPPSelect: (dpp: DPPContent) => void }) => {
+    const otherDPPs = allDPPs.filter(d => d.id !== dpp.id && d.batch === dpp.batch && d.subject === dpp.subject);
+
+    return (
+      <div className="p-4 md:p-6 space-y-6 bg-slate-100 min-h-full">
+        <Button variant="outline" onClick={onBack} className="mb-4">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to DPPs
+        </Button>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-2">
+                <Card className="bg-white rounded-2xl overflow-hidden shadow-2xl">
+                    <CardHeader className="p-6 border-b">
+                        <div className="flex justify-between items-center">
+                            <CardTitle>{dpp.title}</CardTitle>
+                            <Button onClick={() => onDownload(dpp)}>
+                                <Download className="h-4 w-4 mr-2" />
+                                Download
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                    <div className="w-full h-[60vh] md:h-[75vh]">
+                        <iframe
+                        src={dpp.link}
+                        className="w-full h-full"
+                        title={dpp.title}
+                        />
+                    </div>
+                    </CardContent>
+                </Card>
+            </div>
+            <div className="md:col-span-1">
+                <Card className="bg-white rounded-2xl shadow-2xl">
+                    <CardHeader>
+                        <CardTitle>Other DPPs</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-4">
+                            {otherDPPs.map(otherDPP => (
+                                <div key={otherDPP.id} className="p-3 border rounded-lg hover:shadow-md hover:border-primary/50 transition-all duration-200 cursor-pointer" onClick={() => onDPPSelect(otherDPP)}>
+                                    <p className="font-semibold text-primary">{otherDPP.title}</p>
+                                    <p className="text-xs text-muted-foreground">{otherDPP.description}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
+      </div>
+    );
+};
+
 export const StudentDPP = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
   const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
+  const [selectedDPP, setSelectedDPP] = useState<DPPContent | null>(null);
 
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['userEnrollments', profile?.user_id],
@@ -160,6 +215,10 @@ export const StudentDPP = () => {
   
   const isLoading = isLoadingEnrollments || isLoadingDPPContent;
 
+  if (selectedDPP) {
+    return <DPPViewer dpp={selectedDPP} onBack={() => setSelectedDPP(null)} onDownload={handleAccessDPP} allDPPs={dppContent || []} onDPPSelect={setSelectedDPP} />;
+  }
+
   return (
     <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
       <div className="flex items-center justify-between">
@@ -240,11 +299,12 @@ export const StudentDPP = () => {
                     </div>
                   </div>
                   <Button 
-                    onClick={() => handleAccessDPP(dpp)}
+                    onClick={() => setSelectedDPP(dpp)}
                     className="w-full mt-5"
+                    variant="outline"
                     >
                     <ExternalLink className="h-4 w-4 mr-2" />
-                    Start DPP
+                    Preview
                   </Button>
                 </CardContent>
               </Card>
