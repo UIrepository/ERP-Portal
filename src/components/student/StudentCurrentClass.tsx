@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ExternalLink, Clock, Calendar, AlertTriangle, Video } from 'lucide-react';
 import { format, differenceInSeconds, startOfDay, isSameDay } from 'date-fns';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface Schedule {
   id: string;
@@ -70,6 +72,7 @@ const Countdown = ({ targetDate }: { targetDate: Date }) => {
 export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const now = useMemo(() => new Date(), []);
   const currentDay = now.getDay();
   const currentTimeStr = format(now, 'HH:mm:ss');
@@ -115,7 +118,6 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     enabled: !!profile?.user_id,
   });
 
-  // Set up real-time subscription for ongoing class changes
   useEffect(() => {
     if (!profile?.user_id) return;
 
@@ -211,6 +213,80 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
   const isLoadingInitialData = isLoadingAllSchedules || isLoadingOngoingClass;
   const hasErrors = isAllSchedulesError || isOngoingClassError;
 
+  const renderNextUpcoming = () => (
+    nextUpcomingClass ? (
+        <div className="space-y-6">
+            <p className="text-xl font-semibold text-gray-700">
+                Your Next Class: <span className="text-primary">{nextUpcomingClass.subject} ({nextUpcomingClass.batch})</span>
+            </p>
+            <p className="text-lg text-gray-600">
+                {format(nextUpcomingClass.nextOccurrence, "eeee, MMMM do 'at' h:mm a")}
+            </p>
+            <Countdown targetDate={nextUpcomingClass.nextOccurrence} />
+            {nextUpcomingClass.meeting_link_url && (
+                <Button
+                    onClick={() => window.open(nextUpcomingClass.meeting_link_url!, '_blank')}
+                    size="lg"
+                    className="bg-primary hover:bg-primary/90 text-white mt-6"
+                >
+                    <ExternalLink className="h-5 w-5 mr-2" />
+                    Go to Next Class
+                </Button>
+            )}
+        </div>
+    ) : (
+        todaysOtherClasses.length === 0 && (
+        <div className="space-y-4">
+            <AlertTriangle className="h-16 w-16 mx-auto text-yellow-500" />
+            <p className="text-xl font-semibold text-gray-700">No Upcoming Classes Found</p>
+            <p className="text-gray-600">It looks like there are no scheduled classes for your current enrollments.</p>
+        </div>
+        )
+    )
+  );
+
+  const renderTodaysSchedule = () => (
+    todaysOtherClasses && todaysOtherClasses.length > 0 ? (
+        <div className="w-full mt-4 md:mt-12">
+            {!isMobile && <h4 className="text-xl font-semibold text-gray-700 mb-4">Today's Schedule</h4>}
+            <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2">
+                {todaysOtherClasses.map(schedule => {
+                    const isFinished = currentTimeStr >= schedule.end_time;
+                    return (
+                        <Card key={schedule.id} className={`p-4 text-left bg-white/80 backdrop-blur-sm ${isFinished ? 'opacity-70' : ''}`}>
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <p className="font-bold text-gray-800">{schedule.subject}</p>
+                                    <p className="text-sm text-gray-500">{schedule.batch}</p>
+                                    <p className="text-sm text-gray-500 mt-1">{formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}</p>
+                                </div>
+                                {isFinished ? (
+                                    null
+                                ) : (
+                                    schedule.meeting_link_url ? (
+                                        <Button onClick={() => window.open(schedule.meeting_link_url, '_blank')}>
+                                            <ExternalLink className="mr-2 h-4 w-4" />
+                                            Join Class
+                                        </Button>
+                                    ) : null
+                                )}
+                            </div>
+                        </Card>
+                    );
+                })}
+            </div>
+        </div>
+    ) : (
+        !nextUpcomingClass && (
+             <div className="space-y-4 pt-4">
+                <AlertTriangle className="h-16 w-16 mx-auto text-yellow-500" />
+                <p className="text-xl font-semibold text-gray-700">No other classes today</p>
+            </div>
+        )
+    )
+  );
+
+
   if (isLoadingInitialData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50/50">
@@ -292,70 +368,29 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
             </div>
           </Card>
         ) : (
-          <Card className="p-12 text-center rounded-3xl shadow-xl border-2 border-dashed border-gray-300 bg-white">
+          <Card className="p-6 md:p-12 text-center rounded-3xl shadow-xl border-2 border-dashed border-gray-300 bg-white">
             <div className="mb-8"><Clock className="h-20 w-20 mx-auto text-gray-400" /></div>
             <h3 className="text-3xl font-bold text-gray-800 mb-4">No Ongoing Class Right Now</h3>
-            <p className="text-gray-600 mb-8 max-w-lg mx-auto">Relax and prepare for your next session.</p>
-            {nextUpcomingClass ? (
-                <div className="space-y-6">
-                    <p className="text-xl font-semibold text-gray-700">
-                        Your Next Class: <span className="text-primary">{nextUpcomingClass.subject} ({nextUpcomingClass.batch})</span>
-                    </p>
-                    <p className="text-lg text-gray-600">
-                        {format(nextUpcomingClass.nextOccurrence, "eeee, MMMM do 'at' h:mm a")}
-                    </p>
-                    <Countdown targetDate={nextUpcomingClass.nextOccurrence} />
-                    {nextUpcomingClass.meeting_link_url && (
-                        <Button
-                            onClick={() => window.open(nextUpcomingClass.meeting_link_url!, '_blank')}
-                            size="lg"
-                            className="bg-primary hover:bg-primary/90 text-white mt-6"
-                        >
-                            <ExternalLink className="h-5 w-5 mr-2" />
-                            Go to Next Class
-                        </Button>
-                    )}
-                </div>
+            <p className="text-gray-600 mb-8 max-w-lg mx-auto">Here's a look at what's scheduled for today.</p>
+
+            {isMobile ? (
+                <Tabs defaultValue="next-up" className="w-full">
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="next-up">Next Up</TabsTrigger>
+                        <TabsTrigger value="todays-schedule">Today's Schedule</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="next-up" className="pt-6">
+                        {renderNextUpcoming()}
+                    </TabsContent>
+                    <TabsContent value="todays-schedule" className="pt-2">
+                        {renderTodaysSchedule()}
+                    </TabsContent>
+                </Tabs>
             ) : (
-                todaysOtherClasses.length === 0 && (
-                <div className="space-y-4">
-                    <AlertTriangle className="h-16 w-16 mx-auto text-yellow-500" />
-                    <p className="text-xl font-semibold text-gray-700">No Upcoming Classes Found</p>
-                    <p className="text-gray-600">It looks like there are no scheduled classes for your current enrollments.</p>
-                </div>
-                )
-            )}
-            
-            {todaysOtherClasses && todaysOtherClasses.length > 0 && (
-                <div className="w-full mt-12">
-                    <h4 className="text-xl font-semibold text-gray-700 mb-4">Today's Schedule</h4>
-                    <div className="space-y-4">
-                        {todaysOtherClasses.map(schedule => {
-                            const isFinished = currentTimeStr >= schedule.end_time;
-                            return (
-                                <Card key={schedule.id} className={`p-4 text-left bg-white/80 backdrop-blur-sm ${isFinished ? 'opacity-70' : ''}`}>
-                                    <div className="flex justify-between items-center">
-                                        <div>
-                                            <p className="font-bold text-gray-800">{schedule.subject}</p>
-                                            <p className="text-sm text-gray-500">{schedule.batch}</p>
-                                            <p className="text-sm text-gray-500 mt-1">{formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}</p>
-                                        </div>
-                                        {isFinished ? (
-                                            null
-                                        ) : (
-                                            schedule.meeting_link_url ? (
-                                                <Button onClick={() => window.open(schedule.meeting_link_url, '_blank')}>
-                                                    <ExternalLink className="mr-2 h-4 w-4" />
-                                                    Join Class
-                                                </Button>
-                                            ) : null
-                                        )}
-                                    </div>
-                                </Card>
-                            );
-                        })}
-                    </div>
-                </div>
+                <>
+                    {renderNextUpcoming()}
+                    {renderTodaysSchedule()}
+                </>
             )}
 
             <Button 
