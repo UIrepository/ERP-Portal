@@ -161,29 +161,35 @@ export const ScheduleManagement = () => {
                   ))}
               </div>
               <div className="relative">
-                  {timeSlots.map(time => (
-                      <div key={time} className="grid grid-cols-[80px_repeat(7,1fr)] border-t">
-                          <div className="text-center text-sm font-medium text-gray-700 py-4 px-2 border-r">{formatTime(time)}</div>
-                          {weekDates.map((date, dayIndex) => {
-                              const recurringClass = schedules.find(s => !s.date && s.day_of_week === getDay(date) && s.start_time === time);
-                              const dateSpecificClass = schedules.find(s => s.date && isSameDay(new Date(s.date), date) && s.start_time === time);
-                              const classInfo = dateSpecificClass || recurringClass;
-                              return (
-                                  <div key={dayIndex} className={`p-2 border-r last:border-r-0 ${isSameDay(date, today) ? 'bg-blue-50' : ''}`}>
-                                      {classInfo && (
-                                        <Card key={classInfo.id} className="bg-white shadow-md hover:shadow-lg transition-shadow mb-2">
-                                            <CardContent className="p-3">
-                                                <p className="font-bold text-gray-800 text-sm">{classInfo.subject}</p>
-                                                <Badge variant="secondary" className="mt-1">{classInfo.batch}</Badge>
-                                                {classInfo.date && <Badge variant="outline" className="mt-1 ml-1">{format(new Date(classInfo.date), 'MMM d')}</Badge>}
-                                            </CardContent>
-                                        </Card>
-                                      )}
-                                  </div>
-                              );
-                          })}
-                      </div>
-                  ))}
+                  {timeSlots.map(time => {
+                      const sampleScheduleForSlot = schedules?.find(s => s.start_time === time);
+                      const endTime = sampleScheduleForSlot ? sampleScheduleForSlot.end_time : '';
+                      return (
+                          <div key={time} className="grid grid-cols-[80px_repeat(7,1fr)] border-t">
+                              <div className="text-center text-xs font-medium text-gray-700 py-4 px-2 border-r">
+                                {formatTime(time)} - {endTime ? formatTime(endTime) : ''}
+                              </div>
+                              {weekDates.map((date, dayIndex) => {
+                                  const recurringClass = schedules.find(s => !s.date && s.day_of_week === getDay(date) && s.start_time === time);
+                                  const dateSpecificClass = schedules.find(s => s.date && isSameDay(new Date(s.date), date) && s.start_time === time);
+                                  const classInfo = dateSpecificClass || recurringClass;
+                                  return (
+                                      <div key={dayIndex} className={`p-2 border-r last:border-r-0 ${isSameDay(date, today) ? 'bg-blue-50' : ''}`}>
+                                          {classInfo && (
+                                            <Card key={classInfo.id} className="bg-white shadow-md hover:shadow-lg transition-shadow mb-2">
+                                                <CardContent className="p-3">
+                                                    <p className="font-bold text-gray-800 text-sm">{classInfo.subject}</p>
+                                                    <Badge variant="secondary" className="mt-1">{classInfo.batch}</Badge>
+                                                    {classInfo.date && <Badge variant="outline" className="mt-1 ml-1">{format(new Date(classInfo.date), 'MMM d')}</Badge>}
+                                                </CardContent>
+                                            </Card>
+                                          )}
+                                      </div>
+                                  );
+                              })}
+                          </div>
+                      );
+                  })}
               </div>
           </div>
       </div>
