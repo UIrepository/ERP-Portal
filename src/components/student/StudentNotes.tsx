@@ -47,36 +47,59 @@ const NotesSkeleton = () => (
   </div>
 );
 
-const NoteViewer = ({ note, onBack, onDownload }: { note: NotesContent, onBack: () => void, onDownload: (note: NotesContent) => void }) => {
-  return (
-    <div className="p-4 md:p-6 space-y-6 bg-slate-100 min-h-full">
-      <Button variant="outline" onClick={onBack} className="mb-4">
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Notes
-      </Button>
-      <Card className="bg-white rounded-2xl overflow-hidden shadow-2xl">
-        <CardHeader className="p-6 border-b">
-            <div className="flex justify-between items-center">
-                <CardTitle>{note.title}</CardTitle>
-                <Button onClick={() => onDownload(note)}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Download
-                </Button>
+const NoteViewer = ({ note, onBack, onDownload, allNotes, onNoteSelect }: { note: NotesContent, onBack: () => void, onDownload: (note: NotesContent) => void, allNotes: NotesContent[], onNoteSelect: (note: NotesContent) => void }) => {
+    const otherNotes = allNotes.filter(n => n.id !== note.id && n.batch === note.batch && n.subject === note.subject);
+  
+    return (
+      <div className="p-4 md:p-6 space-y-6 bg-slate-100 min-h-full">
+        <Button variant="outline" onClick={onBack} className="mb-4">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Notes
+        </Button>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-2">
+                <Card className="bg-white rounded-2xl overflow-hidden shadow-2xl">
+                    <CardHeader className="p-6 border-b">
+                        <div className="flex justify-between items-center">
+                            <CardTitle>{note.title}</CardTitle>
+                            <Button onClick={() => onDownload(note)}>
+                                <Download className="h-4 w-4 mr-2" />
+                                Download
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                    <div className="w-full h-[60vh] md:h-[75vh]">
+                        <iframe
+                        src={note.file_url}
+                        className="w-full h-full"
+                        title={note.title}
+                        />
+                    </div>
+                    </CardContent>
+                </Card>
             </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="aspect-video">
-            <iframe
-              src={note.file_url}
-              className="w-full h-full"
-              title={note.title}
-            />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
+            <div className="md:col-span-1">
+                <Card className="bg-white rounded-2xl shadow-2xl">
+                    <CardHeader>
+                        <CardTitle>Other Files</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-4">
+                            {otherNotes.map(otherNote => (
+                                <div key={otherNote.id} className="p-3 border rounded-lg hover:shadow-md hover:border-primary/50 transition-all duration-200 cursor-pointer" onClick={() => onNoteSelect(otherNote)}>
+                                    <p className="font-semibold text-primary">{otherNote.title}</p>
+                                    <p className="text-xs text-muted-foreground">{otherNote.filename}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
+      </div>
+    );
+  };
 
 
 export const StudentNotes = () => {
@@ -275,7 +298,7 @@ export const StudentNotes = () => {
   const isLoading = isLoadingEnrollments || isLoadingNotesContent;
 
   if (selectedNote) {
-    return <NoteViewer note={selectedNote} onBack={() => setSelectedNote(null)} onDownload={handleDownload} />;
+    return <NoteViewer note={selectedNote} onBack={() => setSelectedNote(null)} onDownload={handleDownload} allNotes={notes || []} onNoteSelect={setSelectedNote} />;
   }
 
   return (
@@ -340,7 +363,7 @@ export const StudentNotes = () => {
         ) : filteredNotes && filteredNotes.length > 0 ? (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredNotes.map((note) => (
-              <Card key={note.id} className="bg-white hover:shadow-lg transition-shadow duration-300 cursor-pointer" onClick={() => setSelectedNote(note)}>
+              <Card key={note.id} className="bg-white hover:shadow-lg transition-shadow duration-300">
                 <CardContent className="p-5 flex flex-col h-full">
                   <div className="flex-grow">
                     <div className="flex items-start gap-4">
@@ -360,9 +383,9 @@ export const StudentNotes = () => {
                       ))}
                     </div>
                   </div>
-                  <Button onClick={(e) => { e.stopPropagation(); handleDownload(note); }} className="w-full mt-5">
-                    <Download className="h-4 w-4 mr-2" />
-                    Download
+                  <Button onClick={() => setSelectedNote(note)} className="w-full mt-5">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Preview
                   </Button>
                 </CardContent>
               </Card>
