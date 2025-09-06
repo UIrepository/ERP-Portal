@@ -91,14 +91,23 @@ export const StudentSchedule = () => {
     queryKey: ['student-schedule-direct', userEnrollments, selectedBatchFilter],
     queryFn: async (): Promise<Schedule[]> => {
         if (!userEnrollments || userEnrollments.length === 0) return [];
+        
         let query = supabase.from('schedules').select('*');
+
+        // This logic now correctly filters by batch only, based on the student's enrollments
+        // and the batch selected in the dropdown. Subjects are not considered in this filter.
         const batchesToFilter = selectedBatchFilter === 'all'
             ? Array.from(new Set(userEnrollments.map(e => e.batch_name)))
             : [selectedBatchFilter];
+
         if (batchesToFilter.length === 0) return [];
+        
         query = query.in('batch', batchesToFilter);
+
         query = query.order('date', { nullsFirst: false }).order('day_of_week').order('start_time');
+        
         const { data, error } = await query;
+        
         if (error) {
             console.error("Error fetching schedules directly:", error);
             throw error;
