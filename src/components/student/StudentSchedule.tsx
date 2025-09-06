@@ -121,7 +121,6 @@ export const StudentSchedule = () => {
     schedules.forEach(s => slots.add(s.start_time));
 
     const visibleSlots = Array.from(slots).filter(time => {
-        // For this time slot, check if any day in the current week has a class
         return weekDates.some(date => {
             const dayIndex = getDay(date);
             const hasRecurringClass = schedules.some(s => 
@@ -185,7 +184,7 @@ export const StudentSchedule = () => {
             <SelectValue placeholder="Filter by batch" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Batches</SelectItem>
+            <SelectItem value="all">All My Batches</SelectItem>
             {availableBatches.map((batch) => (
               <SelectItem key={batch} value={batch}>{batch}</SelectItem>
             ))}
