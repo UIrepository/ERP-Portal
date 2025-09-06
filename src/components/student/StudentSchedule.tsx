@@ -116,12 +116,26 @@ export const StudentSchedule = () => {
   }, [displayDate]);
 
   const timeSlots = useMemo(() => {
+    if (!schedules) return [];
     const slots = new Set<string>();
-    schedules?.forEach(s => {
-        slots.add(s.start_time);
+    schedules.forEach(s => slots.add(s.start_time));
+
+    const visibleSlots = Array.from(slots).filter(time => {
+        // For this time slot, check if any day in the current week has a class
+        return weekDates.some(date => {
+            const dayIndex = getDay(date);
+            const hasRecurringClass = schedules.some(s => 
+                !s.date && s.start_time === time && s.day_of_week === dayIndex
+            );
+            const hasDateSpecificClass = schedules.some(s => 
+                s.date && s.start_time === time && isSameDay(new Date(s.date), date)
+            );
+            return hasRecurringClass || hasDateSpecificClass;
+        });
     });
-    return Array.from(slots).sort();
-  }, [schedules]);
+
+    return visibleSlots.sort();
+}, [schedules, weekDates]);
 
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
