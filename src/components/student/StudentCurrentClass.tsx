@@ -5,8 +5,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ExternalLink, Clock, Calendar, AlertTriangle } from 'lucide-react';
-import { format, differenceInSeconds, startOfDay } from 'date-fns';
+import { ExternalLink, Clock, Calendar, AlertTriangle, Video } from 'lucide-react';
+import { format, differenceInSeconds, startOfDay, isSameDay } from 'date-fns';
 
 interface Schedule {
   id: string;
@@ -177,6 +177,29 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
 
     return futureSchedules.length > 0 ? futureSchedules[0] : null;
   }, [allSchedules]);
+  
+  const todaysOtherClasses = useMemo(() => {
+    if (!allSchedules) return [];
+    
+    return allSchedules.filter(schedule => {
+      const isToday = schedule.date 
+        ? isSameDay(new Date(schedule.date), now) 
+        : schedule.day_of_week === currentDay;
+      
+      if (!isToday) {
+        return false;
+      }
+      
+      if (ongoingClass) {
+          const isSameClass = schedule.subject === ongoingClass.subject &&
+                              schedule.batch === ongoingClass.batch &&
+                              schedule.start_time === ongoingClass.start_time;
+          if (isSameClass) return false;
+      }
+
+      return true;
+    }).sort((a, b) => a.start_time.localeCompare(b.start_time));
+  }, [allSchedules, ongoingClass, now, currentDay]);
 
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
@@ -294,12 +317,47 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
                     )}
                 </div>
             ) : (
+                todaysOtherClasses.length === 0 && (
                 <div className="space-y-4">
                     <AlertTriangle className="h-16 w-16 mx-auto text-yellow-500" />
                     <p className="text-xl font-semibold text-gray-700">No Upcoming Classes Found</p>
                     <p className="text-gray-600">It looks like there are no scheduled classes for your current enrollments.</p>
                 </div>
+                )
             )}
+            
+            {todaysOtherClasses && todaysOtherClasses.length > 0 && (
+                <div className="w-full mt-12">
+                    <h4 className="text-xl font-semibold text-gray-700 mb-4">Today's Schedule</h4>
+                    <div className="space-y-4">
+                        {todaysOtherClasses.map(schedule => {
+                            const isFinished = currentTimeStr >= schedule.end_time;
+                            return (
+                                <Card key={schedule.id} className={`p-4 text-left bg-white/80 backdrop-blur-sm ${isFinished ? 'opacity-70' : ''}`}>
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <p className="font-bold text-gray-800">{schedule.subject}</p>
+                                            <p className="text-sm text-gray-500">{schedule.batch}</p>
+                                            <p className="text-sm text-gray-500 mt-1">{formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}</p>
+                                        </div>
+                                        {isFinished ? (
+                                            null
+                                        ) : (
+                                            schedule.meeting_link_url ? (
+                                                <Button onClick={() => window.open(schedule.meeting_link_url, '_blank')}>
+                                                    <ExternalLink className="mr-2 h-4 w-4" />
+                                                    Join Class
+                                                </Button>
+                                            ) : null
+                                        )}
+                                    </div>
+                                </Card>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
             <Button 
               onClick={() => onTabChange('schedule')}
               size="lg" 
