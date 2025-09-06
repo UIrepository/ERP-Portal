@@ -2,11 +2,11 @@ import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Crown, ExternalLink, Search } from 'lucide-react';
+import { Crown, ExternalLink, Search, ArrowLeft } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 
@@ -18,7 +18,6 @@ interface UIKiPadhaiContent {
   link: string;
   is_active: boolean;
   created_at: string;
-  // Ensure these properties exist as per the database schema
   batch: string;
   subject: string;
 }
@@ -47,11 +46,75 @@ const PremiumContentSkeleton = () => (
     </div>
 );
 
+const PremiumContentViewer = ({ content, onBack, onAccess, allContent, onContentSelect }: { content: UIKiPadhaiContent, onBack: () => void, onAccess: (content: UIKiPadhaiContent) => void, allContent: UIKiPadhaiContent[], onContentSelect: (content: UIKiPadhaiContent) => void }) => {
+    const otherContent = allContent.filter(c => c.id !== content.id);
+
+    return (
+        <div className="p-4 md:p-6 space-y-6 bg-slate-200 min-h-full">
+            <Button variant="outline" onClick={onBack} className="mb-4 bg-white/80 backdrop-blur-sm">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Premium Content
+            </Button>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                    <Card className="bg-black rounded-2xl overflow-hidden shadow-2xl">
+                         <CardHeader className="p-6 border-b border-yellow-500/30 bg-gray-900">
+                            <div className="flex justify-between items-center">
+                                <CardTitle className="text-white flex items-center gap-3">
+                                    <Crown className="text-yellow-400" />
+                                    {content.title}
+                                </CardTitle>
+                                <Button onClick={() => onAccess(content)} className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold">
+                                    <ExternalLink className="h-4 w-4 mr-2" />
+                                    Access Content
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <div className="w-full h-[60vh] md:h-[75vh]">
+                                <iframe
+                                    src={content.link}
+                                    className="w-full h-full"
+                                    title={content.title}
+                                />
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+                <div className="lg:col-span-1">
+                     <Card className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-gray-800">
+                                <Crown className="text-yellow-500" />
+                                More Premium Content
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-3 max-h-[70vh] overflow-y-auto">
+                                {otherContent.map(item => (
+                                    <div key={item.id} className="p-3 bg-white rounded-lg hover:shadow-xl hover:scale-105 transition-all duration-200 cursor-pointer" onClick={() => onContentSelect(item)}>
+                                        <p className="font-semibold text-gray-900">{item.title}</p>
+                                        <div className="flex items-center gap-2 mt-2">
+                                            <Badge variant="outline">{item.subject}</Badge>
+                                            <Badge variant="secondary">{item.batch}</Badge>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export const StudentUIKiPadhai = () => {
   const { profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
   const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
+  const [selectedContent, setSelectedContent] = useState<UIKiPadhaiContent | null>(null);
 
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['userEnrollments', profile?.user_id],
@@ -90,7 +153,7 @@ export const StudentUIKiPadhai = () => {
         
         const { data, error } = await supabase
             .from('ui_ki_padhai_content')
-            .select('id, title, description, category, link, is_active, created_at, batch, subject') // Ensure batch and subject are selected
+            .select('id, title, description, category, link, is_active, created_at, batch, subject')
             .eq('is_active', true)
             .order('created_at', { ascending: false });
 
@@ -101,15 +164,12 @@ export const StudentUIKiPadhai = () => {
 
         if (!data) return [];
 
-        // Filter content based on user enrollments and selected filters
         const filteredContent = data.filter(content => {
-            // Add defensive checks for content.batch and content.subject
             if (typeof content.batch !== 'string' || typeof content.subject !== 'string') {
               console.warn('Skipping content due to missing or invalid batch/subject:', content);
               return false;
             }
 
-            // Check if user is enrolled in this batch/subject combination
             const isEnrolled = userEnrollments.some(enrollment =>
                 enrollment.batch_name === content.batch &&
                 enrollment.subject_name === content.subject
@@ -117,12 +177,10 @@ export const StudentUIKiPadhai = () => {
 
             if (!isEnrolled) return false;
 
-            // Apply batch filter
             if (selectedBatchFilter !== 'all' && content.batch !== selectedBatchFilter) {
                 return false;
             }
 
-            // Apply subject filter
             if (selectedSubjectFilter !== 'all' && content.subject !== selectedSubjectFilter) {
                 return false;
             }
@@ -148,6 +206,10 @@ export const StudentUIKiPadhai = () => {
   };
   
   const isLoading = isLoadingEnrollments || isLoadingPremiumContent;
+
+  if (selectedContent) {
+    return <PremiumContentViewer content={selectedContent} onBack={() => setSelectedContent(null)} onAccess={handleAccessContent} allContent={premiumContent || []} onContentSelect={setSelectedContent} />;
+  }
 
   return (
     <div className="p-6 bg-gradient-to-br from-yellow-50 to-orange-50 min-h-full flex flex-col items-center">
@@ -236,11 +298,12 @@ export const StudentUIKiPadhai = () => {
                         </div>
                         <div className="flex gap-2 justify-end">
                             <Button 
-                                onClick={() => handleAccessContent(content)}
-                                className="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold"
+                                onClick={() => setSelectedContent(content)}
+                                variant="outline"
+                                className="font-semibold"
                             >
                                 <ExternalLink className="h-4 w-4 mr-2" />
-                                Access Content
+                                View Content
                             </Button>
                         </div>
                     </CardContent>
