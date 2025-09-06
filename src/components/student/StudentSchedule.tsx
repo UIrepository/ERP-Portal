@@ -91,23 +91,14 @@ export const StudentSchedule = () => {
     queryKey: ['student-schedule-direct', userEnrollments, selectedBatchFilter],
     queryFn: async (): Promise<Schedule[]> => {
         if (!userEnrollments || userEnrollments.length === 0) return [];
-        
         let query = supabase.from('schedules').select('*');
-
-        // This logic now correctly filters by batch only, based on the student's enrollments
-        // and the batch selected in the dropdown. Subjects are not considered in this filter.
         const batchesToFilter = selectedBatchFilter === 'all'
             ? Array.from(new Set(userEnrollments.map(e => e.batch_name)))
             : [selectedBatchFilter];
-
         if (batchesToFilter.length === 0) return [];
-        
         query = query.in('batch', batchesToFilter);
-
         query = query.order('date', { nullsFirst: false }).order('day_of_week').order('start_time');
-        
         const { data, error } = await query;
-        
         if (error) {
             console.error("Error fetching schedules directly:", error);
             throw error;
@@ -214,36 +205,42 @@ export const StudentSchedule = () => {
                 ))}
             </div>
             <div className="relative">
-                {timeSlots.map(time => (
-                    <div key={time} className="grid grid-cols-[minmax(100px,1fr)_repeat(7,minmax(120px,1fr))] border-t">
-                        <div className="text-center text-sm font-medium text-gray-700 py-4 px-2 border-r sticky left-0 bg-white z-10">{formatTime(time)}</div>
-                        {weekDates.map((date, dayIndex) => {
-                            const recurringClass = schedules?.find(s => !s.date && s.day_of_week === getDay(date) && s.start_time === time);
-                            const dateSpecificClass = schedules?.find(s => s.date && isSameDay(new Date(s.date), date) && s.start_time === time);
-                            const classInfo = dateSpecificClass || recurringClass;
-                            return (
-                                <div key={`${dayIndex}-${time}`} className={`p-2 border-r last:border-r-0 ${isSameDay(date, today) ? 'bg-blue-50' : ''}`}>
-                                    {classInfo && (
-                                        <Card className="bg-white shadow-md hover:shadow-lg transition-shadow">
-                                            <CardContent className="p-3">
-                                                <p className="font-bold text-gray-800 text-sm">{classInfo.subject}</p>
-                                                <Badge variant="secondary" className="mt-1">{classInfo.batch}</Badge>
-                                                {classInfo.date && <Badge variant="outline" className="mt-1 ml-1">{format(new Date(classInfo.date), 'MMM d')}</Badge>}
-                                                {classInfo.link && (
-                                                    <Button size="sm" asChild className="w-full mt-2">
-                                                        <a href={classInfo.link} target="_blank" rel="noopener noreferrer">
-                                                            <ExternalLink className="h-4 w-4 mr-1" /> Join
-                                                        </a>
-                                                    </Button>
-                                                )}
-                                            </CardContent>
-                                        </Card>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                ))}
+                {timeSlots.map(time => {
+                    const sampleScheduleForSlot = schedules?.find(s => s.start_time === time);
+                    const endTime = sampleScheduleForSlot ? sampleScheduleForSlot.end_time : '';
+                    return (
+                        <div key={time} className="grid grid-cols-[minmax(100px,1fr)_repeat(7,minmax(120px,1fr))] border-t">
+                            <div className="text-center text-xs font-medium text-gray-700 py-4 px-2 border-r sticky left-0 bg-white z-10">
+                                {formatTime(time)} - {endTime ? formatTime(endTime) : ''}
+                            </div>
+                            {weekDates.map((date, dayIndex) => {
+                                const recurringClass = schedules?.find(s => !s.date && s.day_of_week === getDay(date) && s.start_time === time);
+                                const dateSpecificClass = schedules?.find(s => s.date && isSameDay(new Date(s.date), date) && s.start_time === time);
+                                const classInfo = dateSpecificClass || recurringClass;
+                                return (
+                                    <div key={`${dayIndex}-${time}`} className={`p-2 border-r last:border-r-0 ${isSameDay(date, today) ? 'bg-blue-50' : ''}`}>
+                                        {classInfo && (
+                                            <Card className="bg-white shadow-md hover:shadow-lg transition-shadow">
+                                                <CardContent className="p-3">
+                                                    <p className="font-bold text-gray-800 text-sm">{classInfo.subject}</p>
+                                                    <Badge variant="secondary" className="mt-1">{classInfo.batch}</Badge>
+                                                    {classInfo.date && <Badge variant="outline" className="mt-1 ml-1">{format(new Date(classInfo.date), 'MMM d')}</Badge>}
+                                                    {classInfo.link && (
+                                                        <Button size="sm" asChild className="w-full mt-2">
+                                                            <a href={classInfo.link} target="_blank" rel="noopener noreferrer">
+                                                                <ExternalLink className="h-4 w-4 mr-1" /> Join
+                                                            </a>
+                                                        </Button>
+                                                    )}
+                                                </CardContent>
+                                            </Card>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    );
+                })}
             </div>
           </div>
       </div>
