@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Download, Search } from 'lucide-react';
+import { FileText, Download, Search, ArrowLeft } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { CardHeader, CardTitle } from '../ui/card';
 
 interface NotesContent {
   id: string;
@@ -46,12 +47,45 @@ const NotesSkeleton = () => (
   </div>
 );
 
+const NoteViewer = ({ note, onBack, onDownload }: { note: NotesContent, onBack: () => void, onDownload: (note: NotesContent) => void }) => {
+  return (
+    <div className="p-4 md:p-6 space-y-6 bg-slate-100 min-h-full">
+      <Button variant="outline" onClick={onBack} className="mb-4">
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Back to Notes
+      </Button>
+      <Card className="bg-white rounded-2xl overflow-hidden shadow-2xl">
+        <CardHeader className="p-6 border-b">
+            <div className="flex justify-between items-center">
+                <CardTitle>{note.title}</CardTitle>
+                <Button onClick={() => onDownload(note)}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Download
+                </Button>
+            </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="aspect-video">
+            <iframe
+              src={note.file_url}
+              className="w-full h-full"
+              title={note.title}
+            />
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+
 export const StudentNotes = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
   const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
+  const [selectedNote, setSelectedNote] = useState<NotesContent | null>(null);
 
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['userEnrollments', profile?.user_id],
@@ -240,6 +274,10 @@ export const StudentNotes = () => {
 
   const isLoading = isLoadingEnrollments || isLoadingNotesContent;
 
+  if (selectedNote) {
+    return <NoteViewer note={selectedNote} onBack={() => setSelectedNote(null)} onDownload={handleDownload} />;
+  }
+
   return (
     <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
       {/* Header Section */}
@@ -302,7 +340,7 @@ export const StudentNotes = () => {
         ) : filteredNotes && filteredNotes.length > 0 ? (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredNotes.map((note) => (
-              <Card key={note.id} className="bg-white hover:shadow-lg transition-shadow duration-300">
+              <Card key={note.id} className="bg-white hover:shadow-lg transition-shadow duration-300 cursor-pointer" onClick={() => setSelectedNote(note)}>
                 <CardContent className="p-5 flex flex-col h-full">
                   <div className="flex-grow">
                     <div className="flex items-start gap-4">
@@ -322,7 +360,7 @@ export const StudentNotes = () => {
                       ))}
                     </div>
                   </div>
-                  <Button onClick={() => handleDownload(note)} className="w-full mt-5">
+                  <Button onClick={(e) => { e.stopPropagation(); handleDownload(note); }} className="w-full mt-5">
                     <Download className="h-4 w-4 mr-2" />
                     Download
                   </Button>
