@@ -79,9 +79,11 @@ export const EnrollmentAnalytics = () => {
       .channel('admin-enrollment-analytics-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_enrollments' }, () => {
         queryClient.invalidateQueries({ queryKey: ['enrollment-analytics-enrollments'] });
+        queryClient.invalidateQueries({ queryKey: ['all-options-central'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
         queryClient.invalidateQueries({ queryKey: ['enrollment-analytics-enrollments'] });
+        queryClient.invalidateQueries({ queryKey: ['all-options-central'] });
       })
       .subscribe();
 
