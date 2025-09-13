@@ -151,7 +151,7 @@ export const EnrollmentAnalytics = () => {
     });
 
     const chartData = (selectedBatch === 'all' ? allBatches : [selectedBatch]).map(batch => {
-        const batchData: Record<string, any> = { name: batch };
+        const batchData: Record<string, any> = { batch: batch };
         allSubjects.forEach(subject => {
             batchData[subject] = enrollments.filter(e => e.batch_name === batch && e.subject_name === subject).length;
         });
@@ -248,7 +248,7 @@ export const EnrollmentAnalytics = () => {
                     <BarChart data={analyticsData.chartData} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
                       <XAxis type="number" allowDecimals={false} stroke="#888" />
-                      <YAxis type="category" dataKey="name" width={80} stroke="#888" tick={{ fontSize: 12 }} />
+                      <YAxis type="category" dataKey="batch" width={80} stroke="#888" tick={{ fontSize: 12 }} />
                       <Tooltip content={<CustomTooltip />} cursor={{fill: 'rgba(240, 240, 240, 0.5)'}} />
                       <Legend />
                         {analyticsData.allSubjects
