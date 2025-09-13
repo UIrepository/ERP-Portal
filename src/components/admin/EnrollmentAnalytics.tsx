@@ -79,11 +79,9 @@ export const EnrollmentAnalytics = () => {
       .channel('admin-enrollment-analytics-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_enrollments' }, () => {
         queryClient.invalidateQueries({ queryKey: ['enrollment-analytics-enrollments'] });
-        queryClient.invalidateQueries({ queryKey: ['all-options-central'] });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
         queryClient.invalidateQueries({ queryKey: ['enrollment-analytics-enrollments'] });
-        queryClient.invalidateQueries({ queryKey: ['all-options-central'] });
       })
       .subscribe();
 
@@ -113,15 +111,6 @@ export const EnrollmentAnalytics = () => {
     },
   });
 
-  const { data: options = [], isLoading: isLoadingOptions } = useQuery({
-      queryKey: ['all-options-central'],
-      queryFn: async () => {
-          const { data, error } = await supabase.rpc('get_all_options');
-          if (error) throw error;
-          return data || [];
-      }
-  });
-
   // --- Data Processing ---
   const analyticsData = useMemo(() => {
     const studentMap = new Map<string, StudentEnrollmentInfo>();
@@ -143,8 +132,8 @@ export const EnrollmentAnalytics = () => {
     });
     const allStudents = Array.from(studentMap.values());
 
-    const allBatches = Array.from(new Set(options.filter((o: any) => o.type === 'batch').map((o: any) => o.name))).sort();
-    const allSubjects = Array.from(new Set(options.filter((o: any) => o.type === 'subject').map((o: any) => o.name))).sort();
+    const allBatches = Array.from(new Set(enrollments.map(e => e.batch_name))).sort();
+    const allSubjects = Array.from(new Set(enrollments.map(e => e.subject_name))).sort();
 
     const filteredStudents = allStudents.filter(student => {
       const matchesBatch = selectedBatch === 'all' || student.enrollments.some(e => e.batch === selectedBatch);
@@ -167,9 +156,9 @@ export const EnrollmentAnalytics = () => {
       allBatches,
       allSubjects,
     };
-  }, [enrollments, options, selectedBatch, selectedSubject]);
+  }, [enrollments, selectedBatch, selectedSubject]);
   
-  const isLoading = isLoadingEnrollments || isLoadingOptions;
+  const isLoading = isLoadingEnrollments;
 
   // --- Rendering ---
   if (isLoading) {
