@@ -1,4 +1,3 @@
-// uirepository/erp-portal/ERP-Portal-7b7b832aee95da311edc75778bb5b5de51a654f1/src/components/student/StudentSchedule.tsx
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar, Clock, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, getDay, startOfWeek, addDays, isSameDay, subDays } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 interface Schedule {
   id: string;
@@ -28,6 +28,29 @@ interface UserEnrollment {
 }
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+// Color palette for subjects
+const subjectColorClasses = [
+    { bg: 'bg-blue-50', border: 'border-blue-400' },
+    { bg: 'bg-green-50', border: 'border-green-400' },
+    { bg: 'bg-yellow-50', border: 'border-yellow-400' },
+    { bg: 'bg-purple-50', border: 'border-purple-400' },
+    { bg: 'bg-red-50', border: 'border-red-400' },
+    { bg: 'bg-indigo-50', border: 'border-indigo-400' },
+    { bg: 'bg-pink-50', border: 'border-pink-400' },
+    { bg: 'bg-orange-50', border: 'border-orange-400' },
+];
+
+// Function to get a consistent color for each subject
+const getSubjectColorClasses = (subject: string) => {
+  let hash = 0;
+  for (let i = 0; i < subject.length; i++) {
+    hash = subject.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash % subjectColorClasses.length);
+  return subjectColorClasses[index];
+};
+
 
 const ScheduleSkeleton = () => (
     <div className="space-y-6">
@@ -220,10 +243,12 @@ export const StudentSchedule = () => {
                                 const classesInfo = [...(dateSpecificClasses || []), ...(recurringClasses || [])];
                                 return (
                                     <div key={`${dayIndex}-${time}`} className={`p-2 border-r last:border-r-0 ${isSameDay(date, today) ? 'bg-blue-50' : ''}`}>
-                                        {classesInfo.map(classInfo => (
-                                            <Card key={classInfo.id} className="bg-white shadow-md hover:shadow-lg transition-shadow mb-2">
+                                        {classesInfo.map(classInfo => {
+                                            const colorClasses = getSubjectColorClasses(classInfo.subject);
+                                            return (
+                                            <Card key={classInfo.id} className={cn("shadow-md hover:shadow-lg transition-shadow mb-2 border-l-4", colorClasses.border, colorClasses.bg)}>
                                                 <CardContent className="p-3">
-                                                    <p className="font-bold text-gray-800 text-sm">{classInfo.subject}</p>
+                                                    <p className="font-bold text-gray-800 text-sm break-words">{classInfo.subject}</p>
                                                     <Badge variant="secondary" className="mt-1">{classInfo.batch}</Badge>
                                                     {classInfo.date && <Badge variant="outline" className="mt-1 ml-1">{format(new Date(classInfo.date), 'MMM d')}</Badge>}
                                                     {classInfo.link && (
@@ -235,7 +260,7 @@ export const StudentSchedule = () => {
                                                     )}
                                                 </CardContent>
                                             </Card>
-                                        ))}
+                                        )})}
                                     </div>
                                 );
                             })}
