@@ -50,17 +50,6 @@ const subjectColorClasses = [
     'bg-orange-200',
 ];
 
-// Function to get a consistent color for each subject
-const getSubjectColorClass = (subject: string) => {
-  let hash = 0;
-  for (let i = 0; i < subject.length; i++) {
-    hash = subject.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const index = Math.abs(hash % subjectColorClasses.length);
-  return subjectColorClasses[index];
-};
-
-
 const ScheduleSkeleton = () => (
     <div className="space-y-6">
         {[...Array(3)].map((_, i) => (
@@ -168,6 +157,20 @@ export const StudentSchedule = () => {
 
     return visibleSlots.sort();
 }, [schedules, weekDates]);
+
+  const subjectColorMap = useMemo(() => {
+    if (!schedules) return new Map();
+    const uniqueSubjects = Array.from(new Set(schedules.map(s => s.subject))).sort();
+    const colorMap = new Map<string, string>();
+    uniqueSubjects.forEach((subject, index) => {
+        colorMap.set(subject, subjectColorClasses[index % subjectColorClasses.length]);
+    });
+    return colorMap;
+  }, [schedules]);
+
+  const getSubjectColorClass = (subject: string) => {
+    return subjectColorMap.get(subject) || 'bg-gray-200';
+  };
 
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
