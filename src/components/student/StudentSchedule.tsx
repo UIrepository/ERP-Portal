@@ -1,3 +1,4 @@
+// uirepository/erp-portal/ERP-Portal-7b7b832aee95da311edc75778bb5b5de51a654f1/src/components/student/StudentSchedule.tsx
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -123,10 +124,10 @@ export const StudentSchedule = () => {
     const visibleSlots = Array.from(slots).filter(time => {
         return weekDates.some(date => {
             const dayIndex = getDay(date);
-            const hasRecurringClass = schedules.some(s => 
+            const hasRecurringClass = schedules.some(s =>
                 !s.date && s.start_time === time && s.day_of_week === dayIndex
             );
-            const hasDateSpecificClass = schedules.some(s => 
+            const hasDateSpecificClass = schedules.some(s =>
                 s.date && s.start_time === time && isSameDay(new Date(s.date), date)
             );
             return hasRecurringClass || hasDateSpecificClass;
@@ -214,13 +215,13 @@ export const StudentSchedule = () => {
                                 {formatTime(time)} - {endTime ? formatTime(endTime) : ''}
                             </div>
                             {weekDates.map((date, dayIndex) => {
-                                const recurringClass = schedules?.find(s => !s.date && s.day_of_week === getDay(date) && s.start_time === time);
-                                const dateSpecificClass = schedules?.find(s => s.date && isSameDay(new Date(s.date), date) && s.start_time === time);
-                                const classInfo = dateSpecificClass || recurringClass;
+                                const recurringClasses = schedules?.filter(s => !s.date && s.day_of_week === getDay(date) && s.start_time === time);
+                                const dateSpecificClasses = schedules?.filter(s => s.date && isSameDay(new Date(s.date), date) && s.start_time === time);
+                                const classesInfo = [...(dateSpecificClasses || []), ...(recurringClasses || [])];
                                 return (
                                     <div key={`${dayIndex}-${time}`} className={`p-2 border-r last:border-r-0 ${isSameDay(date, today) ? 'bg-blue-50' : ''}`}>
-                                        {classInfo && (
-                                            <Card className="bg-white shadow-md hover:shadow-lg transition-shadow">
+                                        {classesInfo.map(classInfo => (
+                                            <Card key={classInfo.id} className="bg-white shadow-md hover:shadow-lg transition-shadow mb-2">
                                                 <CardContent className="p-3">
                                                     <p className="font-bold text-gray-800 text-sm">{classInfo.subject}</p>
                                                     <Badge variant="secondary" className="mt-1">{classInfo.batch}</Badge>
@@ -234,7 +235,7 @@ export const StudentSchedule = () => {
                                                     )}
                                                 </CardContent>
                                             </Card>
-                                        )}
+                                        ))}
                                     </div>
                                 );
                             })}
