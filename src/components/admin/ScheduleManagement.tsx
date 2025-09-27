@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, getDay, startOfWeek, addDays, isSameDay, subDays } from 'date-fns';
 import { AlertTriangle, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 // Interface for the schedule data
 interface Schedule {
@@ -31,6 +32,27 @@ interface Exam {
 
 // Static data for rendering the schedule grid
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+// Color palette for subjects
+const subjectColorClasses = [
+    'bg-sky-200',
+    'bg-emerald-200',
+    'bg-amber-200',
+    'bg-violet-200',
+    'bg-rose-200',
+    'bg-cyan-200', // Turquoise-like color
+    'bg-fuchsia-200',
+    'bg-lime-200',
+    'bg-teal-200',
+    'bg-blue-200',
+    'bg-green-200',
+    'bg-yellow-200',
+    'bg-purple-200',
+    'bg-red-200',
+    'bg-indigo-200',
+    'bg-pink-200',
+    'bg-orange-200',
+];
 
 // Skeleton component for a better loading experience
 const ScheduleSkeleton = () => (
@@ -125,6 +147,23 @@ export const ScheduleManagement = () => {
     schedules.forEach(s => slots.add(s.start_time));
     return Array.from(slots).sort();
   }, [schedules]);
+  
+  const subjectColorMap = useMemo(() => {
+    const allSubjects = new Set<string>();
+    if (schedules) schedules.forEach(s => allSubjects.add(s.subject));
+    if (exams) exams.forEach(e => allSubjects.add(e.subject));
+
+    const uniqueSubjects = Array.from(allSubjects).sort();
+    const colorMap = new Map<string, string>();
+    uniqueSubjects.forEach((subject, index) => {
+        colorMap.set(subject, subjectColorClasses[index % subjectColorClasses.length]);
+    });
+    return colorMap;
+  }, [schedules, exams]);
+
+  const getSubjectColorClass = (subject: string) => {
+    return subjectColorMap.get(subject) || 'bg-gray-200';
+  };
 
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
@@ -149,7 +188,7 @@ export const ScheduleManagement = () => {
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
         <div>
           <h2 className="text-3xl font-bold text-gray-900">Full Class Schedule</h2>
-          <p className="text-gray-600 mt-1">A real-time overview of all scheduled classes.</p>
+          <p className="text-gray-600 mt-1">A real-time overview of all scheduled classes and exams.</p>
         </div>
         <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-4">
@@ -204,27 +243,26 @@ export const ScheduleManagement = () => {
                                 {formatTime(time)} - {endTime ? formatTime(endTime) : ''}
                               </div>
                               {weekDates.map((date, dayIndex) => {
-                                  const recurringClass = schedules.find(s => !s.date && s.day_of_week === getDay(date) && s.start_time === time);
-                                  const dateSpecificClass = schedules.find(s => s.date && isSameDay(new Date(s.date), date) && s.start_time === time);
-                                  const classInfo = dateSpecificClass || recurringClass;
+                                  const recurringClasses = schedules.filter(s => !s.date && s.day_of_week === getDay(date) && s.start_time === time);
+                                  const dateSpecificClasses = schedules.filter(s => s.date && isSameDay(new Date(s.date), date) && s.start_time === time);
+                                  const classesInfo = [...dateSpecificClasses, ...recurringClasses];
                                   const dayExams = exams.filter(e => isSameDay(new Date(e.date), date));
                                   return (
                                       <div key={dayIndex} className={`p-2 border-r last:border-r-0 ${isSameDay(date, today) ? 'bg-blue-50' : ''}`}>
-                                          {classInfo && (
-                                            <Card key={classInfo.id} className="bg-white shadow-md hover:shadow-lg transition-shadow mb-2">
+                                          {classesInfo.map(classInfo => (
+                                            <Card key={classInfo.id} className={cn("shadow-md hover:shadow-lg transition-shadow mb-2", getSubjectColorClass(classInfo.subject))}>
                                                 <CardContent className="p-3">
-                                                    <p className="font-bold text-gray-800 text-sm">{classInfo.subject}</p>
+                                                    <p className="font-bold text-gray-800 text-sm break-words">{classInfo.subject}</p>
                                                     <Badge variant="secondary" className="mt-1">{classInfo.batch}</Badge>
-                                                    {classInfo.date && <Badge variant="outline" className="mt-1 ml-1">{format(new Date(classInfo.date), 'MMM d')}</Badge>}
                                                 </CardContent>
                                             </Card>
-                                          )}
+                                          ))}
                                           {dayExams.map(exam => (
-                                              <Card key={exam.id} className="bg-rose-50 border-l-4 border-rose-400 shadow-md hover:shadow-lg transition-shadow">
+                                              <Card key={exam.id} className="bg-rose-100 border-l-4 border-rose-400 shadow-md hover:shadow-lg transition-shadow">
                                                   <CardContent className="p-3">
                                                       <div className="flex items-center gap-2">
                                                         <BookOpen className="h-4 w-4 text-rose-600" />
-                                                        <p className="font-bold text-gray-800 text-sm">{exam.name}</p>
+                                                        <p className="font-bold text-gray-800 text-sm break-words">{exam.name}</p>
                                                       </div>
                                                       <Badge variant="destructive" className="mt-1">{exam.batch}</Badge>
                                                       <Badge variant="outline" className="mt-1 ml-1">{exam.subject}</Badge>
