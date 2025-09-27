@@ -31,18 +31,18 @@ const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
 
 // Color palette for subjects
 const subjectColorClasses = [
-    { bg: 'bg-blue-50', border: 'border-blue-400' },
-    { bg: 'bg-green-50', border: 'border-green-400' },
-    { bg: 'bg-yellow-50', border: 'border-yellow-400' },
-    { bg: 'bg-purple-50', border: 'border-purple-400' },
-    { bg: 'bg-red-50', border: 'border-red-400' },
-    { bg: 'bg-indigo-50', border: 'border-indigo-400' },
-    { bg: 'bg-pink-50', border: 'border-pink-400' },
-    { bg: 'bg-orange-50', border: 'border-orange-400' },
+  'bg-blue-200',
+  'bg-green-200',
+  'bg-yellow-200',
+  'bg-purple-200',
+  'bg-red-200',
+  'bg-indigo-200',
+  'bg-pink-200',
+  'bg-orange-200',
 ];
 
 // Function to get a consistent color for each subject
-const getSubjectColorClasses = (subject: string) => {
+const getSubjectColorClass = (subject: string) => {
   let hash = 0;
   for (let i = 0; i < subject.length; i++) {
     hash = subject.charCodeAt(i) + ((hash << 5) - hash);
@@ -243,10 +243,8 @@ export const StudentSchedule = () => {
                                 const classesInfo = [...(dateSpecificClasses || []), ...(recurringClasses || [])];
                                 return (
                                     <div key={`${dayIndex}-${time}`} className={`p-2 border-r last:border-r-0 ${isSameDay(date, today) ? 'bg-blue-50' : ''}`}>
-                                        {classesInfo.map(classInfo => {
-                                            const colorClasses = getSubjectColorClasses(classInfo.subject);
-                                            return (
-                                            <Card key={classInfo.id} className={cn("shadow-md hover:shadow-lg transition-shadow mb-2 border-l-4", colorClasses.border, colorClasses.bg)}>
+                                        {classesInfo.map(classInfo => (
+                                            <Card key={classInfo.id} className={cn("shadow-md hover:shadow-lg transition-shadow mb-2", getSubjectColorClass(classInfo.subject))}>
                                                 <CardContent className="p-3">
                                                     <p className="font-bold text-gray-800 text-sm break-words">{classInfo.subject}</p>
                                                     <Badge variant="secondary" className="mt-1">{classInfo.batch}</Badge>
@@ -260,7 +258,7 @@ export const StudentSchedule = () => {
                                                     )}
                                                 </CardContent>
                                             </Card>
-                                        )})}
+                                        ))}
                                     </div>
                                 );
                             })}
