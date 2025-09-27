@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, getDay, startOfWeek, addDays, isSameDay, subDays } from 'date-fns';
-import { AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react';
 
 // Interface for the schedule data
 interface Schedule {
@@ -17,6 +17,16 @@ interface Schedule {
   start_time: string;
   end_time: string;
   date?: string; // Optional date for specific, non-recurring classes
+}
+
+// Interface for exam data
+interface Exam {
+  id: string;
+  name: string;
+  date: string;
+  subject: string;
+  batch: string;
+  type: string;
 }
 
 // Static data for rendering the schedule grid
@@ -50,13 +60,21 @@ export const ScheduleManagement = () => {
   // --- Real-time Subscription ---
   useEffect(() => {
     const channel = supabase
-      .channel('admin-realtime-schedules')
+      .channel('admin-realtime-schedules-and-exams')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'schedules' },
         (payload) => {
           console.log('Schedule change detected!', payload);
           queryClient.invalidateQueries({ queryKey: ['admin-all-schedules'] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'exams' },
+        (payload) => {
+          console.log('Exam change detected!', payload);
+          queryClient.invalidateQueries({ queryKey: ['admin-all-exams'] });
         }
       )
       .subscribe();
@@ -67,7 +85,7 @@ export const ScheduleManagement = () => {
   }, [queryClient]);
 
   // --- Data Fetching ---
-  const { data: schedules, isLoading, isError, error } = useQuery<Schedule[]>({
+  const { data: schedules, isLoading: isLoadingSchedules, isError: isErrorSchedules, error: errorSchedules } = useQuery<Schedule[]>({
     queryKey: ['admin-all-schedules'],
     queryFn: async (): Promise<Schedule[]> => {
         const { data, error } = await supabase.from('schedules').select('*').order('date', { nullsFirst: false }).order('day_of_week').order('start_time');
@@ -78,6 +96,22 @@ export const ScheduleManagement = () => {
         return data || [];
     },
   });
+
+  const { data: exams, isLoading: isLoadingExams, isError: isErrorExams, error: errorExams } = useQuery<Exam[]>({
+    queryKey: ['admin-all-exams'],
+    queryFn: async (): Promise<Exam[]> => {
+        const { data, error } = await supabase.from('exams').select('*').order('date');
+        if (error) {
+          console.error("Error fetching exams:", error);
+          throw error;
+        }
+        return data || [];
+    },
+  });
+
+  const isLoading = isLoadingSchedules || isLoadingExams;
+  const isError = isErrorSchedules || isErrorExams;
+  const error = errorSchedules || errorExams;
 
   // --- Data Processing ---
   const weekDates = useMemo(() => {
@@ -134,7 +168,7 @@ export const ScheduleManagement = () => {
             </div>
         </div>
       </div>
-        
+
       {isLoading ? (
         <ScheduleSkeleton />
       ) : isError ? (
@@ -173,6 +207,7 @@ export const ScheduleManagement = () => {
                                   const recurringClass = schedules.find(s => !s.date && s.day_of_week === getDay(date) && s.start_time === time);
                                   const dateSpecificClass = schedules.find(s => s.date && isSameDay(new Date(s.date), date) && s.start_time === time);
                                   const classInfo = dateSpecificClass || recurringClass;
+                                  const dayExams = exams.filter(e => isSameDay(new Date(e.date), date));
                                   return (
                                       <div key={dayIndex} className={`p-2 border-r last:border-r-0 ${isSameDay(date, today) ? 'bg-blue-50' : ''}`}>
                                           {classInfo && (
@@ -184,6 +219,18 @@ export const ScheduleManagement = () => {
                                                 </CardContent>
                                             </Card>
                                           )}
+                                          {dayExams.map(exam => (
+                                              <Card key={exam.id} className="bg-rose-50 border-l-4 border-rose-400 shadow-md hover:shadow-lg transition-shadow">
+                                                  <CardContent className="p-3">
+                                                      <div className="flex items-center gap-2">
+                                                        <BookOpen className="h-4 w-4 text-rose-600" />
+                                                        <p className="font-bold text-gray-800 text-sm">{exam.name}</p>
+                                                      </div>
+                                                      <Badge variant="destructive" className="mt-1">{exam.batch}</Badge>
+                                                      <Badge variant="outline" className="mt-1 ml-1">{exam.subject}</Badge>
+                                                  </CardContent>
+                                              </Card>
+                                          ))}
                                       </div>
                                   );
                               })}
