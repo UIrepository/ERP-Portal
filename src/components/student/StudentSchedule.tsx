@@ -257,7 +257,6 @@ export const StudentSchedule = () => {
                                                 <CardContent className="p-3">
                                                     <p className="font-bold text-gray-800 text-sm break-words">{classInfo.subject}</p>
                                                     <Badge variant="secondary" className="mt-1">{classInfo.batch}</Badge>
-                                                    {classInfo.date && <Badge variant="outline" className="mt-1 ml-1">{format(new Date(classInfo.date), 'MMM d')}</Badge>}
                                                     {classInfo.link && (
                                                         <Button size="sm" asChild className="w-full mt-2">
                                                             <a href={classInfo.link} target="_blank" rel="noopener noreferrer">
