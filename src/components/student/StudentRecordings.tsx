@@ -418,9 +418,33 @@ export const StudentRecordings = () => {
                         <h2 className="text-lg font-semibold text-gray-900">Welcome back!</h2>
                         <p className="text-gray-500 text-sm">Review past lectures and catch up on missed classes.</p>
                     </div>
-                    <div className="relative mb-6">
+                    <div className="relative mb-4">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
                         <Input className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Search recordings..." type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                    </div>
+                    <div className="flex gap-4 mb-6">
+                        <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="All Batches" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Batches</SelectItem>
+                                {displayedBatches.map((batch) => (
+                                    <SelectItem key={batch} value={batch}>{batch}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Select value={selectedSubjectFilter} onValueChange={setSelectedSubjectFilter}>
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="All Subjects" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Subjects</SelectItem>
+                                {displayedSubjects.map((subject) => (
+                                    <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div className="space-y-4">
                         {isLoading ? <RecordingSkeleton /> : (
