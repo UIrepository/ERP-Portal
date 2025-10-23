@@ -6,9 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
-import { MessageSquare, Send, CheckCircle, Star, Sparkles, Timer } from 'lucide-react';
+import { MessageSquare, Send, Star, Sparkles, Timer } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { differenceInHours, addDays, differenceInSeconds } from 'date-fns';
 
@@ -44,7 +43,7 @@ const CooldownTimer = ({ lastSubmissionDate }: { lastSubmissionDate: Date }) => 
             if (days === 0 && hours === 0) { // Only show seconds if less than an hour remains
                  parts.push(`${seconds}s`);
             }
-            
+
             setTimeLeft(`Available in ${parts.join(' ')}`);
         };
 
@@ -127,7 +126,7 @@ export const StudentFeedback = () => {
 
   const feedbackTasks = useMemo(() => {
     if (!userEnrollments) return [];
-    
+
     const latestSubmissions = new Map<string, Date>();
     submittedFeedback.forEach(f => {
         const key = `${f.batch}-${f.subject}`;
@@ -139,7 +138,7 @@ export const StudentFeedback = () => {
     return userEnrollments.map(enrollment => {
         const key = `${enrollment.batch_name}-${enrollment.subject_name}`;
         const lastSubmission = latestSubmissions.get(key);
-        const canSubmit = !lastSubmission || differenceInHours(new Date(), lastSubmission) >= 72;
+        const canSubmit = !lastSubmission || differenceInHours(new Date(), lastSubmission) >= 72; // 72 hours = 3 days
 
         return {
             batch: enrollment.batch_name,
@@ -182,7 +181,7 @@ export const StudentFeedback = () => {
       toast({ title: 'Incomplete Form', description: 'Please provide a rating for all questions and add a comment.', variant: 'destructive' });
       return;
     }
-    
+
     const feedbackToSubmit = {
         batch: selectedFeedbackTask?.batch,
         subject: selectedFeedbackTask?.subject,
@@ -193,7 +192,7 @@ export const StudentFeedback = () => {
 
     submitFeedbackMutation.mutate(feedbackToSubmit);
   };
-  
+
   const questions = [
     { key: 'teacher_quality', text: 'Rate the quality of the teacher' },
     { key: 'concept_clarity', text: 'Are you understanding the concepts and explanations?' },
@@ -236,8 +235,8 @@ export const StudentFeedback = () => {
             {isLoading ? (
                 <p>Loading your feedback tasks...</p>
             ) : feedbackTasks.map((task, index) => (
-                <div 
-                    key={index} 
+                <div
+                    key={index}
                     className="p-4 border rounded-lg flex items-center justify-between transition-all duration-300 bg-white"
                 >
                     <div>
@@ -245,8 +244,8 @@ export const StudentFeedback = () => {
                         <p className="text-sm text-muted-foreground">Batch: {task.batch}</p>
                     </div>
                     {task.canSubmit ? (
-                        <Button 
-                            onClick={() => handleOpenDialog(task)} 
+                        <Button
+                            onClick={() => handleOpenDialog(task)}
                             className="bg-primary hover:bg-primary/90 transition-all transform hover:scale-105 active:scale-95"
                         >
                             <Send className="mr-2 h-4 w-4" /> Give Feedback
@@ -262,23 +261,25 @@ export const StudentFeedback = () => {
 
       {/* Dialog for submitting feedback */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-2xl bg-white p-0 rounded-2xl overflow-hidden shadow-2xl">
-            <DialogHeader className="relative p-6 bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
+          {/* Apply max height and overflow to DialogContent */}
+          <DialogContent className="max-w-2xl bg-white p-0 rounded-2xl overflow-hidden shadow-2xl grid grid-rows-[auto_1fr_auto] max-h-[90vh]">
+            <DialogHeader className="relative p-6 bg-gradient-to-r from-blue-500 to-indigo-600 text-white row-span-1">
                 <DialogTitle className="text-2xl font-bold flex items-center justify-center gap-2">
                     <MessageSquare className="h-6 w-6" /> Feedback for {selectedFeedbackTask?.subject} ({selectedFeedbackTask?.batch})
                 </DialogTitle>
                 <DialogDescription className="text-blue-100 text-center mt-2">Your insights are highly valued and will help us improve.</DialogDescription>
             </DialogHeader>
-            <div className="space-y-6 py-6 px-6">
+            {/* Make this middle section scrollable */}
+            <div className="space-y-6 py-6 px-6 overflow-y-auto row-span-1">
                 {questions.map(({ key, text }) => (
                 <div key={key} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
                     <label className="font-semibold text-gray-700 flex items-center gap-2 mb-3">
                         <Sparkles className="h-4 w-4 text-yellow-500" /> {text}
                     </label>
                     <div>
-                    <StarRating 
-                        rating={ratings[key as keyof typeof ratings]} 
-                        setRating={(rating) => setRatings(prev => ({ ...prev, [key]: rating }))} 
+                    <StarRating
+                        rating={ratings[key as keyof typeof ratings]}
+                        setRating={(rating) => setRatings(prev => ({ ...prev, [key]: rating }))}
                     />
                     </div>
                 </div>
@@ -287,7 +288,7 @@ export const StudentFeedback = () => {
                 <label className="font-semibold text-gray-700 flex items-center gap-2 mb-3">
                     <MessageSquare className="h-4 w-4 text-primary" /> Additional Comments (Mandatory)
                 </label>
-                <Textarea 
+                <Textarea
                     className="mt-2 bg-white border-gray-300 focus-visible:ring-primary/50 shadow-sm"
                     rows={4}
                     value={comments}
@@ -296,7 +297,8 @@ export const StudentFeedback = () => {
                 />
                 </div>
             </div>
-            <DialogFooter className="flex-col sm:flex-row p-6 border-t border-gray-100 bg-gray-50">
+            {/* Keep DialogFooter at the bottom */}
+            <DialogFooter className="flex-col sm:flex-row p-6 border-t border-gray-100 bg-gray-50 row-span-1">
                 <DialogClose asChild>
                     <Button variant="outline" onClick={resetForm} className="w-full sm:w-auto text-gray-700 border-gray-300 hover:bg-gray-100">Cancel</Button>
                 </DialogClose>
