@@ -6,9 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Target, ExternalLink, Search, ArrowLeft, Download } from 'lucide-react';
+import { Target, ExternalLink, Search, ArrowLeft, Download, Info } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface DPPContent {
   id: string;
@@ -70,6 +71,12 @@ const DPPViewer = ({ dpp, onBack, onDownload, allDPPs, onDPPSelect }: { dpp: DPP
                             </Button>
                         </div>
                     </CardHeader>
+                    <Alert className="m-4 bg-blue-50 border-blue-200 text-blue-800">
+                      <Info className="h-4 w-4 !text-blue-800" />
+                      <AlertDescription>
+                        For programming subjects, if content isn't viewing correctly or shows an error, please use the <strong>Download</strong> button to access the file.
+                      </AlertDescription>
+                    </Alert>
                     <CardContent className="p-0">
                     <div className="w-full h-[60vh] md:h-[75vh]">
                         <iframe
