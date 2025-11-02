@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FileText, Download, Search, ArrowLeft } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CardHeader, CardTitle } from '../ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface NotesContent {
   id: string;
@@ -68,6 +69,11 @@ const NoteViewer = ({ note, onBack, onDownload, allNotes, onNoteSelect }: { note
                             </Button>
                         </div>
                     </CardHeader>
+                    <Alert className="mx-4 mb-2 p-3 bg-blue-50 border-blue-200 text-blue-800 text-sm [&>svg]:hidden">
+                      <AlertDescription>
+                        For programming subjects, if content isn't viewing correctly, please use the <strong>Download</strong> button.
+                      </AlertDescription>
+                    </Alert>
                     <CardContent className="p-0">
                     <div className="w-full h-[60vh] md:h-[75vh]">
                         <iframe
