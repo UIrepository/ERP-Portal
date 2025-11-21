@@ -26,6 +26,7 @@ interface CommunityMessage {
   reply_to?: {
     id: string;
     content: string | null;
+    image_url: string | null;
     profiles: { name: string };
   };
 }
@@ -48,7 +49,6 @@ export const StudentCommunity = () => {
   const [replyingTo, setReplyingTo] = useState<CommunityMessage | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  // 1. Fetch Groups
   const { data: enrollments = [], isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['community-enrollments', profile?.user_id],
     queryFn: async () => {
@@ -63,14 +63,12 @@ export const StudentCommunity = () => {
     enabled: !!profile?.user_id
   });
 
-  // Auto-select first group (Desktop only)
   useEffect(() => {
     if (!isMobile && !selectedGroup && enrollments.length > 0) {
       setSelectedGroup(enrollments[0]);
     }
   }, [enrollments, selectedGroup, isMobile]);
 
-  // 2. Fetch Messages
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<CommunityMessage[]>({
     queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
     queryFn: async () => {
@@ -82,7 +80,7 @@ export const StudentCommunity = () => {
           *,
           profiles (name),
           reply_to:community_messages!reply_to_id (
-            id, content, profiles(name)
+            id, content, image_url, profiles(name)
           )
         `)
         .eq('batch', selectedGroup.batch_name)
@@ -95,7 +93,6 @@ export const StudentCommunity = () => {
     enabled: !!selectedGroup
   });
 
-  // 3. Real-time
   useEffect(() => {
     if (!selectedGroup) return;
     const channel = supabase
@@ -111,7 +108,6 @@ export const StudentCommunity = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, selectedGroup]);
 
-  // 4. Mutations
   const sendMessageMutation = useMutation({
     mutationFn: async () => {
       if (!profile?.user_id || !selectedGroup) return;
@@ -137,6 +133,7 @@ export const StudentCommunity = () => {
         subject: selectedGroup.subject_name,
         reply_to_id: replyingTo?.id || null
       });
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -171,8 +168,15 @@ export const StudentCommunity = () => {
     ) : part);
   };
 
+  const getReplyPreviewText = (reply: NonNullable<CommunityMessage['reply_to']>) => {
+    if (reply.content && reply.content.trim().length > 0) return reply.content;
+    if (reply.image_url) return '📷 Photo';
+    return 'Message unavailable';
+  };
+
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-gray-100 w-full">
+      {/* Group List Sidebar */}
       <div className={`bg-white border-r flex flex-col h-full ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
         <div className="p-4 border-b bg-gray-50">
           <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Users className="h-5 w-5" /> Communities</h2>
@@ -192,6 +196,7 @@ export const StudentCommunity = () => {
         </ScrollArea>
       </div>
 
+      {/* Chat Area */}
       {!selectedGroup ? (
         <div className={`flex-1 flex items-center justify-center bg-gray-50 ${isMobile ? 'hidden' : 'flex'}`}>
           <div className="text-center text-gray-400"><Hash className="h-16 w-16 mx-auto mb-4 opacity-50" /><p>Select a community to start chatting</p></div>
@@ -211,7 +216,6 @@ export const StudentCommunity = () => {
              messages.length === 0 ? <div className="text-center py-20 opacity-60"><p>No messages yet.</p></div> :
              messages.map((msg) => {
                const isMe = msg.user_id === profile?.user_id;
-               // Logic to prevent empty block rendering
                const hasImage = msg.image_url && msg.image_url.trim() !== '';
                const hasContent = msg.content && msg.content.trim() !== '';
 
@@ -227,23 +231,11 @@ export const StudentCommunity = () => {
                        {msg.reply_to && (
                          <div className={`mb-2 p-2 rounded border-l-4 text-xs ${isMe ? 'bg-white/10 border-white/50' : 'bg-white border-gray-300'}`}>
                            <p className="font-bold opacity-80">{msg.reply_to.profiles?.name}</p>
-                           <p className="truncate opacity-70">{msg.reply_to.content || 'Image Attachment'}</p>
+                           <p className="truncate opacity-70">{getReplyPreviewText(msg.reply_to)}</p>
                          </div>
                        )}
-                       
-                       {/* Only render image block if URL exists */}
-                       {hasImage && (
-                         <div className="mb-2 rounded-lg overflow-hidden">
-                           <img src={msg.image_url!} alt="Shared" className="max-w-full h-auto max-h-64 object-cover" />
-                         </div>
-                       )}
-                       
-                       {/* Only render text block if content exists */}
-                       {hasContent && (
-                         <p className="whitespace-pre-wrap text-sm leading-relaxed break-words">
-                           {renderTextWithLinks(msg.content)}
-                         </p>
-                       )}
+                       {hasImage && <div className="mb-2 rounded-lg overflow-hidden"><img src={msg.image_url!} alt="Shared" className="max-w-full h-auto max-h-64 object-cover" /></div>}
+                       {hasContent && <p className="whitespace-pre-wrap text-sm leading-relaxed break-words">{renderTextWithLinks(msg.content)}</p>}
                        
                        <div className={`absolute -bottom-6 ${isMe ? 'left-0' : 'right-0'} flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
                          <button onClick={() => setReplyingTo(msg)} className="text-gray-400 hover:text-primary p-1" title="Reply"><Reply className="h-4 w-4" /></button>
@@ -258,7 +250,7 @@ export const StudentCommunity = () => {
           </div>
 
           <div className="p-3 md:p-4 bg-white border-t">
-            {replyingTo && <div className="flex justify-between bg-gray-50 p-2 rounded-lg mb-2 border-l-4 border-primary"><div className="text-sm"><span className="font-bold text-primary">Replying to {replyingTo.profiles?.name}</span><p className="text-gray-500 truncate">{replyingTo.content || 'Image'}</p></div><Button variant="ghost" size="sm" onClick={() => setReplyingTo(null)}><X className="h-4 w-4" /></Button></div>}
+            {replyingTo && <div className="flex justify-between bg-gray-50 p-2 rounded-lg mb-2 border-l-4 border-primary"><div className="text-sm"><span className="font-bold text-primary">Replying to {replyingTo.profiles?.name}</span><p className="text-gray-500 truncate">{getReplyPreviewText(replyingTo as any)}</p></div><Button variant="ghost" size="sm" onClick={() => setReplyingTo(null)}><X className="h-4 w-4" /></Button></div>}
             {selectedImage && <div className="flex justify-between bg-blue-50 p-2 rounded-lg mb-2"><div className="flex items-center gap-2 text-sm text-blue-700"><ImageIcon className="h-4 w-4" /><span>{selectedImage.name}</span></div><Button variant="ghost" size="sm" onClick={() => setSelectedImage(null)}><X className="h-4 w-4" /></Button></div>}
             <div className="flex items-end gap-2">
               <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={(e) => e.target.files && setSelectedImage(e.target.files[0])} />
