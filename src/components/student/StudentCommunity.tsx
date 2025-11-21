@@ -45,9 +45,9 @@ interface CommunityMessage {
   created_at: string;
   is_deleted: boolean;
   profiles: { name: string };
-  // 'reply_to' will contain the PRIMARY message details when this message is a reply
+  // 'reply_to' contains the PRIMARY message (the one being replied to)
+  // Can be an object or array depending on Supabase relationship detection
   reply_to?: any; 
-  // Likes array
   message_likes: { user_id: string }[];
 }
 
@@ -86,14 +86,12 @@ export const StudentCommunity = () => {
     enabled: !!profile?.user_id
   });
 
-  // Auto-select first group (Desktop only)
   useEffect(() => {
     if (!isMobile && !selectedGroup && enrollments.length > 0) {
       setSelectedGroup(enrollments[0]);
     }
   }, [enrollments, selectedGroup, isMobile]);
 
-  // Clear inputs when switching groups
   useEffect(() => {
     setMessageText('');
     setSelectedImage(null);
@@ -106,14 +104,14 @@ export const StudentCommunity = () => {
     queryFn: async () => {
       if (!selectedGroup) return [];
       
-      // Fetch messages and JOIN the parent message (reply_to)
-      // !reply_to_id ensures we join on the correct foreign key
+      // Reverted to standard relationship selection to ensure Supabase finds the link.
+      // We select 'reply_to:community_messages' to get the parent message details.
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
           *,
           profiles (name),
-          reply_to:community_messages!reply_to_id (
+          reply_to:community_messages (
             id, content, image_url, user_id, is_deleted, profiles(name)
           ),
           message_likes ( user_id )
@@ -152,7 +150,6 @@ export const StudentCommunity = () => {
 
   // --- 4. Mutations ---
   const sendMessageMutation = useMutation({
-    // We pass the data as arguments to ensure the mutation uses the snapshot of data from when the button was clicked
     mutationFn: async ({ text, image, replyId }: { text: string; image: File | null; replyId: string | null }) => {
       if (!profile?.user_id || !selectedGroup) return;
       let imageUrl = null;
@@ -175,7 +172,7 @@ export const StudentCommunity = () => {
         user_id: profile.user_id,
         batch: selectedGroup.batch_name,
         subject: selectedGroup.subject_name,
-        reply_to_id: replyId // Links this Secondary message to the Primary message
+        reply_to_id: replyId
       });
       if (error) throw error;
     },
@@ -217,9 +214,10 @@ export const StudentCommunity = () => {
 
   const handleSend = () => {
     if (!messageText.trim() && !selectedImage) return;
-    // Capture the current replyTo ID at the moment of sending
-    const currentReplyId = replyingTo?.id || null;
     
+    // Grab the ID immediately from state before mutating
+    const currentReplyId = replyingTo?.id || null;
+
     sendMessageMutation.mutate({
         text: messageText,
         image: selectedImage,
@@ -302,13 +300,11 @@ export const StudentCommunity = () => {
                const hasImage = msg.image_url && msg.image_url.trim() !== '';
                const hasContent = msg.content && msg.content.trim() !== '';
                
-               // Handle potential array response from Supabase join
+               // Determine the Primary message data. 
+               // Note: Supabase can return this as an object or an array of objects.
                const replyData = Array.isArray(msg.reply_to) ? msg.reply_to[0] : msg.reply_to;
                
-               // Extract text for the quote block
                const replyText = getReplyPreview(replyData);
-               
-               // Determine if I am the sender of the PRIMARY message (the one being quoted)
                const isReplyToMe = replyData?.user_id === profile?.user_id;
                const replySenderName = isReplyToMe ? "You" : replyData?.profiles?.name;
                
@@ -327,9 +323,9 @@ export const StudentCommunity = () => {
                      {/* Sender Name (only if not me) */}
                      {!isMe && <div className="text-[11px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
 
-                     {/* QUOTE BLOCK: Displays PRIMARY text inside SECONDARY message */}
-                     {/* We verify ids match to ensure we are displaying the correct parent */}
-                     {msg.reply_to_id && replyData && msg.reply_to_id === replyData.id && replyText && (
+                     {/* QUOTE BLOCK: Visible ONLY in the Secondary Message (the reply) */}
+                     {/* It links back to the Primary Message */}
+                     {msg.reply_to_id && replyData && replyText && (
                        <div 
                         className={`mb-1.5 rounded-md bg-black/5 border-l-[3px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none shadow-sm`}
                         onClick={() => {
@@ -342,7 +338,7 @@ export const StudentCommunity = () => {
                        </div>
                      )}
 
-                     {/* Message Content (The Secondary Text) */}
+                     {/* Message Content */}
                      <div className="text-gray-900 px-1" id={`msg-${msg.id}`}>
                         {hasImage && <div className="mb-1 rounded-lg overflow-hidden mt-1"><img src={msg.image_url!} alt="Attachment" className="max-w-full h-auto max-h-80 object-cover rounded-md cursor-pointer" onClick={() => window.open(msg.image_url!, '_blank')} /></div>}
                         {hasContent && <p className="whitespace-pre-wrap leading-relaxed break-words text-[15px]">{renderTextWithLinks(msg.content)}</p>}
@@ -351,11 +347,11 @@ export const StudentCommunity = () => {
                      {/* Footer: Actions + Info */}
                      <div className="flex justify-between items-end mt-1 pt-1 border-t border-black/5 gap-2">
                         
-                        {/* Actions */}
                         <div className="flex items-center gap-1">
                            <button onClick={() => toggleLikeMutation.mutate({ msgId: msg.id, isLiked })} className="p-1 hover:bg-black/5 rounded-full transition-colors">
                               <Heart className={`h-3.5 w-3.5 ${isLiked ? 'text-red-500 fill-red-500' : 'text-gray-400'}`} />
                            </button>
+                           {/* Reply Button: Clicking this sets CURRENT msg as Primary for your NEW Secondary msg */}
                            <button onClick={() => setReplyingTo(msg)} className="p-1 hover:bg-black/5 rounded-full transition-colors">
                               <Reply className="h-3.5 w-3.5 text-gray-400" />
                            </button>
@@ -366,7 +362,6 @@ export const StudentCommunity = () => {
                            )}
                         </div>
 
-                        {/* Info Row: Likes + Time */}
                         <div className="flex items-center gap-2">
                             {likeCount > 0 && (
                             <div className="flex items-center bg-black/5 px-1.5 rounded-full h-4">
@@ -387,7 +382,7 @@ export const StudentCommunity = () => {
 
           {/* Input Area */}
           <div className="p-2 md:p-3 bg-[#f0f2f5] border-t z-20">
-            {/* Reply Preview Bar: Shows what you are ABOUT to reply to (The Primary Message) */}
+            {/* Reply Preview Bar: Shows the Primary Message you are about to reply to */}
             {replyingTo && (
               <div className="flex items-center justify-between bg-white p-2 rounded-lg mb-2 border-l-4 border-teal-500 shadow-sm animate-in slide-in-from-bottom-2">
                 <div className="flex flex-col px-2">
