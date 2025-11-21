@@ -45,7 +45,7 @@ interface CommunityMessage {
   created_at: string;
   is_deleted: boolean;
   profiles: { name: string };
-  // Nested reply object using the explicit FK name
+  // Nested reply object (Auto-detected)
   reply_to?: {
     id: string;
     content: string | null;
@@ -92,6 +92,7 @@ export const StudentCommunity = () => {
     enabled: !!profile?.user_id
   });
 
+  // Auto-select first group (Desktop only)
   useEffect(() => {
     if (!isMobile && !selectedGroup && enrollments.length > 0) {
       setSelectedGroup(enrollments[0]);
@@ -111,13 +112,14 @@ export const StudentCommunity = () => {
     queryFn: async () => {
       if (!selectedGroup) return [];
       
-      // QUERY WITH EXPLICIT FK: !fk_chat_reply
+      // FIXED QUERY: Removed '!fk_chat_reply' to match your "old code" style
+      // Supabase will now auto-detect the relationship we fixed in SQL
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
           *,
           profiles (name),
-          reply_to:community_messages!fk_chat_reply (
+          reply_to:community_messages (
             id, content, image_url, user_id, is_deleted, profiles(name)
           ),
           message_likes ( user_id )
@@ -232,6 +234,7 @@ export const StudentCommunity = () => {
     ) : part);
   };
 
+  // UI: WhatsApp-style reply preview text
   const getReplyPreview = (reply: NonNullable<CommunityMessage['reply_to']>) => {
     if (reply.is_deleted) return '🗑️ Message deleted';
     if (reply.content && reply.content.trim().length > 0) return reply.content;
@@ -312,10 +315,10 @@ export const StudentCommunity = () => {
                      isMe ? 'bg-[#dcf8c6] rounded-tr-none' : 'bg-white rounded-tl-none'
                    }`}>
                      
-                     {/* Name (Others) */}
+                     {/* Sender Name (Others) */}
                      {!isMe && <div className="text-[11px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
 
-                     {/* REPLY BLOCK (Quoted Box) */}
+                     {/* REPLY BLOCK (Visible Quote Box) */}
                      {msg.reply_to && replyText && (
                        <div 
                         className={`mb-1.5 rounded-md bg-black/5 border-l-[3px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none shadow-sm`}
@@ -335,7 +338,7 @@ export const StudentCommunity = () => {
                         {hasContent && <p className="whitespace-pre-wrap leading-relaxed break-words text-[15px]">{renderTextWithLinks(msg.content)}</p>}
                      </div>
 
-                     {/* Footer: Time + Actions (Inside Bubble) */}
+                     {/* Footer: Time + Actions + Likes */}
                      <div className="flex justify-between items-end mt-1 pt-1 border-t border-black/5 gap-2">
                         
                         {/* Actions Row (Always Visible) */}
