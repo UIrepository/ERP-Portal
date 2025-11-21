@@ -1,3 +1,7 @@
+{
+type: uploaded file
+fileName: uirepository/erp-portal/ERP-Portal-70cdfbff92257ad9c7679499416f9d5398667d81/src/components/student/StudentCommunity.tsx
+fullContent:
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -53,7 +57,7 @@ interface CommunityMessage {
     user_id: string; 
     is_deleted: boolean;
     profiles: { name: string };
-  } | any; // Type relaxation for safety if array comes back
+  } | any;
   // Likes array
   message_likes: { user_id: string }[];
 }
@@ -100,7 +104,7 @@ export const StudentCommunity = () => {
     }
   }, [enrollments, selectedGroup, isMobile]);
 
-  // Clear inputs when switching groups to prevent ghost replies
+  // Clear inputs when switching groups
   useEffect(() => {
     setMessageText('');
     setSelectedImage(null);
@@ -113,7 +117,9 @@ export const StudentCommunity = () => {
     queryFn: async () => {
       if (!selectedGroup) return [];
       
-      // Uses auto-detection for relationships
+      // We explicitly select the reply relation. 
+      // Note: "reply_to:community_messages!reply_to_id" tells Supabase to join 
+      // community_messages again using the reply_to_id column.
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
@@ -187,7 +193,7 @@ export const StudentCommunity = () => {
     onSuccess: () => {
       setMessageText('');
       setSelectedImage(null);
-      setReplyingTo(null); // Clears reply state so next message is clean
+      setReplyingTo(null); 
       if (fileInputRef.current) fileInputRef.current.value = '';
     },
     onError: (e: any) => { setIsUploading(false); toast({ title: "Error", description: e.message, variant: "destructive" }); }
@@ -239,13 +245,12 @@ export const StudentCommunity = () => {
     ) : part);
   };
 
-  // Logic to get the preview text. Returns NULL if invalid, keeping UI clean.
   const getReplyPreview = (reply: any) => {
     if (!reply) return null;
     if (reply.is_deleted) return '🗑️ Message deleted';
     if (reply.content && reply.content.trim().length > 0) return reply.content;
     if (reply.image_url) return '📷 Photo';
-    return null; // Crucial: Returns null if no content, so box won't render
+    return 'Message';
   };
 
   // --- Render ---
@@ -305,15 +310,13 @@ export const StudentCommunity = () => {
                const hasImage = msg.image_url && msg.image_url.trim() !== '';
                const hasContent = msg.content && msg.content.trim() !== '';
                
-               // Safely handle potential array return for reply_to
+               // Handle reply relation potentially being an array
                const replyData = Array.isArray(msg.reply_to) ? msg.reply_to[0] : msg.reply_to;
                
-               // Get actual reply text. If null, the block below won't render.
                const replyText = replyData ? getReplyPreview(replyData) : null;
                const isReplyToMe = replyData?.user_id === profile?.user_id;
                const replySenderName = isReplyToMe ? "You" : replyData?.profiles?.name;
                
-               // Colors for reply bar
                const replyBorderColor = isReplyToMe ? "border-teal-500" : "border-purple-500";
                const replyNameColor = isReplyToMe ? "text-teal-600" : "text-purple-600";
                
@@ -329,7 +332,7 @@ export const StudentCommunity = () => {
                      {/* Name (Others) */}
                      {!isMe && <div className="text-[11px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
 
-                     {/* REPLY BLOCK (Only shows if replyText is valid) */}
+                     {/* REPLY BLOCK */}
                      {msg.reply_to_id && replyText && (
                        <div 
                         className={`mb-1.5 rounded-md bg-black/5 border-l-[3px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none shadow-sm`}
@@ -339,7 +342,8 @@ export const StudentCommunity = () => {
                         }}
                        >
                          <span className={`text-[10px] font-bold ${replyNameColor} mb-0.5`}>{replySenderName}</span>
-                         <span className="text-[11px] text-gray-700 truncate line-clamp-2">{replyText}</span>
+                         {/* Fixed: Removed 'truncate' which conflicts with 'line-clamp' */}
+                         <span className="text-[11px] text-gray-700 line-clamp-2">{replyText}</span>
                        </div>
                      )}
 
@@ -349,10 +353,8 @@ export const StudentCommunity = () => {
                         {hasContent && <p className="whitespace-pre-wrap leading-relaxed break-words text-[15px]">{renderTextWithLinks(msg.content)}</p>}
                      </div>
 
-                     {/* Footer: Actions + Info */}
+                     {/* Footer */}
                      <div className="flex justify-between items-end mt-1 pt-1 border-t border-black/5 gap-2">
-                        
-                        {/* Actions (Inside Bubble - Mobile Friendly) */}
                         <div className="flex items-center gap-1">
                            <button onClick={() => toggleLikeMutation.mutate({ msgId: msg.id, isLiked })} className="p-1 hover:bg-black/5 rounded-full transition-colors">
                               <Heart className={`h-3.5 w-3.5 ${isLiked ? 'text-red-500 fill-red-500' : 'text-gray-400'}`} />
@@ -366,8 +368,6 @@ export const StudentCommunity = () => {
                               </button>
                            )}
                         </div>
-
-                        {/* Info Row: Likes + Time */}
                         <div className="flex items-center gap-2">
                             {likeCount > 0 && (
                             <div className="flex items-center bg-black/5 px-1.5 rounded-full h-4">
@@ -388,7 +388,6 @@ export const StudentCommunity = () => {
 
           {/* Input Area */}
           <div className="p-2 md:p-3 bg-[#f0f2f5] border-t z-20">
-            {/* Reply Preview Bar */}
             {replyingTo && (
               <div className="flex items-center justify-between bg-white p-2 rounded-lg mb-2 border-l-4 border-teal-500 shadow-sm animate-in slide-in-from-bottom-2">
                 <div className="flex flex-col px-2">
@@ -396,17 +395,6 @@ export const StudentCommunity = () => {
                     <span className="text-xs text-gray-500 truncate max-w-[250px]">{getReplyPreview(replyingTo) || 'Attachment'}</span>
                 </div>
                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setReplyingTo(null)}><X className="h-4 w-4 text-gray-500" /></Button>
-              </div>
-            )}
-
-            {/* Image Preview */}
-            {selectedImage && (
-              <div className="flex items-center justify-between bg-blue-50 p-2 rounded-lg mb-2 border border-blue-100 shadow-sm">
-                <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 bg-blue-100 rounded flex items-center justify-center text-blue-600"><ImageIcon className="h-5 w-5"/></div>
-                    <div className="text-sm text-blue-900 truncate max-w-[200px] font-medium">{selectedImage.name}</div>
-                </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-blue-100 rounded-full" onClick={() => setSelectedImage(null)}><X className="h-4 w-4 text-blue-500" /></Button>
               </div>
             )}
 
@@ -436,3 +424,4 @@ export const StudentCommunity = () => {
     </div>
   );
 };
+}
