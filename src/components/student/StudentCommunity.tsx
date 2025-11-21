@@ -32,7 +32,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-// --- Interfaces ---
 interface CommunityMessage {
   id: string;
   content: string | null;
@@ -46,7 +45,7 @@ interface CommunityMessage {
   profiles: {
     name: string;
   };
-  // Nested reply object
+  // Simplified nested reply object
   reply_to?: {
     id: string;
     content: string | null;
@@ -68,7 +67,6 @@ export const StudentCommunity = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- State ---
   const [selectedGroup, setSelectedGroup] = useState<UserEnrollment | null>(null);
   const [messageText, setMessageText] = useState('');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -76,7 +74,7 @@ export const StudentCommunity = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null); 
 
-  // --- 1. Fetch Groups ---
+  // 1. Fetch Groups
   const { data: enrollments = [], isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['community-enrollments', profile?.user_id],
     queryFn: async () => {
@@ -91,26 +89,25 @@ export const StudentCommunity = () => {
     enabled: !!profile?.user_id
   });
 
-  // Auto-select first group (Desktop only)
   useEffect(() => {
     if (!isMobile && !selectedGroup && enrollments.length > 0) {
       setSelectedGroup(enrollments[0]);
     }
   }, [enrollments, selectedGroup, isMobile]);
 
-  // --- 2. Fetch Messages ---
+  // 2. Fetch Messages
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<CommunityMessage[]>({
     queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
     queryFn: async () => {
       if (!selectedGroup) return [];
       
-      // UPDATED QUERY: Uses the explicit relationship name we fixed in SQL
+      // FIXED QUERY: Removed '!community_messages_reply_to_id_fkey' to allow auto-detection
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
           id, content, image_url, user_id, batch, subject, reply_to_id, created_at, is_deleted,
           profiles (name),
-          reply_to:community_messages!community_messages_reply_to_id_fkey (
+          reply_to:community_messages (
             id, content, image_url, user_id, profiles(name)
           )
         `)
@@ -119,13 +116,16 @@ export const StudentCommunity = () => {
         .eq('is_deleted', false)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching messages:", error);
+        throw error;
+      }
       return data as any[];
     },
     enabled: !!selectedGroup
   });
 
-  // --- 3. Real-time ---
+  // 3. Real-time
   useEffect(() => {
     if (!selectedGroup) return;
     const channel = supabase
@@ -145,7 +145,7 @@ export const StudentCommunity = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [messages, selectedGroup]);
 
-  // --- 4. Actions ---
+  // 4. Actions
   const sendMessageMutation = useMutation({
     mutationFn: async () => {
       if (!profile?.user_id || !selectedGroup) return;
@@ -189,7 +189,6 @@ export const StudentCommunity = () => {
       return id;
     },
     onSuccess: (deletedId) => {
-      // Instant Update: Remove from list immediately
       queryClient.setQueryData(
         ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
         (old: CommunityMessage[] | undefined) => old ? old.filter(m => m.id !== deletedId) : []
@@ -205,7 +204,6 @@ export const StudentCommunity = () => {
     sendMessageMutation.mutate();
   };
 
-  // --- Helpers ---
   const renderTextWithLinks = (text: string | null) => {
     if (!text) return null;
     const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -216,7 +214,6 @@ export const StudentCommunity = () => {
   };
 
   const getReplyPreview = (reply: NonNullable<CommunityMessage['reply_to']>) => {
-    // Priority: Text -> Image -> Fallback
     if (reply.content && reply.content.trim().length > 0) return reply.content;
     if (reply.image_url) return '📷 Photo';
     return 'Message';
@@ -283,7 +280,6 @@ export const StudentCommunity = () => {
                const replyText = msg.reply_to ? getReplyPreview(msg.reply_to) : null;
                const isReplyToMe = msg.reply_to?.user_id === profile?.user_id;
                const replySenderName = isReplyToMe ? "You" : msg.reply_to?.profiles?.name;
-               // Colored bar for reply: Teal if mine, Purple if others
                const replyBorderColor = isReplyToMe ? "border-teal-500" : "border-purple-500";
                const replyNameColor = isReplyToMe ? "text-teal-600" : "text-purple-600";
 
@@ -293,6 +289,7 @@ export const StudentCommunity = () => {
                      isMe ? 'bg-[#E7FFDB] rounded-tr-none' : 'bg-white rounded-tl-none'
                    }`}>
                      
+                     {/* Sender Name for Others */}
                      {!isMe && <div className="text-[10px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
 
                      {/* Reply Block */}
@@ -315,7 +312,7 @@ export const StudentCommunity = () => {
                         {hasContent && <p className="whitespace-pre-wrap leading-relaxed break-words text-[15px]">{renderTextWithLinks(msg.content)}</p>}
                      </div>
 
-                     {/* Footer */}
+                     {/* Timestamp */}
                      <div className="flex justify-end items-center gap-1 mt-0.5 px-1">
                         <span className="text-[10px] text-gray-400 min-w-[40px] text-right">{format(new Date(msg.created_at), 'h:mm a')}</span>
                      </div>
@@ -346,6 +343,7 @@ export const StudentCommunity = () => {
               </div>
             )}
 
+            {/* Image Preview */}
             {selectedImage && (
               <div className="flex items-center justify-between bg-blue-50 p-2 rounded-lg mb-2 border border-blue-100 shadow-sm">
                 <div className="flex items-center gap-3">
