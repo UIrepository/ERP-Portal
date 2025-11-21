@@ -46,7 +46,7 @@ interface CommunityMessage {
   profiles: {
     name: string;
   };
-  // Nested reply object must include user_id to check for "You"
+  // Nested reply object
   reply_to?: {
     id: string;
     content: string | null;
@@ -103,6 +103,7 @@ export const StudentCommunity = () => {
     queryFn: async () => {
       if (!selectedGroup) return [];
       
+      // Join profiles twice: once for the message sender, once for the replied-to sender
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
@@ -114,7 +115,7 @@ export const StudentCommunity = () => {
         `)
         .eq('batch', selectedGroup.batch_name)
         .eq('subject', selectedGroup.subject_name)
-        .eq('is_deleted', false) // Filter out deleted messages
+        .eq('is_deleted', false)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -131,8 +132,7 @@ export const StudentCommunity = () => {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'community_messages', filter: `batch=eq.${selectedGroup.batch_name}` }, 
-        (payload) => {
-          // Invalidate on INSERT or UPDATE (soft delete)
+        () => {
           queryClient.invalidateQueries({ queryKey: ['community-messages', selectedGroup.batch_name, selectedGroup.subject_name] });
         }
       )
@@ -181,13 +181,9 @@ export const StudentCommunity = () => {
     onError: (e: any) => { setIsUploading(false); toast({ title: "Error", description: e.message, variant: "destructive" }); }
   });
 
-  // Soft Delete Mutation
   const deleteMessageMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('community_messages')
-        .update({ is_deleted: true })
-        .eq('id', id);
+      const { error } = await supabase.from('community_messages').update({ is_deleted: true }).eq('id', id);
       if (error) throw error;
       return id;
     },
@@ -227,7 +223,7 @@ export const StudentCommunity = () => {
   return (
     <div className="flex h-[calc(100vh-4rem)] w-full bg-[#efeae2] relative overflow-hidden">
       
-      {/* GROUP LIST */}
+      {/* Sidebar */}
       <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
         <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
           <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Users className="h-5 w-5 text-teal-600" /> Communities</h2>
@@ -247,7 +243,7 @@ export const StudentCommunity = () => {
         </ScrollArea>
       </div>
 
-      {/* EMPTY STATE */}
+      {/* Empty State */}
       {!selectedGroup && (
         <div className={`flex-1 flex flex-col items-center justify-center bg-[#f0f2f5] text-gray-500 border-l-4 border-teal-600 ${isMobile ? 'hidden' : 'flex'}`}>
           <Hash className="h-20 w-20 mb-4 opacity-20" />
@@ -255,10 +251,9 @@ export const StudentCommunity = () => {
         </div>
       )}
 
-      {/* CHAT AREA */}
+      {/* Chat Area */}
       {selectedGroup && (
         <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-[#efeae2]' : 'w-full'}`}>
-          
           {/* Header */}
           <div className="p-3 bg-white border-b flex items-center justify-between shadow-sm z-20">
             <div className="flex items-center gap-3">
@@ -273,20 +268,20 @@ export const StudentCommunity = () => {
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#efeae2] pb-24 md:pb-4">
-            <div className="text-center text-xs text-gray-400 my-4 bg-gray-200/50 py-1 px-3 rounded-full w-fit mx-auto">Messages are visible to group members</div>
+            <div className="text-center text-xs text-gray-400 my-4 bg-gray-200/50 py-1 px-3 rounded-full w-fit mx-auto shadow-sm">Messages are end-to-end visible</div>
             {isLoadingMessages ? <div className="flex justify-center p-10"><Loader2 className="animate-spin h-8 w-8 text-gray-400" /></div> : 
              messages.length === 0 ? <div className="text-center py-20 opacity-50 text-sm">No messages yet.</div> :
              messages.map((msg) => {
                const isMe = msg.user_id === profile?.user_id;
                const hasImage = msg.image_url && msg.image_url.trim() !== '';
                const hasContent = msg.content && msg.content.trim() !== '';
-               const replyText = msg.reply_to ? getReplyPreview(msg.reply_to) : null;
                
-               // "You" Logic for Reply
+               const replyText = msg.reply_to ? getReplyPreview(msg.reply_to) : null;
                const isReplyToMe = msg.reply_to?.user_id === profile?.user_id;
                const replySenderName = isReplyToMe ? "You" : msg.reply_to?.profiles?.name;
-               const replyColor = isReplyToMe ? "text-teal-600" : "text-purple-600";
-               const replyBorder = isReplyToMe ? "border-teal-500" : "border-purple-500";
+               // If replying to self, use teal bar. If replying to other, use purple bar.
+               const replyBorderColor = isReplyToMe ? "border-teal-500" : "border-purple-500";
+               const replyNameColor = isReplyToMe ? "text-teal-600" : "text-purple-600";
 
                return (
                  <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} group mb-1`}>
@@ -294,42 +289,38 @@ export const StudentCommunity = () => {
                      isMe ? 'bg-[#E7FFDB] rounded-tr-none' : 'bg-white rounded-tl-none'
                    }`}>
                      
-                     {/* Sender Name (Only for others) */}
-                     {!isMe && (
-                       <div className="text-[10px] font-bold text-orange-600 mb-0.5 px-1">
-                         {msg.profiles?.name}
-                       </div>
-                     )}
+                     {/* Name for others */}
+                     {!isMe && <div className="text-[10px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
 
                      {/* Reply Block */}
                      {msg.reply_to && replyText && (
-                       <div className={`mb-1 rounded-[6px] bg-black/5 border-l-[4px] ${replyBorder} p-1 px-2 flex flex-col justify-center cursor-pointer select-none`}>
-                         <span className={`text-[10px] font-bold ${replyColor}`}>{replySenderName}</span>
+                       <div 
+                        className={`mb-2 rounded-[6px] bg-black/5 border-l-[4px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none`}
+                        onClick={() => {
+                          const el = document.getElementById(`msg-${msg.reply_to_id}`);
+                          if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'});
+                        }}
+                       >
+                         <span className={`text-[10px] font-bold ${replyNameColor} mb-0.5`}>{replySenderName}</span>
                          <span className="text-[11px] text-gray-600 truncate line-clamp-1">{replyText}</span>
                        </div>
                      )}
 
                      {/* Content */}
-                     <div className="text-gray-800 px-1">
+                     <div className="text-gray-800 px-1" id={`msg-${msg.id}`}>
                         {hasImage && <div className="mb-1 rounded-lg overflow-hidden mt-1"><img src={msg.image_url!} alt="Attachment" className="max-w-full h-auto max-h-80 object-cover rounded-md cursor-pointer" onClick={() => window.open(msg.image_url!, '_blank')} /></div>}
                         {hasContent && <p className="whitespace-pre-wrap leading-relaxed break-words text-[15px]">{renderTextWithLinks(msg.content)}</p>}
                      </div>
 
-                     {/* Timestamp */}
+                     {/* Footer */}
                      <div className="flex justify-end items-center gap-1 mt-0.5 px-1">
                         <span className="text-[10px] text-gray-400 min-w-[40px] text-right">{format(new Date(msg.created_at), 'h:mm a')}</span>
                      </div>
 
-                     {/* Hover Actions */}
+                     {/* Actions */}
                      <div className={`absolute top-0 ${isMe ? '-left-20' : '-right-20'} hidden group-hover:flex items-center h-full gap-1 px-2 transition-all`}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 bg-white/80 shadow-sm rounded-full hover:bg-white" onClick={() => setReplyingTo(msg)} title="Reply">
-                            <Reply className="h-4 w-4 text-gray-600" />
-                        </Button>
-                        {isMe && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 bg-white/80 shadow-sm rounded-full hover:bg-red-50" onClick={() => setDeleteId(msg.id)} title="Delete">
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                        )}
+                        <Button variant="ghost" size="icon" className="h-8 w-8 bg-white/80 shadow-sm rounded-full hover:bg-white" onClick={() => setReplyingTo(msg)} title="Reply"><Reply className="h-4 w-4 text-gray-600" /></Button>
+                        {isMe && <Button variant="ghost" size="icon" className="h-8 w-8 bg-white/80 shadow-sm rounded-full hover:bg-red-50" onClick={() => setDeleteId(msg.id)} title="Delete"><Trash2 className="h-4 w-4 text-red-500" /></Button>}
                      </div>
 
                    </div>
@@ -345,9 +336,7 @@ export const StudentCommunity = () => {
             {replyingTo && (
               <div className="flex items-center justify-between bg-white p-2 rounded-lg mb-2 border-l-4 border-teal-500 shadow-sm animate-in slide-in-from-bottom-2">
                 <div className="flex flex-col px-2">
-                    <span className="text-xs font-bold text-teal-600">
-                        Replying to {replyingTo.user_id === profile?.user_id ? 'You' : replyingTo.profiles?.name}
-                    </span>
+                    <span className="text-xs font-bold text-teal-600">Replying to {replyingTo.user_id === profile?.user_id ? 'You' : replyingTo.profiles?.name}</span>
                     <span className="text-xs text-gray-500 truncate max-w-[250px]">{getReplyPreview(replyingTo) || 'Attachment'}</span>
                 </div>
                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setReplyingTo(null)}><X className="h-4 w-4 text-gray-500" /></Button>
@@ -367,32 +356,14 @@ export const StudentCommunity = () => {
 
             <div className="flex items-end gap-2 bg-white p-1.5 rounded-2xl shadow-sm border border-gray-200">
               <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={(e) => e.target.files && setSelectedImage(e.target.files[0])} />
-              <Button variant="ghost" size="icon" className="h-10 w-10 text-gray-500 hover:bg-gray-100 rounded-full shrink-0" onClick={() => fileInputRef.current?.click()}>
-                <Paperclip className="h-5 w-5" />
-              </Button>
-              
-              <Input 
-                value={messageText} 
-                onChange={(e) => setMessageText(e.target.value)} 
-                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())} 
-                placeholder="Type a message" 
-                className="flex-1 border-none shadow-none focus-visible:ring-0 min-h-[40px] py-2 text-[15px]" 
-                disabled={isUploading || sendMessageMutation.isPending} 
-              />
-              
-              <Button 
-                onClick={handleSend} 
-                disabled={(!messageText.trim() && !selectedImage) || isUploading} 
-                className="h-10 w-10 rounded-full bg-teal-600 hover:bg-teal-700 text-white shrink-0 p-0 flex items-center justify-center"
-              >
-                {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5 ml-0.5" />}
-              </Button>
+              <Button variant="ghost" size="icon" className="h-10 w-10 text-gray-500 hover:bg-gray-100 rounded-full shrink-0" onClick={() => fileInputRef.current?.click()}><Paperclip className="h-5 w-5" /></Button>
+              <Input value={messageText} onChange={(e) => setMessageText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())} placeholder="Type a message" className="flex-1 border-none shadow-none focus-visible:ring-0 min-h-[40px] py-2 text-[15px]" disabled={isUploading || sendMessageMutation.isPending} />
+              <Button onClick={handleSend} disabled={(!messageText.trim() && !selectedImage) || isUploading} className="h-10 w-10 rounded-full bg-teal-600 hover:bg-teal-700 text-white shrink-0 p-0 flex items-center justify-center">{isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5 ml-0.5" />}</Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Delete Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
             <AlertDialogHeader>
