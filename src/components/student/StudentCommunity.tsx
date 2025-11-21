@@ -113,7 +113,7 @@ export const StudentCommunity = () => {
     queryFn: async () => {
       if (!selectedGroup) return [];
       
-      // FIXED QUERY: Reverted to auto-detection (removed explicit FK name)
+      // STANDARD QUERY (Auto-detects relationship)
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
@@ -302,13 +302,11 @@ export const StudentCommunity = () => {
                const isReplyToMe = msg.reply_to?.user_id === profile?.user_id;
                const replySenderName = isReplyToMe ? "You" : msg.reply_to?.profiles?.name;
                
-               // Styles for replies
                const replyBorderColor = isReplyToMe ? "border-teal-500" : "border-purple-500";
                const replyNameColor = isReplyToMe ? "text-teal-600" : "text-purple-600";
                
-               // Likes
-               const likeCount = msg.message_likes?.length || 0;
                const isLiked = msg.message_likes?.some(l => l.user_id === profile?.user_id);
+               const likeCount = msg.message_likes?.length || 0;
 
                return (
                  <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} group mb-1`}>
@@ -316,10 +314,10 @@ export const StudentCommunity = () => {
                      isMe ? 'bg-[#dcf8c6] rounded-tr-none' : 'bg-white rounded-tl-none'
                    }`}>
                      
-                     {/* Sender Name (Others only) */}
+                     {/* Sender Name (Others) */}
                      {!isMe && <div className="text-[11px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
 
-                     {/* Reply Block */}
+                     {/* REPLY BLOCK (Click to scroll) */}
                      {msg.reply_to && replyText && (
                        <div 
                         className={`mb-1.5 rounded-md bg-black/5 border-l-4 ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none`}
@@ -339,30 +337,33 @@ export const StudentCommunity = () => {
                         {hasContent && <p className="whitespace-pre-wrap leading-relaxed break-words text-[15px]">{renderTextWithLinks(msg.content)}</p>}
                      </div>
 
-                     {/* Footer: Time + Likes */}
-                     <div className="flex justify-end items-center gap-2 mt-0.5 px-1 select-none">
-                        {likeCount > 0 && (
-                          <div className="flex items-center bg-black/5 px-1.5 rounded-full h-4">
-                            <Heart className="h-2.5 w-2.5 text-red-500 fill-red-500 mr-0.5" />
-                            <span className="text-[9px] font-bold text-gray-600">{likeCount}</span>
-                          </div>
-                        )}
-                        <span className="text-[10px] text-gray-500 min-w-[40px] text-right">{format(new Date(msg.created_at), 'h:mm a')}</span>
-                     </div>
+                     {/* Footer: Time + Likes + Actions (Mobile Friendly) */}
+                     <div className="flex justify-end items-center gap-2 mt-1 px-1 select-none">
+                        
+                        {/* ACTIONS (Inside bubble for mobile access) */}
+                        <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                           <button onClick={() => toggleLikeMutation.mutate({ msgId: msg.id, isLiked })} className="p-1 hover:bg-black/10 rounded-full">
+                              <Heart className={`h-3 w-3 ${isLiked ? 'text-red-500 fill-red-500' : 'text-gray-500'}`} />
+                           </button>
+                           <button onClick={() => setReplyingTo(msg)} className="p-1 hover:bg-black/10 rounded-full">
+                              <Reply className="h-3 w-3 text-gray-500" />
+                           </button>
+                           {isMe && (
+                              <button onClick={() => setDeleteId(msg.id)} className="p-1 hover:bg-red-100 rounded-full">
+                                 <Trash2 className="h-3 w-3 text-gray-500 hover:text-red-500" />
+                              </button>
+                           )}
+                        </div>
 
-                     {/* Actions Overlay */}
-                     <div className={`absolute -bottom-8 ${isMe ? 'left-0' : 'right-0'} hidden group-hover:flex items-center gap-1 px-2 transition-all z-10`}>
-                        <Button variant="secondary" size="icon" className="h-7 w-7 shadow-md rounded-full bg-white hover:bg-gray-50" onClick={() => toggleLikeMutation.mutate({ msgId: msg.id, isLiked })} title="Like">
-                            <Heart className={`h-3.5 w-3.5 ${isLiked ? 'text-red-500 fill-red-500' : 'text-gray-500'}`} />
-                        </Button>
-                        <Button variant="secondary" size="icon" className="h-7 w-7 shadow-md rounded-full bg-white hover:bg-gray-50" onClick={() => setReplyingTo(msg)} title="Reply">
-                            <Reply className="h-3.5 w-3.5 text-gray-600" />
-                        </Button>
-                        {isMe && (
-                          <Button variant="secondary" size="icon" className="h-7 w-7 shadow-md rounded-full bg-white hover:bg-red-50" onClick={() => setDeleteId(msg.id)} title="Delete">
-                              <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                          </Button>
+                        {/* Like Count */}
+                        {likeCount > 0 && (
+                           <div className="flex items-center bg-white/80 px-1 rounded-full border border-gray-100 h-4">
+                              <Heart className="h-2 w-2 text-red-500 fill-red-500 mr-0.5" />
+                              <span className="text-[9px] text-gray-600 font-medium">{likeCount}</span>
+                           </div>
                         )}
+                        
+                        <span className="text-[10px] text-gray-500 min-w-[40px] text-right">{format(new Date(msg.created_at), 'h:mm a')}</span>
                      </div>
 
                    </div>
@@ -374,7 +375,6 @@ export const StudentCommunity = () => {
 
           {/* Input */}
           <div className="p-2 md:p-3 bg-[#f0f2f5] border-t z-20">
-            {/* Reply Preview */}
             {replyingTo && (
               <div className="flex items-center justify-between bg-white p-2 rounded-lg mb-2 border-l-4 border-teal-500 shadow-sm animate-in slide-in-from-bottom-2">
                 <div className="flex flex-col px-2">
@@ -385,7 +385,6 @@ export const StudentCommunity = () => {
               </div>
             )}
 
-            {/* Image Preview */}
             {selectedImage && (
               <div className="flex items-center justify-between bg-blue-50 p-2 rounded-lg mb-2 border border-blue-100 shadow-sm">
                 <div className="flex items-center gap-3">
@@ -406,7 +405,6 @@ export const StudentCommunity = () => {
         </div>
       )}
 
-      {/* Delete Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
             <AlertDialogHeader>
