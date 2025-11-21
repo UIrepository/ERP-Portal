@@ -16,7 +16,8 @@ import {
   Loader2, 
   Paperclip, 
   Trash2, 
-  X 
+  X,
+  Heart
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -32,6 +33,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+// --- Interfaces ---
 interface CommunityMessage {
   id: string;
   content: string | null;
@@ -42,17 +44,18 @@ interface CommunityMessage {
   reply_to_id: string | null;
   created_at: string;
   is_deleted: boolean;
-  profiles: {
-    name: string;
-  };
-  // Simplified nested reply object
+  profiles: { name: string };
+  // Nested reply object
   reply_to?: {
     id: string;
     content: string | null;
     image_url: string | null;
     user_id: string; 
+    is_deleted: boolean;
     profiles: { name: string };
   };
+  // Likes from join
+  message_likes: { user_id: string }[];
 }
 
 interface UserEnrollment {
@@ -67,6 +70,7 @@ export const StudentCommunity = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // --- State ---
   const [selectedGroup, setSelectedGroup] = useState<UserEnrollment | null>(null);
   const [messageText, setMessageText] = useState('');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -74,7 +78,7 @@ export const StudentCommunity = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null); 
 
-  // 1. Fetch Groups
+  // --- 1. Fetch Groups ---
   const { data: enrollments = [], isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['community-enrollments', profile?.user_id],
     queryFn: async () => {
@@ -89,55 +93,61 @@ export const StudentCommunity = () => {
     enabled: !!profile?.user_id
   });
 
+  // Auto-select first group (Desktop only)
   useEffect(() => {
     if (!isMobile && !selectedGroup && enrollments.length > 0) {
       setSelectedGroup(enrollments[0]);
     }
   }, [enrollments, selectedGroup, isMobile]);
 
-  // 2. Fetch Messages
+  // Clear inputs when switching
+  useEffect(() => {
+    setMessageText('');
+    setSelectedImage(null);
+    setReplyingTo(null);
+  }, [selectedGroup]);
+
+  // --- 2. Fetch Messages ---
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<CommunityMessage[]>({
     queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
     queryFn: async () => {
       if (!selectedGroup) return [];
       
-      // FIXED QUERY: Removed '!community_messages_reply_to_id_fkey' to allow auto-detection
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
-          id, content, image_url, user_id, batch, subject, reply_to_id, created_at, is_deleted,
+          *,
           profiles (name),
           reply_to:community_messages (
-            id, content, image_url, user_id, profiles(name)
-          )
+            id, content, image_url, user_id, is_deleted, profiles(name)
+          ),
+          message_likes ( user_id )
         `)
         .eq('batch', selectedGroup.batch_name)
         .eq('subject', selectedGroup.subject_name)
         .eq('is_deleted', false)
         .order('created_at', { ascending: true });
 
-      if (error) {
-        console.error("Error fetching messages:", error);
-        throw error;
-      }
+      if (error) throw error;
       return data as any[];
     },
     enabled: !!selectedGroup
   });
 
-  // 3. Real-time
+  // --- 3. Real-time ---
   useEffect(() => {
     if (!selectedGroup) return;
+    
+    const refresh = () => {
+      queryClient.invalidateQueries({ queryKey: ['community-messages', selectedGroup.batch_name, selectedGroup.subject_name] });
+    };
+
     const channel = supabase
       .channel(`community-${selectedGroup.batch_name}-${selectedGroup.subject_name}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'community_messages', filter: `batch=eq.${selectedGroup.batch_name}` }, 
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['community-messages', selectedGroup.batch_name, selectedGroup.subject_name] });
-        }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'community_messages', filter: `batch=eq.${selectedGroup.batch_name}` }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_likes' }, refresh) // Listen for likes
       .subscribe();
+      
     return () => { supabase.removeChannel(channel); };
   }, [selectedGroup, queryClient]);
 
@@ -145,7 +155,7 @@ export const StudentCommunity = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [messages, selectedGroup]);
 
-  // 4. Actions
+  // --- 4. Mutations ---
   const sendMessageMutation = useMutation({
     mutationFn: async () => {
       if (!profile?.user_id || !selectedGroup) return;
@@ -188,10 +198,10 @@ export const StudentCommunity = () => {
       if (error) throw error;
       return id;
     },
-    onSuccess: (deletedId) => {
+    onSuccess: (id) => {
       queryClient.setQueryData(
         ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
-        (old: CommunityMessage[] | undefined) => old ? old.filter(m => m.id !== deletedId) : []
+        (old: CommunityMessage[] | undefined) => old ? old.filter(m => m.id !== id) : []
       );
       toast({ title: "Message deleted" });
       setDeleteId(null);
@@ -199,11 +209,24 @@ export const StudentCommunity = () => {
     onError: (e: any) => toast({ title: "Failed to delete", description: e.message, variant: "destructive" })
   });
 
+  const toggleLikeMutation = useMutation({
+    mutationFn: async ({ msgId, isLiked }: { msgId: string, isLiked: boolean }) => {
+      if (isLiked) {
+        // Unlike
+        await supabase.from('message_likes').delete().match({ message_id: msgId, user_id: profile?.user_id });
+      } else {
+        // Like
+        await supabase.from('message_likes').insert({ message_id: msgId, user_id: profile?.user_id });
+      }
+    }
+  });
+
   const handleSend = () => {
     if (!messageText.trim() && !selectedImage) return;
     sendMessageMutation.mutate();
   };
 
+  // --- Helpers ---
   const renderTextWithLinks = (text: string | null) => {
     if (!text) return null;
     const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -214,9 +237,10 @@ export const StudentCommunity = () => {
   };
 
   const getReplyPreview = (reply: NonNullable<CommunityMessage['reply_to']>) => {
+    if (reply.is_deleted) return '🗑️ Message deleted';
     if (reply.content && reply.content.trim().length > 0) return reply.content;
     if (reply.image_url) return '📷 Photo';
-    return 'Message';
+    return null;
   };
 
   // --- Render ---
@@ -268,8 +292,7 @@ export const StudentCommunity = () => {
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#efeae2] pb-24 md:pb-4">
-            <div className="text-center text-xs text-gray-400 my-4 bg-gray-200/50 py-1 px-3 rounded-full w-fit mx-auto shadow-sm">Messages are end-to-end visible</div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#efeae2] pb-24 md:pb-4">
             {isLoadingMessages ? <div className="flex justify-center p-10"><Loader2 className="animate-spin h-8 w-8 text-gray-400" /></div> : 
              messages.length === 0 ? <div className="text-center py-20 opacity-50 text-sm">No messages yet.</div> :
              messages.map((msg) => {
@@ -280,47 +303,64 @@ export const StudentCommunity = () => {
                const replyText = msg.reply_to ? getReplyPreview(msg.reply_to) : null;
                const isReplyToMe = msg.reply_to?.user_id === profile?.user_id;
                const replySenderName = isReplyToMe ? "You" : msg.reply_to?.profiles?.name;
-               const replyBorderColor = isReplyToMe ? "border-teal-500" : "border-purple-500";
-               const replyNameColor = isReplyToMe ? "text-teal-600" : "text-purple-600";
+               
+               // Likes Logic
+               const likeCount = msg.message_likes ? msg.message_likes.length : 0;
+               const isLiked = msg.message_likes?.some(l => l.user_id === profile?.user_id);
 
                return (
                  <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} group mb-1`}>
                    <div className={`relative max-w-[85%] md:max-w-[65%] rounded-lg p-2 shadow-sm text-sm ${
-                     isMe ? 'bg-[#E7FFDB] rounded-tr-none' : 'bg-white rounded-tl-none'
+                     isMe ? 'bg-[#dcf8c6] rounded-tr-none' : 'bg-white rounded-tl-none'
                    }`}>
                      
-                     {/* Sender Name for Others */}
-                     {!isMe && <div className="text-[10px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
+                     {/* Name (only for others) */}
+                     {!isMe && <div className="text-[11px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
 
-                     {/* Reply Block */}
+                     {/* QUOTED REPLY BLOCK (WhatsApp Style) */}
                      {msg.reply_to && replyText && (
                        <div 
-                        className={`mb-2 rounded-[6px] bg-black/5 border-l-[4px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none`}
+                        className="mb-1.5 rounded-md bg-black/5 border-l-4 border-teal-600 p-1.5 flex flex-col justify-center cursor-pointer select-none"
                         onClick={() => {
                           const el = document.getElementById(`msg-${msg.reply_to_id}`);
                           if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'});
                         }}
                        >
-                         <span className={`text-[10px] font-bold ${replyNameColor} mb-0.5`}>{replySenderName}</span>
-                         <span className="text-[11px] text-gray-600 truncate line-clamp-1">{replyText}</span>
+                         <span className="text-[10px] font-bold text-teal-700 mb-0.5">{replySenderName}</span>
+                         <span className="text-[11px] text-gray-600 truncate line-clamp-2">{replyText}</span>
                        </div>
                      )}
 
                      {/* Content */}
-                     <div className="text-gray-800 px-1" id={`msg-${msg.id}`}>
+                     <div className="text-gray-900 px-1" id={`msg-${msg.id}`}>
                         {hasImage && <div className="mb-1 rounded-lg overflow-hidden mt-1"><img src={msg.image_url!} alt="Attachment" className="max-w-full h-auto max-h-80 object-cover rounded-md cursor-pointer" onClick={() => window.open(msg.image_url!, '_blank')} /></div>}
                         {hasContent && <p className="whitespace-pre-wrap leading-relaxed break-words text-[15px]">{renderTextWithLinks(msg.content)}</p>}
                      </div>
 
-                     {/* Timestamp */}
-                     <div className="flex justify-end items-center gap-1 mt-0.5 px-1">
-                        <span className="text-[10px] text-gray-400 min-w-[40px] text-right">{format(new Date(msg.created_at), 'h:mm a')}</span>
+                     {/* Footer: Time + Likes */}
+                     <div className="flex justify-end items-center gap-2 mt-0.5 px-1 select-none">
+                        {likeCount > 0 && (
+                          <div className="flex items-center bg-black/5 px-1.5 rounded-full h-4">
+                            <Heart className="h-2.5 w-2.5 text-red-500 fill-red-500 mr-0.5" />
+                            <span className="text-[9px] font-bold text-gray-600">{likeCount}</span>
+                          </div>
+                        )}
+                        <span className="text-[10px] text-gray-500 min-w-[40px] text-right">{format(new Date(msg.created_at), 'h:mm a')}</span>
                      </div>
 
-                     {/* Actions */}
-                     <div className={`absolute top-0 ${isMe ? '-left-20' : '-right-20'} hidden group-hover:flex items-center h-full gap-1 px-2 transition-all`}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 bg-white/80 shadow-sm rounded-full hover:bg-white" onClick={() => setReplyingTo(msg)} title="Reply"><Reply className="h-4 w-4 text-gray-600" /></Button>
-                        {isMe && <Button variant="ghost" size="icon" className="h-8 w-8 bg-white/80 shadow-sm rounded-full hover:bg-red-50" onClick={() => setDeleteId(msg.id)} title="Delete"><Trash2 className="h-4 w-4 text-red-500" /></Button>}
+                     {/* Action Overlay (Reply/Like/Delete) */}
+                     <div className={`absolute -bottom-8 ${isMe ? 'left-0' : 'right-0'} hidden group-hover:flex items-center gap-1 px-2 transition-all z-10`}>
+                        <Button variant="secondary" size="icon" className="h-7 w-7 shadow-md rounded-full bg-white hover:bg-gray-50" onClick={() => toggleLikeMutation.mutate({ msgId: msg.id, isLiked })} title="Like">
+                            <Heart className={`h-3.5 w-3.5 ${isLiked ? 'text-red-500 fill-red-500' : 'text-gray-500'}`} />
+                        </Button>
+                        <Button variant="secondary" size="icon" className="h-7 w-7 shadow-md rounded-full bg-white hover:bg-gray-50" onClick={() => setReplyingTo(msg)} title="Reply">
+                            <Reply className="h-3.5 w-3.5 text-gray-600" />
+                        </Button>
+                        {isMe && (
+                          <Button variant="secondary" size="icon" className="h-7 w-7 shadow-md rounded-full bg-white hover:bg-red-50" onClick={() => setDeleteId(msg.id)} title="Delete">
+                              <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                          </Button>
+                        )}
                      </div>
 
                    </div>
@@ -364,6 +404,7 @@ export const StudentCommunity = () => {
         </div>
       )}
 
+      {/* Delete Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
             <AlertDialogHeader>
