@@ -46,12 +46,12 @@ interface CommunityMessage {
   profiles: {
     name: string;
   };
-  // Nested reply object
+  // Nested reply object must include user_id to check for "You"
   reply_to?: {
     id: string;
     content: string | null;
     image_url: string | null;
-    user_id: string; // Added to check if "You" sent it
+    user_id: string; 
     profiles: { name: string };
   };
 }
@@ -91,20 +91,18 @@ export const StudentCommunity = () => {
     enabled: !!profile?.user_id
   });
 
-  // Auto-select first group (Desktop only)
   useEffect(() => {
     if (!isMobile && !selectedGroup && enrollments.length > 0) {
       setSelectedGroup(enrollments[0]);
     }
   }, [enrollments, selectedGroup, isMobile]);
 
-  // --- 2. Fetch Messages (Filtered by is_deleted) ---
+  // --- 2. Fetch Messages ---
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<CommunityMessage[]>({
     queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
     queryFn: async () => {
       if (!selectedGroup) return [];
       
-      // Note: We added user_id to the reply_to nested select
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
@@ -116,7 +114,7 @@ export const StudentCommunity = () => {
         `)
         .eq('batch', selectedGroup.batch_name)
         .eq('subject', selectedGroup.subject_name)
-        .eq('is_deleted', false) // Backend filter
+        .eq('is_deleted', false) // Filter out deleted messages
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -134,7 +132,7 @@ export const StudentCommunity = () => {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'community_messages', filter: `batch=eq.${selectedGroup.batch_name}` }, 
         (payload) => {
-          // If inserted or updated (soft deleted), refresh
+          // Invalidate on INSERT or UPDATE (soft delete)
           queryClient.invalidateQueries({ queryKey: ['community-messages', selectedGroup.batch_name, selectedGroup.subject_name] });
         }
       )
@@ -188,26 +186,20 @@ export const StudentCommunity = () => {
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('community_messages')
-        .update({ is_deleted: true }) // Update flag instead of delete
+        .update({ is_deleted: true })
         .eq('id', id);
-      
       if (error) throw error;
       return id;
     },
     onSuccess: (deletedId) => {
-      // Instant UI update: Filter out the deleted message immediately
       queryClient.setQueryData(
         ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
-        (oldMessages: CommunityMessage[] | undefined) => {
-            return oldMessages ? oldMessages.filter(msg => msg.id !== deletedId) : [];
-        }
+        (old: CommunityMessage[] | undefined) => old ? old.filter(m => m.id !== deletedId) : []
       );
       toast({ title: "Message deleted" });
       setDeleteId(null);
     },
-    onError: (error: any) => {
-      toast({ title: "Failed to delete", description: error.message, variant: "destructive" })
-    }
+    onError: (e: any) => toast({ title: "Failed to delete", description: e.message, variant: "destructive" })
   });
 
   const handleSend = () => {
@@ -267,7 +259,7 @@ export const StudentCommunity = () => {
       {selectedGroup && (
         <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-[#efeae2]' : 'w-full'}`}>
           
-          {/* Chat Header */}
+          {/* Header */}
           <div className="p-3 bg-white border-b flex items-center justify-between shadow-sm z-20">
             <div className="flex items-center gap-3">
               {isMobile && <Button variant="ghost" size="icon" onClick={() => setSelectedGroup(null)} className="-ml-2 mr-1"><ArrowLeft className="h-5 w-5" /></Button>}
@@ -281,19 +273,20 @@ export const StudentCommunity = () => {
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#efeae2] pb-24 md:pb-4">
-            <div className="text-center text-xs text-gray-400 my-4 bg-gray-200/50 py-1 px-3 rounded-full w-fit mx-auto shadow-sm">Messages are end-to-end visible</div>
+            <div className="text-center text-xs text-gray-400 my-4 bg-gray-200/50 py-1 px-3 rounded-full w-fit mx-auto">Messages are visible to group members</div>
             {isLoadingMessages ? <div className="flex justify-center p-10"><Loader2 className="animate-spin h-8 w-8 text-gray-400" /></div> : 
              messages.length === 0 ? <div className="text-center py-20 opacity-50 text-sm">No messages yet.</div> :
              messages.map((msg) => {
                const isMe = msg.user_id === profile?.user_id;
                const hasImage = msg.image_url && msg.image_url.trim() !== '';
                const hasContent = msg.content && msg.content.trim() !== '';
-               
-               // Get Reply Preview
                const replyText = msg.reply_to ? getReplyPreview(msg.reply_to) : null;
-               // Check if reply was from "You"
+               
+               // "You" Logic for Reply
                const isReplyToMe = msg.reply_to?.user_id === profile?.user_id;
                const replySenderName = isReplyToMe ? "You" : msg.reply_to?.profiles?.name;
+               const replyColor = isReplyToMe ? "text-teal-600" : "text-purple-600";
+               const replyBorder = isReplyToMe ? "border-teal-500" : "border-purple-500";
 
                return (
                  <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} group mb-1`}>
@@ -301,31 +294,33 @@ export const StudentCommunity = () => {
                      isMe ? 'bg-[#E7FFDB] rounded-tr-none' : 'bg-white rounded-tl-none'
                    }`}>
                      
-                     {/* Quote Block for Replies */}
+                     {/* Sender Name (Only for others) */}
+                     {!isMe && (
+                       <div className="text-[10px] font-bold text-orange-600 mb-0.5 px-1">
+                         {msg.profiles?.name}
+                       </div>
+                     )}
+
+                     {/* Reply Block */}
                      {msg.reply_to && replyText && (
-                       <div className="mb-2 rounded-[6px] bg-black/5 border-l-[4px] border-teal-600 p-1.5 flex flex-col justify-center cursor-pointer select-none">
-                         <span className="text-[10px] font-bold text-teal-700 mb-0.5">{replySenderName}</span>
+                       <div className={`mb-1 rounded-[6px] bg-black/5 border-l-[4px] ${replyBorder} p-1 px-2 flex flex-col justify-center cursor-pointer select-none`}>
+                         <span className={`text-[10px] font-bold ${replyColor}`}>{replySenderName}</span>
                          <span className="text-[11px] text-gray-600 truncate line-clamp-1">{replyText}</span>
                        </div>
                      )}
 
-                     {/* Sender Name (only for others in groups) */}
-                     {!isMe && (
-                        <div className="text-[10px] font-bold text-orange-600 mb-0.5">{msg.profiles?.name}</div>
-                     )}
-
-                     {/* Main Content */}
-                     <div className="text-gray-800">
+                     {/* Content */}
+                     <div className="text-gray-800 px-1">
                         {hasImage && <div className="mb-1 rounded-lg overflow-hidden mt-1"><img src={msg.image_url!} alt="Attachment" className="max-w-full h-auto max-h-80 object-cover rounded-md cursor-pointer" onClick={() => window.open(msg.image_url!, '_blank')} /></div>}
                         {hasContent && <p className="whitespace-pre-wrap leading-relaxed break-words text-[15px]">{renderTextWithLinks(msg.content)}</p>}
                      </div>
 
-                     {/* Footer: Timestamp */}
-                     <div className="flex justify-end items-center gap-1 mt-0.5">
+                     {/* Timestamp */}
+                     <div className="flex justify-end items-center gap-1 mt-0.5 px-1">
                         <span className="text-[10px] text-gray-400 min-w-[40px] text-right">{format(new Date(msg.created_at), 'h:mm a')}</span>
                      </div>
 
-                     {/* Actions (Reply/Delete) */}
+                     {/* Hover Actions */}
                      <div className={`absolute top-0 ${isMe ? '-left-20' : '-right-20'} hidden group-hover:flex items-center h-full gap-1 px-2 transition-all`}>
                         <Button variant="ghost" size="icon" className="h-8 w-8 bg-white/80 shadow-sm rounded-full hover:bg-white" onClick={() => setReplyingTo(msg)} title="Reply">
                             <Reply className="h-4 w-4 text-gray-600" />
@@ -344,20 +339,22 @@ export const StudentCommunity = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Area */}
+          {/* Input */}
           <div className="p-2 md:p-3 bg-[#f0f2f5] border-t z-20">
-            {/* Reply Preview Bar */}
+            {/* Reply Preview */}
             {replyingTo && (
               <div className="flex items-center justify-between bg-white p-2 rounded-lg mb-2 border-l-4 border-teal-500 shadow-sm animate-in slide-in-from-bottom-2">
                 <div className="flex flex-col px-2">
-                    <span className="text-xs font-bold text-teal-600">Replying to {replyingTo.user_id === profile?.user_id ? 'You' : replyingTo.profiles?.name}</span>
+                    <span className="text-xs font-bold text-teal-600">
+                        Replying to {replyingTo.user_id === profile?.user_id ? 'You' : replyingTo.profiles?.name}
+                    </span>
                     <span className="text-xs text-gray-500 truncate max-w-[250px]">{getReplyPreview(replyingTo) || 'Attachment'}</span>
                 </div>
                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setReplyingTo(null)}><X className="h-4 w-4 text-gray-500" /></Button>
               </div>
             )}
 
-            {/* Image Upload Preview */}
+            {/* Image Preview */}
             {selectedImage && (
               <div className="flex items-center justify-between bg-blue-50 p-2 rounded-lg mb-2 border border-blue-100 shadow-sm">
                 <div className="flex items-center gap-3">
@@ -395,14 +392,12 @@ export const StudentCommunity = () => {
         </div>
       )}
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
             <AlertDialogHeader>
                 <AlertDialogTitle>Delete Message?</AlertDialogTitle>
-                <AlertDialogDescription>
-                    Are you sure you want to delete this message? It will be removed for everyone.
-                </AlertDialogDescription>
+                <AlertDialogDescription>This message will be removed for everyone.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
