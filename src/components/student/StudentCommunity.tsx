@@ -106,14 +106,13 @@ export const StudentCommunity = () => {
     queryFn: async () => {
       if (!selectedGroup) return [];
       
-      // Explicitly specifying the foreign key constraint to ensure we fetch the PARENT message (the one replied to)
-      // and not the children. This fixes the issue where citations were incorrect or missing.
+      // Corrected Query: using '!reply_to_id' to disambiguate the relationship
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
           *,
           profiles (name),
-          reply_to:community_messages!community_messages_reply_to_id_fkey (
+          reply_to:community_messages!reply_to_id (
             id, content, image_url, user_id, is_deleted, profiles(name)
           ),
           message_likes ( user_id )
