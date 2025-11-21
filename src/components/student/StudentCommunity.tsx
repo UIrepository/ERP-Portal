@@ -45,8 +45,7 @@ interface CommunityMessage {
   created_at: string;
   is_deleted: boolean;
   profiles: { name: string };
-  // 'reply_to' contains the PRIMARY message (the one being replied to)
-  // Can be an object or array depending on Supabase relationship detection
+  // reply_to contains the Parent/Primary message
   reply_to?: any; 
   message_likes: { user_id: string }[];
 }
@@ -104,14 +103,15 @@ export const StudentCommunity = () => {
     queryFn: async () => {
       if (!selectedGroup) return [];
       
-      // Reverted to standard relationship selection to ensure Supabase finds the link.
-      // We select 'reply_to:community_messages' to get the parent message details.
+      // !!! IMPORTANT FIX !!!
+      // using !community_messages_reply_to_id_fkey forces the specific Foreign Key path
+      // This guarantees we fetch the PARENT (Primary) message, not children or self.
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
           *,
           profiles (name),
-          reply_to:community_messages (
+          reply_to:community_messages!community_messages_reply_to_id_fkey (
             id, content, image_url, user_id, is_deleted, profiles(name)
           ),
           message_likes ( user_id )
@@ -215,7 +215,7 @@ export const StudentCommunity = () => {
   const handleSend = () => {
     if (!messageText.trim() && !selectedImage) return;
     
-    // Grab the ID immediately from state before mutating
+    // IMPORTANT: Capture the ID at the exact moment of send
     const currentReplyId = replyingTo?.id || null;
 
     sendMessageMutation.mutate({
@@ -300,8 +300,7 @@ export const StudentCommunity = () => {
                const hasImage = msg.image_url && msg.image_url.trim() !== '';
                const hasContent = msg.content && msg.content.trim() !== '';
                
-               // Determine the Primary message data. 
-               // Note: Supabase can return this as an object or an array of objects.
+               // Primary Message Data (The parent message)
                const replyData = Array.isArray(msg.reply_to) ? msg.reply_to[0] : msg.reply_to;
                
                const replyText = getReplyPreview(replyData);
@@ -324,8 +323,8 @@ export const StudentCommunity = () => {
                      {!isMe && <div className="text-[11px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
 
                      {/* QUOTE BLOCK: Visible ONLY in the Secondary Message (the reply) */}
-                     {/* It links back to the Primary Message */}
-                     {msg.reply_to_id && replyData && replyText && (
+                     {/* Safety: We strictly check that replyData.id MATCHES the message's reply_to_id */}
+                     {msg.reply_to_id && replyData && replyData.id === msg.reply_to_id && replyText && (
                        <div 
                         className={`mb-1.5 rounded-md bg-black/5 border-l-[3px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none shadow-sm`}
                         onClick={() => {
@@ -351,7 +350,6 @@ export const StudentCommunity = () => {
                            <button onClick={() => toggleLikeMutation.mutate({ msgId: msg.id, isLiked })} className="p-1 hover:bg-black/5 rounded-full transition-colors">
                               <Heart className={`h-3.5 w-3.5 ${isLiked ? 'text-red-500 fill-red-500' : 'text-gray-400'}`} />
                            </button>
-                           {/* Reply Button: Clicking this sets CURRENT msg as Primary for your NEW Secondary msg */}
                            <button onClick={() => setReplyingTo(msg)} className="p-1 hover:bg-black/5 rounded-full transition-colors">
                               <Reply className="h-3.5 w-3.5 text-gray-400" />
                            </button>
@@ -382,7 +380,6 @@ export const StudentCommunity = () => {
 
           {/* Input Area */}
           <div className="p-2 md:p-3 bg-[#f0f2f5] border-t z-20">
-            {/* Reply Preview Bar: Shows the Primary Message you are about to reply to */}
             {replyingTo && (
               <div className="flex items-center justify-between bg-white p-2 rounded-lg mb-2 border-l-4 border-teal-500 shadow-sm animate-in slide-in-from-bottom-2">
                 <div className="flex flex-col px-2">
@@ -393,7 +390,6 @@ export const StudentCommunity = () => {
               </div>
             )}
 
-            {/* Image Preview */}
             {selectedImage && (
               <div className="flex items-center justify-between bg-blue-50 p-2 rounded-lg mb-2 border border-blue-100 shadow-sm">
                 <div className="flex items-center gap-3">
