@@ -45,15 +45,9 @@ interface CommunityMessage {
   created_at: string;
   is_deleted: boolean;
   profiles: { name: string };
-  // Reply object - relaxed type to handle potential array response from joins
-  reply_to?: {
-    id: string;
-    content: string | null;
-    image_url: string | null;
-    user_id: string; 
-    is_deleted: boolean;
-    profiles: { name: string };
-  } | any; 
+  // The 'reply_to' field contains the PRIMARY message data
+  // We use 'any' to safely handle if Supabase returns an array or object
+  reply_to?: any; 
   // Likes array
   message_likes: { user_id: string }[];
 }
@@ -100,7 +94,7 @@ export const StudentCommunity = () => {
     }
   }, [enrollments, selectedGroup, isMobile]);
 
-  // Clear inputs when switching groups to prevent ghost replies
+  // Clear inputs when switching groups
   useEffect(() => {
     setMessageText('');
     setSelectedImage(null);
@@ -113,8 +107,8 @@ export const StudentCommunity = () => {
     queryFn: async () => {
       if (!selectedGroup) return [];
       
-      // We explicitly select the reply relation using the foreign key syntax
-      // !reply_to_id tells Supabase to use that specific FK for the join
+      // We fetch the messages (Secondary) and join the parent message (Primary)
+      // using the foreign key 'reply_to_id'.
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
@@ -159,7 +153,7 @@ export const StudentCommunity = () => {
 
   // --- 4. Mutations ---
   const sendMessageMutation = useMutation({
-    // Arguments passed here to avoid stale state closures
+    // We pass arguments here to ensure we use the exact values from the moment the button was clicked
     mutationFn: async ({ text, image, replyId }: { text: string; image: File | null; replyId: string | null }) => {
       if (!profile?.user_id || !selectedGroup) return;
       let imageUrl = null;
@@ -176,20 +170,21 @@ export const StudentCommunity = () => {
         setIsUploading(false);
       }
 
+      // Insert the Secondary message, linking it to the Primary (replyId)
       const { error } = await supabase.from('community_messages').insert({
         content: text,
         image_url: imageUrl,
         user_id: profile.user_id,
         batch: selectedGroup.batch_name,
         subject: selectedGroup.subject_name,
-        reply_to_id: replyId
+        reply_to_id: replyId // This links the new message to the old one
       });
       if (error) throw error;
     },
     onSuccess: () => {
       setMessageText('');
       setSelectedImage(null);
-      setReplyingTo(null); // Clears reply state so next message is clean
+      setReplyingTo(null); 
       if (fileInputRef.current) fileInputRef.current.value = '';
     },
     onError: (e: any) => { setIsUploading(false); toast({ title: "Error", description: e.message, variant: "destructive" }); }
@@ -224,7 +219,7 @@ export const StudentCommunity = () => {
 
   const handleSend = () => {
     if (!messageText.trim() && !selectedImage) return;
-    // Pass current state explicitly to the mutation function
+    // PASSING DATA EXPLICITLY fixes the issue where reply_to_id might be stale
     sendMessageMutation.mutate({
         text: messageText,
         image: selectedImage,
@@ -242,13 +237,13 @@ export const StudentCommunity = () => {
     ) : part);
   };
 
-  // Logic to get the preview text. Returns NULL if invalid, keeping UI clean.
-  const getReplyPreview = (reply: any) => {
-    if (!reply) return null;
-    if (reply.is_deleted) return '🗑️ Message deleted';
-    if (reply.content && reply.content.trim().length > 0) return reply.content;
-    if (reply.image_url) return '📷 Photo';
-    return 'Message'; // Fallback
+  // Helper to extract preview text from the Primary message
+  const getReplyPreview = (primaryMsg: any) => {
+    if (!primaryMsg) return null;
+    if (primaryMsg.is_deleted) return '🗑️ Message deleted';
+    if (primaryMsg.content && primaryMsg.content.trim().length > 0) return primaryMsg.content;
+    if (primaryMsg.image_url) return '📷 Photo';
+    return 'Message'; 
   };
 
   // --- Render ---
@@ -299,7 +294,7 @@ export const StudentCommunity = () => {
             </div>
           </div>
 
-          {/* Messages */}
+          {/* Messages List */}
           <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#efeae2] pb-24 md:pb-4">
             {isLoadingMessages ? <div className="flex justify-center p-10"><Loader2 className="animate-spin h-8 w-8 text-gray-400" /></div> : 
              messages.length === 0 ? <div className="text-center py-20 opacity-50 text-sm">No messages yet.</div> :
@@ -308,13 +303,18 @@ export const StudentCommunity = () => {
                const hasImage = msg.image_url && msg.image_url.trim() !== '';
                const hasContent = msg.content && msg.content.trim() !== '';
                
-               // Safely handle potential array return for reply_to
-               const replyData = Array.isArray(msg.reply_to) ? msg.reply_to[0] : msg.reply_to;
+               // 1. Identify the Primary Message (the one being replied to)
+               // Supabase join might return an array or single object, handle both.
+               const primaryMsg = Array.isArray(msg.reply_to) ? msg.reply_to[0] : msg.reply_to;
                
-               const replyText = replyData ? getReplyPreview(replyData) : null;
-               const isReplyToMe = replyData?.user_id === profile?.user_id;
-               const replySenderName = isReplyToMe ? "You" : replyData?.profiles?.name;
+               // 2. Extract content for the preview
+               const replyText = getReplyPreview(primaryMsg);
                
+               // 3. Determine sender of the Primary message
+               const isReplyToMe = primaryMsg?.user_id === profile?.user_id;
+               const replySenderName = isReplyToMe ? "You" : primaryMsg?.profiles?.name;
+               
+               // Styling for the reply bar
                const replyBorderColor = isReplyToMe ? "border-teal-500" : "border-purple-500";
                const replyNameColor = isReplyToMe ? "text-teal-600" : "text-purple-600";
                
@@ -327,10 +327,10 @@ export const StudentCommunity = () => {
                      isMe ? 'bg-[#dcf8c6] rounded-tr-none' : 'bg-white rounded-tl-none'
                    }`}>
                      
-                     {/* Name (Others) */}
+                     {/* Sender Name (only if not me) */}
                      {!isMe && <div className="text-[11px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
 
-                     {/* REPLY BLOCK */}
+                     {/* QUOTE BLOCK: Displays the Primary Message inside this Secondary Message */}
                      {msg.reply_to_id && replyText && (
                        <div 
                         className={`mb-1.5 rounded-md bg-black/5 border-l-[3px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none shadow-sm`}
@@ -340,12 +340,12 @@ export const StudentCommunity = () => {
                         }}
                        >
                          <span className={`text-[10px] font-bold ${replyNameColor} mb-0.5`}>{replySenderName}</span>
-                         {/* Removed 'truncate' here to allow text to wrap to 2 lines */}
+                         {/* 'line-clamp-2' ensures long quotes don't take up too much space, but show 2 lines */}
                          <span className="text-[11px] text-gray-700 line-clamp-2">{replyText}</span>
                        </div>
                      )}
 
-                     {/* Content */}
+                     {/* Message Content (The Secondary Text) */}
                      <div className="text-gray-900 px-1" id={`msg-${msg.id}`}>
                         {hasImage && <div className="mb-1 rounded-lg overflow-hidden mt-1"><img src={msg.image_url!} alt="Attachment" className="max-w-full h-auto max-h-80 object-cover rounded-md cursor-pointer" onClick={() => window.open(msg.image_url!, '_blank')} /></div>}
                         {hasContent && <p className="whitespace-pre-wrap leading-relaxed break-words text-[15px]">{renderTextWithLinks(msg.content)}</p>}
@@ -354,11 +354,11 @@ export const StudentCommunity = () => {
                      {/* Footer: Actions + Info */}
                      <div className="flex justify-between items-end mt-1 pt-1 border-t border-black/5 gap-2">
                         
-                        {/* Actions (Inside Bubble - Mobile Friendly) */}
                         <div className="flex items-center gap-1">
                            <button onClick={() => toggleLikeMutation.mutate({ msgId: msg.id, isLiked })} className="p-1 hover:bg-black/5 rounded-full transition-colors">
                               <Heart className={`h-3.5 w-3.5 ${isLiked ? 'text-red-500 fill-red-500' : 'text-gray-400'}`} />
                            </button>
+                           {/* Clicking this sets the current message as the Primary for the NEXT Secondary message */}
                            <button onClick={() => setReplyingTo(msg)} className="p-1 hover:bg-black/5 rounded-full transition-colors">
                               <Reply className="h-3.5 w-3.5 text-gray-400" />
                            </button>
@@ -369,7 +369,6 @@ export const StudentCommunity = () => {
                            )}
                         </div>
 
-                        {/* Info Row: Likes + Time */}
                         <div className="flex items-center gap-2">
                             {likeCount > 0 && (
                             <div className="flex items-center bg-black/5 px-1.5 rounded-full h-4">
@@ -390,7 +389,7 @@ export const StudentCommunity = () => {
 
           {/* Input Area */}
           <div className="p-2 md:p-3 bg-[#f0f2f5] border-t z-20">
-            {/* Reply Preview Bar */}
+            {/* Reply Preview Bar: Shows what you are ABOUT to reply to */}
             {replyingTo && (
               <div className="flex items-center justify-between bg-white p-2 rounded-lg mb-2 border-l-4 border-teal-500 shadow-sm animate-in slide-in-from-bottom-2">
                 <div className="flex flex-col px-2">
