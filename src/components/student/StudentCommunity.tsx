@@ -45,8 +45,7 @@ interface CommunityMessage {
   created_at: string;
   is_deleted: boolean;
   profiles: { name: string };
-  // The 'reply_to' field contains the PRIMARY message data
-  // We use 'any' to safely handle if Supabase returns an array or object
+  // 'reply_to' will contain the PRIMARY message details when this message is a reply
   reply_to?: any; 
   // Likes array
   message_likes: { user_id: string }[];
@@ -107,8 +106,8 @@ export const StudentCommunity = () => {
     queryFn: async () => {
       if (!selectedGroup) return [];
       
-      // We fetch the messages (Secondary) and join the parent message (Primary)
-      // using the foreign key 'reply_to_id'.
+      // Fetch messages and JOIN the parent message (reply_to)
+      // !reply_to_id ensures we join on the correct foreign key
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
@@ -153,7 +152,7 @@ export const StudentCommunity = () => {
 
   // --- 4. Mutations ---
   const sendMessageMutation = useMutation({
-    // We pass arguments here to ensure we use the exact values from the moment the button was clicked
+    // We pass the data as arguments to ensure the mutation uses the snapshot of data from when the button was clicked
     mutationFn: async ({ text, image, replyId }: { text: string; image: File | null; replyId: string | null }) => {
       if (!profile?.user_id || !selectedGroup) return;
       let imageUrl = null;
@@ -170,14 +169,13 @@ export const StudentCommunity = () => {
         setIsUploading(false);
       }
 
-      // Insert the Secondary message, linking it to the Primary (replyId)
       const { error } = await supabase.from('community_messages').insert({
         content: text,
         image_url: imageUrl,
         user_id: profile.user_id,
         batch: selectedGroup.batch_name,
         subject: selectedGroup.subject_name,
-        reply_to_id: replyId // This links the new message to the old one
+        reply_to_id: replyId // Links this Secondary message to the Primary message
       });
       if (error) throw error;
     },
@@ -219,11 +217,13 @@ export const StudentCommunity = () => {
 
   const handleSend = () => {
     if (!messageText.trim() && !selectedImage) return;
-    // PASSING DATA EXPLICITLY fixes the issue where reply_to_id might be stale
+    // Capture the current replyTo ID at the moment of sending
+    const currentReplyId = replyingTo?.id || null;
+    
     sendMessageMutation.mutate({
         text: messageText,
         image: selectedImage,
-        replyId: replyingTo?.id || null
+        replyId: currentReplyId
     });
   };
 
@@ -237,7 +237,6 @@ export const StudentCommunity = () => {
     ) : part);
   };
 
-  // Helper to extract preview text from the Primary message
   const getReplyPreview = (primaryMsg: any) => {
     if (!primaryMsg) return null;
     if (primaryMsg.is_deleted) return '🗑️ Message deleted';
@@ -303,18 +302,16 @@ export const StudentCommunity = () => {
                const hasImage = msg.image_url && msg.image_url.trim() !== '';
                const hasContent = msg.content && msg.content.trim() !== '';
                
-               // 1. Identify the Primary Message (the one being replied to)
-               // Supabase join might return an array or single object, handle both.
-               const primaryMsg = Array.isArray(msg.reply_to) ? msg.reply_to[0] : msg.reply_to;
+               // Handle potential array response from Supabase join
+               const replyData = Array.isArray(msg.reply_to) ? msg.reply_to[0] : msg.reply_to;
                
-               // 2. Extract content for the preview
-               const replyText = getReplyPreview(primaryMsg);
+               // Extract text for the quote block
+               const replyText = getReplyPreview(replyData);
                
-               // 3. Determine sender of the Primary message
-               const isReplyToMe = primaryMsg?.user_id === profile?.user_id;
-               const replySenderName = isReplyToMe ? "You" : primaryMsg?.profiles?.name;
+               // Determine if I am the sender of the PRIMARY message (the one being quoted)
+               const isReplyToMe = replyData?.user_id === profile?.user_id;
+               const replySenderName = isReplyToMe ? "You" : replyData?.profiles?.name;
                
-               // Styling for the reply bar
                const replyBorderColor = isReplyToMe ? "border-teal-500" : "border-purple-500";
                const replyNameColor = isReplyToMe ? "text-teal-600" : "text-purple-600";
                
@@ -330,8 +327,9 @@ export const StudentCommunity = () => {
                      {/* Sender Name (only if not me) */}
                      {!isMe && <div className="text-[11px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
 
-                     {/* QUOTE BLOCK: Displays the Primary Message inside this Secondary Message */}
-                     {msg.reply_to_id && replyText && (
+                     {/* QUOTE BLOCK: Displays PRIMARY text inside SECONDARY message */}
+                     {/* We verify ids match to ensure we are displaying the correct parent */}
+                     {msg.reply_to_id && replyData && msg.reply_to_id === replyData.id && replyText && (
                        <div 
                         className={`mb-1.5 rounded-md bg-black/5 border-l-[3px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none shadow-sm`}
                         onClick={() => {
@@ -340,7 +338,6 @@ export const StudentCommunity = () => {
                         }}
                        >
                          <span className={`text-[10px] font-bold ${replyNameColor} mb-0.5`}>{replySenderName}</span>
-                         {/* 'line-clamp-2' ensures long quotes don't take up too much space, but show 2 lines */}
                          <span className="text-[11px] text-gray-700 line-clamp-2">{replyText}</span>
                        </div>
                      )}
@@ -354,11 +351,11 @@ export const StudentCommunity = () => {
                      {/* Footer: Actions + Info */}
                      <div className="flex justify-between items-end mt-1 pt-1 border-t border-black/5 gap-2">
                         
+                        {/* Actions */}
                         <div className="flex items-center gap-1">
                            <button onClick={() => toggleLikeMutation.mutate({ msgId: msg.id, isLiked })} className="p-1 hover:bg-black/5 rounded-full transition-colors">
                               <Heart className={`h-3.5 w-3.5 ${isLiked ? 'text-red-500 fill-red-500' : 'text-gray-400'}`} />
                            </button>
-                           {/* Clicking this sets the current message as the Primary for the NEXT Secondary message */}
                            <button onClick={() => setReplyingTo(msg)} className="p-1 hover:bg-black/5 rounded-full transition-colors">
                               <Reply className="h-3.5 w-3.5 text-gray-400" />
                            </button>
@@ -369,6 +366,7 @@ export const StudentCommunity = () => {
                            )}
                         </div>
 
+                        {/* Info Row: Likes + Time */}
                         <div className="flex items-center gap-2">
                             {likeCount > 0 && (
                             <div className="flex items-center bg-black/5 px-1.5 rounded-full h-4">
@@ -389,7 +387,7 @@ export const StudentCommunity = () => {
 
           {/* Input Area */}
           <div className="p-2 md:p-3 bg-[#f0f2f5] border-t z-20">
-            {/* Reply Preview Bar: Shows what you are ABOUT to reply to */}
+            {/* Reply Preview Bar: Shows what you are ABOUT to reply to (The Primary Message) */}
             {replyingTo && (
               <div className="flex items-center justify-between bg-white p-2 rounded-lg mb-2 border-l-4 border-teal-500 shadow-sm animate-in slide-in-from-bottom-2">
                 <div className="flex flex-col px-2">
