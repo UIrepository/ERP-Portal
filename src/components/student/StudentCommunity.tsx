@@ -52,7 +52,7 @@ interface CommunityMessage {
     content: string | null;
     image_url: string | null;
     user_id: string; 
-    is_deleted: boolean; // Added is_deleted to nested object
+    is_deleted: boolean;
     profiles: { name: string };
   };
 }
@@ -99,25 +99,26 @@ export const StudentCommunity = () => {
     }
   }, [enrollments, selectedGroup, isMobile]);
 
-  // FIX: Clear inputs and reply state when switching groups
+  // Clear state on group switch
   useEffect(() => {
     setMessageText('');
     setSelectedImage(null);
     setReplyingTo(null);
   }, [selectedGroup]);
 
-  // --- 2. Fetch Messages ---
+  // --- 2. Fetch Messages (FIXED QUERY) ---
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<CommunityMessage[]>({
     queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
     queryFn: async () => {
       if (!selectedGroup) return [];
       
+      // REMOVED explicit "!fk_name" to allow auto-detection
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
           id, content, image_url, user_id, batch, subject, reply_to_id, created_at, is_deleted,
           profiles (name),
-          reply_to:community_messages!community_messages_reply_to_id_fkey (
+          reply_to:community_messages (
             id, content, image_url, user_id, is_deleted, profiles(name)
           )
         `)
@@ -221,20 +222,19 @@ export const StudentCommunity = () => {
     ) : part);
   };
 
-  // FIX: Returns NULL if no valid content, preventing empty bubble
   const getReplyPreview = (reply: NonNullable<CommunityMessage['reply_to']>) => {
     if (reply.is_deleted) return '🗑️ Message deleted';
     if (reply.content && reply.content.trim().length > 0) return reply.content;
     if (reply.image_url) return '📷 Photo';
-    return null; // No valid content? Return null.
+    return null;
   };
 
   // --- Render ---
   return (
     <div className="flex h-[calc(100vh-4rem)] w-full bg-[#efeae2] relative overflow-hidden">
       
-      {/* GROUP LIST */}
-      <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
+      {/* GROUP LIST (Hidden on mobile if group selected) */}
+      <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile && selectedGroup ? 'hidden' : 'w-full md:w-80'}`}>
         <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
           <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Users className="h-5 w-5 text-teal-600" /> Communities</h2>
         </div>
@@ -253,7 +253,7 @@ export const StudentCommunity = () => {
         </ScrollArea>
       </div>
 
-      {/* EMPTY STATE */}
+      {/* EMPTY STATE (Hidden on mobile) */}
       {!selectedGroup && (
         <div className={`flex-1 flex flex-col items-center justify-center bg-[#f0f2f5] text-gray-500 border-l-4 border-teal-600 ${isMobile ? 'hidden' : 'flex'}`}>
           <Hash className="h-20 w-20 mb-4 opacity-20" />
@@ -261,9 +261,9 @@ export const StudentCommunity = () => {
         </div>
       )}
 
-      {/* CHAT AREA */}
+      {/* CHAT AREA (Hidden on mobile if NO group selected) */}
       {selectedGroup && (
-        <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-[#efeae2]' : 'w-full'}`}>
+        <div className={`flex-1 flex flex-col h-full relative ${isMobile && !selectedGroup ? 'hidden' : 'w-full'}`}>
           
           {/* Header */}
           <div className="p-3 bg-white border-b flex items-center justify-between shadow-sm z-20">
@@ -279,7 +279,6 @@ export const StudentCommunity = () => {
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#efeae2] pb-24 md:pb-4">
-            <div className="text-center text-xs text-gray-400 my-4 bg-gray-200/50 py-1 px-3 rounded-full w-fit mx-auto shadow-sm">Messages are end-to-end visible</div>
             {isLoadingMessages ? <div className="flex justify-center p-10"><Loader2 className="animate-spin h-8 w-8 text-gray-400" /></div> : 
              messages.length === 0 ? <div className="text-center py-20 opacity-50 text-sm">No messages yet.</div> :
              messages.map((msg) => {
@@ -301,7 +300,7 @@ export const StudentCommunity = () => {
                      
                      {!isMe && <div className="text-[10px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
 
-                     {/* Reply Block: Only renders if replyText is NOT NULL */}
+                     {/* Reply Block */}
                      {msg.reply_to && replyText && (
                        <div 
                         className={`mb-2 rounded-[6px] bg-black/5 border-l-[4px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none`}
@@ -315,13 +314,11 @@ export const StudentCommunity = () => {
                        </div>
                      )}
 
-                     {/* Content */}
                      <div className="text-gray-800 px-1" id={`msg-${msg.id}`}>
                         {hasImage && <div className="mb-1 rounded-lg overflow-hidden mt-1"><img src={msg.image_url!} alt="Attachment" className="max-w-full h-auto max-h-80 object-cover rounded-md cursor-pointer" onClick={() => window.open(msg.image_url!, '_blank')} /></div>}
                         {hasContent && <p className="whitespace-pre-wrap leading-relaxed break-words text-[15px]">{renderTextWithLinks(msg.content)}</p>}
                      </div>
 
-                     {/* Footer */}
                      <div className="flex justify-end items-center gap-1 mt-0.5 px-1">
                         <span className="text-[10px] text-gray-400 min-w-[40px] text-right">{format(new Date(msg.created_at), 'h:mm a')}</span>
                      </div>
@@ -373,7 +370,6 @@ export const StudentCommunity = () => {
         </div>
       )}
 
-      {/* Delete Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
             <AlertDialogHeader>
