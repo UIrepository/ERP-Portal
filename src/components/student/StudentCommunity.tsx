@@ -48,7 +48,7 @@ export const StudentCommunity = () => {
   const [replyingTo, setReplyingTo] = useState<CommunityMessage | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  // 1. Fetch User Enrollments
+  // 1. Fetch Groups
   const { data: enrollments = [], isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['community-enrollments', profile?.user_id],
     queryFn: async () => {
@@ -75,6 +75,7 @@ export const StudentCommunity = () => {
     queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
     queryFn: async () => {
       if (!selectedGroup) return [];
+      
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
@@ -94,11 +95,11 @@ export const StudentCommunity = () => {
     enabled: !!selectedGroup
   });
 
-  // 3. Real-time & Auto-scroll
+  // 3. Real-time
   useEffect(() => {
     if (!selectedGroup) return;
     const channel = supabase
-      .channel(`community-${selectedGroup.batch_name}`)
+      .channel(`community-${selectedGroup.batch_name}-${selectedGroup.subject_name}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'community_messages', filter: `batch=eq.${selectedGroup.batch_name}` }, () => {
         queryClient.invalidateQueries({ queryKey: ['community-messages', selectedGroup.batch_name, selectedGroup.subject_name] });
       })
@@ -110,7 +111,7 @@ export const StudentCommunity = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, selectedGroup]);
 
-  // 4. Mutations (Send & Delete)
+  // 4. Mutations
   const sendMessageMutation = useMutation({
     mutationFn: async () => {
       if (!profile?.user_id || !selectedGroup) return;
@@ -142,6 +143,7 @@ export const StudentCommunity = () => {
       setMessageText('');
       setSelectedImage(null);
       setReplyingTo(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     },
     onError: (e: any) => { setIsUploading(false); toast({ title: "Error", description: e.message, variant: "destructive" }); }
   });
@@ -160,8 +162,7 @@ export const StudentCommunity = () => {
     sendMessageMutation.mutate();
   };
 
-  // Render Helper
-  const renderTextWithLinks = (text: string) => {
+  const renderTextWithLinks = (text: string | null) => {
     if (!text) return null;
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const parts = text.split(urlRegex);
@@ -172,7 +173,6 @@ export const StudentCommunity = () => {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-gray-100 w-full">
-      {/* Group List Sidebar */}
       <div className={`bg-white border-r flex flex-col h-full ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
         <div className="p-4 border-b bg-gray-50">
           <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Users className="h-5 w-5" /> Communities</h2>
@@ -192,7 +192,6 @@ export const StudentCommunity = () => {
         </ScrollArea>
       </div>
 
-      {/* Chat Area */}
       {!selectedGroup ? (
         <div className={`flex-1 flex items-center justify-center bg-gray-50 ${isMobile ? 'hidden' : 'flex'}`}>
           <div className="text-center text-gray-400"><Hash className="h-16 w-16 mx-auto mb-4 opacity-50" /><p>Select a community to start chatting</p></div>
@@ -212,6 +211,10 @@ export const StudentCommunity = () => {
              messages.length === 0 ? <div className="text-center py-20 opacity-60"><p>No messages yet.</p></div> :
              messages.map((msg) => {
                const isMe = msg.user_id === profile?.user_id;
+               // Logic to prevent empty block rendering
+               const hasImage = msg.image_url && msg.image_url.trim() !== '';
+               const hasContent = msg.content && msg.content.trim() !== '';
+
                return (
                  <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''} group`}>
                    <Avatar className="h-8 w-8 mt-1 shrink-0"><AvatarFallback className={isMe ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-200'}>{msg.profiles?.name?.[0] || '?'}</AvatarFallback></Avatar>
@@ -227,8 +230,21 @@ export const StudentCommunity = () => {
                            <p className="truncate opacity-70">{msg.reply_to.content || 'Image Attachment'}</p>
                          </div>
                        )}
-                       {msg.image_url && <div className="mb-2 rounded-lg overflow-hidden"><img src={msg.image_url} alt="Shared" className="max-w-full h-auto max-h-64 object-cover" /></div>}
-                       <p className="whitespace-pre-wrap text-sm leading-relaxed break-words">{renderTextWithLinks(msg.content || '')}</p>
+                       
+                       {/* Only render image block if URL exists */}
+                       {hasImage && (
+                         <div className="mb-2 rounded-lg overflow-hidden">
+                           <img src={msg.image_url!} alt="Shared" className="max-w-full h-auto max-h-64 object-cover" />
+                         </div>
+                       )}
+                       
+                       {/* Only render text block if content exists */}
+                       {hasContent && (
+                         <p className="whitespace-pre-wrap text-sm leading-relaxed break-words">
+                           {renderTextWithLinks(msg.content)}
+                         </p>
+                       )}
+                       
                        <div className={`absolute -bottom-6 ${isMe ? 'left-0' : 'right-0'} flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
                          <button onClick={() => setReplyingTo(msg)} className="text-gray-400 hover:text-primary p-1" title="Reply"><Reply className="h-4 w-4" /></button>
                          {isMe && <button onClick={() => deleteMessageMutation.mutate(msg.id)} className="text-gray-400 hover:text-red-500 p-1" title="Delete"><Trash2 className="h-4 w-4" /></button>}
