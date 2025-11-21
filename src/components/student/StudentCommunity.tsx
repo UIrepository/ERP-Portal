@@ -45,7 +45,7 @@ interface CommunityMessage {
   created_at: string;
   is_deleted: boolean;
   profiles: { name: string };
-  // Nested reply object
+  // Nested reply object using the explicit FK name
   reply_to?: {
     id: string;
     content: string | null;
@@ -54,7 +54,6 @@ interface CommunityMessage {
     is_deleted: boolean;
     profiles: { name: string };
   };
-  // Likes
   message_likes: { user_id: string }[];
 }
 
@@ -93,7 +92,6 @@ export const StudentCommunity = () => {
     enabled: !!profile?.user_id
   });
 
-  // Auto-select first group (Desktop only)
   useEffect(() => {
     if (!isMobile && !selectedGroup && enrollments.length > 0) {
       setSelectedGroup(enrollments[0]);
@@ -113,13 +111,13 @@ export const StudentCommunity = () => {
     queryFn: async () => {
       if (!selectedGroup) return [];
       
-      // STANDARD QUERY (Auto-detects relationship)
+      // QUERY WITH EXPLICIT FK: !fk_chat_reply
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
           *,
           profiles (name),
-          reply_to:community_messages (
+          reply_to:community_messages!fk_chat_reply (
             id, content, image_url, user_id, is_deleted, profiles(name)
           ),
           message_likes ( user_id )
@@ -156,7 +154,7 @@ export const StudentCommunity = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [messages, selectedGroup]);
 
-  // --- 4. Actions ---
+  // --- 4. Mutations ---
   const sendMessageMutation = useMutation({
     mutationFn: async () => {
       if (!profile?.user_id || !selectedGroup) return;
@@ -302,8 +300,8 @@ export const StudentCommunity = () => {
                const isReplyToMe = msg.reply_to?.user_id === profile?.user_id;
                const replySenderName = isReplyToMe ? "You" : msg.reply_to?.profiles?.name;
                
-               const replyBorderColor = isReplyToMe ? "border-teal-500" : "border-purple-500";
-               const replyNameColor = isReplyToMe ? "text-teal-600" : "text-purple-600";
+               const replyBorderColor = isReplyToMe ? "border-teal-600" : "border-purple-600";
+               const replyNameColor = isReplyToMe ? "text-teal-700" : "text-purple-700";
                
                const isLiked = msg.message_likes?.some(l => l.user_id === profile?.user_id);
                const likeCount = msg.message_likes?.length || 0;
@@ -314,20 +312,20 @@ export const StudentCommunity = () => {
                      isMe ? 'bg-[#dcf8c6] rounded-tr-none' : 'bg-white rounded-tl-none'
                    }`}>
                      
-                     {/* Sender Name (Others) */}
+                     {/* Name (Others) */}
                      {!isMe && <div className="text-[11px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
 
-                     {/* REPLY BLOCK (Click to scroll) */}
+                     {/* REPLY BLOCK (Quoted Box) */}
                      {msg.reply_to && replyText && (
                        <div 
-                        className={`mb-1.5 rounded-md bg-black/5 border-l-4 ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none`}
+                        className={`mb-1.5 rounded-md bg-black/5 border-l-[3px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none shadow-sm`}
                         onClick={() => {
                           const el = document.getElementById(`msg-${msg.reply_to_id}`);
                           if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'});
                         }}
                        >
                          <span className={`text-[10px] font-bold ${replyNameColor} mb-0.5`}>{replySenderName}</span>
-                         <span className="text-[11px] text-gray-600 truncate line-clamp-2">{replyText}</span>
+                         <span className="text-[11px] text-gray-700 truncate line-clamp-2">{replyText}</span>
                        </div>
                      )}
 
@@ -337,33 +335,34 @@ export const StudentCommunity = () => {
                         {hasContent && <p className="whitespace-pre-wrap leading-relaxed break-words text-[15px]">{renderTextWithLinks(msg.content)}</p>}
                      </div>
 
-                     {/* Footer: Time + Likes + Actions (Mobile Friendly) */}
-                     <div className="flex justify-end items-center gap-2 mt-1 px-1 select-none">
+                     {/* Footer: Time + Actions (Inside Bubble) */}
+                     <div className="flex justify-between items-end mt-1 pt-1 border-t border-black/5 gap-2">
                         
-                        {/* ACTIONS (Inside bubble for mobile access) */}
-                        <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                           <button onClick={() => toggleLikeMutation.mutate({ msgId: msg.id, isLiked })} className="p-1 hover:bg-black/10 rounded-full">
-                              <Heart className={`h-3 w-3 ${isLiked ? 'text-red-500 fill-red-500' : 'text-gray-500'}`} />
+                        {/* Actions Row (Always Visible) */}
+                        <div className="flex items-center gap-1">
+                           <button onClick={() => toggleLikeMutation.mutate({ msgId: msg.id, isLiked })} className="p-1 hover:bg-black/5 rounded-full transition-colors">
+                              <Heart className={`h-3.5 w-3.5 ${isLiked ? 'text-red-500 fill-red-500' : 'text-gray-400'}`} />
                            </button>
-                           <button onClick={() => setReplyingTo(msg)} className="p-1 hover:bg-black/10 rounded-full">
-                              <Reply className="h-3 w-3 text-gray-500" />
+                           <button onClick={() => setReplyingTo(msg)} className="p-1 hover:bg-black/5 rounded-full transition-colors">
+                              <Reply className="h-3.5 w-3.5 text-gray-400" />
                            </button>
                            {isMe && (
-                              <button onClick={() => setDeleteId(msg.id)} className="p-1 hover:bg-red-100 rounded-full">
-                                 <Trash2 className="h-3 w-3 text-gray-500 hover:text-red-500" />
+                              <button onClick={() => setDeleteId(msg.id)} className="p-1 hover:bg-red-100 rounded-full transition-colors">
+                                 <Trash2 className="h-3.5 w-3.5 text-gray-400 hover:text-red-500" />
                               </button>
                            )}
                         </div>
 
-                        {/* Like Count */}
-                        {likeCount > 0 && (
-                           <div className="flex items-center bg-white/80 px-1 rounded-full border border-gray-100 h-4">
-                              <Heart className="h-2 w-2 text-red-500 fill-red-500 mr-0.5" />
-                              <span className="text-[9px] text-gray-600 font-medium">{likeCount}</span>
-                           </div>
-                        )}
-                        
-                        <span className="text-[10px] text-gray-500 min-w-[40px] text-right">{format(new Date(msg.created_at), 'h:mm a')}</span>
+                        {/* Info Row */}
+                        <div className="flex items-center gap-2">
+                            {likeCount > 0 && (
+                            <div className="flex items-center bg-black/5 px-1.5 rounded-full h-4">
+                                <Heart className="h-2 w-2 text-red-500 fill-red-500 mr-0.5" />
+                                <span className="text-[9px] font-bold text-gray-600">{likeCount}</span>
+                            </div>
+                            )}
+                            <span className="text-[10px] text-gray-400 whitespace-nowrap">{format(new Date(msg.created_at), 'h:mm a')}</span>
+                        </div>
                      </div>
 
                    </div>
@@ -375,6 +374,7 @@ export const StudentCommunity = () => {
 
           {/* Input */}
           <div className="p-2 md:p-3 bg-[#f0f2f5] border-t z-20">
+            {/* Reply Preview */}
             {replyingTo && (
               <div className="flex items-center justify-between bg-white p-2 rounded-lg mb-2 border-l-4 border-teal-500 shadow-sm animate-in slide-in-from-bottom-2">
                 <div className="flex flex-col px-2">
@@ -385,6 +385,7 @@ export const StudentCommunity = () => {
               </div>
             )}
 
+            {/* Image Preview */}
             {selectedImage && (
               <div className="flex items-center justify-between bg-blue-50 p-2 rounded-lg mb-2 border border-blue-100 shadow-sm">
                 <div className="flex items-center gap-3">
@@ -405,6 +406,7 @@ export const StudentCommunity = () => {
         </div>
       )}
 
+      {/* Delete Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
             <AlertDialogHeader>
