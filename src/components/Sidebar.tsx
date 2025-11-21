@@ -1,4 +1,3 @@
-// uirepository/teachgrid-hub/teachgrid-hub-403387c9730ea8d229bbe9118fea5f221ff2dc6c/src/components/Sidebar.tsx
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -14,16 +13,11 @@ import {
   Crown,
   MessageSquare,
   BookOpen,
-  Users,
-  UserCheck,
-  Layers,
+  Users, // Imported Users icon for Community
   Link as LinkIcon,
-  Upload,
-  Plus,
-  Monitor,
   BarChart2,
   LogOut,
-  Megaphone, // New icon
+  Megaphone,
   History,
 } from 'lucide-react';
 
@@ -111,6 +105,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const studentTabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'announcements', label: 'Announcements', icon: Megaphone },
+    { id: 'community', label: 'Community', icon: Users }, // Added Community Tab
     { id: 'schedule', label: 'Class Schedule', icon: Calendar },
     { id: 'current-class', label: 'Ongoing Class', icon: Clock },
     { id: 'recordings', label: 'Recordings', icon: Video },
