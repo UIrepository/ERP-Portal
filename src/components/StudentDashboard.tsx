@@ -8,7 +8,8 @@ import { StudentDPP } from './student/StudentDPP';
 import { StudentUIKiPadhai } from './student/StudentUIKiPadhai';
 import { StudentFeedback } from './student/StudentFeedback';
 import { StudentExams } from './student/StudentExams';
-import { StudentAnnouncements } from './student/StudentAnnouncements'; // Import new component
+import { StudentAnnouncements } from './student/StudentAnnouncements';
+import { StudentCommunity } from './student/StudentCommunity'; // Imported StudentCommunity
 import { FileText, Video, Target, MessageSquare, Calendar, Clock, Crown, BookOpen, Megaphone } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -271,6 +272,8 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
     switch (activeTab) {
       case 'announcements':
         return <StudentAnnouncements />;
+      case 'community': // Added Community Tab
+        return <StudentCommunity />;
       case 'schedule':
         return <StudentSchedule />;
       case 'current-class':
