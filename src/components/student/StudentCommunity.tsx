@@ -53,7 +53,7 @@ interface CommunityMessage {
     user_id: string; 
     is_deleted: boolean;
     profiles: { name: string };
-  };
+  } | any; // Type relaxation for safety if array comes back
   // Likes array
   message_likes: { user_id: string }[];
 }
@@ -119,7 +119,7 @@ export const StudentCommunity = () => {
         .select(`
           *,
           profiles (name),
-          reply_to:community_messages (
+          reply_to:community_messages!reply_to_id (
             id, content, image_url, user_id, is_deleted, profiles(name)
           ),
           message_likes ( user_id )
@@ -158,16 +158,16 @@ export const StudentCommunity = () => {
 
   // --- 4. Mutations ---
   const sendMessageMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ text, image, replyId }: { text: string; image: File | null; replyId: string | null }) => {
       if (!profile?.user_id || !selectedGroup) return;
       let imageUrl = null;
 
-      if (selectedImage) {
+      if (image) {
         setIsUploading(true);
-        const fileExt = selectedImage.name.split('.').pop();
+        const fileExt = image.name.split('.').pop();
         const fileName = `${Math.random()}.${fileExt}`;
         const filePath = `${profile.user_id}/${fileName}`;
-        const { error: uploadError } = await supabase.storage.from('chat_uploads').upload(filePath, selectedImage);
+        const { error: uploadError } = await supabase.storage.from('chat_uploads').upload(filePath, image);
         if (uploadError) throw uploadError;
         const { data: { publicUrl } } = supabase.storage.from('chat_uploads').getPublicUrl(filePath);
         imageUrl = publicUrl;
@@ -175,12 +175,12 @@ export const StudentCommunity = () => {
       }
 
       const { error } = await supabase.from('community_messages').insert({
-        content: messageText,
+        content: text,
         image_url: imageUrl,
         user_id: profile.user_id,
         batch: selectedGroup.batch_name,
         subject: selectedGroup.subject_name,
-        reply_to_id: replyingTo?.id || null
+        reply_to_id: replyId
       });
       if (error) throw error;
     },
@@ -222,7 +222,11 @@ export const StudentCommunity = () => {
 
   const handleSend = () => {
     if (!messageText.trim() && !selectedImage) return;
-    sendMessageMutation.mutate();
+    sendMessageMutation.mutate({
+        text: messageText,
+        image: selectedImage,
+        replyId: replyingTo?.id || null
+    });
   };
 
   // --- Helpers ---
@@ -236,7 +240,8 @@ export const StudentCommunity = () => {
   };
 
   // Logic to get the preview text. Returns NULL if invalid, keeping UI clean.
-  const getReplyPreview = (reply: NonNullable<CommunityMessage['reply_to']>) => {
+  const getReplyPreview = (reply: any) => {
+    if (!reply) return null;
     if (reply.is_deleted) return '🗑️ Message deleted';
     if (reply.content && reply.content.trim().length > 0) return reply.content;
     if (reply.image_url) return '📷 Photo';
@@ -300,10 +305,13 @@ export const StudentCommunity = () => {
                const hasImage = msg.image_url && msg.image_url.trim() !== '';
                const hasContent = msg.content && msg.content.trim() !== '';
                
+               // Safely handle potential array return for reply_to
+               const replyData = Array.isArray(msg.reply_to) ? msg.reply_to[0] : msg.reply_to;
+               
                // Get actual reply text. If null, the block below won't render.
-               const replyText = msg.reply_to ? getReplyPreview(msg.reply_to) : null;
-               const isReplyToMe = msg.reply_to?.user_id === profile?.user_id;
-               const replySenderName = isReplyToMe ? "You" : msg.reply_to?.profiles?.name;
+               const replyText = replyData ? getReplyPreview(replyData) : null;
+               const isReplyToMe = replyData?.user_id === profile?.user_id;
+               const replySenderName = isReplyToMe ? "You" : replyData?.profiles?.name;
                
                // Colors for reply bar
                const replyBorderColor = isReplyToMe ? "border-teal-500" : "border-purple-500";
@@ -322,7 +330,7 @@ export const StudentCommunity = () => {
                      {!isMe && <div className="text-[11px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
 
                      {/* REPLY BLOCK (Only shows if replyText is valid) */}
-                     {msg.reply_to && replyText && (
+                     {msg.reply_to_id && replyText && (
                        <div 
                         className={`mb-1.5 rounded-md bg-black/5 border-l-[3px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none shadow-sm`}
                         onClick={() => {
