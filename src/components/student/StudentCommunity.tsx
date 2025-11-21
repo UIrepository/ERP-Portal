@@ -73,6 +73,7 @@ export const StudentCommunity = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null); 
 
+  // 1. Fetch Groups
   const { data: enrollments = [], isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['community-enrollments', profile?.user_id],
     queryFn: async () => {
@@ -87,18 +88,19 @@ export const StudentCommunity = () => {
     enabled: !!profile?.user_id
   });
 
+  // Auto-select first group (Desktop only)
   useEffect(() => {
     if (!isMobile && !selectedGroup && enrollments.length > 0) {
       setSelectedGroup(enrollments[0]);
     }
   }, [enrollments, selectedGroup, isMobile]);
 
+  // 2. Fetch Messages (with Fixed Relationship Name)
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<CommunityMessage[]>({
     queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
     queryFn: async () => {
       if (!selectedGroup) return [];
       
-      // UPDATED QUERY: Uses explicit FK name for reply_to
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
@@ -113,15 +115,13 @@ export const StudentCommunity = () => {
         .eq('is_deleted', false)
         .order('created_at', { ascending: true });
 
-      if (error) {
-        console.error("Error fetching messages:", error);
-        throw error;
-      }
+      if (error) throw error;
       return data as any[];
     },
     enabled: !!selectedGroup
   });
 
+  // 3. Real-time
   useEffect(() => {
     if (!selectedGroup) return;
     const channel = supabase
@@ -141,6 +141,7 @@ export const StudentCommunity = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [messages, selectedGroup]);
 
+  // 4. Actions
   const sendMessageMutation = useMutation({
     mutationFn: async () => {
       if (!profile?.user_id || !selectedGroup) return;
@@ -214,6 +215,7 @@ export const StudentCommunity = () => {
     return 'Message'; 
   };
 
+  // --- Render ---
   return (
     <div className="flex h-[calc(100vh-4rem)] w-full bg-[#efeae2] relative overflow-hidden">
       
@@ -258,7 +260,6 @@ export const StudentCommunity = () => {
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#efeae2] pb-24 md:pb-4">
-            <div className="text-center text-xs text-gray-400 my-4 bg-gray-200/50 py-1 px-3 rounded-full w-fit mx-auto shadow-sm">Messages are end-to-end visible</div>
             {isLoadingMessages ? <div className="flex justify-center p-10"><Loader2 className="animate-spin h-8 w-8 text-gray-400" /></div> : 
              messages.length === 0 ? <div className="text-center py-20 opacity-50 text-sm">No messages yet.</div> :
              messages.map((msg) => {
@@ -280,17 +281,20 @@ export const StudentCommunity = () => {
                      
                      {!isMe && <div className="text-[10px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
 
-                     {/* Reply Block */}
                      {msg.reply_to && replyText && (
                        <div 
-                        className={`mb-2 rounded-[6px] bg-black/5 border-l-[4px] ${replyBorderColor} p-1 px-2 flex flex-col justify-center cursor-pointer select-none`}
+                        className={`mb-2 rounded-[6px] bg-black/5 border-l-[4px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none`}
+                        onClick={() => {
+                          const el = document.getElementById(`msg-${msg.reply_to_id}`);
+                          if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'});
+                        }}
                        >
                          <span className={`text-[10px] font-bold ${replyNameColor} mb-0.5`}>{replySenderName}</span>
                          <span className="text-[11px] text-gray-600 truncate line-clamp-1">{replyText}</span>
                        </div>
                      )}
 
-                     <div className="text-gray-800 px-1">
+                     <div className="text-gray-800 px-1" id={`msg-${msg.id}`}>
                         {hasImage && <div className="mb-1 rounded-lg overflow-hidden mt-1"><img src={msg.image_url!} alt="Attachment" className="max-w-full h-auto max-h-80 object-cover rounded-md cursor-pointer" onClick={() => window.open(msg.image_url!, '_blank')} /></div>}
                         {hasContent && <p className="whitespace-pre-wrap leading-relaxed break-words text-[15px]">{renderTextWithLinks(msg.content)}</p>}
                      </div>
