@@ -45,7 +45,7 @@ interface CommunityMessage {
   created_at: string;
   is_deleted: boolean;
   profiles: { name: string };
-  // Nested reply object (Auto-detected)
+  // Reply Object (Auto-detected relationship)
   reply_to?: {
     id: string;
     content: string | null;
@@ -54,6 +54,7 @@ interface CommunityMessage {
     is_deleted: boolean;
     profiles: { name: string };
   };
+  // Likes
   message_likes: { user_id: string }[];
 }
 
@@ -99,7 +100,7 @@ export const StudentCommunity = () => {
     }
   }, [enrollments, selectedGroup, isMobile]);
 
-  // Clear inputs when switching
+  // Clear inputs when switching groups
   useEffect(() => {
     setMessageText('');
     setSelectedImage(null);
@@ -112,8 +113,7 @@ export const StudentCommunity = () => {
     queryFn: async () => {
       if (!selectedGroup) return [];
       
-      // FIXED QUERY: Removed '!fk_chat_reply' to match your "old code" style
-      // Supabase will now auto-detect the relationship we fixed in SQL
+      // FIXED QUERY: Removed '!fk_name' to allow auto-detection
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
@@ -234,7 +234,6 @@ export const StudentCommunity = () => {
     ) : part);
   };
 
-  // UI: WhatsApp-style reply preview text
   const getReplyPreview = (reply: NonNullable<CommunityMessage['reply_to']>) => {
     if (reply.is_deleted) return '🗑️ Message deleted';
     if (reply.content && reply.content.trim().length > 0) return reply.content;
@@ -303,8 +302,8 @@ export const StudentCommunity = () => {
                const isReplyToMe = msg.reply_to?.user_id === profile?.user_id;
                const replySenderName = isReplyToMe ? "You" : msg.reply_to?.profiles?.name;
                
-               const replyBorderColor = isReplyToMe ? "border-teal-600" : "border-purple-600";
-               const replyNameColor = isReplyToMe ? "text-teal-700" : "text-purple-700";
+               const replyBorderColor = isReplyToMe ? "border-teal-500" : "border-purple-500";
+               const replyNameColor = isReplyToMe ? "text-teal-600" : "text-purple-600";
                
                const isLiked = msg.message_likes?.some(l => l.user_id === profile?.user_id);
                const likeCount = msg.message_likes?.length || 0;
