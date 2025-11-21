@@ -32,7 +32,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-// --- Interfaces ---
 interface CommunityMessage {
   id: string;
   content: string | null;
@@ -46,7 +45,6 @@ interface CommunityMessage {
   profiles: {
     name: string;
   };
-  // Nested reply object
   reply_to?: {
     id: string;
     content: string | null;
@@ -68,7 +66,6 @@ export const StudentCommunity = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- State ---
   const [selectedGroup, setSelectedGroup] = useState<UserEnrollment | null>(null);
   const [messageText, setMessageText] = useState('');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -76,7 +73,6 @@ export const StudentCommunity = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null); 
 
-  // --- 1. Fetch Groups ---
   const { data: enrollments = [], isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['community-enrollments', profile?.user_id],
     queryFn: async () => {
@@ -97,19 +93,18 @@ export const StudentCommunity = () => {
     }
   }, [enrollments, selectedGroup, isMobile]);
 
-  // --- 2. Fetch Messages ---
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<CommunityMessage[]>({
     queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
     queryFn: async () => {
       if (!selectedGroup) return [];
       
-      // Join profiles twice: once for the message sender, once for the replied-to sender
+      // UPDATED QUERY: Uses explicit FK name for reply_to
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
           id, content, image_url, user_id, batch, subject, reply_to_id, created_at, is_deleted,
           profiles (name),
-          reply_to:community_messages!reply_to_id (
+          reply_to:community_messages!community_messages_reply_to_id_fkey (
             id, content, image_url, user_id, profiles(name)
           )
         `)
@@ -118,13 +113,15 @@ export const StudentCommunity = () => {
         .eq('is_deleted', false)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching messages:", error);
+        throw error;
+      }
       return data as any[];
     },
     enabled: !!selectedGroup
   });
 
-  // --- 3. Real-time ---
   useEffect(() => {
     if (!selectedGroup) return;
     const channel = supabase
@@ -144,7 +141,6 @@ export const StudentCommunity = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [messages, selectedGroup]);
 
-  // --- 4. Actions ---
   const sendMessageMutation = useMutation({
     mutationFn: async () => {
       if (!profile?.user_id || !selectedGroup) return;
@@ -203,7 +199,6 @@ export const StudentCommunity = () => {
     sendMessageMutation.mutate();
   };
 
-  // --- Helpers ---
   const renderTextWithLinks = (text: string | null) => {
     if (!text) return null;
     const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -216,14 +211,12 @@ export const StudentCommunity = () => {
   const getReplyPreview = (reply: NonNullable<CommunityMessage['reply_to']>) => {
     if (reply.content && reply.content.trim().length > 0) return reply.content;
     if (reply.image_url) return '📷 Photo';
-    return null;
+    return 'Message'; 
   };
 
-  // --- Render ---
   return (
     <div className="flex h-[calc(100vh-4rem)] w-full bg-[#efeae2] relative overflow-hidden">
       
-      {/* Sidebar */}
       <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
         <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
           <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Users className="h-5 w-5 text-teal-600" /> Communities</h2>
@@ -243,7 +236,6 @@ export const StudentCommunity = () => {
         </ScrollArea>
       </div>
 
-      {/* Empty State */}
       {!selectedGroup && (
         <div className={`flex-1 flex flex-col items-center justify-center bg-[#f0f2f5] text-gray-500 border-l-4 border-teal-600 ${isMobile ? 'hidden' : 'flex'}`}>
           <Hash className="h-20 w-20 mb-4 opacity-20" />
@@ -251,10 +243,9 @@ export const StudentCommunity = () => {
         </div>
       )}
 
-      {/* Chat Area */}
       {selectedGroup && (
         <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-[#efeae2]' : 'w-full'}`}>
-          {/* Header */}
+          
           <div className="p-3 bg-white border-b flex items-center justify-between shadow-sm z-20">
             <div className="flex items-center gap-3">
               {isMobile && <Button variant="ghost" size="icon" onClick={() => setSelectedGroup(null)} className="-ml-2 mr-1"><ArrowLeft className="h-5 w-5" /></Button>}
@@ -266,7 +257,6 @@ export const StudentCommunity = () => {
             </div>
           </div>
 
-          {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#efeae2] pb-24 md:pb-4">
             <div className="text-center text-xs text-gray-400 my-4 bg-gray-200/50 py-1 px-3 rounded-full w-fit mx-auto shadow-sm">Messages are end-to-end visible</div>
             {isLoadingMessages ? <div className="flex justify-center p-10"><Loader2 className="animate-spin h-8 w-8 text-gray-400" /></div> : 
@@ -279,7 +269,6 @@ export const StudentCommunity = () => {
                const replyText = msg.reply_to ? getReplyPreview(msg.reply_to) : null;
                const isReplyToMe = msg.reply_to?.user_id === profile?.user_id;
                const replySenderName = isReplyToMe ? "You" : msg.reply_to?.profiles?.name;
-               // If replying to self, use teal bar. If replying to other, use purple bar.
                const replyBorderColor = isReplyToMe ? "border-teal-500" : "border-purple-500";
                const replyNameColor = isReplyToMe ? "text-teal-600" : "text-purple-600";
 
@@ -289,35 +278,27 @@ export const StudentCommunity = () => {
                      isMe ? 'bg-[#E7FFDB] rounded-tr-none' : 'bg-white rounded-tl-none'
                    }`}>
                      
-                     {/* Name for others */}
                      {!isMe && <div className="text-[10px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
 
                      {/* Reply Block */}
                      {msg.reply_to && replyText && (
                        <div 
-                        className={`mb-2 rounded-[6px] bg-black/5 border-l-[4px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none`}
-                        onClick={() => {
-                          const el = document.getElementById(`msg-${msg.reply_to_id}`);
-                          if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'});
-                        }}
+                        className={`mb-2 rounded-[6px] bg-black/5 border-l-[4px] ${replyBorderColor} p-1 px-2 flex flex-col justify-center cursor-pointer select-none`}
                        >
                          <span className={`text-[10px] font-bold ${replyNameColor} mb-0.5`}>{replySenderName}</span>
                          <span className="text-[11px] text-gray-600 truncate line-clamp-1">{replyText}</span>
                        </div>
                      )}
 
-                     {/* Content */}
-                     <div className="text-gray-800 px-1" id={`msg-${msg.id}`}>
+                     <div className="text-gray-800 px-1">
                         {hasImage && <div className="mb-1 rounded-lg overflow-hidden mt-1"><img src={msg.image_url!} alt="Attachment" className="max-w-full h-auto max-h-80 object-cover rounded-md cursor-pointer" onClick={() => window.open(msg.image_url!, '_blank')} /></div>}
                         {hasContent && <p className="whitespace-pre-wrap leading-relaxed break-words text-[15px]">{renderTextWithLinks(msg.content)}</p>}
                      </div>
 
-                     {/* Footer */}
                      <div className="flex justify-end items-center gap-1 mt-0.5 px-1">
                         <span className="text-[10px] text-gray-400 min-w-[40px] text-right">{format(new Date(msg.created_at), 'h:mm a')}</span>
                      </div>
 
-                     {/* Actions */}
                      <div className={`absolute top-0 ${isMe ? '-left-20' : '-right-20'} hidden group-hover:flex items-center h-full gap-1 px-2 transition-all`}>
                         <Button variant="ghost" size="icon" className="h-8 w-8 bg-white/80 shadow-sm rounded-full hover:bg-white" onClick={() => setReplyingTo(msg)} title="Reply"><Reply className="h-4 w-4 text-gray-600" /></Button>
                         {isMe && <Button variant="ghost" size="icon" className="h-8 w-8 bg-white/80 shadow-sm rounded-full hover:bg-red-50" onClick={() => setDeleteId(msg.id)} title="Delete"><Trash2 className="h-4 w-4 text-red-500" /></Button>}
@@ -330,9 +311,7 @@ export const StudentCommunity = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input */}
           <div className="p-2 md:p-3 bg-[#f0f2f5] border-t z-20">
-            {/* Reply Preview */}
             {replyingTo && (
               <div className="flex items-center justify-between bg-white p-2 rounded-lg mb-2 border-l-4 border-teal-500 shadow-sm animate-in slide-in-from-bottom-2">
                 <div className="flex flex-col px-2">
@@ -343,7 +322,6 @@ export const StudentCommunity = () => {
               </div>
             )}
 
-            {/* Image Preview */}
             {selectedImage && (
               <div className="flex items-center justify-between bg-blue-50 p-2 rounded-lg mb-2 border border-blue-100 shadow-sm">
                 <div className="flex items-center gap-3">
@@ -376,7 +354,6 @@ export const StudentCommunity = () => {
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
     </div>
   );
 };
