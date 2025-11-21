@@ -32,6 +32,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+// --- Interfaces ---
 interface CommunityMessage {
   id: string;
   content: string | null;
@@ -45,12 +46,13 @@ interface CommunityMessage {
   profiles: {
     name: string;
   };
-  // Simplified nested reply object
+  // Nested reply object
   reply_to?: {
     id: string;
     content: string | null;
     image_url: string | null;
     user_id: string; 
+    is_deleted: boolean; // Added is_deleted to nested object
     profiles: { name: string };
   };
 }
@@ -67,6 +69,7 @@ export const StudentCommunity = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // --- State ---
   const [selectedGroup, setSelectedGroup] = useState<UserEnrollment | null>(null);
   const [messageText, setMessageText] = useState('');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -74,7 +77,7 @@ export const StudentCommunity = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null); 
 
-  // 1. Fetch Groups
+  // --- 1. Fetch Groups ---
   const { data: enrollments = [], isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['community-enrollments', profile?.user_id],
     queryFn: async () => {
@@ -89,26 +92,33 @@ export const StudentCommunity = () => {
     enabled: !!profile?.user_id
   });
 
+  // Auto-select first group (Desktop only)
   useEffect(() => {
     if (!isMobile && !selectedGroup && enrollments.length > 0) {
       setSelectedGroup(enrollments[0]);
     }
   }, [enrollments, selectedGroup, isMobile]);
 
-  // 2. Fetch Messages
+  // FIX: Clear inputs and reply state when switching groups
+  useEffect(() => {
+    setMessageText('');
+    setSelectedImage(null);
+    setReplyingTo(null);
+  }, [selectedGroup]);
+
+  // --- 2. Fetch Messages ---
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<CommunityMessage[]>({
     queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
     queryFn: async () => {
       if (!selectedGroup) return [];
       
-      // FIXED QUERY: Removed '!community_messages_reply_to_id_fkey' to allow auto-detection
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
           id, content, image_url, user_id, batch, subject, reply_to_id, created_at, is_deleted,
           profiles (name),
-          reply_to:community_messages (
-            id, content, image_url, user_id, profiles(name)
+          reply_to:community_messages!community_messages_reply_to_id_fkey (
+            id, content, image_url, user_id, is_deleted, profiles(name)
           )
         `)
         .eq('batch', selectedGroup.batch_name)
@@ -116,16 +126,13 @@ export const StudentCommunity = () => {
         .eq('is_deleted', false)
         .order('created_at', { ascending: true });
 
-      if (error) {
-        console.error("Error fetching messages:", error);
-        throw error;
-      }
+      if (error) throw error;
       return data as any[];
     },
     enabled: !!selectedGroup
   });
 
-  // 3. Real-time
+  // --- 3. Real-time ---
   useEffect(() => {
     if (!selectedGroup) return;
     const channel = supabase
@@ -145,7 +152,7 @@ export const StudentCommunity = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [messages, selectedGroup]);
 
-  // 4. Actions
+  // --- 4. Actions ---
   const sendMessageMutation = useMutation({
     mutationFn: async () => {
       if (!profile?.user_id || !selectedGroup) return;
@@ -204,6 +211,7 @@ export const StudentCommunity = () => {
     sendMessageMutation.mutate();
   };
 
+  // --- Helpers ---
   const renderTextWithLinks = (text: string | null) => {
     if (!text) return null;
     const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -213,10 +221,12 @@ export const StudentCommunity = () => {
     ) : part);
   };
 
+  // FIX: Returns NULL if no valid content, preventing empty bubble
   const getReplyPreview = (reply: NonNullable<CommunityMessage['reply_to']>) => {
+    if (reply.is_deleted) return '🗑️ Message deleted';
     if (reply.content && reply.content.trim().length > 0) return reply.content;
     if (reply.image_url) return '📷 Photo';
-    return 'Message';
+    return null; // No valid content? Return null.
   };
 
   // --- Render ---
@@ -289,10 +299,9 @@ export const StudentCommunity = () => {
                      isMe ? 'bg-[#E7FFDB] rounded-tr-none' : 'bg-white rounded-tl-none'
                    }`}>
                      
-                     {/* Sender Name for Others */}
                      {!isMe && <div className="text-[10px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
 
-                     {/* Reply Block */}
+                     {/* Reply Block: Only renders if replyText is NOT NULL */}
                      {msg.reply_to && replyText && (
                        <div 
                         className={`mb-2 rounded-[6px] bg-black/5 border-l-[4px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none`}
@@ -312,7 +321,7 @@ export const StudentCommunity = () => {
                         {hasContent && <p className="whitespace-pre-wrap leading-relaxed break-words text-[15px]">{renderTextWithLinks(msg.content)}</p>}
                      </div>
 
-                     {/* Timestamp */}
+                     {/* Footer */}
                      <div className="flex justify-end items-center gap-1 mt-0.5 px-1">
                         <span className="text-[10px] text-gray-400 min-w-[40px] text-right">{format(new Date(msg.created_at), 'h:mm a')}</span>
                      </div>
@@ -364,6 +373,7 @@ export const StudentCommunity = () => {
         </div>
       )}
 
+      {/* Delete Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
             <AlertDialogHeader>
