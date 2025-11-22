@@ -1,3 +1,5 @@
+// uirepository/erp-portal/ERP-Portal-600ec08a7e847df2e05825de7912ed509bc4ae14/src/components/student/StudentCommunity.tsx
+
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,7 +19,8 @@ import {
   Paperclip, 
   Trash2, 
   X,
-  Info
+  Info,
+  Ban
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -114,13 +117,12 @@ export const StudentCommunity = () => {
     setReplyingTo(null);
   }, [selectedGroup]);
 
-  // --- 2. Fetch Messages (Now including deleted ones) ---
+  // --- 2. Fetch Messages ---
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<CommunityMessage[]>({
     queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
     queryFn: async () => {
       if (!selectedGroup) return [];
       
-      // REMOVED: .eq('is_deleted', false) so we can show "Message deleted by..."
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
@@ -362,28 +364,34 @@ export const StudentCommunity = () => {
                // Reactions
                const myReaction = msg.message_likes?.find(l => l.user_id === profile?.user_id);
                const reactionsCount = msg.message_likes?.length || 0;
-               // Group reactions for display (e.g. 2👍 1❤️)
                const reactionCounts = msg.message_likes?.reduce((acc: any, curr) => {
-                 acc[curr.reaction_type || 'like'] = (acc[curr.reaction_type || 'like'] || 0) + 1;
+                 const type = curr.reaction_type || 'like';
+                 acc[type] = (acc[type] || 0) + 1;
                  return acc;
                }, {});
 
+               // --- DELETED MESSAGE RENDER ---
+               if (msg.is_deleted) {
+                 return (
+                   <div key={msg.id} className="flex w-full justify-center my-2">
+                     <div className="bg-gray-200/60 text-gray-500 text-xs px-3 py-1 rounded-full flex items-center gap-1.5 select-none border border-gray-200">
+                        <Ban className="h-3 w-3" />
+                        <span>This message was deleted by <span className="font-medium">{msg.profiles?.name || 'Unknown'}</span></span>
+                     </div>
+                   </div>
+                 );
+               }
+
+               // --- NORMAL MESSAGE RENDER ---
                return (
-                 <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} group mb-1`}>
+                 <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} group mb-2 relative`}>
                    
                    <ContextMenu>
-                     <ContextMenuTrigger>
-                       <div className={`relative max-w-[85%] md:max-w-[65%] rounded-lg p-2 shadow-sm text-sm ${
+                     <ContextMenuTrigger className="block max-w-[85%] md:max-w-[65%]">
+                       <div className={`relative rounded-lg p-2 shadow-sm text-sm ${
                          isMe ? 'bg-[#dcf8c6] rounded-tr-none' : 'bg-white rounded-tl-none'
-                       } ${msg.is_deleted ? 'opacity-75' : ''}`}>
+                       }`}>
                          
-                         {/* Deleted Message View */}
-                         {msg.is_deleted ? (
-                           <div className="italic text-gray-500 text-xs flex items-center gap-1">
-                             <X className="h-3 w-3" /> This message was deleted by {msg.profiles?.name}
-                           </div>
-                         ) : (
-                           <>
                              {/* Sender Name */}
                              {!isMe && <div className="text-[11px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
 
@@ -407,28 +415,27 @@ export const StudentCommunity = () => {
                                 {hasContent && <p className="whitespace-pre-wrap leading-relaxed break-words text-[15px]">{renderTextWithLinks(msg.content)}</p>}
                              </div>
 
-                             {/* Footer: Time + Reactions Display */}
-                             <div className="flex justify-end items-center mt-1 gap-1">
-                                {reactionsCount > 0 && (
-                                  <div className="flex items-center gap-1 bg-white/80 rounded-full px-1.5 py-0.5 shadow-sm border border-gray-100 -mb-3 mr-auto z-10 transform translate-y-1/2">
-                                    {Object.entries(reactionCounts).map(([type, count]) => (
-                                      <span key={type} className="text-[10px] flex items-center">
-                                        {type === 'like' ? '👍' : type === 'love' ? '❤️' : type === 'laugh' ? '😂' : type === 'dislike' ? '👎' : '👍'} 
-                                        {Number(count) > 1 && <span className="ml-0.5 font-bold">{String(count)}</span>}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                                <span className="text-[10px] text-gray-400 whitespace-nowrap">{format(new Date(msg.created_at), 'h:mm a')}</span>
+                             {/* Footer: Time */}
+                             <div className="flex justify-end items-center mt-0.5 gap-1 min-w-[60px]">
+                                <span className="text-[10px] text-gray-400 whitespace-nowrap ml-auto">{format(new Date(msg.created_at), 'h:mm a')}</span>
                              </div>
-                           </>
-                         )}
+
+                             {/* Reactions: Floating Bubble */}
+                             {reactionsCount > 0 && (
+                               <div className="absolute -bottom-2 left-1 z-10 flex items-center gap-0.5 bg-white rounded-full px-1.5 py-0.5 shadow border border-gray-200 text-[10px] cursor-pointer hover:scale-105 transition-transform">
+                                 {Object.entries(reactionCounts).map(([type, count]) => (
+                                   <span key={type}>
+                                     {type === 'like' ? '👍' : type === 'love' ? '❤️' : type === 'laugh' ? '😂' : type === 'dislike' ? '👎' : '👍'} 
+                                     {Number(count) > 1 && <span className="ml-0.5 font-bold text-gray-600">{String(count)}</span>}
+                                   </span>
+                                 ))}
+                               </div>
+                             )}
                        </div>
                      </ContextMenuTrigger>
                      
-                     {/* Context Menu for Reactions & Actions */}
-                     {!msg.is_deleted && (
-                       <ContextMenuContent className="w-48">
+                     {/* Context Menu */}
+                     <ContextMenuContent className="w-48">
                          <div className="flex justify-around p-2 bg-gray-50 rounded-md mb-2">
                            {['👍', '❤️', '😂', '👎'].map(emoji => {
                              const typeMap: Record<string, string> = { '👍': 'like', '❤️': 'love', '😂': 'laugh', '👎': 'dislike' };
@@ -452,8 +459,7 @@ export const StudentCommunity = () => {
                              <Trash2 className="mr-2 h-4 w-4" /> Delete
                            </ContextMenuItem>
                          )}
-                       </ContextMenuContent>
-                     )}
+                     </ContextMenuContent>
                    </ContextMenu>
 
                  </div>
