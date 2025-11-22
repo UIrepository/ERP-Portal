@@ -20,7 +20,7 @@ import {
   Ban,
   Lock,
   Info,
-  SmilePlus
+  ShieldCheck
 } from 'lucide-react';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -69,6 +69,16 @@ interface UserEnrollment {
   subject_name: string;
 }
 
+// --- Helper for Avatar Colors ---
+const getAvatarColor = (name: string) => {
+  const colors = ['bg-red-100 text-red-700', 'bg-green-100 text-green-700', 'bg-blue-100 text-blue-700', 'bg-purple-100 text-purple-700', 'bg-yellow-100 text-yellow-700', 'bg-pink-100 text-pink-700'];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+};
+
 // --- Swipeable Message Component ---
 const MessageItem = ({ 
   msg, 
@@ -94,19 +104,21 @@ const MessageItem = ({
   const [translateX, setTranslateX] = useState(0);
   const isSwiping = useRef(false);
 
-  const renderTextWithLinks = (text: string | null) => {
+  const renderTextWithLinks = (text: string | null, isMe: boolean) => {
     if (!text) return null;
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const parts = text.split(urlRegex);
     return parts.map((part, i) => part.match(urlRegex) ? (
-      <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline break-all">{part}</a>
+      <a key={i} href={part} target="_blank" rel="noopener noreferrer" className={`${isMe ? 'text-blue-100 hover:text-white' : 'text-blue-600 hover:text-blue-800'} underline break-all`}>{part}</a>
     ) : part);
   };
 
   const isReplyToMe = replyData?.user_id === profile?.user_id;
   const replySenderName = isReplyToMe ? "You" : replyData?.profiles?.name;
-  const replyBorderColor = isReplyToMe ? "border-teal-500" : "border-purple-500";
-  const replyNameColor = isReplyToMe ? "text-teal-600" : "text-purple-600";
+  // Adjusted reply styling to blend with new bubbles
+  const replyBorderColor = isMe ? "border-white/40" : "border-blue-500";
+  const replyNameColor = isMe ? "text-blue-100" : "text-blue-600";
+  const replyTextColor = isMe ? "text-blue-50" : "text-gray-500";
 
   const myReaction = msg.message_likes?.find(l => l.user_id === profile?.user_id);
   const reactionsCount = msg.message_likes?.length || 0;
@@ -158,10 +170,10 @@ const MessageItem = ({
 
   if (msg.is_deleted) {
     return (
-      <div className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} my-1`}>
-        <div className={`bg-white/50 text-gray-500 text-xs italic px-3 py-1.5 rounded-lg flex items-center gap-1.5 select-none border border-gray-200 max-w-[80%] ${isMe ? 'rounded-tr-none' : 'rounded-tl-none'}`}>
-           <Ban className="h-3 w-3 opacity-70" />
-           <span>This message was deleted by {msg.profiles?.name || 'Unknown'}</span>
+      <div className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} my-2`}>
+        <div className={`text-gray-400 text-xs italic px-4 py-2 border border-dashed border-gray-300 rounded-full flex items-center gap-2 select-none`}>
+           <Ban className="h-3 w-3" />
+           <span>Message deleted</span>
         </div>
       </div>
     );
@@ -169,7 +181,7 @@ const MessageItem = ({
 
   return (
     <div 
-      className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} group mb-2 relative transition-transform duration-200 ease-out`}
+      className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} group mb-3 relative transition-transform duration-200 ease-out px-2`}
       style={{ transform: `translateX(${translateX}px)` }}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
@@ -181,17 +193,27 @@ const MessageItem = ({
         </div>
       )}
 
+      {!isMe && (
+        <Avatar className="h-8 w-8 mr-2 mt-1 shadow-sm border border-gray-100">
+            <AvatarFallback className={`${getAvatarColor(msg.profiles?.name || '?')} text-[10px] font-bold`}>
+                {msg.profiles?.name?.substring(0, 2).toUpperCase()}
+            </AvatarFallback>
+        </Avatar>
+      )}
+
       <ContextMenu>
-        <ContextMenuTrigger className={`block max-w-[85%] md:max-w-[65%] relative ${reactionsCount > 0 ? 'mb-4' : 'mb-0'}`}>
-          <div className={`relative rounded-lg p-2 shadow-sm text-sm ${
-            isMe ? 'bg-[#dcf8c6] rounded-tr-none' : 'bg-white rounded-tl-none'
+        <ContextMenuTrigger className={`block max-w-[85%] md:max-w-[60%] relative ${reactionsCount > 0 ? 'mb-5' : 'mb-0'}`}>
+          <div className={`relative rounded-2xl p-3 shadow-sm text-sm transition-all ${
+            isMe 
+              ? 'bg-blue-600 text-white rounded-tr-sm' // Blue for me, sharp top-right
+              : 'bg-white text-gray-800 border border-gray-200 rounded-tl-sm' // White for others, sharp top-left
           }`}>
             
-            {!isMe && <div className="text-[11px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
+            {!isMe && <div className="text-[11px] font-bold text-gray-500 mb-1">{msg.profiles?.name}</div>}
 
             {replyData && replyText && (
               <div 
-               className={`mb-1.5 rounded-md bg-black/5 border-l-[3px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none shadow-sm`}
+               className={`mb-2 rounded-lg bg-black/5 border-l-2 ${replyBorderColor} p-2 flex flex-col justify-center cursor-pointer select-none`}
                onClick={(e) => {
                  e.stopPropagation(); 
                  const el = document.getElementById(`msg-${msg.reply_to_id}`);
@@ -199,38 +221,38 @@ const MessageItem = ({
                }}
               >
                 <span className={`text-[10px] font-bold ${replyNameColor} mb-0.5`}>{replySenderName}</span>
-                <span className="text-[11px] text-gray-700 line-clamp-2">{replyText}</span>
+                <span className={`text-[11px] ${replyTextColor} line-clamp-1`}>{replyText}</span>
               </div>
             )}
 
-            <div className="text-gray-900 px-1" id={`msg-${msg.id}`}>
+            <div className="" id={`msg-${msg.id}`}>
                {msg.image_url && msg.image_url.trim() !== '' && (
-                 <div className="mb-1 rounded-lg overflow-hidden mt-1">
+                 <div className="mb-2 rounded-lg overflow-hidden">
                    <img 
                      src={msg.image_url} 
                      alt="Attachment" 
-                     className="max-w-full h-auto max-h-80 object-cover rounded-md cursor-pointer" 
+                     className="max-w-full h-auto max-h-72 object-cover rounded-md cursor-pointer hover:opacity-95 transition-opacity" 
                      onClick={() => window.open(msg.image_url!, '_blank')} 
                    />
                  </div>
                )}
                {msg.content && msg.content.trim() !== '' && (
-                 <p className="whitespace-pre-wrap leading-relaxed break-words text-[15px]">
-                   {renderTextWithLinks(msg.content)}
+                 <p className={`whitespace-pre-wrap leading-relaxed break-words text-[15px] ${isMe ? 'text-white/95' : 'text-gray-800'}`}>
+                   {renderTextWithLinks(msg.content, isMe)}
                  </p>
                )}
             </div>
 
-            <div className="flex justify-end items-center mt-0.5 gap-1 min-w-[50px] h-4">
-               <span className="text-[10px] text-gray-400 whitespace-nowrap ml-auto">
+            <div className={`flex justify-end items-center mt-1 gap-1 min-w-[50px]`}>
+               <span className={`text-[10px] ${isMe ? 'text-blue-100' : 'text-gray-400'} whitespace-nowrap ml-auto`}>
                  {format(new Date(msg.created_at), 'h:mm a')}
                </span>
             </div>
 
             {reactionsCount > 0 && (
-              <div className={`absolute -bottom-6 ${isMe ? 'right-0' : 'left-0'} z-10 flex items-center gap-0.5 bg-white rounded-full px-1.5 py-0.5 shadow-sm border border-gray-200 text-[10px] cursor-pointer hover:scale-105 transition-transform`}>
+              <div className={`absolute -bottom-5 ${isMe ? 'right-0' : 'left-0'} z-10 flex items-center gap-1 bg-white rounded-full px-2 py-0.5 shadow-md border border-gray-100 text-[10px] cursor-pointer hover:scale-105 transition-transform`}>
                 {Object.entries(reactionCounts).map(([type, count]) => (
-                  <span key={type}>
+                  <span key={type} className="flex items-center">
                     {type === 'like' ? '👍' : type === 'love' ? '❤️' : type === 'laugh' ? '😂' : type === 'dislike' ? '👎' : '👍'} 
                     {Number(count) > 1 && <span className="ml-0.5 font-bold text-gray-600">{String(count)}</span>}
                   </span>
@@ -241,7 +263,7 @@ const MessageItem = ({
         </ContextMenuTrigger>
         
         <ContextMenuContent className="w-48">
-            <div className="flex justify-around p-2 bg-gray-50 rounded-md mb-2">
+            <div className="flex justify-around p-2 bg-slate-50 rounded-md mb-2">
               {['👍', '❤️', '😂', '👎'].map(emoji => {
                 const typeMap: Record<string, string> = { '👍': 'like', '❤️': 'love', '😂': 'laugh', '👎': 'dislike' };
                 const type = typeMap[emoji];
@@ -261,7 +283,6 @@ const MessageItem = ({
               })}
             </div>
             
-            {/* Explicit Option to Remove Reaction */}
             {myReaction && (
               <>
                 <ContextMenuItem onSelect={() => onReact(msg.id, myReaction.reaction_type)} className="text-red-500 focus:text-red-600">
@@ -437,55 +458,19 @@ export const StudentCommunity = () => {
 
   const toggleReactionMutation = useMutation({
     mutationFn: async ({ msgId, type }: { msgId: string, type: string }) => {
-      const userId = profile?.user_id;
-      if (!userId) throw new Error("Not authenticated");
-
-      // 1. Fetch current reaction state directly from DB
-      const { data: currentReactions, error: fetchError } = await supabase
-        .from('message_likes')
-        .select('*')
-        .eq('message_id', msgId)
-        .eq('user_id', userId);
-
-      if (fetchError) throw fetchError;
-
-      const existingReaction = currentReactions && currentReactions.length > 0 ? currentReactions[0] : null;
-
+      const existingReaction = messages.find(m => m.id === msgId)?.message_likes.find(l => l.user_id === profile?.user_id);
       if (existingReaction) {
         if (existingReaction.reaction_type === type) {
-          // Same reaction -> Delete
-          const { error } = await supabase
-            .from('message_likes')
-            .delete()
-            .eq('message_id', msgId)
-            .eq('user_id', userId);
-          if (error) throw error;
+          await supabase.from('message_likes').delete().match({ message_id: msgId, user_id: profile?.user_id });
         } else {
-          // Different reaction -> Update
-          const { error } = await supabase
-            .from('message_likes')
-            .update({ reaction_type: type })
-            .eq('message_id', msgId)
-            .eq('user_id', userId);
-          if (error) throw error;
+          await supabase.from('message_likes').update({ reaction_type: type }).match({ message_id: msgId, user_id: profile?.user_id });
         }
       } else {
-        // No reaction -> Insert
-        const { error } = await supabase
-          .from('message_likes')
-          .insert({ message_id: msgId, user_id: userId, reaction_type: type });
-        if (error) throw error;
+        await supabase.from('message_likes').insert({ message_id: msgId, user_id: profile?.user_id, reaction_type: type });
       }
     },
     onSuccess: () => {
        queryClient.invalidateQueries({ queryKey: ['community-messages'] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Failed to update reaction",
-        description: error.message,
-        variant: "destructive",
-      });
     }
   });
 
@@ -514,22 +499,38 @@ export const StudentCommunity = () => {
   };
 
   return (
-    <div className="flex h-[100dvh] w-full bg-[#efeae2] relative overflow-hidden">
+    <div className="flex h-[100dvh] w-full bg-slate-50 relative overflow-hidden">
       
       {/* GROUP LIST SIDEBAR */}
       <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
-        <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
-          <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Users className="h-5 w-5 text-teal-600" /> Communities</h2>
+        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white">
+          <h2 className="font-bold text-xl flex items-center gap-2 text-slate-800 tracking-tight"><Users className="h-6 w-6 text-blue-600" /> Communities</h2>
         </div>
         <ScrollArea className="flex-1">
-          <div className="p-2 space-y-1">
+          <div className="p-3 space-y-2">
             {isLoadingEnrollments ? <div className="p-6 text-center text-gray-500 flex justify-center"><Loader2 className="animate-spin" /></div> : 
              enrollments.length === 0 ? <div className="p-6 text-center text-gray-500">No communities found.</div> :
              enrollments.map((group) => (
               <div key={`${group.batch_name}-${group.subject_name}`} onClick={() => setSelectedGroup(group)}
-                className={`p-3 rounded-lg cursor-pointer transition-colors flex items-center gap-3 ${selectedGroup?.batch_name === group.batch_name && selectedGroup?.subject_name === group.subject_name ? 'bg-teal-50 border-teal-200 border' : 'hover:bg-gray-100 border border-transparent'}`}>
-                <div className="h-10 w-10 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold shrink-0">{group.subject_name[0]}</div>
-                <div className="overflow-hidden text-left"><p className="font-semibold text-gray-900 truncate">{group.subject_name}</p><p className="text-xs text-gray-500 truncate">{group.batch_name}</p></div>
+                className={`p-3 rounded-xl cursor-pointer transition-all duration-200 flex items-center gap-3.5 group ${selectedGroup?.batch_name === group.batch_name && selectedGroup?.subject_name === group.subject_name ? 'bg-blue-600 shadow-md' : 'hover:bg-slate-100 bg-white border border-slate-100'}`}>
+                
+                {/* Community Avatar/Icon */}
+                <div className={`h-10 w-10 rounded-lg flex items-center justify-center font-bold shrink-0 transition-colors ${
+                    selectedGroup?.batch_name === group.batch_name && selectedGroup?.subject_name === group.subject_name
+                    ? 'bg-white text-blue-600'
+                    : 'bg-blue-50 text-blue-600 group-hover:bg-white group-hover:shadow-sm'
+                }`}>
+                    {group.subject_name[0]}
+                </div>
+                
+                <div className="overflow-hidden text-left">
+                    <p className={`font-semibold truncate ${selectedGroup?.batch_name === group.batch_name && selectedGroup?.subject_name === group.subject_name ? 'text-white' : 'text-slate-900'}`}>
+                        {group.subject_name}
+                    </p>
+                    <p className={`text-xs truncate ${selectedGroup?.batch_name === group.batch_name && selectedGroup?.subject_name === group.subject_name ? 'text-blue-100' : 'text-slate-500'}`}>
+                        {group.batch_name}
+                    </p>
+                </div>
               </div>
             ))}
           </div>
@@ -538,51 +539,56 @@ export const StudentCommunity = () => {
 
       {/* EMPTY STATE */}
       {!selectedGroup && (
-        <div className={`flex-1 flex flex-col items-center justify-center bg-[#f0f2f5] text-gray-500 border-l-4 border-teal-600 ${isMobile ? 'hidden' : 'flex'}`}>
-          <Hash className="h-20 w-20 mb-4 opacity-20" />
-          <p className="text-lg font-medium">Select a community to start chatting</p>
+        <div className={`flex-1 flex flex-col items-center justify-center bg-slate-50 text-gray-400 ${isMobile ? 'hidden' : 'flex'}`}>
+          <div className="h-24 w-24 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm">
+            <Users className="h-12 w-12 text-blue-200" />
+          </div>
+          <p className="text-lg font-semibold text-gray-600">Select a community</p>
+          <p className="text-sm text-gray-400">Connect with your batchmates and learn together.</p>
         </div>
       )}
 
       {/* CHAT AREA */}
       {selectedGroup && (
-        <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-[#efeae2]' : 'w-full'}`}>
+        <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-slate-50' : 'w-full'}`}>
           
           {/* Header */}
-          <div className="p-3 bg-white border-b flex items-center justify-between shadow-sm z-20">
+          <div className="px-4 py-3 bg-white border-b flex items-center justify-between shadow-sm z-20">
             <div className="flex items-center gap-3">
-              {isMobile && <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }} className="-ml-2 mr-1"><ArrowLeft className="h-5 w-5" /></Button>}
-              <Avatar className="h-10 w-10 border border-gray-200"><AvatarFallback className="bg-teal-600 text-white font-bold">{selectedGroup.subject_name[0]}</AvatarFallback></Avatar>
+              {isMobile && <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }} className="-ml-2 mr-1 text-slate-600"><ArrowLeft className="h-5 w-5" /></Button>}
+              <Avatar className="h-9 w-9 border border-slate-200">
+                <AvatarFallback className="bg-blue-600 text-white font-bold rounded-md">{selectedGroup.subject_name[0]}</AvatarFallback>
+              </Avatar>
               <div>
-                <h3 className="font-bold text-gray-800 leading-tight flex items-center gap-2">
+                <h3 className="font-bold text-slate-800 leading-none flex items-center gap-2 text-base">
                   {selectedGroup.subject_name}
                 </h3>
-                <p className="text-xs text-gray-500">{selectedGroup.batch_name}</p>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">{selectedGroup.batch_name}</p>
               </div>
             </div>
           </div>
 
           {/* Messages List */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#efeae2] pb-24 md:pb-4" ref={scrollAreaRef}>
+          <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-slate-50/50 pb-24 md:pb-4" ref={scrollAreaRef}>
             
-            {/* Encryption Banner */}
+            {/* Professional Encryption/System Note */}
             <div className="flex justify-center mb-6 mt-2">
-                <div className="bg-[#ffeba7]/40 border border-[#ffeba7] text-yellow-800 text-[10px] px-3 py-1 rounded-lg shadow-sm flex items-center gap-1.5 text-center max-w-[90%]">
-                    <Lock className="h-3 w-3 shrink-0" />
-                    <span>Messages are end-to-end encrypted. No one outside of this chat, not even the admins, can read them.</span>
+                <div className="text-gray-400 text-[11px] font-medium flex items-center gap-1.5 select-none opacity-80 bg-slate-100 px-3 py-1 rounded-full">
+                    <ShieldCheck className="h-3 w-3" />
+                    <span>Messages are secure and private to this batch.</span>
                 </div>
             </div>
 
-            {isLoadingMessages ? <div className="flex justify-center p-10"><Loader2 className="animate-spin h-8 w-8 text-gray-400" /></div> : 
-             Object.keys(groupedMessages).length === 0 ? <div className="text-center py-20 opacity-50 text-sm">No messages yet.</div> :
+            {isLoadingMessages ? <div className="flex justify-center p-10"><Loader2 className="animate-spin h-8 w-8 text-blue-400" /></div> : 
+             Object.keys(groupedMessages).length === 0 ? <div className="text-center py-20 text-gray-400 text-sm">No messages yet. Break the ice!</div> :
              Object.entries(groupedMessages).map(([dateKey, dateMessages]) => (
-               <div key={dateKey} id={`date-${dateKey}`} className="space-y-2">
+               <div key={dateKey} id={`date-${dateKey}`} className="space-y-3">
                  
-                 {/* Date Header */}
+                 {/* Date Header (Professional Badge) */}
                  <div className="flex justify-center sticky top-0 z-10 py-2">
                     <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                         <PopoverTrigger asChild>
-                            <div className="bg-gray-100/90 backdrop-blur-sm text-gray-600 text-xs font-medium px-3 py-1 rounded-full shadow-sm border border-gray-200 cursor-pointer hover:bg-gray-200 transition-colors select-none">
+                            <div className="bg-white/80 backdrop-blur border border-gray-200 text-gray-500 text-[11px] font-medium px-3 py-0.5 rounded-full shadow-sm cursor-pointer hover:bg-gray-50 transition-colors select-none">
                                 {isToday(parseISO(dateKey)) ? 'Today' : isYesterday(parseISO(dateKey)) ? 'Yesterday' : format(parseISO(dateKey), 'MMMM d, yyyy')}
                             </div>
                         </PopoverTrigger>
@@ -596,7 +602,7 @@ export const StudentCommunity = () => {
                                     highlighted: activeDates
                                 }}
                                 modifiersStyles={{
-                                    highlighted: { fontWeight: 'bold', color: '#0d9488', textDecoration: 'underline' }
+                                    highlighted: { fontWeight: 'bold', color: '#2563eb', textDecoration: 'underline' }
                                 }}
                             />
                         </PopoverContent>
@@ -623,33 +629,40 @@ export const StudentCommunity = () => {
           </div>
 
           {/* Input Area */}
-          <div className="p-2 md:p-3 bg-[#f0f2f5] border-t z-20">
+          <div className="p-3 md:p-4 bg-white border-t z-20">
             {/* Reply Preview */}
             {replyingTo && (
-              <div className="flex items-center justify-between bg-white p-2 rounded-lg mb-2 border-l-4 border-teal-500 shadow-sm animate-in slide-in-from-bottom-2">
+              <div className="flex items-center justify-between bg-slate-50 p-3 rounded-lg mb-3 border-l-4 border-blue-500 animate-in slide-in-from-bottom-2">
                 <div className="flex flex-col px-2">
-                    <span className="text-xs font-bold text-teal-600">Replying to {replyingTo.user_id === profile?.user_id ? 'You' : replyingTo.profiles?.name}</span>
+                    <span className="text-xs font-bold text-blue-600 mb-0.5">Replying to {replyingTo.user_id === profile?.user_id ? 'You' : replyingTo.profiles?.name}</span>
                     <span className="text-xs text-gray-500 truncate max-w-[250px]">{replyingTo.content || 'Attachment'}</span>
                 </div>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setReplyingTo(null)}><X className="h-4 w-4 text-gray-500" /></Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setReplyingTo(null)}><X className="h-4 w-4 text-gray-500" /></Button>
               </div>
             )}
 
             {selectedImage && (
-              <div className="flex items-center justify-between bg-blue-50 p-2 rounded-lg mb-2 border border-blue-100 shadow-sm">
+              <div className="flex items-center justify-between bg-blue-50 p-2 rounded-lg mb-3 border border-blue-100">
                 <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 bg-blue-100 rounded flex items-center justify-center text-blue-600"><ImageIcon className="h-5 w-5"/></div>
+                    <div className="h-10 w-10 bg-white rounded-md shadow-sm flex items-center justify-center text-blue-600"><ImageIcon className="h-5 w-5"/></div>
                     <div className="text-sm text-blue-900 truncate max-w-[200px] font-medium">{selectedImage.name}</div>
                 </div>
                 <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-blue-100 rounded-full" onClick={() => setSelectedImage(null)}><X className="h-4 w-4 text-blue-500" /></Button>
               </div>
             )}
 
-            <div className="flex items-end gap-2 bg-white p-1.5 rounded-2xl shadow-sm border border-gray-200">
+            <div className="flex items-end gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
               <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={(e) => e.target.files && setSelectedImage(e.target.files[0])} />
-              <Button variant="ghost" size="icon" className="h-10 w-10 text-gray-500 hover:bg-gray-100 rounded-full shrink-0" onClick={() => fileInputRef.current?.click()}><Paperclip className="h-5 w-5" /></Button>
-              <Input value={messageText} onChange={(e) => setMessageText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())} placeholder="Type a message" className="flex-1 border-none shadow-none focus-visible:ring-0 min-h-[40px] py-2 text-[15px]" disabled={isUploading || sendMessageMutation.isPending} />
-              <Button onClick={handleSend} disabled={(!messageText.trim() && !selectedImage) || isUploading} className="h-10 w-10 rounded-full bg-teal-600 hover:bg-teal-700 text-white shrink-0 p-0 flex items-center justify-center">{isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5 ml-0.5" />}</Button>
+              <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-400 hover:bg-white hover:text-blue-600 rounded-lg shrink-0" onClick={() => fileInputRef.current?.click()}><Paperclip className="h-5 w-5" /></Button>
+              <Input 
+                value={messageText} 
+                onChange={(e) => setMessageText(e.target.value)} 
+                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())} 
+                placeholder="Type a message..." 
+                className="flex-1 border-none shadow-none focus-visible:ring-0 bg-transparent min-h-[40px] py-2 text-[15px] placeholder:text-slate-400" 
+                disabled={isUploading || sendMessageMutation.isPending} 
+              />
+              <Button onClick={handleSend} disabled={(!messageText.trim() && !selectedImage) || isUploading} className="h-10 w-10 rounded-lg bg-blue-600 hover:bg-blue-700 text-white shrink-0 p-0 flex items-center justify-center shadow-sm transition-all hover:scale-105">{isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5 ml-0.5" />}</Button>
             </div>
           </div>
         </div>
