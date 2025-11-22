@@ -48,7 +48,6 @@ interface CommunityMessage {
   is_deleted: boolean;
   profiles: { name: string };
   // 'reply_to' contains the PRIMARY message (the one being replied to)
-  // Can be an object or array depending on Supabase relationship detection
   reply_to?: any; 
   message_likes: { user_id: string }[];
 }
@@ -106,13 +105,14 @@ export const StudentCommunity = () => {
     queryFn: async () => {
       if (!selectedGroup) return [];
       
-      // Corrected Query: using '!reply_to_id' to disambiguate the relationship
+      // Using the explicit foreign key constraint name to force finding the PARENT message.
+      // Note: If this fails with 400, you MUST reload the schema cache in Supabase Dashboard -> Settings -> API.
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
           *,
           profiles (name),
-          reply_to:community_messages!reply_to_id (
+          reply_to:community_messages!community_messages_reply_to_id_fkey (
             id, content, image_url, user_id, is_deleted, profiles(name)
           ),
           message_likes ( user_id )
@@ -216,7 +216,6 @@ export const StudentCommunity = () => {
   const handleSend = () => {
     if (!messageText.trim() && !selectedImage) return;
     
-    // Grab the ID immediately from state before mutating
     const currentReplyId = replyingTo?.id || null;
 
     sendMessageMutation.mutate({
@@ -301,9 +300,21 @@ export const StudentCommunity = () => {
                const hasImage = msg.image_url && msg.image_url.trim() !== '';
                const hasContent = msg.content && msg.content.trim() !== '';
                
-               // Determine the Primary message data. 
-               // Note: Supabase can return this as an object or an array of objects.
-               const replyData = Array.isArray(msg.reply_to) ? msg.reply_to[0] : msg.reply_to;
+               // --- CRITICAL FIX: Validation of Reply Data ---
+               // 1. Get raw data
+               let rawReplyData = msg.reply_to;
+               // 2. Handle if it's an array (Supabase might return array for one-to-many)
+               if (Array.isArray(rawReplyData)) {
+                   rawReplyData = rawReplyData[0];
+               }
+               
+               // 3. STRICT CHECK: The ID of the fetched reply MUST match the 'reply_to_id' of the current message.
+               // This prevents the "Reverse Quote" bug where a parent message (with no reply_to_id) 
+               // accidentally displays its children (replies) as quotes.
+               let replyData = null;
+               if (msg.reply_to_id && rawReplyData && rawReplyData.id === msg.reply_to_id) {
+                   replyData = rawReplyData;
+               }
                
                const replyText = getReplyPreview(replyData);
                const isReplyToMe = replyData?.user_id === profile?.user_id;
@@ -324,9 +335,9 @@ export const StudentCommunity = () => {
                      {/* Sender Name (only if not me) */}
                      {!isMe && <div className="text-[11px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
 
-                     {/* QUOTE BLOCK: Visible ONLY in the Secondary Message (the reply) */}
-                     {/* It links back to the Primary Message */}
-                     {msg.reply_to_id && replyData && replyText && (
+                     {/* QUOTE BLOCK */}
+                     {/* Will ONLY render if reply_to_id exists AND matches the fetched data ID */}
+                     {replyData && replyText && (
                        <div 
                         className={`mb-1.5 rounded-md bg-black/5 border-l-[3px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none shadow-sm`}
                         onClick={() => {
@@ -352,7 +363,6 @@ export const StudentCommunity = () => {
                            <button onClick={() => toggleLikeMutation.mutate({ msgId: msg.id, isLiked })} className="p-1 hover:bg-black/5 rounded-full transition-colors">
                               <Heart className={`h-3.5 w-3.5 ${isLiked ? 'text-red-500 fill-red-500' : 'text-gray-400'}`} />
                            </button>
-                           {/* Reply Button: Clicking this sets CURRENT msg as Primary for your NEW Secondary msg */}
                            <button onClick={() => setReplyingTo(msg)} className="p-1 hover:bg-black/5 rounded-full transition-colors">
                               <Reply className="h-3.5 w-3.5 text-gray-400" />
                            </button>
@@ -383,7 +393,6 @@ export const StudentCommunity = () => {
 
           {/* Input Area */}
           <div className="p-2 md:p-3 bg-[#f0f2f5] border-t z-20">
-            {/* Reply Preview Bar: Shows the Primary Message you are about to reply to */}
             {replyingTo && (
               <div className="flex items-center justify-between bg-white p-2 rounded-lg mb-2 border-l-4 border-teal-500 shadow-sm animate-in slide-in-from-bottom-2">
                 <div className="flex flex-col px-2">
@@ -394,7 +403,6 @@ export const StudentCommunity = () => {
               </div>
             )}
 
-            {/* Image Preview */}
             {selectedImage && (
               <div className="flex items-center justify-between bg-blue-50 p-2 rounded-lg mb-2 border border-blue-100 shadow-sm">
                 <div className="flex items-center gap-3">
@@ -415,7 +423,6 @@ export const StudentCommunity = () => {
         </div>
       )}
 
-      {/* Delete Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
             <AlertDialogHeader>
