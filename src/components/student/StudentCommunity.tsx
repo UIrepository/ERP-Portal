@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { 
   Send, 
   Image as ImageIcon, 
@@ -17,11 +17,14 @@ import {
   Trash2, 
   X,
   Ban,
-  Lock
+  Lock,
+  AlertTriangle,
+  Megaphone
 } from 'lucide-react';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { motion, AnimatePresence } from 'framer-motion'; // Requires npm install framer-motion
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,6 +60,7 @@ interface CommunityMessage {
   reply_to_id: string | null;
   created_at: string;
   is_deleted: boolean;
+  is_priority: boolean; // New Field
   profiles: { name: string } | null;
   message_likes: { user_id: string; reaction_type: string }[]; 
 }
@@ -76,7 +80,7 @@ const getAvatarColor = (name: string) => {
   return colors[Math.abs(hash) % colors.length];
 };
 
-// --- Swipeable Message Component (Adapted Design) ---
+// --- Swipeable Message Component ---
 const MessageItem = ({ 
   msg, 
   isMe, 
@@ -101,19 +105,18 @@ const MessageItem = ({
   const [translateX, setTranslateX] = useState(0);
   const isSwiping = useRef(false);
 
-  const renderTextWithLinks = (text: string | null, isMe: boolean) => {
+  const renderTextWithLinks = (text: string | null, isMe: boolean, isPriority: boolean) => {
     if (!text) return null;
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const parts = text.split(urlRegex);
+    const linkColor = isMe && !isPriority ? 'text-teal-100 hover:text-white' : 'text-teal-600 hover:text-teal-800';
     return parts.map((part, i) => part.match(urlRegex) ? (
-      <a key={i} href={part} target="_blank" rel="noopener noreferrer" className={`${isMe ? 'text-teal-100 hover:text-white' : 'text-teal-600 hover:text-teal-800'} underline break-all`}>{part}</a>
+      <a key={i} href={part} target="_blank" rel="noopener noreferrer" className={`${linkColor} underline break-all`}>{part}</a>
     ) : part);
   };
 
   const isReplyToMe = replyData?.user_id === profile?.user_id;
   const replySenderName = isReplyToMe ? "You" : replyData?.profiles?.name;
-  
-  // Styling adapted for the new bubbles
   const replyBorderColor = isMe ? "border-teal-300/50" : "border-teal-500";
   const replyNameColor = isMe ? "text-teal-100" : "text-teal-700";
   const replyTextColor = isMe ? "text-teal-50/80" : "text-gray-500";
@@ -138,30 +141,16 @@ const MessageItem = ({
     setTouchEnd(e.targetTouches[0].clientX);
     const currentX = e.targetTouches[0].clientX;
     const diff = currentX - touchStart;
-
-    if (isMe && diff < 0 && diff > -100) {
-      setTranslateX(diff);
-    } else if (!isMe && diff > 0 && diff < 100) {
-      setTranslateX(diff);
-    }
+    if (isMe && diff < 0 && diff > -100) setTranslateX(diff);
+    else if (!isMe && diff > 0 && diff < 100) setTranslateX(diff);
   };
 
   const onTouchEnd = () => {
     isSwiping.current = false;
-    if (!touchStart || !touchEnd) {
-      setTranslateX(0);
-      return;
-    }
+    if (!touchStart || !touchEnd) { setTranslateX(0); return; }
     const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > 50;
-    const isRightSwipe = distance < -50;
-
-    if (isMe && isLeftSwipe) {
-      onReply(msg);
-    } else if (!isMe && isRightSwipe) {
-      onReply(msg);
-    }
-    
+    if (isMe && distance > 50) onReply(msg);
+    else if (!isMe && distance < -50) onReply(msg);
     setTranslateX(0);
     setTouchStart(null);
     setTouchEnd(null);
@@ -169,23 +158,36 @@ const MessageItem = ({
 
   if (msg.is_deleted) {
     return (
-      <div className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} my-2`}>
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }} 
+        animate={{ opacity: 1, y: 0 }}
+        className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} my-2`}
+      >
         <div className={`text-gray-400 text-xs italic px-3 py-1.5 border border-dashed border-gray-300 rounded-lg flex items-center gap-2 select-none bg-white/50`}>
            <Ban className="h-3 w-3" />
            <span>Message deleted {msg.profiles?.name}</span>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
-  // New Bubble Shape Logic
   const bubbleShapeClass = isMe 
     ? "rounded-tl-2xl rounded-tr-2xl rounded-bl-2xl rounded-br-none" 
     : "rounded-tl-2xl rounded-tr-2xl rounded-br-2xl rounded-bl-none";
 
+  // Priority Styles
+  const priorityClass = msg.is_priority 
+    ? "bg-red-50 border-2 border-red-200 text-red-900 shadow-md" 
+    : isMe 
+      ? "bg-teal-700 text-white" 
+      : "bg-white text-gray-800 border border-gray-200";
+
   return (
-    <div 
-      className={`flex w-full ${isMe ? 'justify-end' : 'justify-start items-end gap-2'} group mb-2 relative transition-transform duration-200 ease-out px-2 animate-in fade-in slide-in-from-bottom-1 duration-300`}
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.95, y: 10 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className={`flex w-full ${isMe ? 'justify-end' : 'justify-start items-end gap-2'} group mb-2 relative px-2`}
       style={{ transform: `translateX(${translateX}px)` }}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
@@ -207,13 +209,18 @@ const MessageItem = ({
 
       <ContextMenu>
         <ContextMenuTrigger className={`block max-w-[85%] md:max-w-[65%] relative ${reactionsCount > 0 ? 'mb-5' : 'mb-0'}`}>
-          <div className={`relative px-4 py-3 shadow-sm text-sm transition-all ${bubbleShapeClass} ${
-            isMe 
-              ? 'bg-teal-700 text-white' 
-              : 'bg-white text-gray-800 border border-gray-200'
-          }`}>
+          <div className={`relative px-4 py-3 shadow-sm text-sm transition-all ${bubbleShapeClass} ${priorityClass}`}>
             
-            {!isMe && <div className="text-[11px] font-bold text-teal-600 mb-1">{msg.profiles?.name}</div>}
+            {/* Priority Badge */}
+            {msg.is_priority && (
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-red-600 uppercase tracking-wider mb-1.5 pb-1 border-b border-red-200/50">
+                <Megaphone className="h-3 w-3 fill-red-600" /> 
+                Priority Announcement
+              </div>
+            )}
+
+            {!isMe && !msg.is_priority && <div className="text-[11px] font-bold text-teal-600 mb-1">{msg.profiles?.name}</div>}
+            {!isMe && msg.is_priority && <div className="text-[11px] font-bold text-red-700 mb-1">{msg.profiles?.name}</div>}
 
             {replyData && replyText && (
               <div 
@@ -241,14 +248,14 @@ const MessageItem = ({
                  </div>
                )}
                {msg.content && msg.content.trim() !== '' && (
-                 <p className={`whitespace-pre-wrap leading-relaxed break-words text-[15px] ${isMe ? 'text-white/95' : 'text-gray-800'}`}>
-                   {renderTextWithLinks(msg.content, isMe)}
+                 <p className={`whitespace-pre-wrap leading-relaxed break-words text-[15px] ${isMe && !msg.is_priority ? 'text-white/95' : 'text-gray-800'}`}>
+                   {renderTextWithLinks(msg.content, isMe, msg.is_priority)}
                  </p>
                )}
             </div>
 
             <div className={`flex justify-end items-center mt-1 gap-1 min-w-[50px]`}>
-               <span className={`text-[10px] ${isMe ? 'text-teal-100' : 'text-gray-400'} whitespace-nowrap ml-auto`}>
+               <span className={`text-[10px] ${isMe && !msg.is_priority ? 'text-teal-100' : 'text-gray-400'} whitespace-nowrap ml-auto`}>
                  {format(new Date(msg.created_at), 'h:mm a')}
                </span>
             </div>
@@ -272,14 +279,8 @@ const MessageItem = ({
                 const typeMap: Record<string, string> = { '👍': 'like', '❤️': 'love', '😂': 'laugh', '👎': 'dislike' };
                 const type = typeMap[emoji];
                 return (
-                  <ContextMenuItem 
-                    key={emoji} 
-                    asChild 
-                    onSelect={() => onReact(msg.id, type)}
-                  >
-                    <button 
-                      className={`text-lg hover:scale-125 transition-transform p-1 cursor-pointer border-none bg-transparent outline-none ${myReaction?.reaction_type === type ? 'bg-blue-100 rounded-full' : ''}`}
-                    >
+                  <ContextMenuItem key={emoji} asChild onSelect={() => onReact(msg.id, type)}>
+                    <button className={`text-lg hover:scale-125 transition-transform p-1 cursor-pointer border-none bg-transparent outline-none ${myReaction?.reaction_type === type ? 'bg-blue-100 rounded-full' : ''}`}>
                       {emoji}
                     </button>
                   </ContextMenuItem>
@@ -306,7 +307,7 @@ const MessageItem = ({
             )}
         </ContextMenuContent>
       </ContextMenu>
-    </div>
+    </motion.div>
   );
 };
 
@@ -505,7 +506,7 @@ export const StudentCommunity = () => {
   return (
     <div className="flex h-[100dvh] w-full bg-[#fdfbf7] relative overflow-hidden">
       
-      {/* GROUP LIST SIDEBAR (Original Style) */}
+      {/* GROUP LIST SIDEBAR */}
       <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
         <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
           <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Users className="h-5 w-5 text-teal-600" /> Communities</h2>
@@ -569,7 +570,7 @@ export const StudentCommunity = () => {
           {/* Messages List */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 z-10 pb-24 md:pb-4" ref={scrollAreaRef}>
             
-            {/* Professional Encryption/System Note (Clean Gray style) */}
+            {/* Professional Encryption/System Note */}
             <div className="flex justify-center mb-6 mt-2">
                 <div className="text-gray-400 text-[10px] font-medium flex items-center gap-1.5 select-none bg-gray-200/50 px-3 py-1 rounded-full border border-gray-200 backdrop-blur-sm">
                     <Lock className="h-3 w-3" />
@@ -590,7 +591,7 @@ export const StudentCommunity = () => {
                                 {isToday(parseISO(dateKey)) ? 'Today' : isYesterday(parseISO(dateKey)) ? 'Yesterday' : format(parseISO(dateKey), 'MMMM d, yyyy')}
                             </div>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="center">
+                        <PopoverContent className="w-auto p-0 bg-white" align="center">
                             <Calendar
                                 mode="single"
                                 selected={calendarDate}
@@ -600,7 +601,7 @@ export const StudentCommunity = () => {
                                     highlighted: activeDates
                                 }}
                                 modifiersStyles={{
-                                    highlighted: { fontWeight: 'bold', color: '#0f766e', textDecoration: 'underline' }
+                                    highlighted: { fontWeight: 'bold', color: '#4a3728', textDecoration: 'underline' }
                                 }}
                             />
                         </PopoverContent>
@@ -608,19 +609,21 @@ export const StudentCommunity = () => {
                  </div>
 
                  {/* Messages */}
-                 {dateMessages.map((msg) => (
-                   <MessageItem
-                     key={msg.id}
-                     msg={msg}
-                     isMe={msg.user_id === profile?.user_id}
-                     replyData={msg.reply_to_id ? messageMap.get(msg.reply_to_id) : null}
-                     replyText={msg.reply_to_id ? (messageMap.get(msg.reply_to_id)?.content || 'Message') : null}
-                     onReply={setReplyingTo}
-                     onDelete={(id) => setDeleteId(id)}
-                     onReact={(msgId, type) => toggleReactionMutation.mutate({ msgId, type })}
-                     profile={profile}
-                   />
-                 ))}
+                 <AnimatePresence>
+                   {dateMessages.map((msg) => (
+                     <MessageItem
+                       key={msg.id}
+                       msg={msg}
+                       isMe={msg.user_id === profile?.user_id}
+                       replyData={msg.reply_to_id ? messageMap.get(msg.reply_to_id) : null}
+                       replyText={msg.reply_to_id ? (messageMap.get(msg.reply_to_id)?.content || 'Message') : null}
+                       onReply={setReplyingTo}
+                       onDelete={(id) => setDeleteId(id)}
+                       onReact={(msgId, type) => toggleReactionMutation.mutate({ msgId, type })}
+                       profile={profile}
+                     />
+                   ))}
+                 </AnimatePresence>
                </div>
              ))}
             <div ref={messagesEndRef} />
