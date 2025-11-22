@@ -18,13 +18,13 @@ import {
   X,
   Ban,
   Lock,
-  AlertTriangle,
+  AlertCircle,
   Megaphone
 } from 'lucide-react';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { motion, AnimatePresence } from 'framer-motion'; // Requires npm install framer-motion
+import { motion, AnimatePresence } from 'framer-motion'; // Requires framer-motion
 import {
   AlertDialog,
   AlertDialogAction,
@@ -177,7 +177,7 @@ const MessageItem = ({
 
   // Priority Styles
   const priorityClass = msg.is_priority 
-    ? "bg-red-50 border-2 border-red-200 text-red-900 shadow-md" 
+    ? "bg-rose-50 border-2 border-rose-200 text-rose-900 shadow-md" 
     : isMe 
       ? "bg-teal-700 text-white" 
       : "bg-white text-gray-800 border border-gray-200";
@@ -213,14 +213,14 @@ const MessageItem = ({
             
             {/* Priority Badge */}
             {msg.is_priority && (
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-red-600 uppercase tracking-wider mb-1.5 pb-1 border-b border-red-200/50">
-                <Megaphone className="h-3 w-3 fill-red-600" /> 
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-rose-600 uppercase tracking-wider mb-1.5 pb-1 border-b border-rose-200/50">
+                <Megaphone className="h-3 w-3 fill-rose-600" /> 
                 Priority Announcement
               </div>
             )}
 
             {!isMe && !msg.is_priority && <div className="text-[11px] font-bold text-teal-600 mb-1">{msg.profiles?.name}</div>}
-            {!isMe && msg.is_priority && <div className="text-[11px] font-bold text-red-700 mb-1">{msg.profiles?.name}</div>}
+            {!isMe && msg.is_priority && <div className="text-[11px] font-bold text-rose-700 mb-1">{msg.profiles?.name}</div>}
 
             {replyData && replyText && (
               <div 
@@ -434,7 +434,8 @@ export const StudentCommunity = () => {
         user_id: profile.user_id,
         batch: selectedGroup.batch_name,
         subject: selectedGroup.subject_name,
-        reply_to_id: replyId
+        reply_to_id: replyId,
+        is_priority: false // Students cannot send priority
       });
       if (error) throw error;
     },
@@ -585,7 +586,7 @@ export const StudentCommunity = () => {
                  
                  {/* Date Header */}
                  <div className="flex justify-center sticky top-0 z-10 py-2">
-                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                    <Popover>
                         <PopoverTrigger asChild>
                             <div className="bg-white/90 backdrop-blur border border-gray-200 text-gray-500 text-[11px] font-medium px-3 py-0.5 rounded-full shadow-sm cursor-pointer hover:bg-gray-50 transition-colors select-none">
                                 {isToday(parseISO(dateKey)) ? 'Today' : isYesterday(parseISO(dateKey)) ? 'Yesterday' : format(parseISO(dateKey), 'MMMM d, yyyy')}
@@ -670,7 +671,7 @@ export const StudentCommunity = () => {
       )}
 
       {/* Delete Dialog */}
-      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+      <AlertDialog>
         <AlertDialogContent>
             <AlertDialogHeader>
                 <AlertDialogTitle>Delete Message?</AlertDialogTitle>
