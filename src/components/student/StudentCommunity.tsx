@@ -18,7 +18,9 @@ import {
   Trash2, 
   X,
   Ban,
-  Lock
+  Lock,
+  Info,
+  SmilePlus
 } from 'lucide-react';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -38,6 +40,7 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
+  ContextMenuSeparator,
 } from "@/components/ui/context-menu";
 import {
   Popover,
@@ -57,7 +60,7 @@ interface CommunityMessage {
   reply_to_id: string | null;
   created_at: string;
   is_deleted: boolean;
-  profiles: { name: string } | null; // Made nullable to be safe
+  profiles: { name: string } | null;
   message_likes: { user_id: string; reaction_type: string }[]; 
 }
 
@@ -86,13 +89,11 @@ const MessageItem = ({
   onReact: (msgId: string, type: string) => void,
   profile: any
 }) => {
-  // Swipe Logic State
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [translateX, setTranslateX] = useState(0);
   const isSwiping = useRef(false);
 
-  // Helpers
   const renderTextWithLinks = (text: string | null) => {
     if (!text) return null;
     const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -107,7 +108,6 @@ const MessageItem = ({
   const replyBorderColor = isReplyToMe ? "border-teal-500" : "border-purple-500";
   const replyNameColor = isReplyToMe ? "text-teal-600" : "text-purple-600";
 
-  // Reactions
   const myReaction = msg.message_likes?.find(l => l.user_id === profile?.user_id);
   const reactionsCount = msg.message_likes?.length || 0;
   const reactionCounts = msg.message_likes?.reduce((acc: any, curr) => {
@@ -116,7 +116,6 @@ const MessageItem = ({
     return acc;
   }, {});
 
-  // Touch Handlers
   const onTouchStart = (e: React.TouchEvent) => {
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
@@ -129,7 +128,6 @@ const MessageItem = ({
     const currentX = e.targetTouches[0].clientX;
     const diff = currentX - touchStart;
 
-    // Limit swipe distance
     if (isMe && diff < 0 && diff > -100) {
       setTranslateX(diff);
     } else if (!isMe && diff > 0 && diff < 100) {
@@ -144,8 +142,8 @@ const MessageItem = ({
       return;
     }
     const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > 50; // Moved finger left
-    const isRightSwipe = distance < -50; // Moved finger right
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
 
     if (isMe && isLeftSwipe) {
       onReply(msg);
@@ -177,7 +175,6 @@ const MessageItem = ({
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
-      {/* Visual Indicator for Swipe */}
       {translateX !== 0 && (
         <div className={`absolute top-1/2 -translate-y-1/2 ${isMe ? 'right-full mr-4' : 'left-full ml-4'} text-gray-400`}>
           <Reply className="h-5 w-5" />
@@ -190,10 +187,8 @@ const MessageItem = ({
             isMe ? 'bg-[#dcf8c6] rounded-tr-none' : 'bg-white rounded-tl-none'
           }`}>
             
-            {/* Sender Name */}
             {!isMe && <div className="text-[11px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
 
-            {/* Quote Block */}
             {replyData && replyText && (
               <div 
                className={`mb-1.5 rounded-md bg-black/5 border-l-[3px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none shadow-sm`}
@@ -208,7 +203,6 @@ const MessageItem = ({
               </div>
             )}
 
-            {/* Content */}
             <div className="text-gray-900 px-1" id={`msg-${msg.id}`}>
                {msg.image_url && msg.image_url.trim() !== '' && (
                  <div className="mb-1 rounded-lg overflow-hidden mt-1">
@@ -227,14 +221,12 @@ const MessageItem = ({
                )}
             </div>
 
-            {/* Footer: Time */}
             <div className="flex justify-end items-center mt-0.5 gap-1 min-w-[50px] h-4">
                <span className="text-[10px] text-gray-400 whitespace-nowrap ml-auto">
                  {format(new Date(msg.created_at), 'h:mm a')}
                </span>
             </div>
 
-            {/* Reactions: Positioned absolutely to avoid flow disruption */}
             {reactionsCount > 0 && (
               <div className={`absolute -bottom-6 ${isMe ? 'right-0' : 'left-0'} z-10 flex items-center gap-0.5 bg-white rounded-full px-1.5 py-0.5 shadow-sm border border-gray-200 text-[10px] cursor-pointer hover:scale-105 transition-transform`}>
                 {Object.entries(reactionCounts).map(([type, count]) => (
@@ -268,6 +260,17 @@ const MessageItem = ({
                 )
               })}
             </div>
+            
+            {/* Explicit Option to Remove Reaction */}
+            {myReaction && (
+              <>
+                <ContextMenuItem onSelect={() => onReact(msg.id, myReaction.reaction_type)} className="text-red-500 focus:text-red-600">
+                  <X className="mr-2 h-4 w-4" /> Remove Reaction
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+              </>
+            )}
+
             <ContextMenuItem onSelect={() => onReply(msg)}>
               <Reply className="mr-2 h-4 w-4" /> Reply
             </ContextMenuItem>
@@ -290,7 +293,6 @@ export const StudentCommunity = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  // --- State ---
   const [selectedGroup, setSelectedGroup] = useState<UserEnrollment | null>(null);
   const [messageText, setMessageText] = useState('');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -298,11 +300,9 @@ export const StudentCommunity = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null); 
   
-  // Calendar State
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(new Date());
 
-  // --- 1. Fetch Groups ---
   const { data: enrollments = [], isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['community-enrollments', profile?.user_id],
     queryFn: async () => {
@@ -329,7 +329,6 @@ export const StudentCommunity = () => {
     setReplyingTo(null);
   }, [selectedGroup]);
 
-  // --- 2. Fetch Messages ---
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<CommunityMessage[]>({
     queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
     queryFn: async () => {
@@ -351,7 +350,6 @@ export const StudentCommunity = () => {
     enabled: !!selectedGroup
   });
 
-  // --- 3. Data Processing ---
   const messageMap = useMemo(() => {
     const map = new Map<string, CommunityMessage>();
     messages.forEach(msg => map.set(msg.id, msg));
@@ -372,7 +370,6 @@ export const StudentCommunity = () => {
     return Object.keys(groupedMessages).map(dateStr => new Date(dateStr));
   }, [groupedMessages]);
 
-  // --- 4. Real-time ---
   useEffect(() => {
     if (!selectedGroup) return;
     const refresh = () => {
@@ -390,7 +387,6 @@ export const StudentCommunity = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [messages?.length, selectedGroup]);
 
-  // --- 5. Mutations ---
   const sendMessageMutation = useMutation({
     mutationFn: async ({ text, image, replyId }: { text: string; image: File | null; replyId: string | null }) => {
       if (!profile?.user_id || !selectedGroup) return;
@@ -444,11 +440,14 @@ export const StudentCommunity = () => {
       const existingReaction = messages.find(m => m.id === msgId)?.message_likes.find(l => l.user_id === profile?.user_id);
       if (existingReaction) {
         if (existingReaction.reaction_type === type) {
+          // Same reaction clicked -> Remove it (DELETE)
           await supabase.from('message_likes').delete().match({ message_id: msgId, user_id: profile?.user_id });
         } else {
+          // Different reaction -> Replace it (UPDATE)
           await supabase.from('message_likes').update({ reaction_type: type }).match({ message_id: msgId, user_id: profile?.user_id });
         }
       } else {
+        // No reaction -> Add new (INSERT)
         await supabase.from('message_likes').insert({ message_id: msgId, user_id: profile?.user_id, reaction_type: type });
       }
     },
@@ -481,17 +480,7 @@ export const StudentCommunity = () => {
     }
   };
 
-  const getReplyPreview = (primaryMsg: CommunityMessage) => {
-    if (!primaryMsg) return null;
-    if (primaryMsg.is_deleted) return '🗑️ Message deleted';
-    if (primaryMsg.content && primaryMsg.content.trim().length > 0) return primaryMsg.content;
-    if (primaryMsg.image_url) return '📷 Photo';
-    return 'Message'; 
-  };
-
-  // --- Render ---
   return (
-    // Updated height to use dynamic viewport height (dvh) for better mobile support
     <div className="flex h-[100dvh] w-full bg-[#efeae2] relative overflow-hidden">
       
       {/* GROUP LIST SIDEBAR */}
@@ -532,7 +521,9 @@ export const StudentCommunity = () => {
               {isMobile && <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }} className="-ml-2 mr-1"><ArrowLeft className="h-5 w-5" /></Button>}
               <Avatar className="h-10 w-10 border border-gray-200"><AvatarFallback className="bg-teal-600 text-white font-bold">{selectedGroup.subject_name[0]}</AvatarFallback></Avatar>
               <div>
-                <h3 className="font-bold text-gray-800 leading-tight">{selectedGroup.subject_name}</h3>
+                <h3 className="font-bold text-gray-800 leading-tight flex items-center gap-2">
+                  {selectedGroup.subject_name}
+                </h3>
                 <p className="text-xs text-gray-500">{selectedGroup.batch_name}</p>
               </div>
             </div>
@@ -586,7 +577,7 @@ export const StudentCommunity = () => {
                      msg={msg}
                      isMe={msg.user_id === profile?.user_id}
                      replyData={msg.reply_to_id ? messageMap.get(msg.reply_to_id) : null}
-                     replyText={msg.reply_to_id ? getReplyPreview(messageMap.get(msg.reply_to_id)!) : null}
+                     replyText={msg.reply_to_id ? (messageMap.get(msg.reply_to_id)?.content || 'Message') : null}
                      onReply={setReplyingTo}
                      onDelete={(id) => setDeleteId(id)}
                      onReact={(msgId, type) => toggleReactionMutation.mutate({ msgId, type })}
@@ -605,7 +596,7 @@ export const StudentCommunity = () => {
               <div className="flex items-center justify-between bg-white p-2 rounded-lg mb-2 border-l-4 border-teal-500 shadow-sm animate-in slide-in-from-bottom-2">
                 <div className="flex flex-col px-2">
                     <span className="text-xs font-bold text-teal-600">Replying to {replyingTo.user_id === profile?.user_id ? 'You' : replyingTo.profiles?.name}</span>
-                    <span className="text-xs text-gray-500 truncate max-w-[250px]">{getReplyPreview(replyingTo) || 'Attachment'}</span>
+                    <span className="text-xs text-gray-500 truncate max-w-[250px]">{replyingTo.content || 'Attachment'}</span>
                 </div>
                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setReplyingTo(null)}><X className="h-4 w-4 text-gray-500" /></Button>
               </div>
