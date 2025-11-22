@@ -18,13 +18,12 @@ import {
   X,
   Ban,
   Lock,
-  AlertCircle,
   Megaphone
 } from 'lucide-react';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { motion, AnimatePresence } from 'framer-motion'; // Requires framer-motion
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -93,7 +92,7 @@ const MessageItem = ({
 }: {
   msg: CommunityMessage,
   isMe: boolean,
-  replyData: any,
+  replyData: CommunityMessage | undefined | null,
   replyText: string | null,
   onReply: (msg: CommunityMessage) => void,
   onDelete: (id: string) => void,
@@ -157,6 +156,12 @@ const MessageItem = ({
   };
 
   if (msg.is_deleted) {
+    // New logic: Check if the message was deleted by the sender (You) or a moderator (Admin)
+    const isDeletedBySender = msg.user_id === profile?.user_id;
+    const deletedText = isDeletedBySender 
+      ? `Message deleted ${msg.profiles?.name}` 
+      : 'Message deleted by moderator';
+
     return (
       <motion.div 
         initial={{ opacity: 0, y: 10 }} 
@@ -165,7 +170,7 @@ const MessageItem = ({
       >
         <div className={`text-gray-400 text-xs italic px-3 py-1.5 border border-dashed border-gray-300 rounded-lg flex items-center gap-2 select-none bg-white/50`}>
            <Ban className="h-3 w-3" />
-           <span>Message deleted {msg.profiles?.name}</span>
+           <span>{deletedText}</span>
         </div>
       </motion.div>
     );
@@ -371,7 +376,7 @@ export const StudentCommunity = () => {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      return data as any[];
+      return (data || []) as CommunityMessage[];
     },
     enabled: !!selectedGroup
   });
@@ -435,11 +440,12 @@ export const StudentCommunity = () => {
         batch: selectedGroup.batch_name,
         subject: selectedGroup.subject_name,
         reply_to_id: replyId,
-        is_priority: false // Students cannot send priority
+        is_priority: false
       });
       if (error) throw error;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['community-messages'] });
       setMessageText('');
       setSelectedImage(null);
       setReplyingTo(null); 
@@ -586,7 +592,7 @@ export const StudentCommunity = () => {
                  
                  {/* Date Header */}
                  <div className="flex justify-center sticky top-0 z-10 py-2">
-                    <Popover>
+                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                         <PopoverTrigger asChild>
                             <div className="bg-white/90 backdrop-blur border border-gray-200 text-gray-500 text-[11px] font-medium px-3 py-0.5 rounded-full shadow-sm cursor-pointer hover:bg-gray-50 transition-colors select-none">
                                 {isToday(parseISO(dateKey)) ? 'Today' : isYesterday(parseISO(dateKey)) ? 'Yesterday' : format(parseISO(dateKey), 'MMMM d, yyyy')}
@@ -598,12 +604,8 @@ export const StudentCommunity = () => {
                                 selected={calendarDate}
                                 onSelect={handleDateSelect}
                                 initialFocus
-                                modifiers={{
-                                    highlighted: activeDates
-                                }}
-                                modifiersStyles={{
-                                    highlighted: { fontWeight: 'bold', color: '#4a3728', textDecoration: 'underline' }
-                                }}
+                                modifiers={{ highlighted: activeDates }}
+                                modifiersStyles={{ highlighted: { fontWeight: 'bold', color: '#4a3728', textDecoration: 'underline' } }}
                             />
                         </PopoverContent>
                     </Popover>
@@ -616,8 +618,8 @@ export const StudentCommunity = () => {
                        key={msg.id}
                        msg={msg}
                        isMe={msg.user_id === profile?.user_id}
-                       replyData={msg.reply_to_id ? messageMap.get(msg.reply_to_id) : null}
-                       replyText={msg.reply_to_id ? (messageMap.get(msg.reply_to_id)?.content || 'Message') : null}
+                       replyData={messageMap.get(msg.reply_to_id || '')}
+                       replyText={messageMap.get(msg.reply_to_id || '')?.content || 'Message'}
                        onReply={setReplyingTo}
                        onDelete={(id) => setDeleteId(id)}
                        onReact={(msgId, type) => toggleReactionMutation.mutate({ msgId, type })}
@@ -671,7 +673,7 @@ export const StudentCommunity = () => {
       )}
 
       {/* Delete Dialog */}
-      <AlertDialog>
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
             <AlertDialogHeader>
                 <AlertDialogTitle>Delete Message?</AlertDialogTitle>
