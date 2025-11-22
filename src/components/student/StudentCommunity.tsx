@@ -5,21 +5,19 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   Send, 
   Image as ImageIcon, 
   Reply, 
   ArrowLeft, 
   Users, 
-  Hash, 
   Loader2, 
   Paperclip, 
   Trash2, 
   X,
   Ban,
-  Lock,
-  ShieldCheck
+  Lock
 } from 'lucide-react';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -78,7 +76,7 @@ const getAvatarColor = (name: string) => {
   return colors[Math.abs(hash) % colors.length];
 };
 
-// --- Swipeable Message Component ---
+// --- Swipeable Message Component (Adapted Design) ---
 const MessageItem = ({ 
   msg, 
   isMe, 
@@ -115,7 +113,7 @@ const MessageItem = ({
   const isReplyToMe = replyData?.user_id === profile?.user_id;
   const replySenderName = isReplyToMe ? "You" : replyData?.profiles?.name;
   
-  // Professional Reply Styling
+  // Styling adapted for the new bubbles
   const replyBorderColor = isMe ? "border-teal-300/50" : "border-teal-500";
   const replyNameColor = isMe ? "text-teal-100" : "text-teal-700";
   const replyTextColor = isMe ? "text-teal-50/80" : "text-gray-500";
@@ -172,17 +170,24 @@ const MessageItem = ({
   if (msg.is_deleted) {
     return (
       <div className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} my-2`}>
-        <div className={`text-gray-400 text-xs italic px-4 py-2 border border-dashed border-gray-300 rounded-lg flex items-center gap-2 select-none`}>
+        <div className={`text-gray-400 text-xs italic px-3 py-1.5 border border-dashed border-gray-300 rounded-lg flex items-center gap-2 select-none bg-white/50`}>
            <Ban className="h-3 w-3" />
-           <span>Message deleted</span>
+           <span>Message deleted ({msg.profiles?.name})</span>
         </div>
       </div>
     );
   }
 
+  // New Bubble Shape Logic
+  // Left (Others): Rounded top-left, top-right, bottom-right. Sharp bottom-left.
+  // Right (Me): Rounded top-left, top-right, bottom-left. Sharp bottom-right.
+  const bubbleShapeClass = isMe 
+    ? "rounded-tl-2xl rounded-tr-2xl rounded-bl-2xl rounded-br-none" 
+    : "rounded-tl-2xl rounded-tr-2xl rounded-br-2xl rounded-bl-none";
+
   return (
     <div 
-      className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} group mb-3 relative transition-transform duration-200 ease-out px-2`}
+      className={`flex w-full ${isMe ? 'justify-end' : 'justify-start items-end gap-2'} group mb-2 relative transition-transform duration-200 ease-out px-2 animate-in fade-in slide-in-from-bottom-1 duration-300`}
       style={{ transform: `translateX(${translateX}px)` }}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
@@ -195,7 +200,7 @@ const MessageItem = ({
       )}
 
       {!isMe && (
-        <Avatar className="h-8 w-8 mr-2 mt-1 shadow-sm border border-gray-100">
+        <Avatar className="h-8 w-8 mb-1 shadow-sm border border-white ring-2 ring-gray-50">
             <AvatarFallback className={`${getAvatarColor(msg.profiles?.name || '?')} text-[10px] font-bold`}>
                 {msg.profiles?.name?.substring(0, 2).toUpperCase()}
             </AvatarFallback>
@@ -204,13 +209,14 @@ const MessageItem = ({
 
       <ContextMenu>
         <ContextMenuTrigger className={`block max-w-[85%] md:max-w-[65%] relative ${reactionsCount > 0 ? 'mb-5' : 'mb-0'}`}>
-          <div className={`relative rounded-2xl px-4 py-3 shadow-sm text-sm transition-all ${
+          {/* Name for others, outside bubble if desired, or inside. Design suggests minimal outside or inside. Putting inside for neatness as per previous design or mimicking new code which hides names for subsequent messages. For now, simple inside. */}
+          <div className={`relative px-4 py-3 shadow-sm text-sm transition-all ${bubbleShapeClass} ${
             isMe 
-              ? 'bg-teal-700 text-white rounded-tr-sm' // Dark Turquoise for "Me"
-              : 'bg-white text-gray-800 border border-gray-100 rounded-tl-sm' // White for others
+              ? 'bg-teal-700 text-white' 
+              : 'bg-white text-gray-800 border border-gray-200'
           }`}>
             
-            {!isMe && <div className="text-[11px] font-bold text-gray-500 mb-1">{msg.profiles?.name}</div>}
+            {!isMe && <div className="text-[11px] font-bold text-teal-600 mb-1">{msg.profiles?.name}</div>}
 
             {replyData && replyText && (
               <div 
@@ -251,7 +257,7 @@ const MessageItem = ({
             </div>
 
             {reactionsCount > 0 && (
-              <div className={`absolute -bottom-5 ${isMe ? 'right-0' : 'left-0'} z-10 flex items-center gap-1 bg-white rounded-full px-2 py-0.5 shadow-md border border-gray-100 text-[10px] cursor-pointer hover:scale-105 transition-transform`}>
+              <div className={`absolute -bottom-4 ${isMe ? 'right-0' : 'left-0'} z-10 flex items-center gap-1 bg-white rounded-full px-2 py-0.5 shadow-sm border border-gray-200 text-[10px] cursor-pointer hover:scale-105 transition-transform`}>
                 {Object.entries(reactionCounts).map(([type, count]) => (
                   <span key={type} className="flex items-center">
                     {type === 'like' ? '👍' : type === 'love' ? '❤️' : type === 'laugh' ? '😂' : type === 'dislike' ? '👎' : '👍'} 
@@ -500,7 +506,7 @@ export const StudentCommunity = () => {
   };
 
   return (
-    <div className="flex h-[100dvh] w-full bg-gray-50 relative overflow-hidden">
+    <div className="flex h-[100dvh] w-full bg-[#f8fafc] relative overflow-hidden">
       
       {/* GROUP LIST SIDEBAR (Original Style) */}
       <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
@@ -534,10 +540,10 @@ export const StudentCommunity = () => {
 
       {/* CHAT AREA */}
       {selectedGroup && (
-        <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-gray-50' : 'w-full'}`}>
+        <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-[#f8fafc]' : 'w-full'}`}>
           
           {/* Header */}
-          <div className="px-4 py-3 bg-white border-b flex items-center justify-between shadow-sm z-20">
+          <div className="px-4 py-3 bg-white border-b flex items-center justify-between shadow-sm z-20 relative">
             <div className="flex items-center gap-3">
               {isMobile && <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }} className="-ml-2 mr-1 text-gray-600"><ArrowLeft className="h-5 w-5" /></Button>}
               <Avatar className="h-9 w-9 border border-gray-200">
@@ -552,12 +558,23 @@ export const StudentCommunity = () => {
             </div>
           </div>
 
+          {/* WATERMARK LAYER */}
+          <div 
+            className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none"
+            style={{
+                backgroundImage: `url('/logoofficial.png')`,
+                backgroundSize: '60px',
+                backgroundRepeat: 'repeat',
+                backgroundPosition: 'center'
+            }}
+          />
+
           {/* Messages List */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 pb-24 md:pb-4" ref={scrollAreaRef}>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 z-10 pb-24 md:pb-4" ref={scrollAreaRef}>
             
             {/* Professional Encryption/System Note (Clean Gray style) */}
             <div className="flex justify-center mb-6 mt-2">
-                <div className="text-gray-400 text-[10px] font-medium flex items-center gap-1.5 select-none bg-gray-200/50 px-3 py-1 rounded-full border border-gray-200">
+                <div className="text-gray-400 text-[10px] font-medium flex items-center gap-1.5 select-none bg-gray-200/50 px-3 py-1 rounded-full border border-gray-200 backdrop-blur-sm">
                     <Lock className="h-3 w-3" />
                     <span>Messages are end-to-end encrypted. No one outside of this chat can read them.</span>
                 </div>
