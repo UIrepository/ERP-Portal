@@ -437,22 +437,55 @@ export const StudentCommunity = () => {
 
   const toggleReactionMutation = useMutation({
     mutationFn: async ({ msgId, type }: { msgId: string, type: string }) => {
-      const existingReaction = messages.find(m => m.id === msgId)?.message_likes.find(l => l.user_id === profile?.user_id);
+      const userId = profile?.user_id;
+      if (!userId) throw new Error("Not authenticated");
+
+      // 1. Fetch current reaction state directly from DB
+      const { data: currentReactions, error: fetchError } = await supabase
+        .from('message_likes')
+        .select('*')
+        .eq('message_id', msgId)
+        .eq('user_id', userId);
+
+      if (fetchError) throw fetchError;
+
+      const existingReaction = currentReactions && currentReactions.length > 0 ? currentReactions[0] : null;
+
       if (existingReaction) {
         if (existingReaction.reaction_type === type) {
-          // Same reaction clicked -> Remove it (DELETE)
-          await supabase.from('message_likes').delete().match({ message_id: msgId, user_id: profile?.user_id });
+          // Same reaction -> Delete
+          const { error } = await supabase
+            .from('message_likes')
+            .delete()
+            .eq('message_id', msgId)
+            .eq('user_id', userId);
+          if (error) throw error;
         } else {
-          // Different reaction -> Replace it (UPDATE)
-          await supabase.from('message_likes').update({ reaction_type: type }).match({ message_id: msgId, user_id: profile?.user_id });
+          // Different reaction -> Update
+          const { error } = await supabase
+            .from('message_likes')
+            .update({ reaction_type: type })
+            .eq('message_id', msgId)
+            .eq('user_id', userId);
+          if (error) throw error;
         }
       } else {
-        // No reaction -> Add new (INSERT)
-        await supabase.from('message_likes').insert({ message_id: msgId, user_id: profile?.user_id, reaction_type: type });
+        // No reaction -> Insert
+        const { error } = await supabase
+          .from('message_likes')
+          .insert({ message_id: msgId, user_id: userId, reaction_type: type });
+        if (error) throw error;
       }
     },
     onSuccess: () => {
        queryClient.invalidateQueries({ queryKey: ['community-messages'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update reaction",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   });
 
