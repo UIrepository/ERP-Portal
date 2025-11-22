@@ -85,14 +85,23 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
         </div>
       </header>
 
-      <div className="flex flex-1">
+      <div className="flex flex-1 overflow-hidden">
         {/* Desktop Sidebar */}
-        <aside className="hidden md:block h-full w-64">
+        <aside className="hidden md:block h-full w-64 border-r">
           <Sidebar activeTab={activeTab} onTabChange={onTabChange} />
         </aside>
         
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <main className="flex-1 overflow-y-auto flex flex-col">
+            <div className="flex-1">
+                {children}
+            </div>
+            <footer className="py-6 border-t bg-card/30 mt-auto">
+                <p className="text-center text-sm text-muted-foreground font-medium">
+                    Built and Maintained by <span className="text-primary">Neural AI</span>
+                </p>
+            </footer>
+        </main>
       </div>
     </div>
   );
