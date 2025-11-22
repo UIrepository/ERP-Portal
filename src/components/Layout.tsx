@@ -98,7 +98,15 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
             </div>
             <footer className="py-6 border-t bg-card/30 mt-auto">
                 <p className="text-center text-sm text-muted-foreground font-medium">
-                    Built and Maintained by <span style={{ fontFamily: '"Zen Dots", sans-serif' }}><span className="text-teal-700">Neural</span> AI</span>
+                    Built and Maintained by <a 
+                      href="https://www.neuralai.in/about" 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="hover:underline"
+                      style={{ fontFamily: '"Zen Dots", sans-serif' }}
+                    >
+                      <span className="text-teal-700">Neural</span> AI
+                    </a>
                 </p>
             </footer>
         </main>
