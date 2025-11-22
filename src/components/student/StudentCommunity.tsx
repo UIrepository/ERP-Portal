@@ -16,10 +16,9 @@ import {
   Loader2, 
   Paperclip, 
   Trash2, 
-  X,
-  Info,
   Ban,
-  Lock
+  Lock,
+  Info
 } from 'lucide-react';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -34,12 +33,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -73,10 +66,224 @@ interface UserEnrollment {
   subject_name: string;
 }
 
-interface StudentProfile {
-  name: string;
-  // Email removed from interface
-}
+// --- Swipeable Message Component ---
+const MessageItem = ({ 
+  msg, 
+  isMe, 
+  replyData, 
+  replyText, 
+  onReply, 
+  onDelete, 
+  onReact, 
+  profile 
+}: {
+  msg: CommunityMessage,
+  isMe: boolean,
+  replyData: any,
+  replyText: string | null,
+  onReply: (msg: CommunityMessage) => void,
+  onDelete: (id: string) => void,
+  onReact: (msgId: string, type: string) => void,
+  profile: any
+}) => {
+  // Swipe Logic State
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const [translateX, setTranslateX] = useState(0);
+  const isSwiping = useRef(false);
+
+  // Helpers
+  const renderTextWithLinks = (text: string | null) => {
+    if (!text) return null;
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    return parts.map((part, i) => part.match(urlRegex) ? (
+      <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline break-all">{part}</a>
+    ) : part);
+  };
+
+  const isReplyToMe = replyData?.user_id === profile?.user_id;
+  const replySenderName = isReplyToMe ? "You" : replyData?.profiles?.name;
+  const replyBorderColor = isReplyToMe ? "border-teal-500" : "border-purple-500";
+  const replyNameColor = isReplyToMe ? "text-teal-600" : "text-purple-600";
+
+  // Reactions
+  const myReaction = msg.message_likes?.find(l => l.user_id === profile?.user_id);
+  const reactionsCount = msg.message_likes?.length || 0;
+  const reactionCounts = msg.message_likes?.reduce((acc: any, curr) => {
+    const type = curr.reaction_type || 'like';
+    acc[type] = (acc[type] || 0) + 1;
+    return acc;
+  }, {});
+
+  // Touch Handlers
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+    isSwiping.current = true;
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (!touchStart || !isSwiping.current) return;
+    setTouchEnd(e.targetTouches[0].clientX);
+    const currentX = e.targetTouches[0].clientX;
+    const diff = currentX - touchStart;
+
+    // Logic: Me (Right) -> Swipe Left (Negative diff)
+    // Logic: Other (Left) -> Swipe Right (Positive diff)
+    if (isMe && diff < 0 && diff > -100) {
+      setTranslateX(diff);
+    } else if (!isMe && diff > 0 && diff < 100) {
+      setTranslateX(diff);
+    }
+  };
+
+  const onTouchEnd = () => {
+    isSwiping.current = false;
+    if (!touchStart || !touchEnd) {
+      setTranslateX(0);
+      return;
+    }
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > 50; // Moved finger left
+    const isRightSwipe = distance < -50; // Moved finger right
+
+    if (isMe && isLeftSwipe) {
+      onReply(msg); // Trigger reply
+    } else if (!isMe && isRightSwipe) {
+      onReply(msg); // Trigger reply
+    }
+    
+    // Reset position
+    setTranslateX(0);
+    setTouchStart(null);
+    setTouchEnd(null);
+  };
+
+  if (msg.is_deleted) {
+    return (
+      <div className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} my-1`}>
+        <div className={`bg-white/50 text-gray-500 text-xs italic px-3 py-1.5 rounded-lg flex items-center gap-1.5 select-none border border-gray-200 max-w-[80%] ${isMe ? 'rounded-tr-none' : 'rounded-tl-none'}`}>
+           <Ban className="h-3 w-3 opacity-70" />
+           <span>This message was deleted by {msg.profiles?.name || 'Unknown'}</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} group mb-2 relative transition-transform duration-200 ease-out`}
+      style={{ transform: `translateX(${translateX}px)` }}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
+      {/* Visual Indicator for Swipe (Optional, shows icon behind message) */}
+      {translateX !== 0 && (
+        <div className={`absolute top-1/2 -translate-y-1/2 ${isMe ? 'right-full mr-4' : 'left-full ml-4'} text-gray-400`}>
+          <Reply className="h-5 w-5" />
+        </div>
+      )}
+
+      <ContextMenu>
+        <ContextMenuTrigger className={`block max-w-[85%] md:max-w-[65%] relative ${reactionsCount > 0 ? 'mb-6' : 'mb-1'}`}>
+          <div className={`relative rounded-lg p-2 shadow-sm text-sm ${
+            isMe ? 'bg-[#dcf8c6] rounded-tr-none' : 'bg-white rounded-tl-none'
+          }`}>
+            
+            {/* Sender Name */}
+            {!isMe && <div className="text-[11px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
+
+            {/* Quote Block */}
+            {replyData && replyText && (
+              <div 
+               className={`mb-1.5 rounded-md bg-black/5 border-l-[3px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none shadow-sm`}
+               onClick={(e) => {
+                 e.stopPropagation(); // Prevent bubble click
+                 const el = document.getElementById(`msg-${msg.reply_to_id}`);
+                 if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'});
+               }}
+              >
+                <span className={`text-[10px] font-bold ${replyNameColor} mb-0.5`}>{replySenderName}</span>
+                <span className="text-[11px] text-gray-700 line-clamp-2">{replyText}</span>
+              </div>
+            )}
+
+            {/* Content */}
+            <div className="text-gray-900 px-1" id={`msg-${msg.id}`}>
+               {msg.image_url && msg.image_url.trim() !== '' && (
+                 <div className="mb-1 rounded-lg overflow-hidden mt-1">
+                   <img 
+                     src={msg.image_url} 
+                     alt="Attachment" 
+                     className="max-w-full h-auto max-h-80 object-cover rounded-md cursor-pointer" 
+                     onClick={() => window.open(msg.image_url!, '_blank')} 
+                   />
+                 </div>
+               )}
+               {msg.content && msg.content.trim() !== '' && (
+                 <p className="whitespace-pre-wrap leading-relaxed break-words text-[15px]">
+                   {renderTextWithLinks(msg.content)}
+                 </p>
+               )}
+            </div>
+
+            {/* Footer: Time */}
+            <div className="flex justify-end items-center mt-0.5 gap-1 min-w-[50px] h-4">
+               <span className="text-[10px] text-gray-400 whitespace-nowrap ml-auto">
+                 {format(new Date(msg.created_at), 'h:mm a')}
+               </span>
+            </div>
+
+            {/* Reactions: Bubble below message (Positioned to not block time) */}
+            {reactionsCount > 0 && (
+              <div className={`absolute -bottom-5 ${isMe ? 'right-0' : 'left-0'} z-10 flex items-center gap-0.5 bg-white rounded-full px-1.5 py-0.5 shadow-sm border border-gray-200 text-[10px] cursor-pointer hover:scale-105 transition-transform`}>
+                {Object.entries(reactionCounts).map(([type, count]) => (
+                  <span key={type}>
+                    {type === 'like' ? '👍' : type === 'love' ? '❤️' : type === 'laugh' ? '😂' : type === 'dislike' ? '👎' : '👍'} 
+                    {Number(count) > 1 && <span className="ml-0.5 font-bold text-gray-600">{String(count)}</span>}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </ContextMenuTrigger>
+        
+        {/* Context Menu */}
+        <ContextMenuContent className="w-48">
+            <div className="flex justify-around p-2 bg-gray-50 rounded-md mb-2">
+              {['👍', '❤️', '😂', '👎'].map(emoji => {
+                const typeMap: Record<string, string> = { '👍': 'like', '❤️': 'love', '😂': 'laugh', '👎': 'dislike' };
+                const type = typeMap[emoji];
+                return (
+                  <ContextMenuItem 
+                    key={emoji} 
+                    asChild 
+                    onSelect={() => onReact(msg.id, type)}
+                  >
+                    <button 
+                      className={`text-lg hover:scale-125 transition-transform p-1 cursor-pointer border-none bg-transparent outline-none ${myReaction?.reaction_type === type ? 'bg-blue-100 rounded-full' : ''}`}
+                    >
+                      {emoji}
+                    </button>
+                  </ContextMenuItem>
+                )
+              })}
+            </div>
+            <ContextMenuItem onSelect={() => onReply(msg)}>
+              <Reply className="mr-2 h-4 w-4" /> Reply
+            </ContextMenuItem>
+            {isMe && (
+              <ContextMenuItem onSelect={() => onDelete(msg.id)} className="text-red-600 focus:text-red-600">
+                <Trash2 className="mr-2 h-4 w-4" /> Delete
+              </ContextMenuItem>
+            )}
+        </ContextMenuContent>
+      </ContextMenu>
+    </div>
+  );
+};
 
 export const StudentCommunity = () => {
   const { profile } = useAuth();
@@ -93,7 +300,6 @@ export const StudentCommunity = () => {
   const [replyingTo, setReplyingTo] = useState<CommunityMessage | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null); 
-  const [showStudentList, setShowStudentList] = useState(false);
   
   // Calendar State
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -155,7 +361,6 @@ export const StudentCommunity = () => {
     return map;
   }, [messages]);
 
-  // Group messages by Date
   const groupedMessages = useMemo(() => {
     const groups: Record<string, CommunityMessage[]> = {};
     messages.forEach(msg => {
@@ -170,25 +375,7 @@ export const StudentCommunity = () => {
     return Object.keys(groupedMessages).map(dateStr => new Date(dateStr));
   }, [groupedMessages]);
 
-  // --- 4. Fetch Students in Group ---
-  const { data: students = [] } = useQuery<StudentProfile[]>({
-    queryKey: ['group-students', selectedGroup?.batch_name, selectedGroup?.subject_name],
-    queryFn: async () => {
-      if (!selectedGroup) return [];
-      // Removed 'email' from the select query
-      const { data, error } = await supabase
-        .from('user_enrollments')
-        .select('profiles(name)') 
-        .eq('batch_name', selectedGroup.batch_name)
-        .eq('subject_name', selectedGroup.subject_name);
-      
-      if (error) throw error;
-      return data.map((item: any) => item.profiles).filter(Boolean);
-    },
-    enabled: !!selectedGroup && showStudentList
-  });
-
-  // --- 5. Real-time ---
+  // --- 4. Real-time ---
   useEffect(() => {
     if (!selectedGroup) return;
     const refresh = () => {
@@ -206,7 +393,7 @@ export const StudentCommunity = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [messages?.length, selectedGroup]);
 
-  // --- 6. Mutations ---
+  // --- 5. Mutations ---
   const sendMessageMutation = useMutation({
     mutationFn: async ({ text, image, replyId }: { text: string; image: File | null; replyId: string | null }) => {
       if (!profile?.user_id || !selectedGroup) return;
@@ -307,15 +494,6 @@ export const StudentCommunity = () => {
     return 'Message'; 
   };
 
-  const renderTextWithLinks = (text: string | null) => {
-    if (!text) return null;
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const parts = text.split(urlRegex);
-    return parts.map((part, i) => part.match(urlRegex) ? (
-      <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline break-all">{part}</a>
-    ) : part);
-  };
-
   // --- Render ---
   return (
     <div className="flex h-[calc(100vh-4rem)] w-full bg-[#efeae2] relative overflow-hidden">
@@ -352,18 +530,14 @@ export const StudentCommunity = () => {
       {selectedGroup && (
         <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-[#efeae2]' : 'w-full'}`}>
           
-          {/* Header */}
-          <div 
-            className="p-3 bg-white border-b flex items-center justify-between shadow-sm z-20 cursor-pointer hover:bg-gray-50 transition-colors"
-            onClick={() => setShowStudentList(true)}
-          >
+          {/* Header (Removed Click Handler for Student List) */}
+          <div className="p-3 bg-white border-b flex items-center justify-between shadow-sm z-20">
             <div className="flex items-center gap-3">
               {isMobile && <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }} className="-ml-2 mr-1"><ArrowLeft className="h-5 w-5" /></Button>}
               <Avatar className="h-10 w-10 border border-gray-200"><AvatarFallback className="bg-teal-600 text-white font-bold">{selectedGroup.subject_name[0]}</AvatarFallback></Avatar>
               <div>
                 <h3 className="font-bold text-gray-800 leading-tight flex items-center gap-2">
                   {selectedGroup.subject_name}
-                  <Info className="h-3 w-3 text-gray-400" />
                 </h3>
                 <p className="text-xs text-gray-500">{selectedGroup.batch_name}</p>
               </div>
@@ -412,123 +586,19 @@ export const StudentCommunity = () => {
                  </div>
 
                  {/* Messages */}
-                 {dateMessages.map((msg) => {
-                   const isMe = msg.user_id === profile?.user_id;
-                   const hasImage = msg.image_url && msg.image_url.trim() !== '';
-                   const hasContent = msg.content && msg.content.trim() !== '';
-                   
-                   // Reply
-                   const replyData = msg.reply_to_id ? messageMap.get(msg.reply_to_id) : null;
-                   const replyText = replyData ? getReplyPreview(replyData) : null;
-                   const isReplyToMe = replyData?.user_id === profile?.user_id;
-                   const replySenderName = isReplyToMe ? "You" : replyData?.profiles?.name;
-                   const replyBorderColor = isReplyToMe ? "border-teal-500" : "border-purple-500";
-                   const replyNameColor = isReplyToMe ? "text-teal-600" : "text-purple-600";
-                   
-                   // Reactions
-                   const myReaction = msg.message_likes?.find(l => l.user_id === profile?.user_id);
-                   const reactionsCount = msg.message_likes?.length || 0;
-                   const reactionCounts = msg.message_likes?.reduce((acc: any, curr) => {
-                     const type = curr.reaction_type || 'like';
-                     acc[type] = (acc[type] || 0) + 1;
-                     return acc;
-                   }, {});
-
-                   if (msg.is_deleted) {
-                     return (
-                       <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} my-1`}>
-                         <div className={`bg-white/50 text-gray-500 text-xs italic px-3 py-1.5 rounded-lg flex items-center gap-1.5 select-none border border-gray-200 max-w-[80%] ${isMe ? 'rounded-tr-none' : 'rounded-tl-none'}`}>
-                            <Ban className="h-3 w-3 opacity-70" />
-                            <span>This message was deleted by {msg.profiles?.name || 'Unknown'}</span>
-                         </div>
-                       </div>
-                     );
-                   }
-
-                   return (
-                     <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} group mb-1 relative`}>
-                       <ContextMenu>
-                         <ContextMenuTrigger className="block max-w-[85%] md:max-w-[65%]">
-                           <div className={`relative rounded-lg p-2 shadow-sm text-sm ${
-                             isMe ? 'bg-[#dcf8c6] rounded-tr-none' : 'bg-white rounded-tl-none'
-                           }`}>
-                             
-                                 {/* Sender Name */}
-                                 {!isMe && <div className="text-[11px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
-
-                                 {/* Quote Block */}
-                                 {replyData && replyText && (
-                                   <div 
-                                    className={`mb-1.5 rounded-md bg-black/5 border-l-[3px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none shadow-sm`}
-                                    onClick={() => {
-                                      const el = document.getElementById(`msg-${msg.reply_to_id}`);
-                                      if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'});
-                                    }}
-                                   >
-                                     <span className={`text-[10px] font-bold ${replyNameColor} mb-0.5`}>{replySenderName}</span>
-                                     <span className="text-[11px] text-gray-700 line-clamp-2">{replyText}</span>
-                                   </div>
-                                 )}
-
-                                 {/* Content */}
-                                 <div className="text-gray-900 px-1" id={`msg-${msg.id}`}>
-                                    {hasImage && <div className="mb-1 rounded-lg overflow-hidden mt-1"><img src={msg.image_url!} alt="Attachment" className="max-w-full h-auto max-h-80 object-cover rounded-md cursor-pointer" onClick={() => window.open(msg.image_url!, '_blank')} /></div>}
-                                    {hasContent && <p className="whitespace-pre-wrap leading-relaxed break-words text-[15px]">{renderTextWithLinks(msg.content)}</p>}
-                                 </div>
-
-                                 {/* Footer: Time */}
-                                 <div className="flex justify-end items-center mt-0.5 gap-1 min-w-[50px] h-4">
-                                    <span className="text-[10px] text-gray-400 whitespace-nowrap ml-auto">{format(new Date(msg.created_at), 'h:mm a')}</span>
-                                 </div>
-
-                                 {/* Reactions */}
-                                 {reactionsCount > 0 && (
-                                   <div className={`absolute -bottom-2 ${isMe ? 'right-0' : 'left-0'} z-10 flex items-center gap-0.5 bg-white rounded-full px-1.5 py-0.5 shadow-sm border border-gray-200 text-[10px] cursor-pointer hover:scale-105 transition-transform`}>
-                                     {Object.entries(reactionCounts).map(([type, count]) => (
-                                       <span key={type}>
-                                         {type === 'like' ? '👍' : type === 'love' ? '❤️' : type === 'laugh' ? '😂' : type === 'dislike' ? '👎' : '👍'} 
-                                         {Number(count) > 1 && <span className="ml-0.5 font-bold text-gray-600">{String(count)}</span>}
-                                       </span>
-                                     ))}
-                                   </div>
-                                 )}
-                           </div>
-                         </ContextMenuTrigger>
-                         
-                         {/* Context Menu */}
-                         <ContextMenuContent className="w-48">
-                             <div className="flex justify-around p-2 bg-gray-50 rounded-md mb-2">
-                               {['👍', '❤️', '😂', '👎'].map(emoji => {
-                                 const typeMap: Record<string, string> = { '👍': 'like', '❤️': 'love', '😂': 'laugh', '👎': 'dislike' };
-                                 const type = typeMap[emoji];
-                                 return (
-                                   <ContextMenuItem 
-                                     key={emoji} 
-                                     asChild 
-                                     onSelect={() => toggleReactionMutation.mutate({ msgId: msg.id, type })}
-                                   >
-                                     <button 
-                                       className={`text-lg hover:scale-125 transition-transform p-1 cursor-pointer border-none bg-transparent outline-none ${myReaction?.reaction_type === type ? 'bg-blue-100 rounded-full' : ''}`}
-                                     >
-                                       {emoji}
-                                     </button>
-                                   </ContextMenuItem>
-                                 )
-                               })}
-                             </div>
-                             <ContextMenuItem onSelect={() => setReplyingTo(msg)}>
-                               <Reply className="mr-2 h-4 w-4" /> Reply
-                             </ContextMenuItem>
-                             {isMe && (
-                               <ContextMenuItem onSelect={() => setDeleteId(msg.id)} className="text-red-600 focus:text-red-600">
-                                 <Trash2 className="mr-2 h-4 w-4" /> Delete
-                               </ContextMenuItem>
-                             )}
-                         </ContextMenuContent>
-                       </ContextMenu>
-                     </div>
-                   );
-                 })}
+                 {dateMessages.map((msg) => (
+                   <MessageItem
+                     key={msg.id}
+                     msg={msg}
+                     isMe={msg.user_id === profile?.user_id}
+                     replyData={msg.reply_to_id ? messageMap.get(msg.reply_to_id) : null}
+                     replyText={msg.reply_to_id ? getReplyPreview(messageMap.get(msg.reply_to_id)!) : null}
+                     onReply={setReplyingTo}
+                     onDelete={(id) => setDeleteId(id)}
+                     onReact={(msgId, type) => toggleReactionMutation.mutate({ msgId, type })}
+                     profile={profile}
+                   />
+                 ))}
                </div>
              ))}
             <div ref={messagesEndRef} />
@@ -566,29 +636,6 @@ export const StudentCommunity = () => {
           </div>
         </div>
       )}
-
-      {/* Student List Dialog */}
-      <Dialog open={showStudentList} onOpenChange={setShowStudentList}>
-        <DialogContent className="sm:max-w-md h-[60vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Community Members</DialogTitle>
-          </DialogHeader>
-          <ScrollArea className="flex-1 pr-4">
-            <div className="space-y-4">
-              {students.map((student, idx) => (
-                <div key={idx} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg">
-                  <Avatar>
-                    <AvatarFallback className="bg-teal-100 text-teal-700">{student.name[0]}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium text-sm">{student.name}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
 
       {/* Delete Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
