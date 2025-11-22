@@ -18,8 +18,7 @@ import {
   X,
   Ban,
   AlertCircle,
-  Megaphone,
-  Lock
+  Megaphone
 } from 'lucide-react';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -182,6 +181,9 @@ const MessageItemAdmin = ({
       ? "bg-teal-700 text-white" 
       : "bg-white text-gray-800 border border-gray-200";
 
+  // ADMIN DELETE LOGIC: Admin can delete any message.
+  const canDelete = isMe || profile?.role === 'super_admin'; 
+
   return (
     <motion.div 
       initial={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -300,7 +302,7 @@ const MessageItemAdmin = ({
             <ContextMenuItem onSelect={() => onReply(msg)}>
               <Reply className="mr-2 h-4 w-4" /> Reply
             </ContextMenuItem>
-            {isMe && (
+            {canDelete && (
               <ContextMenuItem onSelect={() => onDelete(msg.id)} className="text-red-600 focus:text-red-600">
                 <Trash2 className="mr-2 h-4 w-4" /> Delete
               </ContextMenuItem>
@@ -332,7 +334,7 @@ export const AdminCommunity = () => {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(new Date());
   
-  // Admin: Fetch ALL Groups (RLS allows Super Admin to see all)
+  // Admin: Fetch ALL Groups 
   const { data: allGroups = [], isLoading: isLoadingGroups } = useQuery<GroupInfo[]>({
     queryKey: ['admin-all-groups'],
     queryFn: async () => {
@@ -433,7 +435,6 @@ export const AdminCommunity = () => {
 
   const deleteMessageMutation = useMutation({
     mutationFn: async (id: string) => {
-      // Admins should be able to delete any message
       const { error } = await supabase.from('community_messages').update({ is_deleted: true }).eq('id', id);
       if (error) throw error;
       return id;
