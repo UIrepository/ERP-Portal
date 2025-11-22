@@ -60,7 +60,6 @@ interface CommunityMessage {
   created_at: string;
   is_deleted: boolean;
   profiles: { name: string };
-  // Updated to include reaction_type
   message_likes: { user_id: string; reaction_type: string }[]; 
 }
 
@@ -159,7 +158,6 @@ export const StudentCommunity = () => {
         .eq('subject_name', selectedGroup.subject_name);
       
       if (error) throw error;
-      // Flatten the response
       return data.map((item: any) => item.profiles).filter(Boolean);
     },
     enabled: !!selectedGroup && showStudentList
@@ -225,7 +223,6 @@ export const StudentCommunity = () => {
 
   const deleteMessageMutation = useMutation({
     mutationFn: async (id: string) => {
-      // We don't actually delete the row, just mark as deleted
       const { error } = await supabase.from('community_messages').update({ is_deleted: true }).eq('id', id);
       if (error) throw error;
       return id;
@@ -240,24 +237,19 @@ export const StudentCommunity = () => {
 
   const toggleReactionMutation = useMutation({
     mutationFn: async ({ msgId, type }: { msgId: string, type: string }) => {
-      // Check if user already reacted
       const existingReaction = messages.find(m => m.id === msgId)?.message_likes.find(l => l.user_id === profile?.user_id);
       
       if (existingReaction) {
         if (existingReaction.reaction_type === type) {
-          // Same reaction clicked -> Remove it
           await supabase.from('message_likes').delete().match({ message_id: msgId, user_id: profile?.user_id });
         } else {
-          // Different reaction -> Update it
           await supabase.from('message_likes').update({ reaction_type: type }).match({ message_id: msgId, user_id: profile?.user_id });
         }
       } else {
-        // New reaction -> Insert
         await supabase.from('message_likes').insert({ message_id: msgId, user_id: profile?.user_id, reaction_type: type });
       }
     },
     onSuccess: () => {
-       // Optimistic update or simple refetch
        queryClient.invalidateQueries({ queryKey: ['community-messages'] });
     }
   });
@@ -370,10 +362,10 @@ export const StudentCommunity = () => {
                  return acc;
                }, {});
 
-               // --- DELETED MESSAGE RENDER ---
+               // --- DELETED MESSAGE RENDER (ALIGNED) ---
                if (msg.is_deleted) {
                  return (
-                   <div key={msg.id} className="flex w-full justify-center my-2">
+                   <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} my-2`}>
                      <div className="bg-gray-200/60 text-gray-500 text-xs px-3 py-1 rounded-full flex items-center gap-1.5 select-none border border-gray-200">
                         <Ban className="h-3 w-3" />
                         <span>This message was deleted by <span className="font-medium">{msg.profiles?.name || 'Unknown'}</span></span>
@@ -436,26 +428,31 @@ export const StudentCommunity = () => {
                      
                      {/* Context Menu */}
                      <ContextMenuContent className="w-48">
+                         {/* Emoji Row - Using ContextMenuItem with asChild to ensure click closes the menu */}
                          <div className="flex justify-around p-2 bg-gray-50 rounded-md mb-2">
                            {['👍', '❤️', '😂', '👎'].map(emoji => {
                              const typeMap: Record<string, string> = { '👍': 'like', '❤️': 'love', '😂': 'laugh', '👎': 'dislike' };
                              const type = typeMap[emoji];
                              return (
-                               <button 
+                               <ContextMenuItem 
                                  key={emoji} 
-                                 onClick={() => toggleReactionMutation.mutate({ msgId: msg.id, type })}
-                                 className={`text-lg hover:scale-125 transition-transform p-1 ${myReaction?.reaction_type === type ? 'bg-blue-100 rounded-full' : ''}`}
+                                 asChild
+                                 onSelect={() => toggleReactionMutation.mutate({ msgId: msg.id, type })}
                                >
-                                 {emoji}
-                               </button>
+                                 <button 
+                                   className={`text-lg hover:scale-125 transition-transform p-1 cursor-pointer border-none bg-transparent outline-none ${myReaction?.reaction_type === type ? 'bg-blue-100 rounded-full' : ''}`}
+                                 >
+                                   {emoji}
+                                 </button>
+                               </ContextMenuItem>
                              )
                            })}
                          </div>
-                         <ContextMenuItem onClick={() => setReplyingTo(msg)}>
+                         <ContextMenuItem onSelect={() => setReplyingTo(msg)}>
                            <Reply className="mr-2 h-4 w-4" /> Reply
                          </ContextMenuItem>
                          {isMe && (
-                           <ContextMenuItem onClick={() => setDeleteId(msg.id)} className="text-red-600 focus:text-red-600">
+                           <ContextMenuItem onSelect={() => setDeleteId(msg.id)} className="text-red-600 focus:text-red-600">
                              <Trash2 className="mr-2 h-4 w-4" /> Delete
                            </ContextMenuItem>
                          )}
@@ -481,7 +478,6 @@ export const StudentCommunity = () => {
               </div>
             )}
 
-            {/* Image Preview */}
             {selectedImage && (
               <div className="flex items-center justify-between bg-blue-50 p-2 rounded-lg mb-2 border border-blue-100 shadow-sm">
                 <div className="flex items-center gap-3">
