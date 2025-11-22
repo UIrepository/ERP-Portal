@@ -14,11 +14,10 @@ import {
   Users, 
   Loader2, 
   Paperclip, 
-  Trash2, 
-  X,
-  Ban,
   AlertCircle,
-  Megaphone
+  Megaphone,
+  X,
+  Ban
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -70,13 +69,12 @@ export const AdminCommunity = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [isPriority, setIsPriority] = useState(false);
 
-  // Admin: Fetch ALL Groups
+  // Admin: Fetch ALL Groups (RLS allows Super Admin to see all)
   const { data: allGroups = [], isLoading: isLoadingGroups } = useQuery<GroupInfo[]>({
     queryKey: ['admin-all-groups'],
     queryFn: async () => {
       const { data, error } = await supabase.from('user_enrollments').select('batch_name, subject_name');
       if (error) throw error;
-      // Distinct groups
       const uniqueGroups = Array.from(new Set(data.map(item => JSON.stringify(item)))).map(str => JSON.parse(str));
       return uniqueGroups.sort((a, b) => a.batch_name.localeCompare(b.batch_name));
     }
@@ -170,6 +168,51 @@ export const AdminCommunity = () => {
     });
   };
 
+  const MessageItemAdmin = ({ msg }: { msg: CommunityMessage }) => {
+    const isMe = msg.user_id === profile?.user_id;
+    const priorityClass = msg.is_priority 
+      ? "bg-rose-50 border-2 border-rose-200 text-rose-900" 
+      : isMe ? "bg-teal-700 text-white" : "bg-white text-gray-800 border border-gray-200";
+    const bubbleShapeClass = isMe 
+      ? "rounded-tl-2xl rounded-tr-2xl rounded-bl-2xl rounded-br-none" 
+      : "rounded-tl-2xl rounded-tr-2xl rounded-br-2xl rounded-bl-none";
+
+    if (msg.is_deleted) {
+      return (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} my-2`}>
+            <div className={`text-gray-400 text-xs italic px-3 py-1.5 border border-dashed border-gray-300 rounded-lg flex items-center gap-2 select-none bg-white/50`}>
+              <Ban className="h-3 w-3" />
+              <span>Message deleted {msg.profiles?.name}</span>
+            </div>
+        </motion.div>
+      );
+    }
+
+    return (
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} 
+        className={`flex w-full ${isMe ? 'justify-end' : 'justify-start items-end gap-2'} mb-2 px-2`}
+      >
+        {!isMe && (
+          <Avatar className="h-8 w-8 mb-1 shadow-sm border border-white ring-2 ring-gray-50">
+              <AvatarFallback className={`${getAvatarColor(msg.profiles?.name || '?')} text-[10px] font-bold`}>
+                  {msg.profiles?.name?.substring(0, 2).toUpperCase()}
+              </AvatarFallback>
+          </Avatar>
+        )}
+        <div className={`relative px-4 py-3 shadow-sm text-sm max-w-[85%] ${bubbleShapeClass} ${priorityClass}`}>
+          {msg.is_priority && (
+            <div className="flex items-center gap-1 text-[10px] font-bold text-rose-600 uppercase mb-1"><Megaphone className="h-3 w-3 fill-rose-600" /> Priority Announcement</div>
+          )}
+          {!isMe && <div className={`text-[11px] font-bold mb-1 ${msg.is_priority ? 'text-rose-700' : 'text-teal-600'}`}>{msg.profiles?.name}</div>}
+          <p className={`whitespace-pre-wrap ${isMe && !msg.is_priority ? 'text-white/95' : 'text-gray-800'}`}>{msg.content}</p>
+          {msg.image_url && <img src={msg.image_url} alt="Attachment" className="max-w-full h-auto max-h-72 object-cover rounded-md mt-2" />}
+          <div className={`text-[10px] text-right mt-1 ${isMe && !msg.is_priority ? 'text-teal-100' : 'text-gray-400'}`}>{format(new Date(msg.created_at), 'h:mm a')}</div>
+        </div>
+      </motion.div>
+    );
+  };
+
   return (
     <div className="flex h-[100dvh] w-full bg-[#fdfbf7] relative overflow-hidden">
       <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
@@ -201,7 +244,7 @@ export const AdminCommunity = () => {
         <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-[#fdfbf7]' : 'w-full'}`}>
           <div className="px-4 py-3 bg-white border-b flex items-center justify-between shadow-sm z-20 relative">
             <div className="flex items-center gap-3">
-              {isMobile && <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }}><ArrowLeft className="h-5 w-5" /></Button>}
+              {isMobile && <Button variant="ghost" size="icon" onClick={() => { setSelectedGroup(null); }}><ArrowLeft className="h-5 w-5" /></Button>}
               <Avatar className="h-9 w-9 border border-gray-200">
                 <AvatarFallback className="bg-teal-600 text-white font-bold rounded-full">{selectedGroup.subject_name[0]}</AvatarFallback>
               </Avatar>
@@ -225,25 +268,7 @@ export const AdminCommunity = () => {
                     </div>
                  </div>
                  <AnimatePresence>
-                 {dateMessages.map((msg) => {
-                    const isMe = msg.user_id === profile?.user_id;
-                    const priorityClass = msg.is_priority ? "bg-red-50 border-2 border-red-200 text-red-900" : isMe ? "bg-teal-700 text-white" : "bg-white text-gray-800 border border-gray-200";
-                    
-                    return (
-                      <motion.div 
-                        key={msg.id} 
-                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} 
-                        className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} mb-2 px-2`}
-                      >
-                         <div className={`relative px-4 py-3 shadow-sm text-sm rounded-xl max-w-[85%] ${isMe ? 'rounded-br-none' : 'rounded-bl-none'} ${priorityClass}`}>
-                            {msg.is_priority && <div className="flex items-center gap-1 text-[10px] font-bold text-red-600 uppercase mb-1"><AlertCircle className="h-3 w-3"/> Priority</div>}
-                            {!isMe && <div className={`text-[11px] font-bold mb-1 ${msg.is_priority ? 'text-red-700' : 'text-teal-600'}`}>{msg.profiles?.name}</div>}
-                            <p className="whitespace-pre-wrap">{msg.content}</p>
-                            <div className={`text-[10px] text-right mt-1 ${isMe && !msg.is_priority ? 'text-teal-100' : 'text-gray-400'}`}>{format(new Date(msg.created_at), 'h:mm a')}</div>
-                         </div>
-                      </motion.div>
-                    );
-                 })}
+                 {dateMessages.map((msg) => <MessageItemAdmin key={msg.id} msg={msg} />)}
                  </AnimatePresence>
                </div>
              ))}
@@ -274,11 +299,16 @@ export const AdminCommunity = () => {
                 disabled={isUploading || sendMessageMutation.isPending} 
               />
 
-              <Toggle pressed={isPriority} onPressedChange={setIsPriority} className="h-10 w-10 data-[state=on]:bg-red-100 data-[state=on]:text-red-600" aria-label="Toggle priority">
-                <AlertCircle className={`h-5 w-5 ${isPriority ? 'fill-red-600 text-red-600' : 'text-gray-400'}`} />
+              <Toggle 
+                pressed={isPriority} 
+                onPressedChange={setIsPriority} 
+                className="h-10 w-10 rounded-lg data-[state=on]:bg-rose-100 data-[state=on]:text-rose-600" 
+                aria-label="Toggle priority"
+              >
+                <AlertCircle className={`h-5 w-5 ${isPriority ? 'fill-rose-600 text-rose-600' : 'text-gray-400'}`} />
               </Toggle>
 
-              <Button onClick={handleSend} disabled={(!messageText.trim() && !selectedImage) || isUploading} className={`h-10 w-10 p-0 rounded-lg ${isPriority ? 'bg-red-600 hover:bg-red-700' : 'bg-teal-700 hover:bg-teal-800'}`}>
+              <Button onClick={handleSend} disabled={(!messageText.trim() && !selectedImage) || isUploading} className={`h-10 w-10 p-0 rounded-lg ${isPriority ? 'bg-rose-600 hover:bg-rose-700' : 'bg-teal-700 hover:bg-teal-800'}`}>
                 {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5 ml-0.5" />}
               </Button>
             </div>
