@@ -157,6 +157,12 @@ const MessageItemAdmin = ({
   };
 
   if (msg.is_deleted) {
+    // New logic: Check if the message was deleted by the sender (You) or a moderator (Admin)
+    const isDeletedBySender = msg.user_id === profile?.user_id;
+    const deletedText = isDeletedBySender 
+      ? `Message deleted ${msg.profiles?.name}` 
+      : 'Message deleted by moderator';
+
     return (
       <motion.div 
         initial={{ opacity: 0, y: 10 }} 
@@ -165,7 +171,7 @@ const MessageItemAdmin = ({
       >
         <div className={`text-gray-400 text-xs italic px-3 py-1.5 border border-dashed border-gray-300 rounded-lg flex items-center gap-2 select-none bg-white/50`}>
            <Ban className="h-3 w-3" />
-           <span>Message deleted {msg.profiles?.name}</span>
+           <span>{deletedText}</span>
         </div>
       </motion.div>
     );
@@ -302,7 +308,7 @@ const MessageItemAdmin = ({
             <ContextMenuItem onSelect={() => onReply(msg)}>
               <Reply className="mr-2 h-4 w-4" /> Reply
             </ContextMenuItem>
-            {canDelete && (
+            {isMe && (
               <ContextMenuItem onSelect={() => onDelete(msg.id)} className="text-red-600 focus:text-red-600">
                 <Trash2 className="mr-2 h-4 w-4" /> Delete
               </ContextMenuItem>
@@ -312,10 +318,9 @@ const MessageItemAdmin = ({
     </motion.div>
   );
 };
-// --- END MessageItemAdmin ---
 
 
-export const AdminCommunity = () => {
+export const StudentCommunity = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
@@ -323,34 +328,40 @@ export const AdminCommunity = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  const [selectedGroup, setSelectedGroup] = useState<GroupInfo | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<UserEnrollment | null>(null);
   const [messageText, setMessageText] = useState('');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [replyingTo, setReplyingTo] = useState<CommunityMessage | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [isPriority, setIsPriority] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null); 
-
+  
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(new Date());
-  
-  // Admin: Fetch ALL Groups 
-  const { data: allGroups = [], isLoading: isLoadingGroups } = useQuery<GroupInfo[]>({
-    queryKey: ['admin-all-groups'],
+
+  const { data: enrollments = [], isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
+    queryKey: ['community-enrollments', profile?.user_id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('user_enrollments').select('batch_name, subject_name');
+      if (!profile?.user_id) return [];
+      const { data, error } = await supabase
+        .from('user_enrollments')
+        .select('batch_name, subject_name')
+        .eq('user_id', profile.user_id);
       if (error) throw error;
-      const uniqueGroups = Array.from(new Set(data.map(item => JSON.stringify(item)))).map(str => JSON.parse(str));
-      return uniqueGroups.sort((a, b) => a.batch_name.localeCompare(b.batch_name));
-    }
+      return data || [];
+    },
+    enabled: !!profile?.user_id
   });
 
   useEffect(() => {
-    if (!isMobile && !selectedGroup && allGroups.length > 0) setSelectedGroup(allGroups[0]);
-  }, [allGroups, selectedGroup, isMobile]);
+    if (!isMobile && !selectedGroup && enrollments.length > 0) {
+      setSelectedGroup(enrollments[0]);
+    }
+  }, [enrollments, selectedGroup, isMobile]);
 
   useEffect(() => {
-    setMessageText(''); setSelectedImage(null); setReplyingTo(null); setIsPriority(false);
+    setMessageText('');
+    setSelectedImage(null);
+    setReplyingTo(null);
   }, [selectedGroup]);
 
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery<CommunityMessage[]>({
@@ -359,12 +370,17 @@ export const AdminCommunity = () => {
       if (!selectedGroup) return [];
       const { data, error } = await supabase
         .from('community_messages')
-        .select(`*, profiles (name), message_likes ( user_id, reaction_type )`)
+        .select(`
+          *,
+          profiles (name),
+          message_likes ( user_id, reaction_type )
+        `)
         .eq('batch', selectedGroup.batch_name)
         .eq('subject', selectedGroup.subject_name)
         .order('created_at', { ascending: true });
+
       if (error) throw error;
-      return data as any[];
+      return (data || []) as CommunityMessage[];
     },
     enabled: !!selectedGroup
   });
@@ -391,18 +407,23 @@ export const AdminCommunity = () => {
 
   useEffect(() => {
     if (!selectedGroup) return;
-    const refresh = () => { queryClient.invalidateQueries({ queryKey: ['community-messages', selectedGroup.batch_name, selectedGroup.subject_name] }); };
-    const channel = supabase.channel(`community-${selectedGroup.batch_name}-${selectedGroup.subject_name}`)
+    const refresh = () => {
+      queryClient.invalidateQueries({ queryKey: ['community-messages', selectedGroup.batch_name, selectedGroup.subject_name] });
+    };
+    const channel = supabase
+      .channel(`community-${selectedGroup.batch_name}-${selectedGroup.subject_name}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'community_messages', filter: `batch=eq.${selectedGroup.batch_name}` }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_likes' }, refresh)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [selectedGroup, queryClient]);
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'auto' }); }, [messages?.length, selectedGroup]);
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+  }, [messages?.length, selectedGroup]);
 
   const sendMessageMutation = useMutation({
-    mutationFn: async ({ text, image, replyId, priority }: { text: string; image: File | null; replyId: string | null, priority: boolean }) => {
+    mutationFn: async ({ text, image, replyId }: { text: string; image: File | null; replyId: string | null }) => {
       if (!profile?.user_id || !selectedGroup) return;
       let imageUrl = null;
       if (image) {
@@ -410,9 +431,10 @@ export const AdminCommunity = () => {
         const fileExt = image.name.split('.').pop();
         const fileName = `${Math.random()}.${fileExt}`;
         const filePath = `${profile.user_id}/${fileName}`;
-        await supabase.storage.from('chat_uploads').upload(filePath, image);
-        const { data } = supabase.storage.from('chat_uploads').getPublicUrl(filePath);
-        imageUrl = data.publicUrl;
+        const { error: uploadError } = await supabase.storage.from('chat_uploads').upload(filePath, image);
+        if (uploadError) throw uploadError;
+        const { data: { publicUrl } } = supabase.storage.from('chat_uploads').getPublicUrl(filePath);
+        imageUrl = publicUrl;
         setIsUploading(false);
       }
       const { error } = await supabase.from('community_messages').insert({
@@ -422,12 +444,15 @@ export const AdminCommunity = () => {
         batch: selectedGroup.batch_name,
         subject: selectedGroup.subject_name,
         reply_to_id: replyId,
-        is_priority: priority
+        is_priority: false
       });
       if (error) throw error;
     },
     onSuccess: () => {
-      setMessageText(''); setSelectedImage(null); setReplyingTo(null); setIsPriority(false);
+      queryClient.invalidateQueries({ queryKey: ['community-messages'] });
+      setMessageText('');
+      setSelectedImage(null);
+      setReplyingTo(null); 
       if (fileInputRef.current) fileInputRef.current.value = '';
     },
     onError: (e: any) => { setIsUploading(false); toast({ title: "Error", description: e.message, variant: "destructive" }); }
@@ -467,11 +492,11 @@ export const AdminCommunity = () => {
 
   const handleSend = () => {
     if (!messageText.trim() && !selectedImage) return;
+    const currentReplyId = replyingTo?.id || null;
     sendMessageMutation.mutate({
-      text: messageText,
-      image: selectedImage,
-      replyId: replyingTo?.id || null,
-      priority: isPriority
+        text: messageText,
+        image: selectedImage,
+        replyId: currentReplyId
     });
   };
 
@@ -491,14 +516,17 @@ export const AdminCommunity = () => {
 
   return (
     <div className="flex h-[100dvh] w-full bg-[#fdfbf7] relative overflow-hidden">
+      
+      {/* GROUP LIST SIDEBAR */}
       <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
         <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
-          <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Megaphone className="h-5 w-5 text-red-600" /> Admin Chat</h2>
+          <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Users className="h-5 w-5 text-teal-600" /> Communities</h2>
         </div>
         <ScrollArea className="flex-1">
           <div className="p-2 space-y-1">
-            {isLoadingGroups ? <div className="p-6 text-center text-gray-500"><Loader2 className="animate-spin mx-auto" /></div> : 
-             allGroups.map((group) => (
+            {isLoadingEnrollments ? <div className="p-6 text-center text-gray-500 flex justify-center"><Loader2 className="animate-spin" /></div> : 
+             enrollments.length === 0 ? <div className="p-6 text-center text-gray-500">No communities found.</div> :
+             enrollments.map((group) => (
               <div key={`${group.batch_name}-${group.subject_name}`} onClick={() => setSelectedGroup(group)}
                 className={`p-3 rounded-lg cursor-pointer transition-colors flex items-center gap-3 ${selectedGroup?.batch_name === group.batch_name && selectedGroup?.subject_name === group.subject_name ? 'bg-teal-50 border-teal-200 border' : 'hover:bg-gray-100 border border-transparent'}`}>
                 <div className="h-10 w-10 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold shrink-0">{group.subject_name[0]}</div>
@@ -509,18 +537,24 @@ export const AdminCommunity = () => {
         </ScrollArea>
       </div>
 
+      {/* EMPTY STATE */}
       {!selectedGroup && (
         <div className={`flex-1 flex flex-col items-center justify-center bg-gray-50 text-gray-400 ${isMobile ? 'hidden' : 'flex'}`}>
-          <Users className="h-10 w-10 text-teal-200 mb-4" />
-          <p className="text-lg font-medium text-gray-600">Select a group to manage</p>
+          <div className="h-20 w-20 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm">
+            <Users className="h-10 w-10 text-teal-200" />
+          </div>
+          <p className="text-lg font-medium text-gray-600">Select a community to start chatting</p>
         </div>
       )}
 
+      {/* CHAT AREA */}
       {selectedGroup && (
         <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-[#fdfbf7]' : 'w-full'}`}>
+          
+          {/* Header */}
           <div className="px-4 py-3 bg-white border-b flex items-center justify-between shadow-sm z-20 relative">
             <div className="flex items-center gap-3">
-              {isMobile && <Button variant="ghost" size="icon" onClick={() => { setSelectedGroup(null); }}><ArrowLeft className="h-5 w-5" /></Button>}
+              {isMobile && <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }} className="-ml-2 mr-1 text-gray-600"><ArrowLeft className="h-5 w-5" /></Button>}
               <Avatar className="h-9 w-9 border border-gray-200">
                 <AvatarFallback className="bg-teal-600 text-white font-bold rounded-full">{selectedGroup.subject_name[0]}</AvatarFallback>
               </Avatar>
@@ -528,14 +562,26 @@ export const AdminCommunity = () => {
                 <h3 className="font-bold text-gray-800 leading-none flex items-center gap-2 text-base">
                   {selectedGroup.subject_name}
                 </h3>
-                <p className="text-xs text-gray-500 font-medium mt-0.5">{selectedGroup.batch_name} (Admin View)</p>
+                <p className="text-xs text-gray-500 font-medium mt-0.5">{selectedGroup.batch_name}</p>
               </div>
             </div>
           </div>
 
-          <div className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: `url('/logoofficial.png')`, backgroundSize: '60px', backgroundRepeat: 'repeat', backgroundPosition: 'center' }} />
+          {/* WATERMARK LAYER */}
+          <div 
+            className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none"
+            style={{
+                backgroundImage: `url('/logoofficial.png')`,
+                backgroundSize: '60px',
+                backgroundRepeat: 'repeat',
+                backgroundPosition: 'center'
+            }}
+          />
 
+          {/* Messages List */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 z-10 pb-24 md:pb-4" ref={scrollAreaRef}>
+            
+            {/* Professional Encryption/System Note */}
             <div className="flex justify-center mb-6 mt-2">
                 <div className="text-gray-400 text-[10px] font-medium flex items-center gap-1.5 select-none bg-gray-200/50 px-3 py-1 rounded-full border border-gray-200 backdrop-blur-sm">
                     <Lock className="h-3 w-3" />
@@ -547,6 +593,8 @@ export const AdminCommunity = () => {
              Object.keys(groupedMessages).length === 0 ? <div className="text-center py-20 text-gray-400 text-sm">No messages yet. Break the ice!</div> :
              Object.entries(groupedMessages).map(([dateKey, dateMessages]) => (
                <div key={dateKey} id={`date-${dateKey}`} className="space-y-3">
+                 
+                 {/* Date Header */}
                  <div className="flex justify-center sticky top-0 z-10 py-2">
                     <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                         <PopoverTrigger asChild>
@@ -566,79 +614,81 @@ export const AdminCommunity = () => {
                         </PopoverContent>
                     </Popover>
                  </div>
+
+                 {/* Messages */}
                  <AnimatePresence>
-                 {dateMessages.map((msg) => (
-                    <MessageItemAdmin
+                   {dateMessages.map((msg) => (
+                     <MessageItem
                        key={msg.id}
                        msg={msg}
                        isMe={msg.user_id === profile?.user_id}
-                       replyData={messageMap.get(msg.reply_to_id || '')} // Admin map has all messages
+                       replyData={messageMap.get(msg.reply_to_id || '')}
                        replyText={messageMap.get(msg.reply_to_id || '')?.content || 'Message'}
                        onReply={setReplyingTo}
                        onDelete={(id) => setDeleteId(id)}
                        onReact={(msgId, type) => toggleReactionMutation.mutate({ msgId, type })}
                        profile={profile}
                      />
-                 ))}
+                   ))}
                  </AnimatePresence>
                </div>
              ))}
-             <div ref={messagesEndRef} />
+            <div ref={messagesEndRef} />
           </div>
 
+          {/* Input Area */}
           <div className="p-3 md:p-4 bg-white border-t z-20">
+            {/* Reply Preview */}
             {replyingTo && (
-              <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg mb-3 border-l-4 border-teal-500">
+              <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg mb-3 border-l-4 border-teal-500 animate-in slide-in-from-bottom-2">
                 <div className="flex flex-col px-2">
-                    <span className="text-xs font-bold text-teal-600">Replying to...</span>
-                    <span className="text-xs text-gray-500 truncate">{replyingTo.content}</span>
+                    <span className="text-xs font-bold text-teal-600 mb-0.5">Replying to {replyingTo.user_id === profile?.user_id ? 'You' : replyingTo.profiles?.name}</span>
+                    <span className="text-xs text-gray-500 truncate max-w-[250px]">{replyingTo.content || 'Attachment'}</span>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => setReplyingTo(null)}><X className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setReplyingTo(null)}><X className="h-4 w-4 text-gray-500" /></Button>
               </div>
             )}
 
-            <div className="flex items-end gap-2 bg-gray-50 p-2 rounded-xl border border-gray-200">
+            {selectedImage && (
+              <div className="flex items-center justify-between bg-teal-50 p-2 rounded-lg mb-3 border border-teal-100">
+                <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 bg-white rounded-md shadow-sm flex items-center justify-center text-teal-600"><ImageIcon className="h-5 w-5"/></div>
+                    <div className="text-sm text-teal-900 truncate max-w-[200px] font-medium">{selectedImage.name}</div>
+                </div>
+                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-teal-100 rounded-full" onClick={() => setSelectedImage(null)}><X className="h-4 w-4 text-teal-500" /></Button>
+              </div>
+            )}
+
+            <div className="flex items-end gap-2 bg-gray-50 p-2 rounded-xl border border-gray-200 focus-within:border-teal-300 focus-within:ring-2 focus-within:ring-teal-100 transition-all">
               <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={(e) => e.target.files && setSelectedImage(e.target.files[0])} />
-              <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()}><Paperclip className="h-5 w-5 text-gray-500" /></Button>
-              
+              <Button variant="ghost" size="icon" className="h-10 w-10 text-gray-400 hover:bg-white hover:text-teal-600 rounded-lg shrink-0" onClick={() => fileInputRef.current?.click()}><Paperclip className="h-5 w-5" /></Button>
               <Input 
                 value={messageText} 
                 onChange={(e) => setMessageText(e.target.value)} 
                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())} 
-                placeholder="Type an admin message..." 
-                className="flex-1 border-none bg-transparent focus-visible:ring-0" 
+                placeholder="Type a message..." 
+                className="flex-1 border-none shadow-none focus-visible:ring-0 bg-transparent min-h-[40px] py-2 text-[15px] placeholder:text-gray-400" 
                 disabled={isUploading || sendMessageMutation.isPending} 
               />
-
-              <Toggle 
-                pressed={isPriority} 
-                onPressedChange={setIsPriority} 
-                className="h-10 w-10 rounded-lg data-[state=on]:bg-rose-100 data-[state=on]:text-rose-600" 
-                aria-label="Toggle priority"
-              >
-                <AlertCircle className={`h-5 w-5 ${isPriority ? 'fill-rose-600 text-rose-600' : 'text-gray-400'}`} />
-              </Toggle>
-
-              <Button onClick={handleSend} disabled={(!messageText.trim() && !selectedImage) || isUploading} className={`h-10 w-10 p-0 rounded-lg ${isPriority ? 'bg-rose-600 hover:bg-rose-700' : 'bg-teal-700 hover:bg-teal-800'}`}>
-                {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5 ml-0.5" />}
-              </Button>
+              <Button onClick={handleSend} disabled={(!messageText.trim() && !selectedImage) || isUploading} className="h-10 w-10 rounded-lg bg-teal-700 hover:bg-teal-800 text-white shrink-0 p-0 flex items-center justify-center shadow-sm transition-all hover:scale-105">{isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5 ml-0.5" />}</Button>
             </div>
           </div>
-          
-          <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Message?</AlertDialogTitle>
-                    <AlertDialogDescription>This message will be removed for everyone.</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => deleteId && deleteMessageMutation.mutate(deleteId)} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
         </div>
       )}
+
+      {/* Delete Dialog */}
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Delete Message?</AlertDialogTitle>
+                <AlertDialogDescription>This message will be removed for everyone.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => deleteId && deleteMessageMutation.mutate(deleteId)} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
