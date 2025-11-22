@@ -16,9 +16,9 @@ import {
   Loader2, 
   Paperclip, 
   Trash2, 
+  X,
   Ban,
-  Lock,
-  Info
+  Lock
 } from 'lucide-react';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -57,7 +57,7 @@ interface CommunityMessage {
   reply_to_id: string | null;
   created_at: string;
   is_deleted: boolean;
-  profiles: { name: string };
+  profiles: { name: string } | null; // Made nullable to be safe
   message_likes: { user_id: string; reaction_type: string }[]; 
 }
 
@@ -129,8 +129,7 @@ const MessageItem = ({
     const currentX = e.targetTouches[0].clientX;
     const diff = currentX - touchStart;
 
-    // Logic: Me (Right) -> Swipe Left (Negative diff)
-    // Logic: Other (Left) -> Swipe Right (Positive diff)
+    // Limit swipe distance
     if (isMe && diff < 0 && diff > -100) {
       setTranslateX(diff);
     } else if (!isMe && diff > 0 && diff < 100) {
@@ -149,12 +148,11 @@ const MessageItem = ({
     const isRightSwipe = distance < -50; // Moved finger right
 
     if (isMe && isLeftSwipe) {
-      onReply(msg); // Trigger reply
+      onReply(msg);
     } else if (!isMe && isRightSwipe) {
-      onReply(msg); // Trigger reply
+      onReply(msg);
     }
     
-    // Reset position
     setTranslateX(0);
     setTouchStart(null);
     setTouchEnd(null);
@@ -179,7 +177,7 @@ const MessageItem = ({
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
-      {/* Visual Indicator for Swipe (Optional, shows icon behind message) */}
+      {/* Visual Indicator for Swipe */}
       {translateX !== 0 && (
         <div className={`absolute top-1/2 -translate-y-1/2 ${isMe ? 'right-full mr-4' : 'left-full ml-4'} text-gray-400`}>
           <Reply className="h-5 w-5" />
@@ -187,7 +185,7 @@ const MessageItem = ({
       )}
 
       <ContextMenu>
-        <ContextMenuTrigger className={`block max-w-[85%] md:max-w-[65%] relative ${reactionsCount > 0 ? 'mb-6' : 'mb-1'}`}>
+        <ContextMenuTrigger className={`block max-w-[85%] md:max-w-[65%] relative ${reactionsCount > 0 ? 'mb-4' : 'mb-0'}`}>
           <div className={`relative rounded-lg p-2 shadow-sm text-sm ${
             isMe ? 'bg-[#dcf8c6] rounded-tr-none' : 'bg-white rounded-tl-none'
           }`}>
@@ -200,7 +198,7 @@ const MessageItem = ({
               <div 
                className={`mb-1.5 rounded-md bg-black/5 border-l-[3px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none shadow-sm`}
                onClick={(e) => {
-                 e.stopPropagation(); // Prevent bubble click
+                 e.stopPropagation(); 
                  const el = document.getElementById(`msg-${msg.reply_to_id}`);
                  if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'});
                }}
@@ -236,9 +234,9 @@ const MessageItem = ({
                </span>
             </div>
 
-            {/* Reactions: Bubble below message (Positioned to not block time) */}
+            {/* Reactions: Positioned absolutely to avoid flow disruption */}
             {reactionsCount > 0 && (
-              <div className={`absolute -bottom-5 ${isMe ? 'right-0' : 'left-0'} z-10 flex items-center gap-0.5 bg-white rounded-full px-1.5 py-0.5 shadow-sm border border-gray-200 text-[10px] cursor-pointer hover:scale-105 transition-transform`}>
+              <div className={`absolute -bottom-6 ${isMe ? 'right-0' : 'left-0'} z-10 flex items-center gap-0.5 bg-white rounded-full px-1.5 py-0.5 shadow-sm border border-gray-200 text-[10px] cursor-pointer hover:scale-105 transition-transform`}>
                 {Object.entries(reactionCounts).map(([type, count]) => (
                   <span key={type}>
                     {type === 'like' ? '👍' : type === 'love' ? '❤️' : type === 'laugh' ? '😂' : type === 'dislike' ? '👎' : '👍'} 
@@ -250,7 +248,6 @@ const MessageItem = ({
           </div>
         </ContextMenuTrigger>
         
-        {/* Context Menu */}
         <ContextMenuContent className="w-48">
             <div className="flex justify-around p-2 bg-gray-50 rounded-md mb-2">
               {['👍', '❤️', '😂', '👎'].map(emoji => {
@@ -354,7 +351,7 @@ export const StudentCommunity = () => {
     enabled: !!selectedGroup
   });
 
-  // --- 3. Data Processing (Maps & Groups) ---
+  // --- 3. Data Processing ---
   const messageMap = useMemo(() => {
     const map = new Map<string, CommunityMessage>();
     messages.forEach(msg => map.set(msg.id, msg));
@@ -460,7 +457,6 @@ export const StudentCommunity = () => {
     }
   });
 
-  // --- Handlers ---
   const handleSend = () => {
     if (!messageText.trim() && !selectedImage) return;
     const currentReplyId = replyingTo?.id || null;
@@ -475,7 +471,6 @@ export const StudentCommunity = () => {
     if (!date) return;
     setCalendarDate(date);
     setIsCalendarOpen(false);
-
     const dateId = format(date, 'yyyy-MM-dd');
     const element = document.getElementById(`date-${dateId}`);
     if (element) {
@@ -496,7 +491,8 @@ export const StudentCommunity = () => {
 
   // --- Render ---
   return (
-    <div className="flex h-[calc(100vh-4rem)] w-full bg-[#efeae2] relative overflow-hidden">
+    // Updated height to use dynamic viewport height (dvh) for better mobile support
+    <div className="flex h-[100dvh] w-full bg-[#efeae2] relative overflow-hidden">
       
       {/* GROUP LIST SIDEBAR */}
       <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
@@ -530,15 +526,13 @@ export const StudentCommunity = () => {
       {selectedGroup && (
         <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-[#efeae2]' : 'w-full'}`}>
           
-          {/* Header (Removed Click Handler for Student List) */}
+          {/* Header */}
           <div className="p-3 bg-white border-b flex items-center justify-between shadow-sm z-20">
             <div className="flex items-center gap-3">
               {isMobile && <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }} className="-ml-2 mr-1"><ArrowLeft className="h-5 w-5" /></Button>}
               <Avatar className="h-10 w-10 border border-gray-200"><AvatarFallback className="bg-teal-600 text-white font-bold">{selectedGroup.subject_name[0]}</AvatarFallback></Avatar>
               <div>
-                <h3 className="font-bold text-gray-800 leading-tight flex items-center gap-2">
-                  {selectedGroup.subject_name}
-                </h3>
+                <h3 className="font-bold text-gray-800 leading-tight">{selectedGroup.subject_name}</h3>
                 <p className="text-xs text-gray-500">{selectedGroup.batch_name}</p>
               </div>
             </div>
@@ -549,8 +543,8 @@ export const StudentCommunity = () => {
             
             {/* Encryption Banner */}
             <div className="flex justify-center mb-6 mt-2">
-                <div className="bg-[#ffeba7]/40 border border-[#ffeba7] text-yellow-800 text-[10px] px-3 py-1 rounded-lg shadow-sm flex items-center gap-1.5">
-                    <Lock className="h-3 w-3" />
+                <div className="bg-[#ffeba7]/40 border border-[#ffeba7] text-yellow-800 text-[10px] px-3 py-1 rounded-lg shadow-sm flex items-center gap-1.5 text-center max-w-[90%]">
+                    <Lock className="h-3 w-3 shrink-0" />
                     <span>Messages are end-to-end encrypted. No one outside of this chat, not even the admins, can read them.</span>
                 </div>
             </div>
@@ -564,7 +558,7 @@ export const StudentCommunity = () => {
                  <div className="flex justify-center sticky top-0 z-10 py-2">
                     <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                         <PopoverTrigger asChild>
-                            <div className="bg-gray-100/90 backdrop-blur-sm text-gray-600 text-xs font-medium px-3 py-1 rounded-full shadow-sm border border-gray-200 cursor-pointer hover:bg-gray-200 transition-colors">
+                            <div className="bg-gray-100/90 backdrop-blur-sm text-gray-600 text-xs font-medium px-3 py-1 rounded-full shadow-sm border border-gray-200 cursor-pointer hover:bg-gray-200 transition-colors select-none">
                                 {isToday(parseISO(dateKey)) ? 'Today' : isYesterday(parseISO(dateKey)) ? 'Yesterday' : format(parseISO(dateKey), 'MMMM d, yyyy')}
                             </div>
                         </PopoverTrigger>
