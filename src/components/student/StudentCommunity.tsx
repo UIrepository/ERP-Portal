@@ -19,7 +19,6 @@ import {
   X,
   Ban,
   Lock,
-  Info,
   ShieldCheck
 } from 'lucide-react';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
@@ -109,16 +108,18 @@ const MessageItem = ({
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const parts = text.split(urlRegex);
     return parts.map((part, i) => part.match(urlRegex) ? (
-      <a key={i} href={part} target="_blank" rel="noopener noreferrer" className={`${isMe ? 'text-blue-100 hover:text-white' : 'text-blue-600 hover:text-blue-800'} underline break-all`}>{part}</a>
+      <a key={i} href={part} target="_blank" rel="noopener noreferrer" className={`${isMe ? 'text-teal-100 hover:text-white' : 'text-teal-600 hover:text-teal-800'} underline break-all`}>{part}</a>
     ) : part);
   };
 
   const isReplyToMe = replyData?.user_id === profile?.user_id;
   const replySenderName = isReplyToMe ? "You" : replyData?.profiles?.name;
-  // Adjusted reply styling to blend with new bubbles
-  const replyBorderColor = isMe ? "border-white/40" : "border-blue-500";
-  const replyNameColor = isMe ? "text-blue-100" : "text-blue-600";
-  const replyTextColor = isMe ? "text-blue-50" : "text-gray-500";
+  
+  // Professional Reply Styling
+  const replyBorderColor = isMe ? "border-teal-300/50" : "border-teal-500";
+  const replyNameColor = isMe ? "text-teal-100" : "text-teal-700";
+  const replyTextColor = isMe ? "text-teal-50/80" : "text-gray-500";
+  const replyBg = isMe ? "bg-black/10" : "bg-gray-50";
 
   const myReaction = msg.message_likes?.find(l => l.user_id === profile?.user_id);
   const reactionsCount = msg.message_likes?.length || 0;
@@ -171,7 +172,7 @@ const MessageItem = ({
   if (msg.is_deleted) {
     return (
       <div className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} my-2`}>
-        <div className={`text-gray-400 text-xs italic px-4 py-2 border border-dashed border-gray-300 rounded-full flex items-center gap-2 select-none`}>
+        <div className={`text-gray-400 text-xs italic px-4 py-2 border border-dashed border-gray-300 rounded-lg flex items-center gap-2 select-none`}>
            <Ban className="h-3 w-3" />
            <span>Message deleted</span>
         </div>
@@ -202,18 +203,18 @@ const MessageItem = ({
       )}
 
       <ContextMenu>
-        <ContextMenuTrigger className={`block max-w-[85%] md:max-w-[60%] relative ${reactionsCount > 0 ? 'mb-5' : 'mb-0'}`}>
-          <div className={`relative rounded-2xl p-3 shadow-sm text-sm transition-all ${
+        <ContextMenuTrigger className={`block max-w-[85%] md:max-w-[65%] relative ${reactionsCount > 0 ? 'mb-5' : 'mb-0'}`}>
+          <div className={`relative rounded-2xl px-4 py-3 shadow-sm text-sm transition-all ${
             isMe 
-              ? 'bg-blue-600 text-white rounded-tr-sm' // Blue for me, sharp top-right
-              : 'bg-white text-gray-800 border border-gray-200 rounded-tl-sm' // White for others, sharp top-left
+              ? 'bg-teal-700 text-white rounded-tr-sm' // Dark Turquoise for "Me"
+              : 'bg-white text-gray-800 border border-gray-100 rounded-tl-sm' // White for others
           }`}>
             
             {!isMe && <div className="text-[11px] font-bold text-gray-500 mb-1">{msg.profiles?.name}</div>}
 
             {replyData && replyText && (
               <div 
-               className={`mb-2 rounded-lg bg-black/5 border-l-2 ${replyBorderColor} p-2 flex flex-col justify-center cursor-pointer select-none`}
+               className={`mb-2 rounded-md ${replyBg} border-l-4 ${replyBorderColor} p-2 flex flex-col justify-center cursor-pointer select-none`}
                onClick={(e) => {
                  e.stopPropagation(); 
                  const el = document.getElementById(`msg-${msg.reply_to_id}`);
@@ -244,7 +245,7 @@ const MessageItem = ({
             </div>
 
             <div className={`flex justify-end items-center mt-1 gap-1 min-w-[50px]`}>
-               <span className={`text-[10px] ${isMe ? 'text-blue-100' : 'text-gray-400'} whitespace-nowrap ml-auto`}>
+               <span className={`text-[10px] ${isMe ? 'text-teal-100' : 'text-gray-400'} whitespace-nowrap ml-auto`}>
                  {format(new Date(msg.created_at), 'h:mm a')}
                </span>
             </div>
@@ -499,38 +500,22 @@ export const StudentCommunity = () => {
   };
 
   return (
-    <div className="flex h-[100dvh] w-full bg-slate-50 relative overflow-hidden">
+    <div className="flex h-[100dvh] w-full bg-gray-50 relative overflow-hidden">
       
-      {/* GROUP LIST SIDEBAR */}
+      {/* GROUP LIST SIDEBAR (Original Style) */}
       <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white">
-          <h2 className="font-bold text-xl flex items-center gap-2 text-slate-800 tracking-tight"><Users className="h-6 w-6 text-blue-600" /> Communities</h2>
+        <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
+          <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Users className="h-5 w-5 text-teal-600" /> Communities</h2>
         </div>
         <ScrollArea className="flex-1">
-          <div className="p-3 space-y-2">
+          <div className="p-2 space-y-1">
             {isLoadingEnrollments ? <div className="p-6 text-center text-gray-500 flex justify-center"><Loader2 className="animate-spin" /></div> : 
              enrollments.length === 0 ? <div className="p-6 text-center text-gray-500">No communities found.</div> :
              enrollments.map((group) => (
               <div key={`${group.batch_name}-${group.subject_name}`} onClick={() => setSelectedGroup(group)}
-                className={`p-3 rounded-xl cursor-pointer transition-all duration-200 flex items-center gap-3.5 group ${selectedGroup?.batch_name === group.batch_name && selectedGroup?.subject_name === group.subject_name ? 'bg-blue-600 shadow-md' : 'hover:bg-slate-100 bg-white border border-slate-100'}`}>
-                
-                {/* Community Avatar/Icon */}
-                <div className={`h-10 w-10 rounded-lg flex items-center justify-center font-bold shrink-0 transition-colors ${
-                    selectedGroup?.batch_name === group.batch_name && selectedGroup?.subject_name === group.subject_name
-                    ? 'bg-white text-blue-600'
-                    : 'bg-blue-50 text-blue-600 group-hover:bg-white group-hover:shadow-sm'
-                }`}>
-                    {group.subject_name[0]}
-                </div>
-                
-                <div className="overflow-hidden text-left">
-                    <p className={`font-semibold truncate ${selectedGroup?.batch_name === group.batch_name && selectedGroup?.subject_name === group.subject_name ? 'text-white' : 'text-slate-900'}`}>
-                        {group.subject_name}
-                    </p>
-                    <p className={`text-xs truncate ${selectedGroup?.batch_name === group.batch_name && selectedGroup?.subject_name === group.subject_name ? 'text-blue-100' : 'text-slate-500'}`}>
-                        {group.batch_name}
-                    </p>
-                </div>
+                className={`p-3 rounded-lg cursor-pointer transition-colors flex items-center gap-3 ${selectedGroup?.batch_name === group.batch_name && selectedGroup?.subject_name === group.subject_name ? 'bg-teal-50 border-teal-200 border' : 'hover:bg-gray-100 border border-transparent'}`}>
+                <div className="h-10 w-10 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold shrink-0">{group.subject_name[0]}</div>
+                <div className="overflow-hidden text-left"><p className="font-semibold text-gray-900 truncate">{group.subject_name}</p><p className="text-xs text-gray-500 truncate">{group.batch_name}</p></div>
               </div>
             ))}
           </div>
@@ -539,56 +524,55 @@ export const StudentCommunity = () => {
 
       {/* EMPTY STATE */}
       {!selectedGroup && (
-        <div className={`flex-1 flex flex-col items-center justify-center bg-slate-50 text-gray-400 ${isMobile ? 'hidden' : 'flex'}`}>
-          <div className="h-24 w-24 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm">
-            <Users className="h-12 w-12 text-blue-200" />
+        <div className={`flex-1 flex flex-col items-center justify-center bg-gray-50 text-gray-400 ${isMobile ? 'hidden' : 'flex'}`}>
+          <div className="h-20 w-20 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm">
+            <Users className="h-10 w-10 text-teal-200" />
           </div>
-          <p className="text-lg font-semibold text-gray-600">Select a community</p>
-          <p className="text-sm text-gray-400">Connect with your batchmates and learn together.</p>
+          <p className="text-lg font-medium text-gray-600">Select a community to start chatting</p>
         </div>
       )}
 
       {/* CHAT AREA */}
       {selectedGroup && (
-        <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-slate-50' : 'w-full'}`}>
+        <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-gray-50' : 'w-full'}`}>
           
           {/* Header */}
           <div className="px-4 py-3 bg-white border-b flex items-center justify-between shadow-sm z-20">
             <div className="flex items-center gap-3">
-              {isMobile && <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }} className="-ml-2 mr-1 text-slate-600"><ArrowLeft className="h-5 w-5" /></Button>}
-              <Avatar className="h-9 w-9 border border-slate-200">
-                <AvatarFallback className="bg-blue-600 text-white font-bold rounded-md">{selectedGroup.subject_name[0]}</AvatarFallback>
+              {isMobile && <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }} className="-ml-2 mr-1 text-gray-600"><ArrowLeft className="h-5 w-5" /></Button>}
+              <Avatar className="h-9 w-9 border border-gray-200">
+                <AvatarFallback className="bg-teal-600 text-white font-bold rounded-full">{selectedGroup.subject_name[0]}</AvatarFallback>
               </Avatar>
               <div>
-                <h3 className="font-bold text-slate-800 leading-none flex items-center gap-2 text-base">
+                <h3 className="font-bold text-gray-800 leading-none flex items-center gap-2 text-base">
                   {selectedGroup.subject_name}
                 </h3>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">{selectedGroup.batch_name}</p>
+                <p className="text-xs text-gray-500 font-medium mt-0.5">{selectedGroup.batch_name}</p>
               </div>
             </div>
           </div>
 
           {/* Messages List */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-slate-50/50 pb-24 md:pb-4" ref={scrollAreaRef}>
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 pb-24 md:pb-4" ref={scrollAreaRef}>
             
-            {/* Professional Encryption/System Note */}
+            {/* Professional Encryption/System Note (Clean Gray style) */}
             <div className="flex justify-center mb-6 mt-2">
-                <div className="text-gray-400 text-[11px] font-medium flex items-center gap-1.5 select-none opacity-80 bg-slate-100 px-3 py-1 rounded-full">
-                    <ShieldCheck className="h-3 w-3" />
-                    <span>Messages are secure and private to this batch.</span>
+                <div className="text-gray-400 text-[10px] font-medium flex items-center gap-1.5 select-none bg-gray-200/50 px-3 py-1 rounded-full border border-gray-200">
+                    <Lock className="h-3 w-3" />
+                    <span>Messages are end-to-end encrypted. No one outside of this chat can read them.</span>
                 </div>
             </div>
 
-            {isLoadingMessages ? <div className="flex justify-center p-10"><Loader2 className="animate-spin h-8 w-8 text-blue-400" /></div> : 
+            {isLoadingMessages ? <div className="flex justify-center p-10"><Loader2 className="animate-spin h-8 w-8 text-teal-400" /></div> : 
              Object.keys(groupedMessages).length === 0 ? <div className="text-center py-20 text-gray-400 text-sm">No messages yet. Break the ice!</div> :
              Object.entries(groupedMessages).map(([dateKey, dateMessages]) => (
                <div key={dateKey} id={`date-${dateKey}`} className="space-y-3">
                  
-                 {/* Date Header (Professional Badge) */}
+                 {/* Date Header */}
                  <div className="flex justify-center sticky top-0 z-10 py-2">
                     <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                         <PopoverTrigger asChild>
-                            <div className="bg-white/80 backdrop-blur border border-gray-200 text-gray-500 text-[11px] font-medium px-3 py-0.5 rounded-full shadow-sm cursor-pointer hover:bg-gray-50 transition-colors select-none">
+                            <div className="bg-white/90 backdrop-blur border border-gray-200 text-gray-500 text-[11px] font-medium px-3 py-0.5 rounded-full shadow-sm cursor-pointer hover:bg-gray-50 transition-colors select-none">
                                 {isToday(parseISO(dateKey)) ? 'Today' : isYesterday(parseISO(dateKey)) ? 'Yesterday' : format(parseISO(dateKey), 'MMMM d, yyyy')}
                             </div>
                         </PopoverTrigger>
@@ -602,7 +586,7 @@ export const StudentCommunity = () => {
                                     highlighted: activeDates
                                 }}
                                 modifiersStyles={{
-                                    highlighted: { fontWeight: 'bold', color: '#2563eb', textDecoration: 'underline' }
+                                    highlighted: { fontWeight: 'bold', color: '#0f766e', textDecoration: 'underline' }
                                 }}
                             />
                         </PopoverContent>
@@ -632,9 +616,9 @@ export const StudentCommunity = () => {
           <div className="p-3 md:p-4 bg-white border-t z-20">
             {/* Reply Preview */}
             {replyingTo && (
-              <div className="flex items-center justify-between bg-slate-50 p-3 rounded-lg mb-3 border-l-4 border-blue-500 animate-in slide-in-from-bottom-2">
+              <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg mb-3 border-l-4 border-teal-500 animate-in slide-in-from-bottom-2">
                 <div className="flex flex-col px-2">
-                    <span className="text-xs font-bold text-blue-600 mb-0.5">Replying to {replyingTo.user_id === profile?.user_id ? 'You' : replyingTo.profiles?.name}</span>
+                    <span className="text-xs font-bold text-teal-600 mb-0.5">Replying to {replyingTo.user_id === profile?.user_id ? 'You' : replyingTo.profiles?.name}</span>
                     <span className="text-xs text-gray-500 truncate max-w-[250px]">{replyingTo.content || 'Attachment'}</span>
                 </div>
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setReplyingTo(null)}><X className="h-4 w-4 text-gray-500" /></Button>
@@ -642,27 +626,27 @@ export const StudentCommunity = () => {
             )}
 
             {selectedImage && (
-              <div className="flex items-center justify-between bg-blue-50 p-2 rounded-lg mb-3 border border-blue-100">
+              <div className="flex items-center justify-between bg-teal-50 p-2 rounded-lg mb-3 border border-teal-100">
                 <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 bg-white rounded-md shadow-sm flex items-center justify-center text-blue-600"><ImageIcon className="h-5 w-5"/></div>
-                    <div className="text-sm text-blue-900 truncate max-w-[200px] font-medium">{selectedImage.name}</div>
+                    <div className="h-10 w-10 bg-white rounded-md shadow-sm flex items-center justify-center text-teal-600"><ImageIcon className="h-5 w-5"/></div>
+                    <div className="text-sm text-teal-900 truncate max-w-[200px] font-medium">{selectedImage.name}</div>
                 </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-blue-100 rounded-full" onClick={() => setSelectedImage(null)}><X className="h-4 w-4 text-blue-500" /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-teal-100 rounded-full" onClick={() => setSelectedImage(null)}><X className="h-4 w-4 text-teal-500" /></Button>
               </div>
             )}
 
-            <div className="flex items-end gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200 focus-within:border-blue-300 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+            <div className="flex items-end gap-2 bg-gray-50 p-2 rounded-xl border border-gray-200 focus-within:border-teal-300 focus-within:ring-2 focus-within:ring-teal-100 transition-all">
               <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={(e) => e.target.files && setSelectedImage(e.target.files[0])} />
-              <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-400 hover:bg-white hover:text-blue-600 rounded-lg shrink-0" onClick={() => fileInputRef.current?.click()}><Paperclip className="h-5 w-5" /></Button>
+              <Button variant="ghost" size="icon" className="h-10 w-10 text-gray-400 hover:bg-white hover:text-teal-600 rounded-lg shrink-0" onClick={() => fileInputRef.current?.click()}><Paperclip className="h-5 w-5" /></Button>
               <Input 
                 value={messageText} 
                 onChange={(e) => setMessageText(e.target.value)} 
                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())} 
                 placeholder="Type a message..." 
-                className="flex-1 border-none shadow-none focus-visible:ring-0 bg-transparent min-h-[40px] py-2 text-[15px] placeholder:text-slate-400" 
+                className="flex-1 border-none shadow-none focus-visible:ring-0 bg-transparent min-h-[40px] py-2 text-[15px] placeholder:text-gray-400" 
                 disabled={isUploading || sendMessageMutation.isPending} 
               />
-              <Button onClick={handleSend} disabled={(!messageText.trim() && !selectedImage) || isUploading} className="h-10 w-10 rounded-lg bg-blue-600 hover:bg-blue-700 text-white shrink-0 p-0 flex items-center justify-center shadow-sm transition-all hover:scale-105">{isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5 ml-0.5" />}</Button>
+              <Button onClick={handleSend} disabled={(!messageText.trim() && !selectedImage) || isUploading} className="h-10 w-10 rounded-lg bg-teal-700 hover:bg-teal-800 text-white shrink-0 p-0 flex items-center justify-center shadow-sm transition-all hover:scale-105">{isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5 ml-0.5" />}</Button>
             </div>
           </div>
         </div>
