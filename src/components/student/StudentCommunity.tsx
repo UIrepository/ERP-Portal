@@ -21,7 +21,7 @@ import {
   Ban,
   Lock
 } from 'lucide-react';
-import { format, isToday, isYesterday, isSameDay, parseISO, startOfDay } from 'date-fns';
+import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
@@ -75,7 +75,7 @@ interface UserEnrollment {
 
 interface StudentProfile {
   name: string;
-  email?: string;
+  // Email removed from interface
 }
 
 export const StudentCommunity = () => {
@@ -166,7 +166,6 @@ export const StudentCommunity = () => {
     return groups;
   }, [messages]);
 
-  // Get all dates that have messages for the calendar highlight
   const activeDates = useMemo(() => {
     return Object.keys(groupedMessages).map(dateStr => new Date(dateStr));
   }, [groupedMessages]);
@@ -176,9 +175,10 @@ export const StudentCommunity = () => {
     queryKey: ['group-students', selectedGroup?.batch_name, selectedGroup?.subject_name],
     queryFn: async () => {
       if (!selectedGroup) return [];
+      // Removed 'email' from the select query
       const { data, error } = await supabase
         .from('user_enrollments')
-        .select('profiles(name, email)')
+        .select('profiles(name)') 
         .eq('batch_name', selectedGroup.batch_name)
         .eq('subject_name', selectedGroup.subject_name);
       
@@ -202,10 +202,9 @@ export const StudentCommunity = () => {
     return () => { supabase.removeChannel(channel); };
   }, [selectedGroup, queryClient]);
 
-  // Scroll to bottom on new message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
-  }, [messages?.length, selectedGroup]); // Only scroll on new message count or group change
+  }, [messages?.length, selectedGroup]);
 
   // --- 6. Mutations ---
   const sendMessageMutation = useMutation({
@@ -261,14 +260,11 @@ export const StudentCommunity = () => {
       const existingReaction = messages.find(m => m.id === msgId)?.message_likes.find(l => l.user_id === profile?.user_id);
       if (existingReaction) {
         if (existingReaction.reaction_type === type) {
-          // Remove if same
           await supabase.from('message_likes').delete().match({ message_id: msgId, user_id: profile?.user_id });
         } else {
-          // Update if different
           await supabase.from('message_likes').update({ reaction_type: type }).match({ message_id: msgId, user_id: profile?.user_id });
         }
       } else {
-        // Add new
         await supabase.from('message_likes').insert({ message_id: msgId, user_id: profile?.user_id, reaction_type: type });
       }
     },
@@ -291,9 +287,8 @@ export const StudentCommunity = () => {
   const handleDateSelect = (date: Date | undefined) => {
     if (!date) return;
     setCalendarDate(date);
-    setIsCalendarOpen(false); // Auto close
+    setIsCalendarOpen(false);
 
-    // Scroll to the specific date group
     const dateId = format(date, 'yyyy-MM-dd');
     const element = document.getElementById(`date-${dateId}`);
     if (element) {
@@ -378,7 +373,7 @@ export const StudentCommunity = () => {
           {/* Messages List */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#efeae2] pb-24 md:pb-4" ref={scrollAreaRef}>
             
-            {/* End-to-End Encryption Banner */}
+            {/* Encryption Banner */}
             <div className="flex justify-center mb-6 mt-2">
                 <div className="bg-[#ffeba7]/40 border border-[#ffeba7] text-yellow-800 text-[10px] px-3 py-1 rounded-lg shadow-sm flex items-center gap-1.5">
                     <Lock className="h-3 w-3" />
@@ -391,7 +386,7 @@ export const StudentCommunity = () => {
              Object.entries(groupedMessages).map(([dateKey, dateMessages]) => (
                <div key={dateKey} id={`date-${dateKey}`} className="space-y-2">
                  
-                 {/* Date Header with Calendar Popover */}
+                 {/* Date Header */}
                  <div className="flex justify-center sticky top-0 z-10 py-2">
                     <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                         <PopoverTrigger asChild>
@@ -409,20 +404,20 @@ export const StudentCommunity = () => {
                                     highlighted: activeDates
                                 }}
                                 modifiersStyles={{
-                                    highlighted: { fontWeight: 'bold', color: '#0d9488', textDecoration: 'underline' } // Teal color for dates with messages
+                                    highlighted: { fontWeight: 'bold', color: '#0d9488', textDecoration: 'underline' }
                                 }}
                             />
                         </PopoverContent>
                     </Popover>
                  </div>
 
-                 {/* Messages for this date */}
+                 {/* Messages */}
                  {dateMessages.map((msg) => {
                    const isMe = msg.user_id === profile?.user_id;
                    const hasImage = msg.image_url && msg.image_url.trim() !== '';
                    const hasContent = msg.content && msg.content.trim() !== '';
                    
-                   // Reply Logic
+                   // Reply
                    const replyData = msg.reply_to_id ? messageMap.get(msg.reply_to_id) : null;
                    const replyText = replyData ? getReplyPreview(replyData) : null;
                    const isReplyToMe = replyData?.user_id === profile?.user_id;
@@ -430,7 +425,7 @@ export const StudentCommunity = () => {
                    const replyBorderColor = isReplyToMe ? "border-teal-500" : "border-purple-500";
                    const replyNameColor = isReplyToMe ? "text-teal-600" : "text-purple-600";
                    
-                   // Reactions Logic
+                   // Reactions
                    const myReaction = msg.message_likes?.find(l => l.user_id === profile?.user_id);
                    const reactionsCount = msg.message_likes?.length || 0;
                    const reactionCounts = msg.message_likes?.reduce((acc: any, curr) => {
@@ -439,7 +434,6 @@ export const StudentCommunity = () => {
                      return acc;
                    }, {});
 
-                   // --- DELETED MESSAGE RENDER ---
                    if (msg.is_deleted) {
                      return (
                        <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} my-1`}>
@@ -451,7 +445,6 @@ export const StudentCommunity = () => {
                      );
                    }
 
-                   // --- NORMAL MESSAGE RENDER ---
                    return (
                      <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} group mb-1 relative`}>
                        <ContextMenu>
@@ -488,7 +481,7 @@ export const StudentCommunity = () => {
                                     <span className="text-[10px] text-gray-400 whitespace-nowrap ml-auto">{format(new Date(msg.created_at), 'h:mm a')}</span>
                                  </div>
 
-                                 {/* Reactions: Bubble below message */}
+                                 {/* Reactions */}
                                  {reactionsCount > 0 && (
                                    <div className={`absolute -bottom-2 ${isMe ? 'right-0' : 'left-0'} z-10 flex items-center gap-0.5 bg-white rounded-full px-1.5 py-0.5 shadow-sm border border-gray-200 text-[10px] cursor-pointer hover:scale-105 transition-transform`}>
                                      {Object.entries(reactionCounts).map(([type, count]) => (
@@ -504,7 +497,6 @@ export const StudentCommunity = () => {
                          
                          {/* Context Menu */}
                          <ContextMenuContent className="w-48">
-                             {/* Emoji Row */}
                              <div className="flex justify-around p-2 bg-gray-50 rounded-md mb-2">
                                {['👍', '❤️', '😂', '👎'].map(emoji => {
                                  const typeMap: Record<string, string> = { '👍': 'like', '❤️': 'love', '😂': 'laugh', '👎': 'dislike' };
@@ -544,6 +536,7 @@ export const StudentCommunity = () => {
 
           {/* Input Area */}
           <div className="p-2 md:p-3 bg-[#f0f2f5] border-t z-20">
+            {/* Reply Preview */}
             {replyingTo && (
               <div className="flex items-center justify-between bg-white p-2 rounded-lg mb-2 border-l-4 border-teal-500 shadow-sm animate-in slide-in-from-bottom-2">
                 <div className="flex flex-col px-2">
@@ -589,7 +582,6 @@ export const StudentCommunity = () => {
                   </Avatar>
                   <div>
                     <p className="font-medium text-sm">{student.name}</p>
-                    {student.email && <p className="text-xs text-gray-500">{student.email}</p>}
                   </div>
                 </div>
               ))}
