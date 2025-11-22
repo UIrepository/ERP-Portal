@@ -13,7 +13,7 @@ import {
   Crown,
   MessageSquare,
   BookOpen,
-  Users, // Imported Users icon for Community
+  Users,
   Link as LinkIcon,
   BarChart2,
   LogOut,
@@ -105,7 +105,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const studentTabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'announcements', label: 'Announcements', icon: Megaphone },
-    { id: 'community', label: 'Community', icon: Users }, // Added Community Tab
+    { id: 'community', label: 'Community', icon: Users },
     { id: 'schedule', label: 'Class Schedule', icon: Calendar },
     { id: 'current-class', label: 'Ongoing Class', icon: Clock },
     { id: 'recordings', label: 'Recordings', icon: Video },
@@ -118,6 +118,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
 
   const adminTabs = [
     { id: 'enrollment-analytics', label: 'Student Analytics', icon: BarChart2 },
+    { id: 'community-admin', label: 'Community Chat', icon: Users }, // ADDED COMMUNITY TAB
     { id: 'schedules', label: 'Schedules', icon: Calendar },
     { id: 'meeting-manager', label: 'Meeting Links', icon: LinkIcon },
     { id: 'feedback-viewer', label: 'Feedback Viewer', icon: MessageSquare },
