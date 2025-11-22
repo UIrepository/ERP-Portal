@@ -43,7 +43,7 @@ function Calendar({
         ),
         day_range_end: "day-range-end",
         day_selected:
-          "bg-[#4a3728] text-white hover:bg-[#4a3728] hover:text-white focus:bg-[#4a3728] focus:text-white aria-selected:bg-[#4a3728] aria-selected:text-white",
+          "bg-[#4a3728] !text-white hover:bg-[#4a3728] hover:text-white focus:bg-[#4a3728] focus:text-white aria-selected:bg-[#4a3728] aria-selected:!text-white",
         day_today: "bg-slate-100 text-slate-900 font-bold",
         day_outside:
           "day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30",
