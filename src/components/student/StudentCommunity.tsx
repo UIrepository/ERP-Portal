@@ -1,6 +1,4 @@
-// uirepository/erp-portal/ERP-Portal-600ec08a7e847df2e05825de7912ed509bc4ae14/src/components/student/StudentCommunity.tsx
-
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -47,8 +45,7 @@ interface CommunityMessage {
   created_at: string;
   is_deleted: boolean;
   profiles: { name: string };
-  // 'reply_to' contains the PRIMARY message (the one being replied to)
-  reply_to?: any; 
+  // We handle reply connection manually now, so this optional field isn't needed from DB
   message_likes: { user_id: string }[];
 }
 
@@ -105,16 +102,13 @@ export const StudentCommunity = () => {
     queryFn: async () => {
       if (!selectedGroup) return [];
       
-      // CORRECTED QUERY: Using '!reply_to_id' forces Supabase to use the specific foreign key column
-      // to find the PARENT message. This disambiguates the self-reference.
+      // SIMPLIFIED QUERY: We removed the confusing 'reply_to' join. 
+      // We will link messages manually in the UI using 'reply_to_id'.
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
           *,
           profiles (name),
-          reply_to:community_messages!reply_to_id (
-            id, content, image_url, user_id, is_deleted, profiles(name)
-          ),
           message_likes ( user_id )
         `)
         .eq('batch', selectedGroup.batch_name)
@@ -122,16 +116,21 @@ export const StudentCommunity = () => {
         .eq('is_deleted', false)
         .order('created_at', { ascending: true });
 
-      if (error) {
-        console.error("Supabase Query Error:", error);
-        throw error;
-      }
+      if (error) throw error;
       return data as any[];
     },
     enabled: !!selectedGroup
   });
 
-  // --- 3. Real-time ---
+  // --- 3. Create Message Map for Replies ---
+  // This creates a dictionary { [id]: Message } so we can instantly look up any parent message
+  const messageMap = useMemo(() => {
+    const map = new Map<string, CommunityMessage>();
+    messages.forEach(msg => map.set(msg.id, msg));
+    return map;
+  }, [messages]);
+
+  // --- 4. Real-time ---
   useEffect(() => {
     if (!selectedGroup) return;
     
@@ -152,7 +151,7 @@ export const StudentCommunity = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [messages, selectedGroup]);
 
-  // --- 4. Mutations ---
+  // --- 5. Mutations ---
   const sendMessageMutation = useMutation({
     mutationFn: async ({ text, image, replyId }: { text: string; image: File | null; replyId: string | null }) => {
       if (!profile?.user_id || !selectedGroup) return;
@@ -238,7 +237,7 @@ export const StudentCommunity = () => {
     ) : part);
   };
 
-  const getReplyPreview = (primaryMsg: any) => {
+  const getReplyPreview = (primaryMsg: CommunityMessage) => {
     if (!primaryMsg) return null;
     if (primaryMsg.is_deleted) return '🗑️ Message deleted';
     if (primaryMsg.content && primaryMsg.content.trim().length > 0) return primaryMsg.content;
@@ -303,21 +302,12 @@ export const StudentCommunity = () => {
                const hasImage = msg.image_url && msg.image_url.trim() !== '';
                const hasContent = msg.content && msg.content.trim() !== '';
                
-               // --- CRITICAL VALIDATION LOGIC ---
-               // 1. Extract raw data
-               let rawReplyData = msg.reply_to;
-               if (Array.isArray(rawReplyData)) {
-                   rawReplyData = rawReplyData[0];
-               }
+               // --- FIXED LOGIC ---
+               // Look up the parent message directly from our client-side map.
+               // This guarantees we get the message that THIS message is replying TO.
+               const replyData = msg.reply_to_id ? messageMap.get(msg.reply_to_id) : null;
                
-               // 2. Verify ID Match: Ensure the data we fetched is actually the parent of this message
-               // This prevents "Reverse Quoting" where a parent accidentally quotes a child because of API confusion.
-               let replyData = null;
-               if (msg.reply_to_id && rawReplyData && rawReplyData.id === msg.reply_to_id) {
-                   replyData = rawReplyData;
-               }
-               
-               const replyText = getReplyPreview(replyData);
+               const replyText = replyData ? getReplyPreview(replyData) : null;
                const isReplyToMe = replyData?.user_id === profile?.user_id;
                const replySenderName = isReplyToMe ? "You" : replyData?.profiles?.name;
                
@@ -336,7 +326,7 @@ export const StudentCommunity = () => {
                      {/* Sender Name (only if not me) */}
                      {!isMe && <div className="text-[11px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
 
-                     {/* QUOTE BLOCK: Only rendered if VALID reply data exists */}
+                     {/* QUOTE BLOCK: Only rendered if replyData was found in the map */}
                      {replyData && replyText && (
                        <div 
                         className={`mb-1.5 rounded-md bg-black/5 border-l-[3px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none shadow-sm`}
