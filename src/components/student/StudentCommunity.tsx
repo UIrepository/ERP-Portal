@@ -105,14 +105,14 @@ export const StudentCommunity = () => {
     queryFn: async () => {
       if (!selectedGroup) return [];
       
-      // Using the explicit foreign key constraint name to force finding the PARENT message.
-      // Note: If this fails with 400, you MUST reload the schema cache in Supabase Dashboard -> Settings -> API.
+      // CORRECTED QUERY: Using '!reply_to_id' forces Supabase to use the specific foreign key column
+      // to find the PARENT message. This disambiguates the self-reference.
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
           *,
           profiles (name),
-          reply_to:community_messages!community_messages_reply_to_id_fkey (
+          reply_to:community_messages!reply_to_id (
             id, content, image_url, user_id, is_deleted, profiles(name)
           ),
           message_likes ( user_id )
@@ -122,7 +122,10 @@ export const StudentCommunity = () => {
         .eq('is_deleted', false)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase Query Error:", error);
+        throw error;
+      }
       return data as any[];
     },
     enabled: !!selectedGroup
@@ -300,17 +303,15 @@ export const StudentCommunity = () => {
                const hasImage = msg.image_url && msg.image_url.trim() !== '';
                const hasContent = msg.content && msg.content.trim() !== '';
                
-               // --- CRITICAL FIX: Validation of Reply Data ---
-               // 1. Get raw data
+               // --- CRITICAL VALIDATION LOGIC ---
+               // 1. Extract raw data
                let rawReplyData = msg.reply_to;
-               // 2. Handle if it's an array (Supabase might return array for one-to-many)
                if (Array.isArray(rawReplyData)) {
                    rawReplyData = rawReplyData[0];
                }
                
-               // 3. STRICT CHECK: The ID of the fetched reply MUST match the 'reply_to_id' of the current message.
-               // This prevents the "Reverse Quote" bug where a parent message (with no reply_to_id) 
-               // accidentally displays its children (replies) as quotes.
+               // 2. Verify ID Match: Ensure the data we fetched is actually the parent of this message
+               // This prevents "Reverse Quoting" where a parent accidentally quotes a child because of API confusion.
                let replyData = null;
                if (msg.reply_to_id && rawReplyData && rawReplyData.id === msg.reply_to_id) {
                    replyData = rawReplyData;
@@ -335,8 +336,7 @@ export const StudentCommunity = () => {
                      {/* Sender Name (only if not me) */}
                      {!isMe && <div className="text-[11px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
 
-                     {/* QUOTE BLOCK */}
-                     {/* Will ONLY render if reply_to_id exists AND matches the fetched data ID */}
+                     {/* QUOTE BLOCK: Only rendered if VALID reply data exists */}
                      {replyData && replyText && (
                        <div 
                         className={`mb-1.5 rounded-md bg-black/5 border-l-[3px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none shadow-sm`}
@@ -393,6 +393,7 @@ export const StudentCommunity = () => {
 
           {/* Input Area */}
           <div className="p-2 md:p-3 bg-[#f0f2f5] border-t z-20">
+            {/* Reply Preview Bar */}
             {replyingTo && (
               <div className="flex items-center justify-between bg-white p-2 rounded-lg mb-2 border-l-4 border-teal-500 shadow-sm animate-in slide-in-from-bottom-2">
                 <div className="flex flex-col px-2">
@@ -423,6 +424,7 @@ export const StudentCommunity = () => {
         </div>
       )}
 
+      {/* Delete Dialog */}
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>
             <AlertDialogHeader>
