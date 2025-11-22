@@ -172,15 +172,13 @@ const MessageItem = ({
       <div className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} my-2`}>
         <div className={`text-gray-400 text-xs italic px-3 py-1.5 border border-dashed border-gray-300 rounded-lg flex items-center gap-2 select-none bg-white/50`}>
            <Ban className="h-3 w-3" />
-           <span>Message deleted ({msg.profiles?.name})</span>
+           <span>Message deleted {msg.profiles?.name}</span>
         </div>
       </div>
     );
   }
 
   // New Bubble Shape Logic
-  // Left (Others): Rounded top-left, top-right, bottom-right. Sharp bottom-left.
-  // Right (Me): Rounded top-left, top-right, bottom-left. Sharp bottom-right.
   const bubbleShapeClass = isMe 
     ? "rounded-tl-2xl rounded-tr-2xl rounded-bl-2xl rounded-br-none" 
     : "rounded-tl-2xl rounded-tr-2xl rounded-br-2xl rounded-bl-none";
@@ -209,7 +207,6 @@ const MessageItem = ({
 
       <ContextMenu>
         <ContextMenuTrigger className={`block max-w-[85%] md:max-w-[65%] relative ${reactionsCount > 0 ? 'mb-5' : 'mb-0'}`}>
-          {/* Name for others, outside bubble if desired, or inside. Design suggests minimal outside or inside. Putting inside for neatness as per previous design or mimicking new code which hides names for subsequent messages. For now, simple inside. */}
           <div className={`relative px-4 py-3 shadow-sm text-sm transition-all ${bubbleShapeClass} ${
             isMe 
               ? 'bg-teal-700 text-white' 
@@ -506,7 +503,7 @@ export const StudentCommunity = () => {
   };
 
   return (
-    <div className="flex h-[100dvh] w-full bg-[#f8fafc] relative overflow-hidden">
+    <div className="flex h-[100dvh] w-full bg-[#fdfbf7] relative overflow-hidden">
       
       {/* GROUP LIST SIDEBAR (Original Style) */}
       <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
@@ -540,7 +537,7 @@ export const StudentCommunity = () => {
 
       {/* CHAT AREA */}
       {selectedGroup && (
-        <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-[#f8fafc]' : 'w-full'}`}>
+        <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-[#fdfbf7]' : 'w-full'}`}>
           
           {/* Header */}
           <div className="px-4 py-3 bg-white border-b flex items-center justify-between shadow-sm z-20 relative">
