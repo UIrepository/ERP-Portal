@@ -1,5 +1,3 @@
-// uirepository/erp-portal/ERP-Portal-600ec08a7e847df2e05825de7912ed509bc4ae14/src/components/student/StudentCommunity.tsx
-
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,9 +18,10 @@ import {
   Trash2, 
   X,
   Info,
-  Ban
+  Ban,
+  Lock
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isToday, isYesterday, isSameDay, parseISO, startOfDay } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
@@ -47,6 +46,12 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 
 // --- Interfaces ---
 interface CommunityMessage {
@@ -79,6 +84,7 @@ export const StudentCommunity = () => {
   const isMobile = useIsMobile();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   // --- State ---
   const [selectedGroup, setSelectedGroup] = useState<UserEnrollment | null>(null);
@@ -88,6 +94,10 @@ export const StudentCommunity = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null); 
   const [showStudentList, setShowStudentList] = useState(false);
+  
+  // Calendar State
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [calendarDate, setCalendarDate] = useState<Date | undefined>(new Date());
 
   // --- 1. Fetch Groups ---
   const { data: enrollments = [], isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
@@ -121,7 +131,6 @@ export const StudentCommunity = () => {
     queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
     queryFn: async () => {
       if (!selectedGroup) return [];
-      
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
@@ -139,12 +148,28 @@ export const StudentCommunity = () => {
     enabled: !!selectedGroup
   });
 
-  // --- 3. Create Message Map for Replies ---
+  // --- 3. Data Processing (Maps & Groups) ---
   const messageMap = useMemo(() => {
     const map = new Map<string, CommunityMessage>();
     messages.forEach(msg => map.set(msg.id, msg));
     return map;
   }, [messages]);
+
+  // Group messages by Date
+  const groupedMessages = useMemo(() => {
+    const groups: Record<string, CommunityMessage[]> = {};
+    messages.forEach(msg => {
+      const dateKey = format(new Date(msg.created_at), 'yyyy-MM-dd');
+      if (!groups[dateKey]) groups[dateKey] = [];
+      groups[dateKey].push(msg);
+    });
+    return groups;
+  }, [messages]);
+
+  // Get all dates that have messages for the calendar highlight
+  const activeDates = useMemo(() => {
+    return Object.keys(groupedMessages).map(dateStr => new Date(dateStr));
+  }, [groupedMessages]);
 
   // --- 4. Fetch Students in Group ---
   const { data: students = [] } = useQuery<StudentProfile[]>({
@@ -166,30 +191,27 @@ export const StudentCommunity = () => {
   // --- 5. Real-time ---
   useEffect(() => {
     if (!selectedGroup) return;
-    
     const refresh = () => {
       queryClient.invalidateQueries({ queryKey: ['community-messages', selectedGroup.batch_name, selectedGroup.subject_name] });
     };
-
     const channel = supabase
       .channel(`community-${selectedGroup.batch_name}-${selectedGroup.subject_name}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'community_messages', filter: `batch=eq.${selectedGroup.batch_name}` }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_likes' }, refresh)
       .subscribe();
-      
     return () => { supabase.removeChannel(channel); };
   }, [selectedGroup, queryClient]);
 
+  // Scroll to bottom on new message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
-  }, [messages, selectedGroup]);
+  }, [messages?.length, selectedGroup]); // Only scroll on new message count or group change
 
   // --- 6. Mutations ---
   const sendMessageMutation = useMutation({
     mutationFn: async ({ text, image, replyId }: { text: string; image: File | null; replyId: string | null }) => {
       if (!profile?.user_id || !selectedGroup) return;
       let imageUrl = null;
-
       if (image) {
         setIsUploading(true);
         const fileExt = image.name.split('.').pop();
@@ -201,7 +223,6 @@ export const StudentCommunity = () => {
         imageUrl = publicUrl;
         setIsUploading(false);
       }
-
       const { error } = await supabase.from('community_messages').insert({
         content: text,
         image_url: imageUrl,
@@ -238,14 +259,16 @@ export const StudentCommunity = () => {
   const toggleReactionMutation = useMutation({
     mutationFn: async ({ msgId, type }: { msgId: string, type: string }) => {
       const existingReaction = messages.find(m => m.id === msgId)?.message_likes.find(l => l.user_id === profile?.user_id);
-      
       if (existingReaction) {
         if (existingReaction.reaction_type === type) {
+          // Remove if same
           await supabase.from('message_likes').delete().match({ message_id: msgId, user_id: profile?.user_id });
         } else {
+          // Update if different
           await supabase.from('message_likes').update({ reaction_type: type }).match({ message_id: msgId, user_id: profile?.user_id });
         }
       } else {
+        // Add new
         await supabase.from('message_likes').insert({ message_id: msgId, user_id: profile?.user_id, reaction_type: type });
       }
     },
@@ -254,6 +277,7 @@ export const StudentCommunity = () => {
     }
   });
 
+  // --- Handlers ---
   const handleSend = () => {
     if (!messageText.trim() && !selectedImage) return;
     const currentReplyId = replyingTo?.id || null;
@@ -264,14 +288,20 @@ export const StudentCommunity = () => {
     });
   };
 
-  // --- Helpers ---
-  const renderTextWithLinks = (text: string | null) => {
-    if (!text) return null;
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const parts = text.split(urlRegex);
-    return parts.map((part, i) => part.match(urlRegex) ? (
-      <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline break-all">{part}</a>
-    ) : part);
+  const handleDateSelect = (date: Date | undefined) => {
+    if (!date) return;
+    setCalendarDate(date);
+    setIsCalendarOpen(false); // Auto close
+
+    // Scroll to the specific date group
+    const dateId = format(date, 'yyyy-MM-dd');
+    const element = document.getElementById(`date-${dateId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      toast({ title: `Jumped to ${format(date, 'MMM d, yyyy')}` });
+    } else {
+      toast({ title: "No messages found for this date", variant: "destructive" });
+    }
   };
 
   const getReplyPreview = (primaryMsg: CommunityMessage) => {
@@ -280,6 +310,15 @@ export const StudentCommunity = () => {
     if (primaryMsg.content && primaryMsg.content.trim().length > 0) return primaryMsg.content;
     if (primaryMsg.image_url) return '📷 Photo';
     return 'Message'; 
+  };
+
+  const renderTextWithLinks = (text: string | null) => {
+    if (!text) return null;
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    return parts.map((part, i) => part.match(urlRegex) ? (
+      <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline break-all">{part}</a>
+    ) : part);
   };
 
   // --- Render ---
@@ -318,7 +357,7 @@ export const StudentCommunity = () => {
       {selectedGroup && (
         <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-[#efeae2]' : 'w-full'}`}>
           
-          {/* Header (Clickable to show students) */}
+          {/* Header */}
           <div 
             className="p-3 bg-white border-b flex items-center justify-between shadow-sm z-20 cursor-pointer hover:bg-gray-50 transition-colors"
             onClick={() => setShowStudentList(true)}
@@ -337,137 +376,174 @@ export const StudentCommunity = () => {
           </div>
 
           {/* Messages List */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#efeae2] pb-24 md:pb-4">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#efeae2] pb-24 md:pb-4" ref={scrollAreaRef}>
+            
+            {/* End-to-End Encryption Banner */}
+            <div className="flex justify-center mb-6 mt-2">
+                <div className="bg-[#ffeba7]/40 border border-[#ffeba7] text-yellow-800 text-[10px] px-3 py-1 rounded-lg shadow-sm flex items-center gap-1.5">
+                    <Lock className="h-3 w-3" />
+                    <span>Messages are end-to-end encrypted. No one outside of this chat, not even the admins, can read them.</span>
+                </div>
+            </div>
+
             {isLoadingMessages ? <div className="flex justify-center p-10"><Loader2 className="animate-spin h-8 w-8 text-gray-400" /></div> : 
-             messages.length === 0 ? <div className="text-center py-20 opacity-50 text-sm">No messages yet.</div> :
-             messages.map((msg) => {
-               const isMe = msg.user_id === profile?.user_id;
-               const hasImage = msg.image_url && msg.image_url.trim() !== '';
-               const hasContent = msg.content && msg.content.trim() !== '';
-               
-               // Resolve Reply
-               const replyData = msg.reply_to_id ? messageMap.get(msg.reply_to_id) : null;
-               const replyText = replyData ? getReplyPreview(replyData) : null;
-               const isReplyToMe = replyData?.user_id === profile?.user_id;
-               const replySenderName = isReplyToMe ? "You" : replyData?.profiles?.name;
-               const replyBorderColor = isReplyToMe ? "border-teal-500" : "border-purple-500";
-               const replyNameColor = isReplyToMe ? "text-teal-600" : "text-purple-600";
-               
-               // Reactions
-               const myReaction = msg.message_likes?.find(l => l.user_id === profile?.user_id);
-               const reactionsCount = msg.message_likes?.length || 0;
-               const reactionCounts = msg.message_likes?.reduce((acc: any, curr) => {
-                 const type = curr.reaction_type || 'like';
-                 acc[type] = (acc[type] || 0) + 1;
-                 return acc;
-               }, {});
-
-               // --- DELETED MESSAGE RENDER (ALIGNED) ---
-               if (msg.is_deleted) {
-                 return (
-                   <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} my-2`}>
-                     <div className="bg-gray-200/60 text-gray-500 text-xs px-3 py-1 rounded-full flex items-center gap-1.5 select-none border border-gray-200">
-                        <Ban className="h-3 w-3" />
-                        <span>This message was deleted by <span className="font-medium">{msg.profiles?.name || 'Unknown'}</span></span>
-                     </div>
-                   </div>
-                 );
-               }
-
-               // --- NORMAL MESSAGE RENDER ---
-               return (
-                 <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} group mb-2 relative`}>
-                   
-                   <ContextMenu>
-                     <ContextMenuTrigger className="block max-w-[85%] md:max-w-[65%]">
-                       <div className={`relative rounded-lg p-2 shadow-sm text-sm ${
-                         isMe ? 'bg-[#dcf8c6] rounded-tr-none' : 'bg-white rounded-tl-none'
-                       }`}>
-                         
-                             {/* Sender Name */}
-                             {!isMe && <div className="text-[11px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
-
-                             {/* Quote Block */}
-                             {replyData && replyText && (
-                               <div 
-                                className={`mb-1.5 rounded-md bg-black/5 border-l-[3px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none shadow-sm`}
-                                onClick={() => {
-                                  const el = document.getElementById(`msg-${msg.reply_to_id}`);
-                                  if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'});
+             Object.keys(groupedMessages).length === 0 ? <div className="text-center py-20 opacity-50 text-sm">No messages yet.</div> :
+             Object.entries(groupedMessages).map(([dateKey, dateMessages]) => (
+               <div key={dateKey} id={`date-${dateKey}`} className="space-y-2">
+                 
+                 {/* Date Header with Calendar Popover */}
+                 <div className="flex justify-center sticky top-0 z-10 py-2">
+                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                        <PopoverTrigger asChild>
+                            <div className="bg-gray-100/90 backdrop-blur-sm text-gray-600 text-xs font-medium px-3 py-1 rounded-full shadow-sm border border-gray-200 cursor-pointer hover:bg-gray-200 transition-colors">
+                                {isToday(parseISO(dateKey)) ? 'Today' : isYesterday(parseISO(dateKey)) ? 'Yesterday' : format(parseISO(dateKey), 'MMMM d, yyyy')}
+                            </div>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="center">
+                            <Calendar
+                                mode="single"
+                                selected={calendarDate}
+                                onSelect={handleDateSelect}
+                                initialFocus
+                                modifiers={{
+                                    highlighted: activeDates
                                 }}
-                               >
-                                 <span className={`text-[10px] font-bold ${replyNameColor} mb-0.5`}>{replySenderName}</span>
-                                 <span className="text-[11px] text-gray-700 line-clamp-2">{replyText}</span>
-                               </div>
-                             )}
-
-                             {/* Content */}
-                             <div className="text-gray-900 px-1" id={`msg-${msg.id}`}>
-                                {hasImage && <div className="mb-1 rounded-lg overflow-hidden mt-1"><img src={msg.image_url!} alt="Attachment" className="max-w-full h-auto max-h-80 object-cover rounded-md cursor-pointer" onClick={() => window.open(msg.image_url!, '_blank')} /></div>}
-                                {hasContent && <p className="whitespace-pre-wrap leading-relaxed break-words text-[15px]">{renderTextWithLinks(msg.content)}</p>}
-                             </div>
-
-                             {/* Footer: Time */}
-                             <div className="flex justify-end items-center mt-0.5 gap-1 min-w-[60px]">
-                                <span className="text-[10px] text-gray-400 whitespace-nowrap ml-auto">{format(new Date(msg.created_at), 'h:mm a')}</span>
-                             </div>
-
-                             {/* Reactions: Floating Bubble */}
-                             {reactionsCount > 0 && (
-                               <div className="absolute -bottom-2 left-1 z-10 flex items-center gap-0.5 bg-white rounded-full px-1.5 py-0.5 shadow border border-gray-200 text-[10px] cursor-pointer hover:scale-105 transition-transform">
-                                 {Object.entries(reactionCounts).map(([type, count]) => (
-                                   <span key={type}>
-                                     {type === 'like' ? '👍' : type === 'love' ? '❤️' : type === 'laugh' ? '😂' : type === 'dislike' ? '👎' : '👍'} 
-                                     {Number(count) > 1 && <span className="ml-0.5 font-bold text-gray-600">{String(count)}</span>}
-                                   </span>
-                                 ))}
-                               </div>
-                             )}
-                       </div>
-                     </ContextMenuTrigger>
-                     
-                     {/* Context Menu */}
-                     <ContextMenuContent className="w-48">
-                         {/* Emoji Row - Using ContextMenuItem with asChild to ensure click closes the menu */}
-                         <div className="flex justify-around p-2 bg-gray-50 rounded-md mb-2">
-                           {['👍', '❤️', '😂', '👎'].map(emoji => {
-                             const typeMap: Record<string, string> = { '👍': 'like', '❤️': 'love', '😂': 'laugh', '👎': 'dislike' };
-                             const type = typeMap[emoji];
-                             return (
-                               <ContextMenuItem 
-                                 key={emoji} 
-                                 asChild
-                                 onSelect={() => toggleReactionMutation.mutate({ msgId: msg.id, type })}
-                               >
-                                 <button 
-                                   className={`text-lg hover:scale-125 transition-transform p-1 cursor-pointer border-none bg-transparent outline-none ${myReaction?.reaction_type === type ? 'bg-blue-100 rounded-full' : ''}`}
-                                 >
-                                   {emoji}
-                                 </button>
-                               </ContextMenuItem>
-                             )
-                           })}
-                         </div>
-                         <ContextMenuItem onSelect={() => setReplyingTo(msg)}>
-                           <Reply className="mr-2 h-4 w-4" /> Reply
-                         </ContextMenuItem>
-                         {isMe && (
-                           <ContextMenuItem onSelect={() => setDeleteId(msg.id)} className="text-red-600 focus:text-red-600">
-                             <Trash2 className="mr-2 h-4 w-4" /> Delete
-                           </ContextMenuItem>
-                         )}
-                     </ContextMenuContent>
-                   </ContextMenu>
-
+                                modifiersStyles={{
+                                    highlighted: { fontWeight: 'bold', color: '#0d9488', textDecoration: 'underline' } // Teal color for dates with messages
+                                }}
+                            />
+                        </PopoverContent>
+                    </Popover>
                  </div>
-               );
-             })}
+
+                 {/* Messages for this date */}
+                 {dateMessages.map((msg) => {
+                   const isMe = msg.user_id === profile?.user_id;
+                   const hasImage = msg.image_url && msg.image_url.trim() !== '';
+                   const hasContent = msg.content && msg.content.trim() !== '';
+                   
+                   // Reply Logic
+                   const replyData = msg.reply_to_id ? messageMap.get(msg.reply_to_id) : null;
+                   const replyText = replyData ? getReplyPreview(replyData) : null;
+                   const isReplyToMe = replyData?.user_id === profile?.user_id;
+                   const replySenderName = isReplyToMe ? "You" : replyData?.profiles?.name;
+                   const replyBorderColor = isReplyToMe ? "border-teal-500" : "border-purple-500";
+                   const replyNameColor = isReplyToMe ? "text-teal-600" : "text-purple-600";
+                   
+                   // Reactions Logic
+                   const myReaction = msg.message_likes?.find(l => l.user_id === profile?.user_id);
+                   const reactionsCount = msg.message_likes?.length || 0;
+                   const reactionCounts = msg.message_likes?.reduce((acc: any, curr) => {
+                     const type = curr.reaction_type || 'like';
+                     acc[type] = (acc[type] || 0) + 1;
+                     return acc;
+                   }, {});
+
+                   // --- DELETED MESSAGE RENDER ---
+                   if (msg.is_deleted) {
+                     return (
+                       <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} my-1`}>
+                         <div className={`bg-white/50 text-gray-500 text-xs italic px-3 py-1.5 rounded-lg flex items-center gap-1.5 select-none border border-gray-200 max-w-[80%] ${isMe ? 'rounded-tr-none' : 'rounded-tl-none'}`}>
+                            <Ban className="h-3 w-3 opacity-70" />
+                            <span>This message was deleted by {msg.profiles?.name || 'Unknown'}</span>
+                         </div>
+                       </div>
+                     );
+                   }
+
+                   // --- NORMAL MESSAGE RENDER ---
+                   return (
+                     <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} group mb-1 relative`}>
+                       <ContextMenu>
+                         <ContextMenuTrigger className="block max-w-[85%] md:max-w-[65%]">
+                           <div className={`relative rounded-lg p-2 shadow-sm text-sm ${
+                             isMe ? 'bg-[#dcf8c6] rounded-tr-none' : 'bg-white rounded-tl-none'
+                           }`}>
+                             
+                                 {/* Sender Name */}
+                                 {!isMe && <div className="text-[11px] font-bold text-orange-600 mb-0.5 px-1">{msg.profiles?.name}</div>}
+
+                                 {/* Quote Block */}
+                                 {replyData && replyText && (
+                                   <div 
+                                    className={`mb-1.5 rounded-md bg-black/5 border-l-[3px] ${replyBorderColor} p-1.5 flex flex-col justify-center cursor-pointer select-none shadow-sm`}
+                                    onClick={() => {
+                                      const el = document.getElementById(`msg-${msg.reply_to_id}`);
+                                      if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'});
+                                    }}
+                                   >
+                                     <span className={`text-[10px] font-bold ${replyNameColor} mb-0.5`}>{replySenderName}</span>
+                                     <span className="text-[11px] text-gray-700 line-clamp-2">{replyText}</span>
+                                   </div>
+                                 )}
+
+                                 {/* Content */}
+                                 <div className="text-gray-900 px-1" id={`msg-${msg.id}`}>
+                                    {hasImage && <div className="mb-1 rounded-lg overflow-hidden mt-1"><img src={msg.image_url!} alt="Attachment" className="max-w-full h-auto max-h-80 object-cover rounded-md cursor-pointer" onClick={() => window.open(msg.image_url!, '_blank')} /></div>}
+                                    {hasContent && <p className="whitespace-pre-wrap leading-relaxed break-words text-[15px]">{renderTextWithLinks(msg.content)}</p>}
+                                 </div>
+
+                                 {/* Footer: Time */}
+                                 <div className="flex justify-end items-center mt-0.5 gap-1 min-w-[50px] h-4">
+                                    <span className="text-[10px] text-gray-400 whitespace-nowrap ml-auto">{format(new Date(msg.created_at), 'h:mm a')}</span>
+                                 </div>
+
+                                 {/* Reactions: Bubble below message */}
+                                 {reactionsCount > 0 && (
+                                   <div className={`absolute -bottom-2 ${isMe ? 'right-0' : 'left-0'} z-10 flex items-center gap-0.5 bg-white rounded-full px-1.5 py-0.5 shadow-sm border border-gray-200 text-[10px] cursor-pointer hover:scale-105 transition-transform`}>
+                                     {Object.entries(reactionCounts).map(([type, count]) => (
+                                       <span key={type}>
+                                         {type === 'like' ? '👍' : type === 'love' ? '❤️' : type === 'laugh' ? '😂' : type === 'dislike' ? '👎' : '👍'} 
+                                         {Number(count) > 1 && <span className="ml-0.5 font-bold text-gray-600">{String(count)}</span>}
+                                       </span>
+                                     ))}
+                                   </div>
+                                 )}
+                           </div>
+                         </ContextMenuTrigger>
+                         
+                         {/* Context Menu */}
+                         <ContextMenuContent className="w-48">
+                             {/* Emoji Row */}
+                             <div className="flex justify-around p-2 bg-gray-50 rounded-md mb-2">
+                               {['👍', '❤️', '😂', '👎'].map(emoji => {
+                                 const typeMap: Record<string, string> = { '👍': 'like', '❤️': 'love', '😂': 'laugh', '👎': 'dislike' };
+                                 const type = typeMap[emoji];
+                                 return (
+                                   <ContextMenuItem 
+                                     key={emoji} 
+                                     asChild 
+                                     onSelect={() => toggleReactionMutation.mutate({ msgId: msg.id, type })}
+                                   >
+                                     <button 
+                                       className={`text-lg hover:scale-125 transition-transform p-1 cursor-pointer border-none bg-transparent outline-none ${myReaction?.reaction_type === type ? 'bg-blue-100 rounded-full' : ''}`}
+                                     >
+                                       {emoji}
+                                     </button>
+                                   </ContextMenuItem>
+                                 )
+                               })}
+                             </div>
+                             <ContextMenuItem onSelect={() => setReplyingTo(msg)}>
+                               <Reply className="mr-2 h-4 w-4" /> Reply
+                             </ContextMenuItem>
+                             {isMe && (
+                               <ContextMenuItem onSelect={() => setDeleteId(msg.id)} className="text-red-600 focus:text-red-600">
+                                 <Trash2 className="mr-2 h-4 w-4" /> Delete
+                               </ContextMenuItem>
+                             )}
+                         </ContextMenuContent>
+                       </ContextMenu>
+                     </div>
+                   );
+                 })}
+               </div>
+             ))}
             <div ref={messagesEndRef} />
           </div>
 
           {/* Input Area */}
           <div className="p-2 md:p-3 bg-[#f0f2f5] border-t z-20">
-            {/* Reply Preview Bar */}
             {replyingTo && (
               <div className="flex items-center justify-between bg-white p-2 rounded-lg mb-2 border-l-4 border-teal-500 shadow-sm animate-in slide-in-from-bottom-2">
                 <div className="flex flex-col px-2">
