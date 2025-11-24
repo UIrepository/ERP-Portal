@@ -311,7 +311,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
   );
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
+    <div className={activeTab === 'community' ? '' : 'min-h-screen bg-gray-50/50'}>
       {renderTabContent()}
     </div>
   );
