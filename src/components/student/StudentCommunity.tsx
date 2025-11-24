@@ -417,7 +417,7 @@ export const StudentCommunity = () => {
   useEffect(() => {
     // Ensure smooth scrolling to the latest message, fixing the jumpiness
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, selectedGroup]); // FIX: Replaced messages?.length with messages.length
+  }, [messages.length, selectedGroup]); 
 
   const sendMessageMutation = useMutation({
     mutationFn: async ({ text, image, replyId }: { text: string; image: File | null; replyId: string | null }) => {
@@ -547,6 +547,7 @@ export const StudentCommunity = () => {
 
       {/* CHAT AREA */}
       {selectedGroup && (
+        // The container uses flex-col h-full to occupy available space and arrange children vertically
         <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full h-full bg-[#fdfbf7]' : 'w-full'}`}>
           
           {/* Header - FIXED: flex-shrink-0 ensures it stays put */}
@@ -577,8 +578,8 @@ export const StudentCommunity = () => {
             }}
           />
 
-          {/* Messages List - SCROLLABLE AREA: flex-1 ensures it fills the remaining height */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 z-10 pb-4" ref={scrollAreaRef}>
+          {/* Messages List - SCROLLABLE AREA: h-0 is added to ensure flex-1 correctly dictates height */}
+          <div className="flex-1 h-0 overflow-y-auto p-4 space-y-4 z-10 pb-4" ref={scrollAreaRef}>
             
             {/* Professional Encryption/System Note */}
             <div className="flex justify-center mb-6 mt-2">
