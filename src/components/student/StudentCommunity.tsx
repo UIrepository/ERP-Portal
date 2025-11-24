@@ -18,12 +18,13 @@ import {
   X,
   Ban,
   Lock,
+  AlertCircle,
   Megaphone
 } from 'lucide-react';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion'; // Requires framer-motion
 import {
   AlertDialog,
   AlertDialogAction,
@@ -79,10 +80,6 @@ const getAvatarColor = (name: string) => {
   return colors[Math.abs(hash) % colors.length];
 };
 
-interface StudentCommunityProps {
-  onChatOpenChange?: (isOpen: boolean) => void;
-}
-
 // --- Swipeable Message Component ---
 const MessageItem = ({ 
   msg, 
@@ -96,7 +93,7 @@ const MessageItem = ({
 }: {
   msg: CommunityMessage,
   isMe: boolean,
-  replyData: CommunityMessage | undefined | null,
+  replyData: any,
   replyText: string | null,
   onReply: (msg: CommunityMessage) => void,
   onDelete: (id: string) => void,
@@ -160,12 +157,6 @@ const MessageItem = ({
   };
 
   if (msg.is_deleted) {
-    // New logic: Check if the message was deleted by the sender (You) or a moderator (Admin)
-    const isDeletedBySender = msg.user_id === profile?.user_id;
-    const deletedText = isDeletedBySender 
-      ? `Message deleted ${msg.profiles?.name}` 
-      : 'Message deleted by moderator';
-
     return (
       <motion.div 
         initial={{ opacity: 0, y: 10 }} 
@@ -174,7 +165,7 @@ const MessageItem = ({
       >
         <div className={`text-gray-400 text-xs italic px-3 py-1.5 border border-dashed border-gray-300 rounded-lg flex items-center gap-2 select-none bg-white/50`}>
            <Ban className="h-3 w-3" />
-           <span>{deletedText}</span>
+           <span>Message deleted {msg.profiles?.name}</span>
         </div>
       </motion.div>
     );
@@ -320,11 +311,7 @@ const MessageItem = ({
   );
 };
 
-interface StudentCommunityProps {
-  onChatOpenChange?: (isOpen: boolean) => void;
-}
-
-export const StudentCommunity = ({ onChatOpenChange }: StudentCommunityProps) => {
+export const StudentCommunity = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
@@ -363,13 +350,6 @@ export const StudentCommunity = ({ onChatOpenChange }: StudentCommunityProps) =>
   }, [enrollments, selectedGroup, isMobile]);
 
   useEffect(() => {
-    // Notify parent when chat open state changes on mobile
-    if (isMobile && onChatOpenChange) {
-      onChatOpenChange(!!selectedGroup);
-    }
-  }, [selectedGroup, isMobile, onChatOpenChange]);
-
-  useEffect(() => {
     setMessageText('');
     setSelectedImage(null);
     setReplyingTo(null);
@@ -391,7 +371,7 @@ export const StudentCommunity = ({ onChatOpenChange }: StudentCommunityProps) =>
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      return (data || []) as CommunityMessage[];
+      return data as any[];
     },
     enabled: !!selectedGroup
   });
@@ -430,7 +410,7 @@ export const StudentCommunity = ({ onChatOpenChange }: StudentCommunityProps) =>
   }, [selectedGroup, queryClient]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [messages?.length, selectedGroup]);
 
   const sendMessageMutation = useMutation({
@@ -455,12 +435,11 @@ export const StudentCommunity = ({ onChatOpenChange }: StudentCommunityProps) =>
         batch: selectedGroup.batch_name,
         subject: selectedGroup.subject_name,
         reply_to_id: replyId,
-        is_priority: false
+        is_priority: false // Students cannot send priority
       });
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['community-messages'] });
       setMessageText('');
       setSelectedImage(null);
       setReplyingTo(null); 
@@ -526,11 +505,7 @@ export const StudentCommunity = ({ onChatOpenChange }: StudentCommunityProps) =>
   };
 
   return (
-    <div className={`flex w-full bg-[#fdfbf7] relative ${
-      selectedGroup && isMobile 
-        ? 'fixed inset-0 z-50 h-[100dvh] overflow-hidden' 
-        : 'h-[calc(100vh-8rem)] md:h-[calc(100vh-12rem)] overflow-hidden'
-    }`}>
+    <div className="flex h-[100dvh] w-full bg-[#fdfbf7] relative overflow-hidden">
       
       {/* GROUP LIST SIDEBAR */}
       <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
@@ -564,10 +539,10 @@ export const StudentCommunity = ({ onChatOpenChange }: StudentCommunityProps) =>
 
       {/* CHAT AREA */}
       {selectedGroup && (
-        <div className="flex-1 flex flex-col h-full relative w-full bg-[#fdfbf7] overflow-hidden">
+        <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-[#fdfbf7]' : 'w-full'}`}>
           
-          {/* Header - FIXED */}
-          <div className="px-4 py-3 bg-white border-b flex items-center justify-between shadow-sm z-20 shrink-0">
+          {/* Header */}
+          <div className="px-4 py-3 bg-white border-b flex items-center justify-between shadow-sm z-20 relative">
             <div className="flex items-center gap-3">
               {isMobile && <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }} className="-ml-2 mr-1 text-gray-600"><ArrowLeft className="h-5 w-5" /></Button>}
               <Avatar className="h-9 w-9 border border-gray-200">
@@ -593,8 +568,8 @@ export const StudentCommunity = ({ onChatOpenChange }: StudentCommunityProps) =>
             }}
           />
 
-          {/* Messages List - SCROLLABLE */}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-4 z-10" ref={scrollAreaRef}>
+          {/* Messages List */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 z-10 pb-24 md:pb-4" ref={scrollAreaRef}>
             
             {/* Professional Encryption/System Note */}
             <div className="flex justify-center mb-6 mt-2">
@@ -611,7 +586,7 @@ export const StudentCommunity = ({ onChatOpenChange }: StudentCommunityProps) =>
                  
                  {/* Date Header */}
                  <div className="flex justify-center sticky top-0 z-10 py-2">
-                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                    <Popover>
                         <PopoverTrigger asChild>
                             <div className="bg-white/90 backdrop-blur border border-gray-200 text-gray-500 text-[11px] font-medium px-3 py-0.5 rounded-full shadow-sm cursor-pointer hover:bg-gray-50 transition-colors select-none">
                                 {isToday(parseISO(dateKey)) ? 'Today' : isYesterday(parseISO(dateKey)) ? 'Yesterday' : format(parseISO(dateKey), 'MMMM d, yyyy')}
@@ -623,8 +598,12 @@ export const StudentCommunity = ({ onChatOpenChange }: StudentCommunityProps) =>
                                 selected={calendarDate}
                                 onSelect={handleDateSelect}
                                 initialFocus
-                                modifiers={{ highlighted: activeDates }}
-                                modifiersStyles={{ highlighted: { fontWeight: 'bold', color: '#4a3728', textDecoration: 'underline' } }}
+                                modifiers={{
+                                    highlighted: activeDates
+                                }}
+                                modifiersStyles={{
+                                    highlighted: { fontWeight: 'bold', color: '#4a3728', textDecoration: 'underline' }
+                                }}
                             />
                         </PopoverContent>
                     </Popover>
@@ -637,8 +616,8 @@ export const StudentCommunity = ({ onChatOpenChange }: StudentCommunityProps) =>
                        key={msg.id}
                        msg={msg}
                        isMe={msg.user_id === profile?.user_id}
-                       replyData={messageMap.get(msg.reply_to_id || '')}
-                       replyText={messageMap.get(msg.reply_to_id || '')?.content || 'Message'}
+                       replyData={msg.reply_to_id ? messageMap.get(msg.reply_to_id) : null}
+                       replyText={msg.reply_to_id ? (messageMap.get(msg.reply_to_id)?.content || 'Message') : null}
                        onReply={setReplyingTo}
                        onDelete={(id) => setDeleteId(id)}
                        onReact={(msgId, type) => toggleReactionMutation.mutate({ msgId, type })}
@@ -651,8 +630,8 @@ export const StudentCommunity = ({ onChatOpenChange }: StudentCommunityProps) =>
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Area - FIXED */}
-          <div className="p-3 md:p-4 bg-white border-t z-20 shrink-0">
+          {/* Input Area */}
+          <div className="p-3 md:p-4 bg-white border-t z-20">
             {/* Reply Preview */}
             {replyingTo && (
               <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg mb-3 border-l-4 border-teal-500 animate-in slide-in-from-bottom-2">
@@ -692,7 +671,7 @@ export const StudentCommunity = ({ onChatOpenChange }: StudentCommunityProps) =>
       )}
 
       {/* Delete Dialog */}
-      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+      <AlertDialog>
         <AlertDialogContent>
             <AlertDialogHeader>
                 <AlertDialogTitle>Delete Message?</AlertDialogTitle>

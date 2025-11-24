@@ -17,30 +17,6 @@ interface AuthContextType {
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 
-// Helper function to fetch and normalize the profile
-const fetchAndNormalizeProfile = async (user: User | null): Promise<Profile | null> => {
-    if (!user) return null;
-    
-    // Fetch user profile
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
-    
-    if (profileData) {
-      // Normalize array-or-null fields to an empty array to prevent 'not iterable' errors
-      return {
-        ...profileData,
-        batch: profileData.batch || [],
-        exams: profileData.exams || [],
-        subjects: profileData.subjects || [],
-      } as Profile; // Cast to Profile type
-    }
-    
-    return null;
-}
-
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = React.useState<User | null>(null);
   const [session, setSession] = React.useState<Session | null>(null);
@@ -48,46 +24,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    // 1. Setup the Auth State Change listener for *future* changes (sign in/out)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        
+
         if (session?.user) {
-          // Profile update on sign-in/event
-          const normalizedProfile = await fetchAndNormalizeProfile(session.user);
-          setProfile(normalizedProfile);
+          // Fetch user profile
+          setTimeout(async () => {
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('user_id', session.user.id)
+              .single();
+            setProfile(profileData);
+            setLoading(false);
+          }, 0);
         } else {
           setProfile(null);
-        }
-        
-        // This is only set to false for events *after* the initial load
-        if (event !== 'INITIAL_SESSION') {
-            setLoading(false);
+          setLoading(false);
         }
       }
     );
 
-    // 2. Handle the initial session check on mount (The Fix)
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      try { // Added try block to catch potential errors during profile fetch
-        setSession(session);
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
-        
-        if (currentUser) {
-          // FIX: Fetch the profile here for the initial load
-          const normalizedProfile = await fetchAndNormalizeProfile(currentUser);
-          setProfile(normalizedProfile);
-        }
-      } catch (error) {
-        // Log the error but proceed to stop loading
-        console.error("Error during initial session and profile fetch:", error);
-        setProfile(null);
-        setUser(null);
-      } finally {
-        // FIX: Crucial: Set loading to false in finally block to ensure it always runs.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (!session) {
         setLoading(false);
       }
     });

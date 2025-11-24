@@ -18,16 +18,15 @@ interface LayoutProps {
   children: React.ReactNode;
   activeTab: string;
   onTabChange: (tab: string) => void;
-  hideNavOnMobile?: boolean;
 }
 
-export const Layout = ({ children, activeTab, onTabChange, hideNavOnMobile = false }: LayoutProps) => {
+export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
   const { profile, signOut } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      <header className={`border-b bg-card sticky top-0 z-30 ${hideNavOnMobile ? 'hidden md:block' : ''}`}>
+      <header className="border-b bg-card sticky top-0 z-30">
         <div className="flex h-16 items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-4">
             {/* Mobile Sidebar Toggle */}
@@ -88,16 +87,16 @@ export const Layout = ({ children, activeTab, onTabChange, hideNavOnMobile = fal
 
       <div className="flex flex-1 overflow-hidden">
         {/* Desktop Sidebar */}
-        <aside className={`${hideNavOnMobile ? 'hidden md:block' : 'hidden'} md:block h-full w-64 border-r`}>
+        <aside className="hidden md:block h-full w-64 border-r">
           <Sidebar activeTab={activeTab} onTabChange={onTabChange} />
         </aside>
         
         {/* Main Content */}
-        <main className={`flex-1 flex flex-col ${hideNavOnMobile ? 'overflow-hidden' : 'overflow-y-auto'}`}>
-            <div className={`flex-1 ${hideNavOnMobile ? '' : ''}`}>
+        <main className="flex-1 overflow-y-auto flex flex-col">
+            <div className="flex-1">
                 {children}
             </div>
-            <footer className={`py-6 border-t bg-card/30 mt-auto ${hideNavOnMobile ? 'hidden md:block' : ''}`}>
+            <footer className="py-6 border-t bg-card/30 mt-auto">
                 <p className="text-center text-sm text-muted-foreground font-medium">
                     Built and Maintained by <a 
                       href="https://www.neuralai.in/about" 

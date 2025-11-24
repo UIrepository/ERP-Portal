@@ -20,7 +20,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 interface StudentDashboardProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
-  onChatOpenChange?: (isOpen: boolean) => void;
 }
 
 interface UserEnrollment {
@@ -35,7 +34,7 @@ interface AnalyticsData {
   feedbackSubmitted: number;
 }
 
-export const StudentDashboard = ({ activeTab, onTabChange, onChatOpenChange }: StudentDashboardProps) => {
+export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardProps) => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
 
@@ -161,7 +160,7 @@ export const StudentDashboard = ({ activeTab, onTabChange, onChatOpenChange }: S
         return <StudentAnnouncements />;
       // 2. THIS IS THE CRITICAL PART THAT WAS MISSING OR BROKEN
       case 'community':
-        return <StudentCommunity onChatOpenChange={onChatOpenChange} />;
+        return <StudentCommunity />;
       case 'schedule':
         return <StudentSchedule />;
       case 'current-class':
@@ -312,7 +311,7 @@ export const StudentDashboard = ({ activeTab, onTabChange, onChatOpenChange }: S
   );
 
   return (
-    <div className={activeTab === 'community' ? '' : 'min-h-screen bg-gray-50/50'}>
+    <div className="min-h-screen bg-gray-50/50">
       {renderTabContent()}
     </div>
   );

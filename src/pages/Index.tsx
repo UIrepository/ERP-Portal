@@ -18,7 +18,6 @@ const Index = () => {
   };
 
   const [activeTab, setActiveTab] = useState(getInitialTab());
-  const [isChatOpen, setIsChatOpen] = useState(false);
 
   useEffect(() => {
     setActiveTab(getInitialTab());
@@ -35,7 +34,7 @@ const Index = () => {
   const renderDashboard = () => {
     switch (profile?.role) {
       case 'student':
-        return <StudentDashboard activeTab={activeTab} onTabChange={setActiveTab} onChatOpenChange={setIsChatOpen} />;
+        return <StudentDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
       case 'super_admin':
         return <AdminDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
       default:
@@ -49,11 +48,7 @@ const Index = () => {
   };
 
   return (
-    <Layout 
-      activeTab={activeTab} 
-      onTabChange={setActiveTab}
-      hideNavOnMobile={isChatOpen}
-    >
+    <Layout activeTab={activeTab} onTabChange={setActiveTab}>
       {renderDashboard()}
     </Layout>
   );

@@ -16,12 +16,15 @@ export const TeacherAnalytics = () => {
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [selectedBatch, setSelectedBatch] = useState<string>('all');
 
-  // Note: 'teacher' role doesn't exist in current enum (only 'student' and 'super_admin')
   const { data: teachers = [], isLoading: isLoadingTeachers } = useQuery<TeacherProfile[]>({
     queryKey: ['teacher-analytics-profiles'],
     queryFn: async () => {
-      // Return empty array until 'teacher' role is added to enum
-      return [];
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('batch, subjects')
+        .eq('role', 'teacher');
+      if (error) throw error;
+      return data || [];
     },
   });
 
