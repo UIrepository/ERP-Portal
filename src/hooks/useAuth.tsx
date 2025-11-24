@@ -21,6 +21,7 @@ const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 const fetchAndNormalizeProfile = async (user: User | null): Promise<Profile | null> => {
     if (!user) return null;
     
+    // Fetch user profile
     const { data: profileData } = await supabase
       .from('profiles')
       .select('*')
@@ -34,7 +35,7 @@ const fetchAndNormalizeProfile = async (user: User | null): Promise<Profile | nu
         batch: profileData.batch || [],
         exams: profileData.exams || [],
         subjects: profileData.subjects || [],
-      };
+      } as Profile; // Cast to Profile type
     }
     
     return null;
@@ -70,18 +71,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     // 2. Handle the initial session check on mount (The Fix)
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      
-      if (currentUser) {
-        // FIX: Fetch the profile here for the initial load to ensure loading=false is called.
-        const normalizedProfile = await fetchAndNormalizeProfile(currentUser);
-        setProfile(normalizedProfile);
+      try { // Added try block to catch potential errors during profile fetch
+        setSession(session);
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+        
+        if (currentUser) {
+          // FIX: Fetch the profile here for the initial load
+          const normalizedProfile = await fetchAndNormalizeProfile(currentUser);
+          setProfile(normalizedProfile);
+        }
+      } catch (error) {
+        // Log the error but proceed to stop loading
+        console.error("Error during initial session and profile fetch:", error);
+        setProfile(null);
+        setUser(null);
+      } finally {
+        // FIX: Crucial: Set loading to false in finally block to ensure it always runs.
+        setLoading(false);
       }
-      
-      // Crucial: Set loading to false once initial checks and profile fetch are complete.
-      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
