@@ -352,9 +352,10 @@ export const AdminCommunity = () => {
         .select('batch_name, subject_name')
         .eq('user_id', profile.user_id);
       if (error) throw error;
-      return data || [];
+      return Array.isArray(data) ? data : [];
     },
-    enabled: !!profile?.user_id
+    enabled: !!profile?.user_id,
+    initialData: []
   });
 
   useEffect(() => {
