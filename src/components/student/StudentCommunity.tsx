@@ -415,7 +415,7 @@ export const StudentCommunity = () => {
   }, [selectedGroup, queryClient]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages?.length, selectedGroup]);
 
   const sendMessageMutation = useMutation({
@@ -515,7 +515,7 @@ export const StudentCommunity = () => {
       
       {/* GROUP LIST SIDEBAR */}
       <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
-        <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
+        <div className="p-4 border-b bg-gray-50 flex items-center justify-between flex-shrink-0">
           <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Users className="h-5 w-5 text-teal-600" /> Communities</h2>
         </div>
         <ScrollArea className="flex-1">
@@ -545,10 +545,10 @@ export const StudentCommunity = () => {
 
       {/* CHAT AREA */}
       {selectedGroup && (
-        <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-[#fdfbf7]' : 'w-full'}`}>
+        <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full h-full bg-[#fdfbf7]' : 'w-full'}`}>
           
-          {/* Header */}
-          <div className="px-4 py-3 bg-white border-b flex items-center justify-between shadow-sm z-20 relative">
+          {/* Header - FIXED: Added flex-shrink-0 */}
+          <div className="px-4 py-3 bg-white border-b flex items-center justify-between shadow-sm z-20 relative flex-shrink-0">
             <div className="flex items-center gap-3">
               {isMobile && <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }} className="-ml-2 mr-1 text-gray-600"><ArrowLeft className="h-5 w-5" /></Button>}
               <Avatar className="h-9 w-9 border border-gray-200">
@@ -574,7 +574,7 @@ export const StudentCommunity = () => {
             }}
           />
 
-          {/* Messages List - FIXED: pb-20 on mobile to prevent floating/overlap with input */}
+          {/* Messages List - FIXED: pb-20 on mobile to fit stable input bar */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 z-10 pb-20 md:pb-4" ref={scrollAreaRef}>
             
             {/* Professional Encryption/System Note */}
@@ -646,7 +646,7 @@ export const StudentCommunity = () => {
             )}
 
             {selectedImage && (
-              <div className="flex items-center justify-between bg-teal-50 p-2 rounded-lg mb-3 border border-teal-100">
+              <div className="flex items-center justify-between bg-teal-50 p-2 rounded-lg mb-3 border border-teal-100 flex-shrink-0">
                 <div className="flex items-center gap-3">
                     <div className="h-10 w-10 bg-white rounded-md shadow-sm flex items-center justify-center text-teal-600"><ImageIcon className="h-5 w-5"/></div>
                     <div className="text-sm text-teal-900 truncate max-w-[200px] font-medium">{selectedImage.name}</div>
