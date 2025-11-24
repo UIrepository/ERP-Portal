@@ -30,29 +30,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          // Fetch user profile
-          setTimeout(async () => {
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('user_id', session.user.id)
-              .single();
-            
-            // FIX: Normalize array-or-null fields to an empty array to prevent 'not iterable' errors
-            if (profileData) {
-              const normalizedProfile: Profile = {
-                ...profileData,
-                batch: profileData.batch || [],
-                exams: profileData.exams || [],
-                subjects: profileData.subjects || [],
-              };
-              setProfile(normalizedProfile);
-            } else {
-              setProfile(null);
-            }
-
-            setLoading(false);
-          }, 0);
+          // Fetch user profile synchronously (Removed setTimeout)
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .single();
+          
+          // FIX: Normalize array-or-null fields to an empty array
+          if (profileData) {
+            const normalizedProfile: Profile = {
+              ...profileData,
+              batch: profileData.batch || [],
+              exams: profileData.exams || [],
+              subjects: profileData.subjects || [],
+            };
+            setProfile(normalizedProfile);
+          } else {
+            setProfile(null);
+          }
+          
+          setLoading(false);
         } else {
           setProfile(null);
           setLoading(false);
@@ -61,8 +59,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     );
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      // Initialize state for immediate use
       setSession(session);
       setUser(session?.user ?? null);
+      
+      // If there is no session initially, we can stop loading immediately.
+      // If there IS a session, the onAuthStateChange listener will fire immediately 
+      // and handle the profile fetch and set loading to false.
       if (!session) {
         setLoading(false);
       }
