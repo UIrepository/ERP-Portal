@@ -415,6 +415,7 @@ export const StudentCommunity = () => {
   }, [selectedGroup, queryClient]);
 
   useEffect(() => {
+    // Ensure smooth scrolling to the latest message, fixing the jumpiness
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages?.length, selectedGroup]);
 
@@ -511,7 +512,8 @@ export const StudentCommunity = () => {
   };
 
   return (
-    <div className="flex h-[100dvh] w-full bg-[#fdfbf7] relative overflow-hidden">
+    // Main container now takes full height from Layout.tsx and uses flex-col
+    <div className="flex h-full w-full bg-[#fdfbf7] relative overflow-hidden">
       
       {/* GROUP LIST SIDEBAR */}
       <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
@@ -547,9 +549,10 @@ export const StudentCommunity = () => {
       {selectedGroup && (
         <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full h-full bg-[#fdfbf7]' : 'w-full'}`}>
           
-          {/* Header - FIXED: Added flex-shrink-0 */}
+          {/* Header - FIXED: Added flex-shrink-0 for stability */}
           <div className="px-4 py-3 bg-white border-b flex items-center justify-between shadow-sm z-20 relative flex-shrink-0">
             <div className="flex items-center gap-3">
+              {/* Only show back button on mobile when a group is selected (in the chat view) */}
               {isMobile && <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }} className="-ml-2 mr-1 text-gray-600"><ArrowLeft className="h-5 w-5" /></Button>}
               <Avatar className="h-9 w-9 border border-gray-200">
                 <AvatarFallback className="bg-teal-600 text-white font-bold rounded-full">{selectedGroup.subject_name[0]}</AvatarFallback>
@@ -574,8 +577,8 @@ export const StudentCommunity = () => {
             }}
           />
 
-          {/* Messages List - FIXED: pb-20 on mobile to fit stable input bar */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 z-10 pb-20 md:pb-4" ref={scrollAreaRef}>
+          {/* Messages List - FIXED: Uses flex-1 and minimal bottom padding */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 z-10 pb-4" ref={scrollAreaRef}>
             
             {/* Professional Encryption/System Note */}
             <div className="flex justify-center mb-6 mt-2">
@@ -632,9 +635,9 @@ export const StudentCommunity = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Area - FIXED: Added flex-shrink-0 */}
+          {/* Input Area - FIXED: Added flex-shrink-0 for stability */}
           <div className="p-3 md:p-4 bg-white border-t z-20 flex-shrink-0">
-            {/* Reply Preview - FIXED: Added flex-shrink-0 */}
+            {/* Reply Preview - FIXED: Added flex-shrink-0 for stability */}
             {replyingTo && (
               <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg mb-3 border-l-4 border-teal-500 animate-in slide-in-from-bottom-2 flex-shrink-0">
                 <div className="flex flex-col px-2">
