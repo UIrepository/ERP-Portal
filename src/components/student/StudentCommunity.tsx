@@ -415,7 +415,7 @@ export const StudentCommunity = () => {
   }, [selectedGroup, queryClient]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages?.length, selectedGroup]);
 
   const sendMessageMutation = useMutation({
@@ -511,7 +511,11 @@ export const StudentCommunity = () => {
   };
 
   return (
-    <div className="flex h-[100dvh] w-full bg-[#fdfbf7] relative overflow-hidden">
+    <div className={`flex w-full bg-[#fdfbf7] relative overflow-hidden ${
+      selectedGroup && isMobile 
+        ? 'fixed inset-0 z-50 h-[100dvh]' 
+        : 'min-h-[calc(100vh-8rem)]'
+    }`}>
       
       {/* GROUP LIST SIDEBAR */}
       <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
@@ -545,10 +549,10 @@ export const StudentCommunity = () => {
 
       {/* CHAT AREA */}
       {selectedGroup && (
-        <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-[#fdfbf7]' : 'w-full'}`}>
+        <div className="flex-1 flex flex-col h-full relative w-full bg-[#fdfbf7]">
           
-          {/* Header */}
-          <div className="px-4 py-3 bg-white border-b flex items-center justify-between shadow-sm z-20 relative">
+          {/* Header - FIXED */}
+          <div className="px-4 py-3 bg-white border-b flex items-center justify-between shadow-sm z-20 sticky top-0 shrink-0">
             <div className="flex items-center gap-3">
               {isMobile && <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }} className="-ml-2 mr-1 text-gray-600"><ArrowLeft className="h-5 w-5" /></Button>}
               <Avatar className="h-9 w-9 border border-gray-200">
@@ -574,8 +578,8 @@ export const StudentCommunity = () => {
             }}
           />
 
-          {/* Messages List */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 z-10 pb-24 md:pb-4" ref={scrollAreaRef}>
+          {/* Messages List - SCROLLABLE */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 z-10" ref={scrollAreaRef}>
             
             {/* Professional Encryption/System Note */}
             <div className="flex justify-center mb-6 mt-2">
@@ -632,8 +636,8 @@ export const StudentCommunity = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Area */}
-          <div className="p-3 md:p-4 bg-white border-t z-20">
+          {/* Input Area - FIXED */}
+          <div className="p-3 md:p-4 bg-white border-t z-20 sticky bottom-0 shrink-0">
             {/* Reply Preview */}
             {replyingTo && (
               <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg mb-3 border-l-4 border-teal-500 animate-in slide-in-from-bottom-2">

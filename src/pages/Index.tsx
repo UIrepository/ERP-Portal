@@ -48,7 +48,11 @@ const Index = () => {
   };
 
   return (
-    <Layout activeTab={activeTab} onTabChange={setActiveTab}>
+    <Layout 
+      activeTab={activeTab} 
+      onTabChange={setActiveTab}
+      hideNavOnMobile={activeTab === 'community'}
+    >
       {renderDashboard()}
     </Layout>
   );
