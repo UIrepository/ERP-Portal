@@ -173,7 +173,7 @@ const MessageItem = ({
            <span>{deletedText}</span>
         </div>
       </motion.div>
-    );
+    ) // FIX: Removed the semicolon here to prevent the parsing error
   }
 
   const bubbleShapeClass = isMe 
