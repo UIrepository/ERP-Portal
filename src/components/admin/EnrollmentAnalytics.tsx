@@ -247,10 +247,7 @@ export const EnrollmentAnalytics = () => {
                             .map((subject, index, arr) => (
                             <Bar key={subject} dataKey={subject} stackId="a" shape={<RoundedBar />}>
                                 {analyticsData.chartData.map((entry, entryIndex) => {
-                                    const isFirst = index === 0;
-                                    const isLast = index === arr.length - 1;
-                                    const radius: [number, number, number, number] = [isFirst ? 8 : 0, isLast ? 8 : 0, isLast ? 8 : 0, isFirst ? 8 : 0];
-                                    return <Cell key={`cell-${entryIndex}`} fill={COLORS[analyticsData.allSubjects.indexOf(subject) % COLORS.length]} radius={radius}/>
+                                    return <Cell key={`cell-${entryIndex}`} fill={COLORS[analyticsData.allSubjects.indexOf(subject) % COLORS.length]}/>
                                 })}
                             </Bar>
                         ))}

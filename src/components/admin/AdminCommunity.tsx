@@ -71,6 +71,11 @@ interface GroupInfo {
   subject_name: string;
 }
 
+interface UserEnrollment {
+  batch_name: string;
+  subject_name: string;
+}
+
 const getAvatarColor = (name: string) => {
   const colors = ['bg-red-100 text-red-700', 'bg-green-100 text-green-700', 'bg-blue-100 text-blue-700', 'bg-purple-100 text-purple-700', 'bg-yellow-100 text-yellow-700', 'bg-pink-100 text-pink-700'];
   let hash = 0;
@@ -320,7 +325,7 @@ const MessageItemAdmin = ({
 };
 
 
-export const StudentCommunity = () => {
+export const AdminCommunity = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
@@ -618,7 +623,7 @@ export const StudentCommunity = () => {
                  {/* Messages */}
                  <AnimatePresence>
                    {dateMessages.map((msg) => (
-                     <MessageItem
+                     <MessageItemAdmin
                        key={msg.id}
                        msg={msg}
                        isMe={msg.user_id === profile?.user_id}

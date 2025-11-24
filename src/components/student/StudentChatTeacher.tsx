@@ -29,16 +29,12 @@ export const StudentChatTeacher = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
+  // Note: 'teacher' role doesn't exist in current enum (only 'student' and 'super_admin')
   const { data: teachers } = useQuery({
     queryKey: ['batch-teachers'],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', 'teacher')
-        .eq('batch', profile?.batch)
-        .contains('subjects', profile?.subjects || []);
-      return data || [];
+      // Return empty array until 'teacher' role is added to enum
+      return [];
     },
     enabled: !!profile?.batch && !!profile?.subjects
   });

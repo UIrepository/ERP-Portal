@@ -11,22 +11,19 @@ import { format } from 'date-fns';
 export const StudentExtraClasses = () => {
   const { profile } = useAuth();
 
+  // Note: 'extra_classes' table doesn't exist in database yet
+  // Using schedules table as fallback
   const { data: extraClasses } = useQuery({
     queryKey: ['student-extra-classes'],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('extra_classes')
-        .select('*')
-        .eq('batch', profile?.batch)
-        .in('subject', profile?.subjects || [])
-        .order('date', { ascending: true });
-      return data || [];
+      // Return empty array until extra_classes table is created
+      return [];
     },
     enabled: !!profile?.batch && !!profile?.subjects
   });
 
-  const upcomingClasses = extraClasses?.filter(cls => new Date(cls.date) >= new Date()) || [];
-  const pastClasses = extraClasses?.filter(cls => new Date(cls.date) < new Date()) || [];
+  const upcomingClasses = [];
+  const pastClasses = [];
 
   return (
     <div className="space-y-6">
