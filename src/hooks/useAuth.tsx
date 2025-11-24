@@ -17,6 +17,29 @@ interface AuthContextType {
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 
+// Helper function to fetch and normalize the profile
+const fetchAndNormalizeProfile = async (user: User | null): Promise<Profile | null> => {
+    if (!user) return null;
+    
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+    
+    if (profileData) {
+      // Normalize array-or-null fields to an empty array to prevent 'not iterable' errors
+      return {
+        ...profileData,
+        batch: profileData.batch || [],
+        exams: profileData.exams || [],
+        subjects: profileData.subjects || [],
+      };
+    }
+    
+    return null;
+}
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = React.useState<User | null>(null);
   const [session, setSession] = React.useState<Session | null>(null);
@@ -24,51 +47,41 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
+    // 1. Setup the Auth State Change listener for *future* changes (sign in/out)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-
+        
         if (session?.user) {
-          // Fetch user profile synchronously (Removed setTimeout)
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('user_id', session.user.id)
-            .single();
-          
-          // FIX: Normalize array-or-null fields to an empty array
-          if (profileData) {
-            const normalizedProfile: Profile = {
-              ...profileData,
-              batch: profileData.batch || [],
-              exams: profileData.exams || [],
-              subjects: profileData.subjects || [],
-            };
-            setProfile(normalizedProfile);
-          } else {
-            setProfile(null);
-          }
-          
-          setLoading(false);
+          // Profile update on sign-in/event
+          const normalizedProfile = await fetchAndNormalizeProfile(session.user);
+          setProfile(normalizedProfile);
         } else {
           setProfile(null);
-          setLoading(false);
+        }
+        
+        // This is only set to false for events *after* the initial load
+        if (event !== 'INITIAL_SESSION') {
+            setLoading(false);
         }
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      // Initialize state for immediate use
+    // 2. Handle the initial session check on mount (The Fix)
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
-      setUser(session?.user ?? null);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
       
-      // If there is no session initially, we can stop loading immediately.
-      // If there IS a session, the onAuthStateChange listener will fire immediately 
-      // and handle the profile fetch and set loading to false.
-      if (!session) {
-        setLoading(false);
+      if (currentUser) {
+        // FIX: Fetch the profile here for the initial load to ensure loading=false is called.
+        const normalizedProfile = await fetchAndNormalizeProfile(currentUser);
+        setProfile(normalizedProfile);
       }
+      
+      // Crucial: Set loading to false once initial checks and profile fetch are complete.
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
