@@ -91,8 +91,7 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        </div>
-      </header>
+        </header>
       )}
 
       <div className="flex flex-1 overflow-hidden">
