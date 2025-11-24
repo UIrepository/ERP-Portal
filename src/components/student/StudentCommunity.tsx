@@ -417,7 +417,7 @@ export const StudentCommunity = () => {
   useEffect(() => {
     // Ensure smooth scrolling to the latest message, fixing the jumpiness
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages?.length, selectedGroup]);
+  }, [messages.length, selectedGroup]); // FIX: Replaced messages?.length with messages.length
 
   const sendMessageMutation = useMutation({
     mutationFn: async ({ text, image, replyId }: { text: string; image: File | null; replyId: string | null }) => {
