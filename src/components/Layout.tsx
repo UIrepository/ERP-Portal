@@ -30,10 +30,10 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
   const isMobileChatActive = isMobile && activeTab === 'community'; // ADDED
 
   return (
-    // FIX 1: Apply conditional class for full screen on mobile chat
+    // Apply conditional class for full screen on mobile chat
     <div className={`flex flex-col min-h-screen bg-background ${isMobileChatActive ? 'h-screen overflow-hidden' : ''}`}> 
       
-      {/* FIX 2: HEADER is conditionally rendered (removed from flow entirely on mobile chat) */}
+      {/* HEADER: Hidden when mobile chat is active */}
       {!isMobileChatActive && (
         <header className="border-b bg-card sticky top-0 z-30">
           <div className="flex h-16 items-center justify-between px-4 sm:px-6">
@@ -91,7 +91,8 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        </header>
+        </div>
+      </header>
       )}
 
       <div className="flex flex-1 overflow-hidden">
@@ -101,12 +102,12 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
         </aside>
         
         {/* Main Content */}
-        {/* Use conditional overflow to allow scrolling only when chat is NOT active */}
+        {/* Use conditional overflow to control app scrolling vs chat scrolling */}
         <main className={`flex-1 ${isMobileChatActive ? 'overflow-hidden' : 'overflow-y-auto'} flex flex-col`}>
             <div className="flex-1">
                 {children}
             </div>
-            {/* FIX 3: FOOTER is conditionally rendered */}
+            {/* FOOTER: Hidden when mobile chat is active */}
             {!isMobileChatActive && (
               <footer className="py-6 border-t bg-card/30 mt-auto">
                   <p className="text-center text-sm text-muted-foreground font-medium">
