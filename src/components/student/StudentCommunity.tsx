@@ -512,7 +512,7 @@ export const StudentCommunity = () => {
   };
 
   return (
-    // Main container now takes full height from Layout.tsx and uses flex-col
+    // Main container uses flex-col h-full on mobile (when outer layout hides header/footer)
     <div className="flex h-full w-full bg-[#fdfbf7] relative overflow-hidden">
       
       {/* GROUP LIST SIDEBAR */}
