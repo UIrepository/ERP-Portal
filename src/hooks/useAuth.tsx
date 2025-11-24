@@ -37,7 +37,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               .select('*')
               .eq('user_id', session.user.id)
               .single();
-            setProfile(profileData);
+            
+            // FIX: Normalize array-or-null fields to an empty array to prevent 'not iterable' errors
+            if (profileData) {
+              const normalizedProfile: Profile = {
+                ...profileData,
+                batch: profileData.batch || [],
+                exams: profileData.exams || [],
+                subjects: profileData.subjects || [],
+              };
+              setProfile(normalizedProfile);
+            } else {
+              setProfile(null);
+            }
+
             setLoading(false);
           }, 0);
         } else {
