@@ -91,6 +91,7 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+        </div>
         </header>
       )}
 
