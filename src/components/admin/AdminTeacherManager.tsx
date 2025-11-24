@@ -18,15 +18,13 @@ export const AdminTeacherManager = () => {
   const [editedBatches, setEditedBatches] = useState<string[]>([]);
   const [editedSubjects, setEditedSubjects] = useState<string[]>([]);
   
+  // Note: 'teacher' role doesn't exist in current enum (only 'student' and 'super_admin')
+  // This component needs database migration to add 'teacher' role
   const { data: teachers = [] } = useQuery({
     queryKey: ['admin-teachers'],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', 'teacher')
-        .order('created_at', { ascending: false });
-      return data || [];
+      // Return empty array until 'teacher' role is added to enum
+      return [];
     },
   });
 
