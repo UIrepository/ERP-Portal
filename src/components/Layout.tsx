@@ -30,9 +30,9 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
   const isMobileChatActive = isMobile && activeTab === 'community'; // ADDED
 
   return (
-    // If chat is active on mobile, enforce full height and no vertical scrolling on the body level
+    // FIX 1: Conditional class for full screen on mobile chat
     <div className={`flex flex-col min-h-screen bg-background ${isMobileChatActive ? 'h-screen overflow-hidden' : ''}`}> 
-      {/* HEADER: Hidden when mobile chat is active */}
+      {/* FIX 2: HEADER is now conditionally rendered */}
       {!isMobileChatActive && (
         <header className="border-b bg-card sticky top-0 z-30">
           <div className="flex h-16 items-center justify-between px-4 sm:px-6">
@@ -90,8 +90,8 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         {/* Desktop Sidebar */}
@@ -104,7 +104,7 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
             <div className="flex-1">
                 {children}
             </div>
-            {/* FOOTER: Hidden when mobile chat is active */}
+            {/* FIX 3: FOOTER is now conditionally rendered */}
             {!isMobileChatActive && (
               <footer className="py-6 border-t bg-card/30 mt-auto">
                   <p className="text-center text-sm text-muted-foreground font-medium">
