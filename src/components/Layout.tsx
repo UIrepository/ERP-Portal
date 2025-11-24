@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from './Sidebar';
-import { useIsMobile } from '@/hooks/use-mobile'; // ADDED
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -24,29 +23,21 @@ interface LayoutProps {
 export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
   const { profile, signOut } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const isMobile = useIsMobile(); // ADDED
-  
-  // Logic to hide global layout elements for the mobile chat experience
-  const isMobileChatActive = isMobile && activeTab === 'community'; // ADDED
 
   return (
-    // Apply conditional class for full screen on mobile chat
-    <div className={`flex flex-col min-h-screen bg-background ${isMobileChatActive ? 'h-screen overflow-hidden' : ''}`}> 
-      
-      {/* HEADER: Hidden when mobile chat is active */}
-      {!isMobileChatActive && (
-        <header className="border-b bg-card sticky top-0 z-30">
-          <div className="flex h-16 items-center justify-between px-4 sm:px-6">
-            <div className="flex items-center gap-4">
-              {/* Mobile Sidebar Toggle */}
-              <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
-                <SheetTrigger asChild className="md:hidden">
-                  <Button size="icon" variant="outline">
-                    <PanelLeft className="h-5 w-5" />
-                    <span className="sr-only">Toggle Menu</span>
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-72 p-0">
+    <div className="flex flex-col min-h-screen bg-background">
+      <header className="border-b bg-card sticky top-0 z-30">
+        <div className="flex h-16 items-center justify-between px-4 sm:px-6">
+          <div className="flex items-center gap-4">
+            {/* Mobile Sidebar Toggle */}
+            <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
+              <SheetTrigger asChild className="md:hidden">
+                <Button size="icon" variant="outline">
+                  <PanelLeft className="h-5 w-5" />
+                  <span className="sr-only">Toggle Menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-72 p-0">
                  <SheetHeader className="sr-only">
                     <SheetTitle>Sidebar Menu</SheetTitle>
                     <SheetDescription>
@@ -92,8 +83,7 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
             </DropdownMenu>
           </div>
         </div>
-        </header>
-      )}
+      </header>
 
       <div className="flex flex-1 overflow-hidden">
         {/* Desktop Sidebar */}
@@ -102,27 +92,23 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
         </aside>
         
         {/* Main Content */}
-        {/* Use conditional overflow to control app scrolling vs chat scrolling */}
-        <main className={`flex-1 ${isMobileChatActive ? 'overflow-hidden' : 'overflow-y-auto'} flex flex-col`}>
+        <main className="flex-1 overflow-y-auto flex flex-col">
             <div className="flex-1">
                 {children}
             </div>
-            {/* FOOTER: Hidden when mobile chat is active */}
-            {!isMobileChatActive && (
-              <footer className="py-6 border-t bg-card/30 mt-auto">
-                  <p className="text-center text-sm text-muted-foreground font-medium">
-                      Built and Maintained by <a 
-                        href="https://www.neuralai.in/about" 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="hover:underline"
-                        style={{ fontFamily: '"Zen Dots", sans-serif' }}
-                      >
-                        <span className="text-teal-700">Neural</span> AI
-                      </a>
-                  </p>
-              </footer>
-            )}
+            <footer className="py-6 border-t bg-card/30 mt-auto">
+                <p className="text-center text-sm text-muted-foreground font-medium">
+                    Built and Maintained by <a 
+                      href="https://www.neuralai.in/about" 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="hover:underline"
+                      style={{ fontFamily: '"Zen Dots", sans-serif' }}
+                    >
+                      <span className="text-teal-700">Neural</span> AI
+                    </a>
+                </p>
+            </footer>
         </main>
       </div>
     </div>

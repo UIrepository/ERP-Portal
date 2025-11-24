@@ -173,7 +173,7 @@ const MessageItem = ({
            <span>{deletedText}</span>
         </div>
       </motion.div>
-    ) // FIX: Removed the semicolon here to prevent the parsing error
+    );
   }
 
   const bubbleShapeClass = isMe 
@@ -415,9 +415,8 @@ export const StudentCommunity = () => {
   }, [selectedGroup, queryClient]);
 
   useEffect(() => {
-    // Ensure smooth scrolling to the latest message, fixing the jumpiness
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, selectedGroup]); 
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+  }, [messages?.length, selectedGroup]);
 
   const sendMessageMutation = useMutation({
     mutationFn: async ({ text, image, replyId }: { text: string; image: File | null; replyId: string | null }) => {
@@ -512,12 +511,11 @@ export const StudentCommunity = () => {
   };
 
   return (
-    // Main container uses flex-col h-full to take over the viewport
-    <div className="flex h-full w-full bg-[#fdfbf7] relative overflow-hidden">
+    <div className="flex h-[100dvh] w-full bg-[#fdfbf7] relative overflow-hidden">
       
       {/* GROUP LIST SIDEBAR */}
       <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
-        <div className="p-4 border-b bg-gray-50 flex items-center justify-between flex-shrink-0">
+        <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
           <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Users className="h-5 w-5 text-teal-600" /> Communities</h2>
         </div>
         <ScrollArea className="flex-1">
@@ -547,13 +545,11 @@ export const StudentCommunity = () => {
 
       {/* CHAT AREA */}
       {selectedGroup && (
-        // The container uses flex-col h-full to occupy available space and arrange children vertically
-        <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full h-full bg-[#fdfbf7]' : 'w-full'}`}>
+        <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-[#fdfbf7]' : 'w-full'}`}>
           
-          {/* Header - FIXED: flex-shrink-0 ensures it stays put */}
-          <div className="px-4 py-3 bg-white border-b flex items-center justify-between shadow-sm z-20 relative flex-shrink-0">
+          {/* Header */}
+          <div className="px-4 py-3 bg-white border-b flex items-center justify-between shadow-sm z-20 relative">
             <div className="flex items-center gap-3">
-              {/* Only show back button on mobile when a group is selected (in the chat view) */}
               {isMobile && <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }} className="-ml-2 mr-1 text-gray-600"><ArrowLeft className="h-5 w-5" /></Button>}
               <Avatar className="h-9 w-9 border border-gray-200">
                 <AvatarFallback className="bg-teal-600 text-white font-bold rounded-full">{selectedGroup.subject_name[0]}</AvatarFallback>
@@ -578,8 +574,8 @@ export const StudentCommunity = () => {
             }}
           />
 
-          {/* Messages List - SCROLLABLE AREA: h-0 is added to ensure flex-1 correctly dictates height */}
-          <div className="flex-1 h-0 overflow-y-auto p-4 space-y-4 z-10 pb-4" ref={scrollAreaRef}>
+          {/* Messages List */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 z-10 pb-24 md:pb-4" ref={scrollAreaRef}>
             
             {/* Professional Encryption/System Note */}
             <div className="flex justify-center mb-6 mt-2">
@@ -636,11 +632,11 @@ export const StudentCommunity = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Area - FIXED: flex-shrink-0 ensures it stays exactly at the bottom */}
-          <div className="p-3 md:p-4 bg-white border-t z-20 flex-shrink-0">
-            {/* Reply Preview - FIXED: flex-shrink-0 ensures fixed height */}
+          {/* Input Area */}
+          <div className="p-3 md:p-4 bg-white border-t z-20">
+            {/* Reply Preview */}
             {replyingTo && (
-              <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg mb-3 border-l-4 border-teal-500 animate-in slide-in-from-bottom-2 flex-shrink-0">
+              <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg mb-3 border-l-4 border-teal-500 animate-in slide-in-from-bottom-2">
                 <div className="flex flex-col px-2">
                     <span className="text-xs font-bold text-teal-600 mb-0.5">Replying to {replyingTo.user_id === profile?.user_id ? 'You' : replyingTo.profiles?.name}</span>
                     <span className="text-xs text-gray-500 truncate max-w-[250px]">{replyingTo.content || 'Attachment'}</span>
@@ -650,7 +646,7 @@ export const StudentCommunity = () => {
             )}
 
             {selectedImage && (
-              <div className="flex items-center justify-between bg-teal-50 p-2 rounded-lg mb-3 border border-teal-100 flex-shrink-0">
+              <div className="flex items-center justify-between bg-teal-50 p-2 rounded-lg mb-3 border border-teal-100">
                 <div className="flex items-center gap-3">
                     <div className="h-10 w-10 bg-white rounded-md shadow-sm flex items-center justify-center text-teal-600"><ImageIcon className="h-5 w-5"/></div>
                     <div className="text-sm text-teal-900 truncate max-w-[200px] font-medium">{selectedImage.name}</div>
