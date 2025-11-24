@@ -79,6 +79,10 @@ const getAvatarColor = (name: string) => {
   return colors[Math.abs(hash) % colors.length];
 };
 
+interface StudentCommunityProps {
+  onChatOpenChange?: (isOpen: boolean) => void;
+}
+
 // --- Swipeable Message Component ---
 const MessageItem = ({ 
   msg, 
@@ -316,7 +320,11 @@ const MessageItem = ({
   );
 };
 
-export const StudentCommunity = () => {
+interface StudentCommunityProps {
+  onChatOpenChange?: (isOpen: boolean) => void;
+}
+
+export const StudentCommunity = ({ onChatOpenChange }: StudentCommunityProps) => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
@@ -353,6 +361,13 @@ export const StudentCommunity = () => {
       setSelectedGroup(enrollments[0]);
     }
   }, [enrollments, selectedGroup, isMobile]);
+
+  useEffect(() => {
+    // Notify parent when chat open state changes on mobile
+    if (isMobile && onChatOpenChange) {
+      onChatOpenChange(!!selectedGroup);
+    }
+  }, [selectedGroup, isMobile, onChatOpenChange]);
 
   useEffect(() => {
     setMessageText('');
@@ -511,10 +526,10 @@ export const StudentCommunity = () => {
   };
 
   return (
-    <div className={`flex w-full bg-[#fdfbf7] relative overflow-hidden ${
+    <div className={`flex w-full bg-[#fdfbf7] relative ${
       selectedGroup && isMobile 
-        ? 'fixed inset-0 z-50 h-[100dvh]' 
-        : 'min-h-[calc(100vh-8rem)]'
+        ? 'fixed inset-0 z-50 h-[100dvh] overflow-hidden' 
+        : 'h-[calc(100vh-8rem)] md:h-[calc(100vh-12rem)] overflow-hidden'
     }`}>
       
       {/* GROUP LIST SIDEBAR */}
@@ -549,10 +564,10 @@ export const StudentCommunity = () => {
 
       {/* CHAT AREA */}
       {selectedGroup && (
-        <div className="flex-1 flex flex-col h-full relative w-full bg-[#fdfbf7]">
+        <div className="flex-1 flex flex-col h-full relative w-full bg-[#fdfbf7] overflow-hidden">
           
           {/* Header - FIXED */}
-          <div className="px-4 py-3 bg-white border-b flex items-center justify-between shadow-sm z-20 sticky top-0 shrink-0">
+          <div className="px-4 py-3 bg-white border-b flex items-center justify-between shadow-sm z-20 shrink-0">
             <div className="flex items-center gap-3">
               {isMobile && <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }} className="-ml-2 mr-1 text-gray-600"><ArrowLeft className="h-5 w-5" /></Button>}
               <Avatar className="h-9 w-9 border border-gray-200">
@@ -579,7 +594,7 @@ export const StudentCommunity = () => {
           />
 
           {/* Messages List - SCROLLABLE */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 z-10" ref={scrollAreaRef}>
+          <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-4 z-10" ref={scrollAreaRef}>
             
             {/* Professional Encryption/System Note */}
             <div className="flex justify-center mb-6 mt-2">
@@ -637,7 +652,7 @@ export const StudentCommunity = () => {
           </div>
 
           {/* Input Area - FIXED */}
-          <div className="p-3 md:p-4 bg-white border-t z-20 sticky bottom-0 shrink-0">
+          <div className="p-3 md:p-4 bg-white border-t z-20 shrink-0">
             {/* Reply Preview */}
             {replyingTo && (
               <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg mb-3 border-l-4 border-teal-500 animate-in slide-in-from-bottom-2">
