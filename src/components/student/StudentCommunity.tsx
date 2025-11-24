@@ -574,8 +574,8 @@ export const StudentCommunity = () => {
             }}
           />
 
-          {/* Messages List */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 z-10 pb-24 md:pb-4" ref={scrollAreaRef}>
+          {/* Messages List - FIXED: pb-20 on mobile to prevent floating/overlap with input */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 z-10 pb-20 md:pb-4" ref={scrollAreaRef}>
             
             {/* Professional Encryption/System Note */}
             <div className="flex justify-center mb-6 mt-2">
@@ -632,11 +632,11 @@ export const StudentCommunity = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Area */}
-          <div className="p-3 md:p-4 bg-white border-t z-20">
-            {/* Reply Preview */}
+          {/* Input Area - FIXED: Added flex-shrink-0 */}
+          <div className="p-3 md:p-4 bg-white border-t z-20 flex-shrink-0">
+            {/* Reply Preview - FIXED: Added flex-shrink-0 */}
             {replyingTo && (
-              <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg mb-3 border-l-4 border-teal-500 animate-in slide-in-from-bottom-2">
+              <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg mb-3 border-l-4 border-teal-500 animate-in slide-in-from-bottom-2 flex-shrink-0">
                 <div className="flex flex-col px-2">
                     <span className="text-xs font-bold text-teal-600 mb-0.5">Replying to {replyingTo.user_id === profile?.user_id ? 'You' : replyingTo.profiles?.name}</span>
                     <span className="text-xs text-gray-500 truncate max-w-[250px]">{replyingTo.content || 'Attachment'}</span>
