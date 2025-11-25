@@ -19,10 +19,9 @@ import {
   LogOut,
   Megaphone,
   History,
-  Phone, // ADDED: Phone icon for Contact Admin
+  Phone, 
 } from 'lucide-react';
 
-// ADDED: Imports for AlertDialog components
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,33 +49,29 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const { profile, signOut } = useAuth();
   const queryClient = useQueryClient();
 
-  // MODIFIED: WhatsApp contact details and handler logic
-  const ADMIN_WHATSAPP_NUMBER = '6297143798'; // Using the number without +91 for wa.me link
+  // MODIFIED: Updated ADMIN_WHATSAPP_NUMBER to include country code (91)
+  const ADMIN_WHATSAPP_NUMBER = '916297143798'; 
   const WHATSAPP_MESSAGE_TEMPLATE = "Hello Sir, this is (NAME) from the (BATCH_NAME). I wanted to clarify a few doubts about the class workflow.";
 
   const getWhatsAppLink = (studentName: string, batchName: string) => {
-      // Replace placeholders in the template with the actual name and batch
       const name = studentName || 'Student';
-      // Use the batchName, defaulting if not provided
-      const batch = batchName || 'Unknown Batch'; 
+      const batch = batchName || 'your batch'; 
       
       let message = WHATSAPP_MESSAGE_TEMPLATE.replace('(NAME)', name);
       message = message.replace('(BATCH_NAME)', batch);
       
       const encodedMessage = encodeURIComponent(message);
-      // Construct the WhatsApp URL
+      // Construct the WhatsApp URL using the number with the country code
       return `https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${encodedMessage}`;
   };
 
   const handleContactAdmin = () => {
       const studentName = profile?.name || 'Student'; 
-      // Use the first batch name found for the message, or a default
       const batchName = availableBatches.length > 0 ? availableBatches[0] : 'your batch';
       const whatsappLink = getWhatsAppLink(studentName, batchName); 
       // Open the WhatsApp link in a new tab/window
       window.open(whatsappLink, '_blank');
   };
-  // END MODIFIED LOGIC
 
   // Fetch user's specific enrollments for sidebar display
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
@@ -156,12 +151,12 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     { id: 'ui-ki-padhai', label: 'UI Ki Padhai', icon: Crown },
     { id: 'feedback', label: 'Feedback', icon: MessageSquare },
     { id: 'exams', label: 'Exams', icon: BookOpen },
-    { id: 'contact-admin', label: 'Contact Admin', icon: Phone }, // ADDED new tab definition
+    { id: 'contact-admin', label: 'Contact Admin', icon: Phone }, 
   ];
 
   const adminTabs = [
     { id: 'enrollment-analytics', label: 'Student Analytics', icon: BarChart2 },
-    { id: 'community-admin', label: 'Community Chat', icon: Users }, // ADDED COMMUNITY TAB
+    { id: 'community-admin', label: 'Community Chat', icon: Users }, 
     { id: 'schedules', label: 'Schedules', icon: Calendar },
     { id: 'meeting-manager', label: 'Meeting Links', icon: LinkIcon },
     { id: 'feedback-viewer', label: 'Feedback Viewer', icon: MessageSquare },
@@ -277,7 +272,6 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
                             <AlertDialogContent>
                                 <AlertDialogHeader>
                                     <AlertDialogTitle>Contact Admin on WhatsApp</AlertDialogTitle>
-                                    {/* MODIFIED: Simplified description to remove phone number and message preview */}
                                     <AlertDialogDescription>
                                         Are you sure you want to proceed and open a new WhatsApp chat with the Admin?
                                     </AlertDialogDescription>
