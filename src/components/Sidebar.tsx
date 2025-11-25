@@ -50,26 +50,33 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const { profile, signOut } = useAuth();
   const queryClient = useQueryClient();
 
-  // ADDED: WhatsApp contact details and handler logic
-  const ADMIN_WHATSAPP_NUMBER = '6297143798';
-  const WHATSAPP_MESSAGE_TEMPLATE = "Hello Sir This is (NAME) as per dashbaord of student. i am from the premium batch i have some doubts related to it.";
+  // MODIFIED: WhatsApp contact details and handler logic
+  const ADMIN_WHATSAPP_NUMBER = '6297143798'; // Using the number without +91 for wa.me link
+  const WHATSAPP_MESSAGE_TEMPLATE = "Hello Sir, this is (NAME) from the (BATCH_NAME). I wanted to clarify a few doubts about the class workflow.";
 
-  const getWhatsAppLink = (studentName: string) => {
-      // Replace (NAME) in the template with the actual name, defaulting to 'Student'
+  const getWhatsAppLink = (studentName: string, batchName: string) => {
+      // Replace placeholders in the template with the actual name and batch
       const name = studentName || 'Student';
-      const message = WHATSAPP_MESSAGE_TEMPLATE.replace('(NAME)', name);
+      // Use the batchName, defaulting if not provided
+      const batch = batchName || 'Unknown Batch'; 
+      
+      let message = WHATSAPP_MESSAGE_TEMPLATE.replace('(NAME)', name);
+      message = message.replace('(BATCH_NAME)', batch);
+      
       const encodedMessage = encodeURIComponent(message);
       // Construct the WhatsApp URL
       return `https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${encodedMessage}`;
   };
 
   const handleContactAdmin = () => {
-      const studentName = profile?.name || 'Student'; // Get student name from profile
-      const whatsappLink = getWhatsAppLink(studentName);
+      const studentName = profile?.name || 'Student'; 
+      // Use the first batch name found for the message, or a default
+      const batchName = availableBatches.length > 0 ? availableBatches[0] : 'your batch';
+      const whatsappLink = getWhatsAppLink(studentName, batchName); 
       // Open the WhatsApp link in a new tab/window
       window.open(whatsappLink, '_blank');
   };
-  // END ADDED LOGIC
+  // END MODIFIED LOGIC
 
   // Fetch user's specific enrollments for sidebar display
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
@@ -251,6 +258,11 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
                 const isContactAdminTab = tab.id === 'contact-admin';
 
                 if (isContactAdminTab) {
+                    // Pre-calculate descriptive text for the alert
+                    const studentName = profile?.name || 'Student';
+                    const batchNames = availableBatches.length > 0 ? availableBatches.join(', ') : 'Unknown Batch';
+                    const previewMessage = `Hello Sir, this is ${studentName} from the ${batchNames}. I wanted to clarify a few doubts about the class workflow.`;
+
                     // Render the Contact Admin button wrapped in an AlertDialog for confirmation
                     return (
                         <AlertDialog key={tab.id}>
@@ -269,10 +281,14 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                                 <AlertDialogHeader>
-                                    <AlertDialogTitle>Contact Admin</AlertDialogTitle>
+                                    <AlertDialogTitle>Contact Admin on WhatsApp</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                        You are about to open a new window to contact the Admin on WhatsApp. 
-                                        Your name (which appears as &quot;{profile?.name || 'Student'}&quot;) will be pre-filled in the message. Do you wish to continue?
+                                        You are about to open a new window to contact the Admin on WhatsApp ({ADMIN_WHATSAPP_NUMBER}). 
+                                        The following message will be pre-filled:
+                                        <p className="mt-2 p-2 border border-gray-200 rounded text-xs italic bg-gray-50 text-gray-700 font-medium whitespace-pre-wrap">
+                                            {previewMessage}
+                                        </p>
+                                        Do you wish to continue?
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
