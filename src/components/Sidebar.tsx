@@ -2,7 +2,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useState } from 'react'; // ADDED useState import
 import {
   LayoutDashboard,
   Calendar,
@@ -48,6 +48,11 @@ interface UserEnrollment {
 export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const { profile, signOut } = useAuth();
   const queryClient = useQueryClient();
+
+  // ADDED: Mock state for unread community messages. 
+  // In a real application, this state would be managed by a real-time service 
+  // checking for unread messages in the group chat tables.
+  const [hasUnreadCommunityMessage, setHasUnreadCommunityMessage] = useState(true); 
 
   const ADMIN_WHATSAPP_NUMBER = '916297143798'; 
   const WHATSAPP_MESSAGE_TEMPLATE = "Hello Sir, this is (NAME) from the (BATCH_NAME). I wanted to clarify a few doubts about the class workflow.";
@@ -101,6 +106,8 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   useEffect(() => {
     if (!profile?.user_id) return;
 
+    // This block is left untouched. In a real application, a separate real-time listener 
+    // would update the 'hasUnreadCommunityMessage' state when a new message is detected.
     const channel = supabase
       .channel('sidebar-realtime-updates')
       .on(
@@ -209,7 +216,6 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   };
 
   return (
-    // MODIFIED: Added overflow-y-auto to the main container for mobile scrolling
     <div className="w-full bg-white border-r border-gray-200 h-full flex flex-col overflow-y-auto">
       <div className="p-4 border-b border-gray-200 shrink-0">
         <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-16 w-auto mx-auto mb-4 md:hidden" />
@@ -246,17 +252,14 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
       </div>
       
       <div className="flex flex-col flex-grow">
-          {/* Note: The 'nav' element is already set up for scrolling the tabs with 'overflow-y-auto'. 
-             The change above ensures the header and footer are also visible if content overflows. */}
           <nav className="overflow-y-auto p-4 space-y-2">
               {tabs.map((tab) => {
                 const isContactAdminTab = tab.id === 'contact-admin';
                 
-                // Logic to determine if the current tab is a Community tab
                 const isCommunityTab = tab.id === 'community' || tab.id === 'community-admin';
                 
-                // Mock notification state (shows badge if it's the community tab AND it's NOT the active tab)
-                const hasNewGroupMessage = isCommunityTab && tab.id !== activeTab; 
+                // MODIFIED: Badge only shows if it's the community tab AND the mock unread state is true.
+                const showNotificationBadge = isCommunityTab && hasUnreadCommunityMessage; 
 
                 if (isContactAdminTab) {
                     return (
@@ -302,13 +305,19 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
                                 ? 'bg-blue-600 text-white hover:bg-blue-700' 
                                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                             }`}
-                            onClick={() => onTabChange(tab.id)}
+                            onClick={() => {
+                                // ADDED: Clear unread notification when a user clicks the community tab
+                                if (isCommunityTab) {
+                                    setHasUnreadCommunityMessage(false);
+                                }
+                                onTabChange(tab.id);
+                            }}
                         >
                             <tab.icon className="mr-3 h-4 w-4" />
                             {tab.label}
                         </Button>
                         {/* Notification dot/badge */}
-                        {hasNewGroupMessage && (
+                        {showNotificationBadge && (
                             <span 
                                 className="absolute top-1 right-2 h-3 w-3 rounded-full bg-red-500 border-2 border-white animate-pulse" 
                                 title="New group messages received"
