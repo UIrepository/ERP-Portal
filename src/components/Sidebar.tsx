@@ -258,11 +258,6 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
                 const isContactAdminTab = tab.id === 'contact-admin';
 
                 if (isContactAdminTab) {
-                    // Pre-calculate descriptive text for the alert
-                    const studentName = profile?.name || 'Student';
-                    const batchNames = availableBatches.length > 0 ? availableBatches.join(', ') : 'Unknown Batch';
-                    const previewMessage = `Hello Sir, this is ${studentName} from the ${batchNames}. I wanted to clarify a few doubts about the class workflow.`;
-
                     // Render the Contact Admin button wrapped in an AlertDialog for confirmation
                     return (
                         <AlertDialog key={tab.id}>
@@ -282,13 +277,9 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
                             <AlertDialogContent>
                                 <AlertDialogHeader>
                                     <AlertDialogTitle>Contact Admin on WhatsApp</AlertDialogTitle>
+                                    {/* MODIFIED: Simplified description to remove phone number and message preview */}
                                     <AlertDialogDescription>
-                                        You are about to open a new window to contact the Admin on WhatsApp ({ADMIN_WHATSAPP_NUMBER}). 
-                                        The following message will be pre-filled:
-                                        <p className="mt-2 p-2 border border-gray-200 rounded text-xs italic bg-gray-50 text-gray-700 font-medium whitespace-pre-wrap">
-                                            {previewMessage}
-                                        </p>
-                                        Do you wish to continue?
+                                        Are you sure you want to proceed and open a new WhatsApp chat with the Admin?
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
