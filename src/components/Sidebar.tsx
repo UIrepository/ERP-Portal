@@ -49,7 +49,6 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const { profile, signOut } = useAuth();
   const queryClient = useQueryClient();
 
-  // MODIFIED: Updated ADMIN_WHATSAPP_NUMBER to include country code (91)
   const ADMIN_WHATSAPP_NUMBER = '916297143798'; 
   const WHATSAPP_MESSAGE_TEMPLATE = "Hello Sir, this is (NAME) from the (BATCH_NAME). I wanted to clarify a few doubts about the class workflow.";
 
@@ -61,7 +60,6 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
       message = message.replace('(BATCH_NAME)', batch);
       
       const encodedMessage = encodeURIComponent(message);
-      // Construct the WhatsApp URL using the number with the country code
       return `https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${encodedMessage}`;
   };
 
@@ -69,7 +67,6 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
       const studentName = profile?.name || 'Student'; 
       const batchName = availableBatches.length > 0 ? availableBatches[0] : 'your batch';
       const whatsappLink = getWhatsAppLink(studentName, batchName); 
-      // Open the WhatsApp link in a new tab/window
       window.open(whatsappLink, '_blank');
   };
 
@@ -212,7 +209,8 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   };
 
   return (
-    <div className="w-full bg-white border-r border-gray-200 h-full flex flex-col">
+    // MODIFIED: Added overflow-y-auto to the main container for mobile scrolling
+    <div className="w-full bg-white border-r border-gray-200 h-full flex flex-col overflow-y-auto">
       <div className="p-4 border-b border-gray-200 shrink-0">
         <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-16 w-auto mx-auto mb-4 md:hidden" />
         <h2 className="font-semibold text-gray-800 text-lg">
@@ -248,12 +246,19 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
       </div>
       
       <div className="flex flex-col flex-grow">
+          {/* Note: The 'nav' element is already set up for scrolling the tabs with 'overflow-y-auto'. 
+             The change above ensures the header and footer are also visible if content overflows. */}
           <nav className="overflow-y-auto p-4 space-y-2">
               {tabs.map((tab) => {
                 const isContactAdminTab = tab.id === 'contact-admin';
+                
+                // Logic to determine if the current tab is a Community tab
+                const isCommunityTab = tab.id === 'community' || tab.id === 'community-admin';
+                
+                // Mock notification state (shows badge if it's the community tab AND it's NOT the active tab)
+                const hasNewGroupMessage = isCommunityTab && tab.id !== activeTab; 
 
                 if (isContactAdminTab) {
-                    // Render the Contact Admin button wrapped in an AlertDialog for confirmation
                     return (
                         <AlertDialog key={tab.id}>
                             <AlertDialogTrigger asChild>
@@ -278,7 +283,6 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    {/* The AlertDialogAction triggers the WhatsApp link logic */}
                                     <AlertDialogAction onClick={handleContactAdmin}>
                                         Proceed to WhatsApp
                                     </AlertDialogAction>
@@ -288,21 +292,29 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
                     );
                 }
 
-                // Default rendering for all other tabs
+                // Default rendering for all other tabs, wrapped in a relative div for the badge
                 return (
-                    <Button
-                        key={tab.id}
-                        variant={activeTab === tab.id ? 'default' : 'ghost'}
-                        className={`w-full justify-start ${
-                        activeTab === tab.id 
-                            ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                        }`}
-                        onClick={() => onTabChange(tab.id)}
-                    >
-                        <tab.icon className="mr-3 h-4 w-4" />
-                        {tab.label}
-                    </Button>
+                    <div key={tab.id} className="relative">
+                        <Button
+                            variant={activeTab === tab.id ? 'default' : 'ghost'}
+                            className={`w-full justify-start ${
+                            activeTab === tab.id 
+                                ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                            }`}
+                            onClick={() => onTabChange(tab.id)}
+                        >
+                            <tab.icon className="mr-3 h-4 w-4" />
+                            {tab.label}
+                        </Button>
+                        {/* Notification dot/badge */}
+                        {hasNewGroupMessage && (
+                            <span 
+                                className="absolute top-1 right-2 h-3 w-3 rounded-full bg-red-500 border-2 border-white animate-pulse" 
+                                title="New group messages received"
+                            />
+                        )}
+                    </div>
                 )
               })}
           </nav>
