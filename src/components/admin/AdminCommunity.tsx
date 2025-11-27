@@ -81,7 +81,7 @@ const getAvatarColor = (name: string) => {
   return colors[Math.abs(hash) % colors.length];
 };
 
-// --- Full Featured Message Component (from StudentCommunity) ---
+// --- Full Featured Message Component ---
 const MessageItemAdmin = ({ 
   msg, 
   isMe, 
@@ -332,7 +332,7 @@ export const AdminCommunity = () => {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(new Date());
   
-  // Admin: Fetch ALL Groups (RLS allows Super Admin to see all)
+  // Admin: Fetch ALL Groups
   const { data: allGroups = [], isLoading: isLoadingGroups } = useQuery<GroupInfo[]>({
     queryKey: ['admin-all-groups'],
     queryFn: async () => {
@@ -399,6 +399,7 @@ export const AdminCommunity = () => {
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'auto' }); }, [messages?.length, selectedGroup]);
 
+  // UPDATED MUTATION: Only inserts into DB. The SQL Trigger detects 'is_priority' and sends email.
   const sendMessageMutation = useMutation({
     mutationFn: async ({ text, image, replyId, priority }: { text: string; image: File | null; replyId: string | null, priority: boolean }) => {
       if (!profile?.user_id || !selectedGroup) return;
@@ -420,7 +421,7 @@ export const AdminCommunity = () => {
         batch: selectedGroup.batch_name,
         subject: selectedGroup.subject_name,
         reply_to_id: replyId,
-        is_priority: priority
+        is_priority: priority // Crucial: This triggers the email if true
       });
       if (error) throw error;
     },
@@ -433,7 +434,6 @@ export const AdminCommunity = () => {
 
   const deleteMessageMutation = useMutation({
     mutationFn: async (id: string) => {
-      // Admins should be able to delete any message
       const { error } = await supabase.from('community_messages').update({ is_deleted: true }).eq('id', id);
       if (error) throw error;
       return id;
