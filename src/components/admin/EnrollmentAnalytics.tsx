@@ -63,7 +63,8 @@ const getPath = (x: number, y: number, width: number, height: number, radius: [n
 };
 
 const RoundedBar = (props: any) => {
-    const { fill, x, y, width, height, radius } = props;
+    const { fill, x, y, width, height } = props;
+    const radius = props.radius || [0, 0, 0, 0];
     return <path d={getPath(x, y, width, height, radius)} stroke="none" fill={fill} />;
 };
 
@@ -247,8 +248,8 @@ export const EnrollmentAnalytics = () => {
                                 {analyticsData.chartData.map((entry, entryIndex) => {
                                     const isFirst = index === 0;
                                     const isLast = index === arr.length - 1;
-                                    const radius = [isFirst ? 8 : 0, isLast ? 8 : 0, isLast ? 8 : 0, isFirst ? 8 : 0] as [number, number, number, number];
-                                    return <Cell key={`cell-${entryIndex}`} fill={COLORS[analyticsData.allSubjects.indexOf(subject) % COLORS.length]} radius={radius}/>
+                                    const radius = [isFirst ? 8 : 0, isLast ? 8 : 0, isLast ? 8 : 0, isFirst ? 8 : 0];
+                                    return <Cell key={`cell-${entryIndex}`} fill={COLORS[analyticsData.allSubjects.indexOf(subject) % COLORS.length]} radius={radius as any}/>
                                 })}
                             </Bar>
                         ))}
