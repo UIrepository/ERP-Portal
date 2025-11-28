@@ -12,7 +12,7 @@ import { Combobox } from '@/components/ui/combobox';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 
-// Interface for defining a target combination of batch and subject
+// New interface for defining a target combination of batch and subject
 interface TargetCombination {
   batch: string | null;
   subject: string | null;
@@ -23,10 +23,8 @@ export const AdminCreateAnnouncement = () => {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
-  
   // State to hold multiple target combinations
   const [targets, setTargets] = useState<TargetCombination[]>([]);
-  
   // State for the current selection in the dropdowns
   const [currentBatch, setCurrentBatch] = useState<string | null>(null);
   const [currentSubject, setCurrentSubject] = useState<string | null>(null);
@@ -56,15 +54,14 @@ export const AdminCreateAnnouncement = () => {
   }, [enrollments, currentBatch]);
 
 
-  // UPDATED MUTATION: Only inserts into DB. The SQL Trigger sends the email.
   const createAnnouncementMutation = useMutation({
-    mutationFn: async (announcementData: any[]) => {
-      // The announcements are inserted as an array
+    mutationFn: async (announcementData: any) => {
+        // The announcements are now inserted as an array
       const { error } = await supabase.from('notifications').insert(announcementData);
       if (error) throw error;
     },
     onSuccess: () => {
-      toast({ title: "Success", description: "Announcement posted and emails queued." });
+      toast({ title: "Success", description: "Announcement has been sent." });
       setTitle('');
       setMessage('');
       setTargets([]);
@@ -93,10 +90,11 @@ export const AdminCreateAnnouncement = () => {
     }
   };
 
-  // Removes a target from the list
+    // Removes a target from the list
   const handleRemoveTarget = (index: number) => {
     setTargets(targets.filter((_, i) => i !== index));
   };
+
 
   const handleSendAnnouncement = () => {
     if (!title.trim() || !message.trim()) {
@@ -120,12 +118,12 @@ export const AdminCreateAnnouncement = () => {
         // Otherwise, create an announcement for each target combination
         announcementsToSend = targets.map(target => ({
              title,
-             message,
-             target_batch: target.batch,
-             target_subject: target.subject,
-             created_by: profile?.user_id,
-             is_active: true,
-             target_role: 'student'
+            message,
+            target_batch: target.batch,
+            target_subject: target.subject,
+            created_by: profile?.user_id,
+            is_active: true,
+            target_role: 'student'
         }))
     }
 

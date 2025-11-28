@@ -46,7 +46,7 @@ export const AdminAnnouncementsViewer = () => {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('notifications')
-                .select('id, title, message, created_at, created_by_name, target_batch, target_subject')
+                .select('*')
                 .order('created_at', { ascending: false });
             
             if (error) {

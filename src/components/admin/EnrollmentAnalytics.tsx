@@ -16,7 +16,7 @@ interface Enrollment {
   profiles: {
     name: string;
     email: string;
-  };
+  } | null;
 }
 
 interface StudentEnrollmentInfo {
@@ -63,8 +63,7 @@ const getPath = (x: number, y: number, width: number, height: number, radius: [n
 };
 
 const RoundedBar = (props: any) => {
-    const { fill, x, y, width, height } = props;
-    const radius = props.radius || [0, 0, 0, 0];
+    const { fill, x, y, width, height, radius } = props;
     return <path d={getPath(x, y, width, height, radius)} stroke="none" fill={fill} />;
 };
 
@@ -100,7 +99,7 @@ export const EnrollmentAnalytics = () => {
         .select(`
           batch_name,
           subject_name,
-          profiles!inner ( name, email )
+          profiles ( name, email )
         `);
 
       if (error) {
@@ -108,7 +107,7 @@ export const EnrollmentAnalytics = () => {
           throw error;
       };
       
-      return (data || []) as Enrollment[];
+      return data.filter(e => e.profiles) as Enrollment[];
     },
   });
 
@@ -116,18 +115,20 @@ export const EnrollmentAnalytics = () => {
   const analyticsData = useMemo(() => {
     const studentMap = new Map<string, StudentEnrollmentInfo>();
     enrollments.forEach(enrollment => {
-      const email = enrollment.profiles.email;
-      if (!studentMap.has(email)) {
-        studentMap.set(email, {
-          name: enrollment.profiles.name,
-          email: email,
-          enrollments: [],
+      if (enrollment.profiles) {
+        const email = enrollment.profiles.email;
+        if (!studentMap.has(email)) {
+          studentMap.set(email, {
+            name: enrollment.profiles.name,
+            email: email,
+            enrollments: [],
+          });
+        }
+        studentMap.get(email)?.enrollments.push({
+          batch: enrollment.batch_name,
+          subject: enrollment.subject_name,
         });
       }
-      studentMap.get(email)?.enrollments.push({
-        batch: enrollment.batch_name,
-        subject: enrollment.subject_name,
-      });
     });
     const allStudents = Array.from(studentMap.values());
 
@@ -248,8 +249,8 @@ export const EnrollmentAnalytics = () => {
                                 {analyticsData.chartData.map((entry, entryIndex) => {
                                     const isFirst = index === 0;
                                     const isLast = index === arr.length - 1;
-                                    const radius = [isFirst ? 8 : 0, isLast ? 8 : 0, isLast ? 8 : 0, isFirst ? 8 : 0];
-                                    return <Cell key={`cell-${entryIndex}`} fill={COLORS[analyticsData.allSubjects.indexOf(subject) % COLORS.length]} radius={radius as any}/>
+                                    const radius: [number, number, number, number] = [isFirst ? 8 : 0, isLast ? 8 : 0, isLast ? 8 : 0, isFirst ? 8 : 0];
+                                    return <Cell key={`cell-${entryIndex}`} fill={COLORS[analyticsData.allSubjects.indexOf(subject) % COLORS.length]} radius={radius}/>
                                 })}
                             </Bar>
                         ))}
