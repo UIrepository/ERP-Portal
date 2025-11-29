@@ -77,6 +77,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
   const currentDay = now.getDay();
   const currentTimeStr = format(now, 'HH:mm:ss');
 
+  // Fetch all schedules for the student
   const { data: allSchedules, isLoading: isLoadingAllSchedules, isError: isAllSchedulesError } = useQuery<Schedule[]>({
     queryKey: ['allStudentSchedulesRPC', profile?.user_id],
     queryFn: async (): Promise<Schedule[]> => {
@@ -91,29 +92,38 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     enabled: !!profile?.user_id
   });
 
-  const { data: ongoingClass, isLoading: isLoadingOngoingClass, isError: isOngoingClassError } = useQuery<OngoingClass | null>({
+  // Fetch ongoing classes (Returned as an Array now)
+  const { data: ongoingClasses, isLoading: isLoadingOngoingClass, isError: isOngoingClassError } = useQuery<OngoingClass[] | null>({
     queryKey: ['ongoingClassRPC', profile?.user_id],
-    queryFn: async (): Promise<OngoingClass | null> => {
+    queryFn: async (): Promise<OngoingClass[] | null> => {
       if (!profile?.user_id) return null;
+      
+      const todayDateStr = format(new Date(), 'yyyy-MM-dd'); // Format date for RPC
+
       const { data, error } = await supabase.rpc('get_schedules_with_links_filtered_by_enrollment', {
         p_user_id: profile.user_id,
         p_day_of_week: new Date().getDay(),
         p_current_time: format(new Date(), 'HH:mm:ss'),
-        p_is_active_link: true
+        p_is_active_link: true,
+        // Make sure your RPC function accepts this parameter to filter by specific date
+        p_target_date: todayDateStr 
       });
+
       if (error) {
         console.error("Error fetching ongoing class via RPC:", error);
         throw error;
       }
+      
       if (!data || data.length === 0) return null;
-      const schedule = data[0];
-      return {
+
+      // Map all returned schedules to OngoingClass objects
+      return data.map((schedule: any) => ({
         subject: schedule.subject,
         batch: schedule.batch,
         start_time: schedule.start_time,
         end_time: schedule.end_time,
         meeting_link: schedule.meeting_link_url || schedule.link || ''
-      };
+      }));
     },
     enabled: !!profile?.user_id,
   });
@@ -192,16 +202,19 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
         return false;
       }
       
-      if (ongoingClass) {
-          const isSameClass = schedule.subject === ongoingClass.subject &&
-                              schedule.batch === ongoingClass.batch &&
-                              schedule.start_time === ongoingClass.start_time;
-          if (isSameClass) return false;
+      // Filter out any class that is currently ongoing
+      if (ongoingClasses && ongoingClasses.length > 0) {
+          const isOngoing = ongoingClasses.some(ongoing => 
+              schedule.subject === ongoing.subject &&
+              schedule.batch === ongoing.batch &&
+              schedule.start_time === ongoing.start_time
+          );
+          if (isOngoing) return false;
       }
 
       return true;
     }).sort((a, b) => a.start_time.localeCompare(b.start_time));
-  }, [allSchedules, ongoingClass, now, currentDay]);
+  }, [allSchedules, ongoingClasses, now, currentDay]);
 
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
@@ -330,45 +343,58 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
 
   return (
     <div className="p-6 bg-gradient-to-br from-gray-50 to-white min-h-screen flex items-center justify-center">
-      <div className="max-w-3xl w-full mx-auto text-center">
-        {ongoingClass ? (
-          <Card className="relative p-10 overflow-hidden rounded-3xl shadow-2xl border-none bg-gradient-to-br from-green-500 to-emerald-600 text-white">
-            <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/10 rounded-full animate-pulse-slow"></div>
-            <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-white/10 rounded-full animate-pulse-slow animation-delay-500"></div>
-            <div className="relative z-10">
-              <div className="flex items-center justify-center gap-4 mb-6">
-                <div className="w-5 h-5 bg-white rounded-full animate-ping"></div>
-                <span className="font-extrabold text-2xl drop-shadow-md">LIVE CLASS IN PROGRESS</span>
-              </div>
-              <h3 className="text-5xl font-bold mb-4 tracking-tight drop-shadow-lg">{ongoingClass.subject}</h3>
-              <div className="flex items-center justify-center gap-8 mb-8 text-green-100">
-                <div className="flex items-center gap-3 text-lg font-semibold">
-                  <Clock className="h-6 w-6" />
-                  <span>{formatTime(ongoingClass.start_time)} - {formatTime(ongoingClass.end_time)}</span>
-                </div>
-                <div className="flex items-center gap-3 text-lg font-semibold">
-                  <Calendar className="h-6 w-6" />
-                  <span>{ongoingClass.batch}</span>
-                </div>
-              </div>
-              {ongoingClass.meeting_link ? (
-                <Button 
-                  onClick={() => window.open(ongoingClass.meeting_link, '_blank')}
-                  className="bg-white text-green-700 hover:bg-gray-100 hover:text-green-800 px-10 py-4 text-xl font-bold rounded-full shadow-lg transition-all transform hover:scale-105 active:scale-95"
-                  size="lg"
-                >
-                  <ExternalLink className="h-6 w-6 mr-3" />
-                  Join Class Now
-                </Button>
-              ) : (
-                <div className="bg-yellow-100 border border-yellow-300 text-yellow-900 rounded-lg p-5 mt-6 shadow-md">
-                  <p className="text-lg font-medium">Meeting link not available for this session.</p>
-                </div>
-              )}
+      <div className="max-w-6xl w-full mx-auto text-center">
+        {ongoingClasses && ongoingClasses.length > 0 ? (
+          <div className="space-y-8">
+            {ongoingClasses.length > 1 && (
+                 <div className="mb-4">
+                    <h2 className="text-3xl font-bold text-gray-800">Multiple Live Classes</h2>
+                    <p className="text-gray-600">You have multiple classes scheduled for this time slot.</p>
+                 </div>
+            )}
+            
+            <div className={`grid gap-8 ${ongoingClasses.length === 1 ? 'grid-cols-1 max-w-3xl mx-auto' : 'grid-cols-1 md:grid-cols-2'}`}>
+              {ongoingClasses.map((cls, index) => (
+                <Card key={index} className="relative p-10 overflow-hidden rounded-3xl shadow-2xl border-none bg-gradient-to-br from-green-500 to-emerald-600 text-white">
+                    <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/10 rounded-full animate-pulse-slow"></div>
+                    <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-white/10 rounded-full animate-pulse-slow animation-delay-500"></div>
+                    <div className="relative z-10">
+                    <div className="flex items-center justify-center gap-4 mb-6">
+                        <div className="w-5 h-5 bg-white rounded-full animate-ping"></div>
+                        <span className="font-extrabold text-xl md:text-2xl drop-shadow-md">LIVE CLASS</span>
+                    </div>
+                    <h3 className="text-3xl md:text-5xl font-bold mb-4 tracking-tight drop-shadow-lg">{cls.subject}</h3>
+                    <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8 mb-8 text-green-100">
+                        <div className="flex items-center gap-3 text-lg font-semibold">
+                        <Clock className="h-6 w-6" />
+                        <span>{formatTime(cls.start_time)} - {formatTime(cls.end_time)}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-lg font-semibold">
+                        <Calendar className="h-6 w-6" />
+                        <span>{cls.batch}</span>
+                        </div>
+                    </div>
+                    {cls.meeting_link ? (
+                        <Button 
+                        onClick={() => window.open(cls.meeting_link, '_blank')}
+                        className="bg-white text-green-700 hover:bg-gray-100 hover:text-green-800 px-10 py-4 text-xl font-bold rounded-full shadow-lg transition-all transform hover:scale-105 active:scale-95 w-full md:w-auto"
+                        size="lg"
+                        >
+                        <ExternalLink className="h-6 w-6 mr-3" />
+                        Join Class
+                        </Button>
+                    ) : (
+                        <div className="bg-yellow-100 border border-yellow-300 text-yellow-900 rounded-lg p-5 mt-6 shadow-md">
+                        <p className="text-lg font-medium">Meeting link not available.</p>
+                        </div>
+                    )}
+                    </div>
+                </Card>
+              ))}
             </div>
-          </Card>
+          </div>
         ) : (
-          <Card className="p-6 md:p-12 text-center rounded-3xl shadow-xl border-2 border-dashed border-gray-300 bg-white">
+          <Card className="p-6 md:p-12 text-center rounded-3xl shadow-xl border-2 border-dashed border-gray-300 bg-white max-w-3xl mx-auto">
             <div className="mb-8"><Clock className="h-20 w-20 mx-auto text-gray-400" /></div>
             <h3 className="text-3xl font-bold text-gray-800 mb-4">No Ongoing Class Right Now</h3>
             <p className="text-gray-600 mb-8 max-w-lg mx-auto">Here's a look at what's scheduled for today.</p>
