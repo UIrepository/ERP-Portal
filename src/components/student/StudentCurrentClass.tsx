@@ -5,8 +5,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ExternalLink, Clock, Calendar, AlertTriangle, Video, CheckCircle2, Radio } from 'lucide-react';
-import { format, differenceInSeconds, startOfDay, isSameDay } from 'date-fns';
+import { ExternalLink, Clock, Calendar, AlertTriangle, Video, Radio, CheckCircle2 } from 'lucide-react';
+import { format, differenceInSeconds, isSameDay } from 'date-fns';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -31,14 +31,12 @@ interface OngoingClass {
   start_time: string;
   end_time: string;
   meeting_link: string;
-  date?: string;
 }
 
 interface StudentCurrentClassProps {
     onTabChange: (tab: string) => void;
 }
 
-// --- Helper Component: Countdown ---
 const Countdown = ({ targetDate }: { targetDate: Date }) => {
   const calculateTimeLeft = () => {
     const totalSeconds = differenceInSeconds(targetDate, new Date());
@@ -76,13 +74,11 @@ const Countdown = ({ targetDate }: { targetDate: Date }) => {
   );
 };
 
-// --- Main Component ---
 export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   
-  // Real-time clock
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
@@ -90,15 +86,16 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
   }, []);
 
   const currentTimeStr = format(now, 'HH:mm:ss');
-  const todayDateStr = format(now, 'yyyy-MM-dd'); 
 
-  // --- 1. Fetch All Schedules ---
+  // --- 1. Fetch ALL Schedules (History + Future for Today) ---
   const { data: allSchedules, isLoading: isLoadingAllSchedules, isError: isAllSchedulesError } = useQuery<Schedule[]>({
     queryKey: ['allStudentSchedulesRPC', profile?.user_id],
     queryFn: async (): Promise<Schedule[]> => {
       if (!profile?.user_id) return [];
+      // Fetch ONLY for current day of week to filter the "Today's Schedule" list correctly
       const { data, error } = await supabase.rpc('get_schedules_with_links_filtered_by_enrollment', { 
-          p_user_id: profile.user_id 
+          p_user_id: profile.user_id,
+          p_day_of_week: new Date().getDay() 
       });
       if (error) throw error;
       return data || [];
@@ -106,7 +103,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     enabled: !!profile?.user_id
   });
 
-  // --- 2. Fetch Live Classes (STRICT FILTERING) ---
+  // --- 2. Fetch LIVE Classes ---
   const { data: ongoingClasses, isLoading: isLoadingOngoingClass } = useQuery<OngoingClass[] | null>({
     queryKey: ['ongoingClassRPC', profile?.user_id],
     queryFn: async (): Promise<OngoingClass[] | null> => {
@@ -115,28 +112,18 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
       const { data, error } = await supabase.rpc('get_schedules_with_links_filtered_by_enrollment', {
         p_user_id: profile.user_id,
         p_day_of_week: new Date().getDay(),
-        p_current_time: format(new Date(), 'HH:mm:ss'), 
-        p_is_active_link: true,
-        p_target_date: todayDateStr 
+        p_current_time: format(new Date(), 'HH:mm:ss'), // SQL Filters: end_time >= now
+        p_is_active_link: true
       });
 
       if (error) throw error;
       if (!data || data.length === 0) return null;
 
-      // --- FILTERING LOGIC ---
       const nowTime = new Date();
-      const bufferMinutes = 10; // Allow joining 10 mins early
-      const currentSqlDate = format(nowTime, 'yyyy-MM-dd');
+      const bufferMinutes = 15; // 15 min buffer
       
-      let validClasses = data.filter((schedule: any) => {
-          // 1. DATE PRIORITY CHECK:
-          // If a class has a specific date (e.g., Extra Class), it MUST match today.
-          // If date is different (even if Day of Week matches), IGNORE IT.
-          if (schedule.date && schedule.date !== currentSqlDate) {
-              return false;
-          }
-
-          // 2. TIME CHECK:
+      // Strict Logic: Filter out classes that haven't started yet
+      const validClasses = data.filter((schedule: any) => {
           const [h, m] = schedule.start_time.split(':');
           const startTime = new Date(nowTime);
           startTime.setHours(Number(h), Number(m), 0, 0);
@@ -145,32 +132,29 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
           return nowTime >= validJoinTime; 
       });
 
-      // --- DEDUPLICATION LOGIC ---
+      // Strict Deduplication: Use ID or (Subject+Batch+Time) to prevent duplicates
       const uniqueMap = new Map();
       validClasses.forEach((cls: any) => {
-          const key = `${cls.subject}-${cls.batch}`;
-          // Priority: Prefer classes WITH a date (Extra Class) over generic ones
-          if (!uniqueMap.has(key) || (cls.date && !uniqueMap.get(key).date)) {
+          const key = cls.id || `${cls.subject}-${cls.batch}-${cls.start_time}`;
+          if (!uniqueMap.has(key)) {
               uniqueMap.set(key, cls);
           }
       });
-      validClasses = Array.from(uniqueMap.values());
 
-      return validClasses.map((schedule: any) => ({
+      return Array.from(uniqueMap.values()).map((schedule: any) => ({
         id: schedule.id,
         subject: schedule.subject,
         batch: schedule.batch,
         start_time: schedule.start_time,
         end_time: schedule.end_time,
-        meeting_link: schedule.meeting_link_url || schedule.link || '',
-        date: schedule.date
+        meeting_link: schedule.meeting_link_url || schedule.link || ''
       }));
     },
     enabled: !!profile?.user_id,
-    refetchInterval: 30000 // Check every 30s
+    refetchInterval: 30000 
   });
 
-  // --- 3. Realtime Subscription ---
+  // --- Realtime Subscription ---
   useEffect(() => {
     if (!profile?.user_id) return;
     const channel = supabase.channel('class-updates')
@@ -186,18 +170,17 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     return () => { supabase.removeChannel(channel); };
   }, [queryClient, profile?.user_id]);
 
-  // --- 4. Logic for Past/Future Sections ---
+  // --- Logic for Past/Future Sections ---
   const { pastClasses, futureClasses, nextClass } = useMemo(() => {
     if (!allSchedules) return { pastClasses: [], futureClasses: [], nextClass: null };
 
-    const todaysClasses = allSchedules.filter(schedule => {
-        // Strict Date Check for the Full List too
-        if (schedule.date && schedule.date !== todayDateStr) return false;
-        
-        return schedule.date 
-            ? isSameDay(new Date(schedule.date), now) 
-            : schedule.day_of_week === now.getDay();
+    // Deduplicate the main list too
+    const uniqueSchedules = new Map();
+    allSchedules.forEach(s => {
+       const key = s.id || `${s.subject}-${s.batch}-${s.start_time}`;
+       if (!uniqueSchedules.has(key)) uniqueSchedules.set(key, s);
     });
+    const todaysClasses = Array.from(uniqueSchedules.values());
 
     const isLive = (s: Schedule) => {
         if (!ongoingClasses) return false;
@@ -216,7 +199,6 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
             const [h, m] = schedule.start_time.split(':').map(Number);
             const dateObj = new Date(now);
             dateObj.setHours(h, m, 0, 0);
-            
             future.push({ ...schedule, nextOccurrence: dateObj } as any);
         }
     });
@@ -229,7 +211,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
         futureClasses: future,
         nextClass: future.length > 0 ? (future[0] as any) : null
     };
-  }, [allSchedules, ongoingClasses, now, currentTimeStr, todayDateStr]);
+  }, [allSchedules, ongoingClasses, now, currentTimeStr]);
 
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
@@ -244,19 +226,6 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50/50">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (!allSchedules || allSchedules.length === 0 || isAllSchedulesError) {
-    return (
-      <div className="p-8 text-center bg-gray-50 min-h-screen flex items-center justify-center">
-        <Card className="p-12 text-center rounded-3xl shadow-xl border-dashed">
-            <AlertTriangle className="h-16 w-16 mx-auto text-yellow-500 mb-4" />
-            <h3 className="text-2xl font-bold text-gray-800">No Schedules Found</h3>
-            <p className="text-gray-600 mb-6">You don't have any classes scheduled for your enrollments.</p>
-            <Button onClick={() => onTabChange('dashboard')}>Back to Dashboard</Button>
-        </Card>
       </div>
     );
   }
@@ -276,7 +245,6 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
          <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
             {ongoingClasses.map((cls, idx) => (
                 <Card key={idx} className="relative overflow-hidden border-none shadow-2xl bg-gradient-to-br from-green-500 to-emerald-700 text-white transform hover:scale-[1.02] transition-all duration-300">
-                    {/* Decorative Background Elements */}
                     <div className="absolute top-0 right-0 p-4 opacity-10 rotate-12"><Video size={120} /></div>
                     <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
                     
