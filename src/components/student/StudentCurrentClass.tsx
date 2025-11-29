@@ -77,12 +77,15 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
   const currentDay = now.getDay();
   const currentTimeStr = format(now, 'HH:mm:ss');
 
-  // Fetch all schedules for the student
+  // --- 1. Fetch ALL Schedules (History + Future) ---
+  // Note: We do NOT pass p_current_time here, so the backend returns the full day history.
   const { data: allSchedules, isLoading: isLoadingAllSchedules, isError: isAllSchedulesError } = useQuery<Schedule[]>({
     queryKey: ['allStudentSchedulesRPC', profile?.user_id],
     queryFn: async (): Promise<Schedule[]> => {
       if (!profile?.user_id) return [];
-      const { data, error } = await supabase.rpc('get_schedules_with_links_filtered_by_enrollment', { p_user_id: profile.user_id });
+      const { data, error } = await supabase.rpc('get_schedules_with_links_filtered_by_enrollment', { 
+          p_user_id: profile.user_id 
+      });
       if (error) {
           console.error("Error fetching all schedules via RPC:", error);
           throw error;
@@ -92,20 +95,19 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     enabled: !!profile?.user_id
   });
 
-  // Fetch ongoing classes (Returned as an Array now)
+  // --- 2. Fetch Ongoing Classes (Live Now) ---
   const { data: ongoingClasses, isLoading: isLoadingOngoingClass, isError: isOngoingClassError } = useQuery<OngoingClass[] | null>({
     queryKey: ['ongoingClassRPC', profile?.user_id],
     queryFn: async (): Promise<OngoingClass[] | null> => {
       if (!profile?.user_id) return null;
       
-      const todayDateStr = format(new Date(), 'yyyy-MM-dd'); // Format date for RPC
+      const todayDateStr = format(new Date(), 'yyyy-MM-dd'); 
 
       const { data, error } = await supabase.rpc('get_schedules_with_links_filtered_by_enrollment', {
         p_user_id: profile.user_id,
         p_day_of_week: new Date().getDay(),
         p_current_time: format(new Date(), 'HH:mm:ss'),
         p_is_active_link: true,
-        // Make sure your RPC function accepts this parameter to filter by specific date
         p_target_date: todayDateStr 
       });
 
@@ -116,7 +118,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
       
       if (!data || data.length === 0) return null;
 
-      // Map all returned schedules to OngoingClass objects
+      // Map response to our OngoingClass interface
       return data.map((schedule: any) => ({
         subject: schedule.subject,
         batch: schedule.batch,
@@ -128,6 +130,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     enabled: !!profile?.user_id,
   });
 
+  // --- Realtime Updates ---
   useEffect(() => {
     if (!profile?.user_id) return;
 
@@ -135,11 +138,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
       .channel('ongoing-class-changes')
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'schedules',
-        },
+        { event: '*', schema: 'public', table: 'schedules' },
         () => {
           queryClient.invalidateQueries({ queryKey: ['ongoingClassRPC', profile?.user_id] });
           queryClient.invalidateQueries({ queryKey: ['allStudentSchedulesRPC', profile?.user_id] });
@@ -147,11 +146,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
       )
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'meeting_links',
-        },
+        { event: '*', schema: 'public', table: 'meeting_links' },
         () => {
           queryClient.invalidateQueries({ queryKey: ['ongoingClassRPC', profile?.user_id] });
           queryClient.invalidateQueries({ queryKey: ['allStudentSchedulesRPC', profile?.user_id] });
@@ -164,6 +159,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     };
   }, [queryClient, profile?.user_id]);
 
+  // --- Derived State: Next Upcoming Class ---
   const nextUpcomingClass = useMemo(() => {
     if (!allSchedules || allSchedules.length === 0) return null;
     const now = new Date();
@@ -177,6 +173,8 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
             const today = startOfDay(now);
             nextOccurrence = new Date(today);
             let dayDifference = schedule.day_of_week - today.getDay();
+            
+            // Logic to find next instance of this recurring class
             if (dayDifference < 0 || (dayDifference === 0 && (hour * 60 + minute) < (now.getHours() * 60 + now.getMinutes()))) {
                 dayDifference += 7;
             }
@@ -190,6 +188,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     return futureSchedules.length > 0 ? futureSchedules[0] : null;
   }, [allSchedules]);
   
+  // --- Derived State: Today's Schedule List ---
   const todaysOtherClasses = useMemo(() => {
     if (!allSchedules) return [];
     
@@ -198,11 +197,9 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
         ? isSameDay(new Date(schedule.date), now) 
         : schedule.day_of_week === currentDay;
       
-      if (!isToday) {
-        return false;
-      }
+      if (!isToday) return false;
       
-      // Filter out any class that is currently ongoing
+      // Filter out classes that are currently LIVE so they don't appear twice
       if (ongoingClasses && ongoingClasses.length > 0) {
           const isOngoing = ongoingClasses.some(ongoing => 
               schedule.subject === ongoing.subject &&
@@ -226,6 +223,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
   const isLoadingInitialData = isLoadingAllSchedules || isLoadingOngoingClass;
   const hasErrors = isAllSchedulesError || isOngoingClassError;
 
+  // --- Render Helpers ---
   const renderNextUpcoming = () => (
     nextUpcomingClass ? (
         <div className="space-y-6">
@@ -274,7 +272,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
                                     <p className="text-sm text-gray-500 mt-1">{formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}</p>
                                 </div>
                                 {isFinished ? (
-                                    null
+                                    <Badge variant="secondary" className="bg-gray-200 text-gray-600">Finished</Badge>
                                 ) : (
                                     schedule.meeting_link_url ? (
                                         <Button onClick={() => window.open(schedule.meeting_link_url, '_blank')}>
