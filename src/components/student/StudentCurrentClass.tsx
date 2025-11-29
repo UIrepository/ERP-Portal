@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ExternalLink, Clock, Calendar, AlertTriangle, Video, CheckCircle2 } from 'lucide-react';
+import { ExternalLink, Clock, Calendar, AlertTriangle, Video, CheckCircle2, Radio } from 'lucide-react';
 import { format, differenceInSeconds, startOfDay, isSameDay } from 'date-fns';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -21,11 +21,11 @@ interface Schedule {
   link?: string;
   meeting_link_url?: string;
   date?: string;
-  nextOccurrence?: Date; // Added for internal logic
+  nextOccurrence?: Date;
 }
 
 interface OngoingClass {
-  id: string; // Added ID for deduping
+  id: string;
   subject: string;
   batch: string;
   start_time: string;
@@ -82,7 +82,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   
-  // Real-time clock for updates
+  // Real-time clock
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
@@ -92,7 +92,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
   const currentTimeStr = format(now, 'HH:mm:ss');
   const todayDateStr = format(now, 'yyyy-MM-dd'); 
 
-  // --- 1. Fetch All Schedules (History + Future) ---
+  // --- 1. Fetch All Schedules ---
   const { data: allSchedules, isLoading: isLoadingAllSchedules, isError: isAllSchedulesError } = useQuery<Schedule[]>({
     queryKey: ['allStudentSchedulesRPC', profile?.user_id],
     queryFn: async (): Promise<Schedule[]> => {
@@ -106,7 +106,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     enabled: !!profile?.user_id
   });
 
-  // --- 2. Fetch Live Classes (With Strict Filtering) ---
+  // --- 2. Fetch Live Classes (STRICT FILTERING) ---
   const { data: ongoingClasses, isLoading: isLoadingOngoingClass } = useQuery<OngoingClass[] | null>({
     queryKey: ['ongoingClassRPC', profile?.user_id],
     queryFn: async (): Promise<OngoingClass[] | null> => {
@@ -115,7 +115,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
       const { data, error } = await supabase.rpc('get_schedules_with_links_filtered_by_enrollment', {
         p_user_id: profile.user_id,
         p_day_of_week: new Date().getDay(),
-        p_current_time: format(new Date(), 'HH:mm:ss'), // This filters END time in SQL
+        p_current_time: format(new Date(), 'HH:mm:ss'), 
         p_is_active_link: true,
         p_target_date: todayDateStr 
       });
@@ -123,28 +123,33 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
       if (error) throw error;
       if (!data || data.length === 0) return null;
 
-      // --- STRICT FILTERING LOGIC ---
+      // --- FILTERING LOGIC ---
       const nowTime = new Date();
       const bufferMinutes = 10; // Allow joining 10 mins early
+      const currentSqlDate = format(nowTime, 'yyyy-MM-dd');
       
-      // Filter out "Future" classes that SQL let through
       let validClasses = data.filter((schedule: any) => {
+          // 1. DATE PRIORITY CHECK:
+          // If a class has a specific date (e.g., Extra Class), it MUST match today.
+          // If date is different (even if Day of Week matches), IGNORE IT.
+          if (schedule.date && schedule.date !== currentSqlDate) {
+              return false;
+          }
+
+          // 2. TIME CHECK:
           const [h, m] = schedule.start_time.split(':');
           const startTime = new Date(nowTime);
           startTime.setHours(Number(h), Number(m), 0, 0);
           
-          // Calculate Start Time minus Buffer
           const validJoinTime = new Date(startTime.getTime() - bufferMinutes * 60000);
-          
-          return nowTime >= validJoinTime; // ONLY show if we are past the join time
+          return nowTime >= validJoinTime; 
       });
 
       // --- DEDUPLICATION LOGIC ---
-      // If we have duplicates (e.g. one recurring, one extra class for same subject), keep the one with a date.
       const uniqueMap = new Map();
       validClasses.forEach((cls: any) => {
           const key = `${cls.subject}-${cls.batch}`;
-          // If collision: Prefer the one WITH a specific date (Extra Class override)
+          // Priority: Prefer classes WITH a date (Extra Class) over generic ones
           if (!uniqueMap.has(key) || (cls.date && !uniqueMap.get(key).date)) {
               uniqueMap.set(key, cls);
           }
@@ -162,7 +167,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
       }));
     },
     enabled: !!profile?.user_id,
-    refetchInterval: 60000 // Re-check every minute to auto-show classes when they start
+    refetchInterval: 30000 // Check every 30s
   });
 
   // --- 3. Realtime Subscription ---
@@ -181,18 +186,19 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     return () => { supabase.removeChannel(channel); };
   }, [queryClient, profile?.user_id]);
 
-  // --- 4. Filtering Logic (Past vs Future) ---
+  // --- 4. Logic for Past/Future Sections ---
   const { pastClasses, futureClasses, nextClass } = useMemo(() => {
     if (!allSchedules) return { pastClasses: [], futureClasses: [], nextClass: null };
 
-    // Filter for TODAY only
     const todaysClasses = allSchedules.filter(schedule => {
+        // Strict Date Check for the Full List too
+        if (schedule.date && schedule.date !== todayDateStr) return false;
+        
         return schedule.date 
             ? isSameDay(new Date(schedule.date), now) 
             : schedule.day_of_week === now.getDay();
     });
 
-    // Helper to check if a class is "Live" right now (to exclude it from Past/Future lists)
     const isLive = (s: Schedule) => {
         if (!ongoingClasses) return false;
         return ongoingClasses.some(o => o.subject === s.subject && o.batch === s.batch && o.start_time === s.start_time);
@@ -202,12 +208,11 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     const future: Schedule[] = [];
 
     todaysClasses.forEach(schedule => {
-        if (isLive(schedule)) return; // Skip if it's currently live
+        if (isLive(schedule)) return; 
 
         if (schedule.end_time < currentTimeStr) {
             past.push(schedule);
         } else if (schedule.start_time > currentTimeStr) {
-            // Add Date object for sorting/countdown
             const [h, m] = schedule.start_time.split(':').map(Number);
             const dateObj = new Date(now);
             dateObj.setHours(h, m, 0, 0);
@@ -216,16 +221,15 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
         }
     });
 
-    // Sort
-    past.sort((a, b) => b.start_time.localeCompare(a.start_time)); // Most recent past class first
-    future.sort((a, b) => a.start_time.localeCompare(b.start_time)); // Soonest future class first
+    past.sort((a, b) => b.start_time.localeCompare(a.start_time));
+    future.sort((a, b) => a.start_time.localeCompare(b.start_time));
 
     return {
         pastClasses: past,
         futureClasses: future,
         nextClass: future.length > 0 ? (future[0] as any) : null
     };
-  }, [allSchedules, ongoingClasses, now, currentTimeStr]);
+  }, [allSchedules, ongoingClasses, now, currentTimeStr, todayDateStr]);
 
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
@@ -257,38 +261,54 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     );
   }
 
-  // --- Render Functions ---
+  // --- Render Sections ---
 
   const renderLiveSection = () => (
     ongoingClasses && ongoingClasses.length > 0 && (
       <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
          <div className="flex items-center gap-2 mb-4">
-            <div className="h-3 w-3 bg-red-500 rounded-full animate-pulse" />
+            <span className="relative flex h-4 w-4">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-4 w-4 bg-green-500"></span>
+            </span>
             <h2 className="text-2xl font-bold text-gray-900">Live Now</h2>
          </div>
          <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
             {ongoingClasses.map((cls, idx) => (
-                <Card key={idx} className="relative overflow-hidden border-none shadow-2xl bg-gradient-to-br from-green-600 to-emerald-700 text-white">
-                    <div className="absolute top-0 right-0 p-4 opacity-20"><Video size={100} /></div>
-                    <CardContent className="p-6 relative z-10">
-                        <Badge className="bg-red-500 hover:bg-red-600 text-white border-none mb-4 animate-pulse">
-                            ● LIVE CLASS
-                        </Badge>
-                        <h3 className="text-3xl font-bold mb-2">{cls.subject}</h3>
-                        <p className="text-green-100 mb-6 font-medium">{cls.batch}</p>
-                        <div className="flex items-center gap-4 text-sm font-semibold bg-white/10 p-3 rounded-lg mb-6 w-fit">
-                            <Clock className="h-4 w-4" />
-                            {formatTime(cls.start_time)} - {formatTime(cls.end_time)}
+                <Card key={idx} className="relative overflow-hidden border-none shadow-2xl bg-gradient-to-br from-green-500 to-emerald-700 text-white transform hover:scale-[1.02] transition-all duration-300">
+                    {/* Decorative Background Elements */}
+                    <div className="absolute top-0 right-0 p-4 opacity-10 rotate-12"><Video size={120} /></div>
+                    <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+                    
+                    <CardContent className="p-8 relative z-10 flex flex-col h-full justify-between">
+                        <div>
+                            <div className="flex justify-between items-start mb-4">
+                                <Badge className="bg-white/20 hover:bg-white/30 text-white border-none backdrop-blur-sm px-3 py-1 flex items-center gap-2">
+                                    <Radio className="h-3 w-3 animate-pulse text-red-300" /> LIVE
+                                </Badge>
+                                <span className="text-green-50 text-xs font-semibold tracking-wider uppercase bg-green-800/30 px-2 py-1 rounded">
+                                    {cls.batch}
+                                </span>
+                            </div>
+                            
+                            <h3 className="text-3xl font-extrabold mb-1 tracking-tight">{cls.subject}</h3>
+                            <p className="text-green-100 text-sm mb-6 opacity-90">Session is in progress</p>
+                            
+                            <div className="flex items-center gap-3 text-sm font-bold bg-black/20 backdrop-blur-md p-4 rounded-xl mb-6 border border-white/10">
+                                <Clock className="h-5 w-5 text-green-300" />
+                                <span>{formatTime(cls.start_time)} - {formatTime(cls.end_time)}</span>
+                            </div>
                         </div>
+
                         {cls.meeting_link ? (
                             <Button 
                                 onClick={() => window.open(cls.meeting_link, '_blank')}
-                                className="w-full bg-white text-green-700 hover:bg-gray-100 font-bold rounded-xl h-12 text-lg shadow-lg"
+                                className="w-full bg-white text-emerald-800 hover:bg-green-50 font-bold rounded-xl h-14 text-lg shadow-xl hover:shadow-2xl transition-all active:scale-95"
                             >
-                                <ExternalLink className="mr-2 h-5 w-5" /> Join Now
+                                <ExternalLink className="mr-2 h-5 w-5" /> Join Class
                             </Button>
                         ) : (
-                            <div className="text-center p-3 bg-yellow-400/20 rounded-xl text-yellow-100 text-sm">
+                            <div className="text-center p-4 bg-yellow-500/20 border border-yellow-200/30 rounded-xl text-yellow-50 text-sm font-medium">
                                 Link unavailable
                             </div>
                         )}
@@ -307,7 +327,6 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
                 <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                     <Calendar className="h-6 w-6 text-primary" /> Up Next
                 </h2>
-                {/* Main "Up Next" Card */}
                 <Card className="border-l-4 border-l-primary shadow-md bg-white mb-6">
                     <CardContent className="p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
                         <div className="text-center md:text-left space-y-2">
@@ -340,7 +359,6 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
                     </CardContent>
                 </Card>
 
-                {/* Other Future Classes List */}
                 {futureClasses.length > 1 && (
                     <div className="space-y-3 pl-2 md:pl-4 border-l-2 border-dashed border-gray-200">
                         <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Later Today</p>
@@ -360,7 +378,6 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
                 )}
             </>
         ) : (
-            // No future classes
             !ongoingClasses && (
                 <div className="text-center py-12 bg-white rounded-3xl border-2 border-dashed">
                     <div className="bg-green-100 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
@@ -417,7 +434,6 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
   return (
     <div className="p-4 md:p-8 bg-gray-50/50 min-h-screen">
         <div className="max-w-5xl mx-auto">
-            {/* Header */}
             <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Today's Schedule</h1>
@@ -428,13 +444,8 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
                 </Button>
             </div>
 
-            {/* Live Classes (Priority) */}
             {renderLiveSection()}
-
-            {/* Upcoming Classes */}
             {renderFutureSection()}
-
-            {/* Past Classes Table */}
             {renderPastSection()}
         </div>
     </div>
