@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import { ExternalLink, Clock, Calendar, AlertTriangle, Video, Radio, CheckCircle2 } from 'lucide-react';
 import { format, differenceInSeconds, isSameDay } from 'date-fns';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 // --- Interfaces ---
 interface Schedule {
@@ -79,6 +78,9 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   
+  // Debug Log to check if file updated
+  useEffect(() => { console.log("StudentCurrentClass Component Loaded - GREEN VERSION"); }, []);
+
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
@@ -87,12 +89,11 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
 
   const currentTimeStr = format(now, 'HH:mm:ss');
 
-  // --- 1. Fetch ALL Schedules (History + Future for Today) ---
+  // --- 1. Fetch ALL Schedules ---
   const { data: allSchedules, isLoading: isLoadingAllSchedules, isError: isAllSchedulesError } = useQuery<Schedule[]>({
     queryKey: ['allStudentSchedulesRPC', profile?.user_id],
     queryFn: async (): Promise<Schedule[]> => {
       if (!profile?.user_id) return [];
-      // Fetch ONLY for current day of week to filter the "Today's Schedule" list correctly
       const { data, error } = await supabase.rpc('get_schedules_with_links_filtered_by_enrollment', { 
           p_user_id: profile.user_id,
           p_day_of_week: new Date().getDay() 
@@ -103,7 +104,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     enabled: !!profile?.user_id
   });
 
-  // --- 2. Fetch LIVE Classes ---
+  // --- 2. Fetch LIVE Classes (With Strict Frontend Deduplication) ---
   const { data: ongoingClasses, isLoading: isLoadingOngoingClass } = useQuery<OngoingClass[] | null>({
     queryKey: ['ongoingClassRPC', profile?.user_id],
     queryFn: async (): Promise<OngoingClass[] | null> => {
@@ -112,7 +113,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
       const { data, error } = await supabase.rpc('get_schedules_with_links_filtered_by_enrollment', {
         p_user_id: profile.user_id,
         p_day_of_week: new Date().getDay(),
-        p_current_time: format(new Date(), 'HH:mm:ss'), // SQL Filters: end_time >= now
+        p_current_time: format(new Date(), 'HH:mm:ss'),
         p_is_active_link: true
       });
 
@@ -120,9 +121,9 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
       if (!data || data.length === 0) return null;
 
       const nowTime = new Date();
-      const bufferMinutes = 15; // 15 min buffer
+      const bufferMinutes = 15; 
       
-      // Strict Logic: Filter out classes that haven't started yet
+      // Filter: Must be within join window
       const validClasses = data.filter((schedule: any) => {
           const [h, m] = schedule.start_time.split(':');
           const startTime = new Date(nowTime);
@@ -132,10 +133,12 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
           return nowTime >= validJoinTime; 
       });
 
-      // Strict Deduplication: Use ID or (Subject+Batch+Time) to prevent duplicates
+      // --- STRICT DEDUPLICATION ---
+      // We ignore ID and use Subject + Start Time as the unique key.
+      // This kills duplicates even if they exist in the database with different IDs.
       const uniqueMap = new Map();
       validClasses.forEach((cls: any) => {
-          const key = cls.id || `${cls.subject}-${cls.batch}-${cls.start_time}`;
+          const key = `${cls.subject}-${cls.start_time}`; // STRICT KEY
           if (!uniqueMap.has(key)) {
               uniqueMap.set(key, cls);
           }
@@ -174,17 +177,18 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
   const { pastClasses, futureClasses, nextClass } = useMemo(() => {
     if (!allSchedules) return { pastClasses: [], futureClasses: [], nextClass: null };
 
-    // Deduplicate the main list too
+    // Strict Deduplication for the Full List too
     const uniqueSchedules = new Map();
     allSchedules.forEach(s => {
-       const key = s.id || `${s.subject}-${s.batch}-${s.start_time}`;
+       // Use Subject + Start Time to merge duplicates
+       const key = `${s.subject}-${s.start_time}`;
        if (!uniqueSchedules.has(key)) uniqueSchedules.set(key, s);
     });
     const todaysClasses = Array.from(uniqueSchedules.values());
 
     const isLive = (s: Schedule) => {
         if (!ongoingClasses) return false;
-        return ongoingClasses.some(o => o.subject === s.subject && o.batch === s.batch && o.start_time === s.start_time);
+        return ongoingClasses.some(o => o.subject === s.subject && o.start_time === s.start_time);
     };
 
     const past: Schedule[] = [];
