@@ -2,11 +2,11 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ExternalLink, Clock, Calendar, AlertTriangle, Video, CheckCircle2 } from 'lucide-react';
-import { format, differenceInSeconds, startOfDay, isSameDay, parse } from 'date-fns';
+import { format, differenceInSeconds, startOfDay, isSameDay } from 'date-fns';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -21,14 +21,17 @@ interface Schedule {
   link?: string;
   meeting_link_url?: string;
   date?: string;
+  nextOccurrence?: Date; // Added for internal logic
 }
 
 interface OngoingClass {
+  id: string; // Added ID for deduping
   subject: string;
   batch: string;
   start_time: string;
   end_time: string;
   meeting_link: string;
+  date?: string;
 }
 
 interface StudentCurrentClassProps {
@@ -89,7 +92,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
   const currentTimeStr = format(now, 'HH:mm:ss');
   const todayDateStr = format(now, 'yyyy-MM-dd'); 
 
-  // --- 1. Fetch All Schedules ---
+  // --- 1. Fetch All Schedules (History + Future) ---
   const { data: allSchedules, isLoading: isLoadingAllSchedules, isError: isAllSchedulesError } = useQuery<Schedule[]>({
     queryKey: ['allStudentSchedulesRPC', profile?.user_id],
     queryFn: async (): Promise<Schedule[]> => {
@@ -103,29 +106,63 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     enabled: !!profile?.user_id
   });
 
-  // --- 2. Fetch Live Classes ---
+  // --- 2. Fetch Live Classes (With Strict Filtering) ---
   const { data: ongoingClasses, isLoading: isLoadingOngoingClass } = useQuery<OngoingClass[] | null>({
     queryKey: ['ongoingClassRPC', profile?.user_id],
     queryFn: async (): Promise<OngoingClass[] | null> => {
       if (!profile?.user_id) return null;
+      
       const { data, error } = await supabase.rpc('get_schedules_with_links_filtered_by_enrollment', {
         p_user_id: profile.user_id,
         p_day_of_week: new Date().getDay(),
-        p_current_time: format(new Date(), 'HH:mm:ss'),
+        p_current_time: format(new Date(), 'HH:mm:ss'), // This filters END time in SQL
         p_is_active_link: true,
         p_target_date: todayDateStr 
       });
+
       if (error) throw error;
       if (!data || data.length === 0) return null;
-      return data.map((schedule: any) => ({
+
+      // --- STRICT FILTERING LOGIC ---
+      const nowTime = new Date();
+      const bufferMinutes = 10; // Allow joining 10 mins early
+      
+      // Filter out "Future" classes that SQL let through
+      let validClasses = data.filter((schedule: any) => {
+          const [h, m] = schedule.start_time.split(':');
+          const startTime = new Date(nowTime);
+          startTime.setHours(Number(h), Number(m), 0, 0);
+          
+          // Calculate Start Time minus Buffer
+          const validJoinTime = new Date(startTime.getTime() - bufferMinutes * 60000);
+          
+          return nowTime >= validJoinTime; // ONLY show if we are past the join time
+      });
+
+      // --- DEDUPLICATION LOGIC ---
+      // If we have duplicates (e.g. one recurring, one extra class for same subject), keep the one with a date.
+      const uniqueMap = new Map();
+      validClasses.forEach((cls: any) => {
+          const key = `${cls.subject}-${cls.batch}`;
+          // If collision: Prefer the one WITH a specific date (Extra Class override)
+          if (!uniqueMap.has(key) || (cls.date && !uniqueMap.get(key).date)) {
+              uniqueMap.set(key, cls);
+          }
+      });
+      validClasses = Array.from(uniqueMap.values());
+
+      return validClasses.map((schedule: any) => ({
+        id: schedule.id,
         subject: schedule.subject,
         batch: schedule.batch,
         start_time: schedule.start_time,
         end_time: schedule.end_time,
-        meeting_link: schedule.meeting_link_url || schedule.link || ''
+        meeting_link: schedule.meeting_link_url || schedule.link || '',
+        date: schedule.date
       }));
     },
     enabled: !!profile?.user_id,
+    refetchInterval: 60000 // Re-check every minute to auto-show classes when they start
   });
 
   // --- 3. Realtime Subscription ---
