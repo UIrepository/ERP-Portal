@@ -4,7 +4,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { 
   Send, 
@@ -81,7 +80,7 @@ const getAvatarColor = (name: string) => {
   return colors[Math.abs(hash) % colors.length];
 };
 
-// --- Full Featured Message Component (from StudentCommunity) ---
+// --- Message Component ---
 const MessageItemAdmin = ({ 
   msg, 
   isMe, 
@@ -211,7 +210,6 @@ const MessageItemAdmin = ({
         <ContextMenuTrigger className={`block max-w-[85%] md:max-w-[65%] relative ${reactionsCount > 0 ? 'mb-5' : 'mb-0'}`}>
           <div className={`relative px-4 py-3 shadow-sm text-sm transition-all ${bubbleShapeClass} ${priorityClass}`}>
             
-            {/* Priority Badge */}
             {msg.is_priority && (
               <div className="flex items-center gap-1.5 text-[10px] font-bold text-rose-600 uppercase tracking-wider mb-1.5 pb-1 border-b border-rose-200/50">
                 <Megaphone className="h-3 w-3 fill-rose-600" /> 
@@ -300,17 +298,14 @@ const MessageItemAdmin = ({
             <ContextMenuItem onSelect={() => onReply(msg)}>
               <Reply className="mr-2 h-4 w-4" /> Reply
             </ContextMenuItem>
-            {isMe && (
-              <ContextMenuItem onSelect={() => onDelete(msg.id)} className="text-red-600 focus:text-red-600">
-                <Trash2 className="mr-2 h-4 w-4" /> Delete
-              </ContextMenuItem>
-            )}
+            <ContextMenuItem onSelect={() => onDelete(msg.id)} className="text-red-600 focus:text-red-600">
+              <Trash2 className="mr-2 h-4 w-4" /> Delete
+            </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
     </motion.div>
   );
 };
-// --- END MessageItemAdmin ---
 
 
 export const AdminCommunity = () => {
@@ -329,17 +324,16 @@ export const AdminCommunity = () => {
   const [isPriority, setIsPriority] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null); 
 
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(new Date());
   
-  // Admin: Fetch ALL Groups (RLS allows Super Admin to see all)
+  // Admin: Fetch ALL Groups
   const { data: allGroups = [], isLoading: isLoadingGroups } = useQuery<GroupInfo[]>({
     queryKey: ['admin-all-groups'],
     queryFn: async () => {
       const { data, error } = await supabase.from('user_enrollments').select('batch_name, subject_name');
       if (error) throw error;
       const uniqueGroups = Array.from(new Set(data.map(item => JSON.stringify(item)))).map(str => JSON.parse(str));
-      return uniqueGroups.sort((a, b) => a.batch_name.localeCompare(b.batch_name));
+      return uniqueGroups.sort((a: GroupInfo, b: GroupInfo) => a.batch_name.localeCompare(b.batch_name));
     }
   });
 
@@ -355,14 +349,14 @@ export const AdminCommunity = () => {
     queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
     queryFn: async () => {
       if (!selectedGroup) return [];
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('community_messages')
         .select(`*, profiles (name), message_likes ( user_id, reaction_type )`)
         .eq('batch', selectedGroup.batch_name)
         .eq('subject', selectedGroup.subject_name)
         .order('created_at', { ascending: true });
       if (error) throw error;
-      return data as any[];
+      return data as CommunityMessage[];
     },
     enabled: !!selectedGroup
   });
@@ -413,7 +407,7 @@ export const AdminCommunity = () => {
         imageUrl = data.publicUrl;
         setIsUploading(false);
       }
-      const { error } = await supabase.from('community_messages').insert({
+      const { error } = await (supabase as any).from('community_messages').insert({
         content: text,
         image_url: imageUrl,
         user_id: profile.user_id,
@@ -433,8 +427,7 @@ export const AdminCommunity = () => {
 
   const deleteMessageMutation = useMutation({
     mutationFn: async (id: string) => {
-      // Admins should be able to delete any message
-      const { error } = await supabase.from('community_messages').update({ is_deleted: true }).eq('id', id);
+      const { error } = await (supabase as any).from('community_messages').update({ is_deleted: true }).eq('id', id);
       if (error) throw error;
       return id;
     },
@@ -451,12 +444,12 @@ export const AdminCommunity = () => {
       const existingReaction = messages.find(m => m.id === msgId)?.message_likes.find(l => l.user_id === profile?.user_id);
       if (existingReaction) {
         if (existingReaction.reaction_type === type) {
-          await supabase.from('message_likes').delete().match({ message_id: msgId, user_id: profile?.user_id });
+          await (supabase as any).from('message_likes').delete().match({ message_id: msgId, user_id: profile?.user_id });
         } else {
-          await supabase.from('message_likes').update({ reaction_type: type }).match({ message_id: msgId, user_id: profile?.user_id });
+          await (supabase as any).from('message_likes').update({ reaction_type: type }).match({ message_id: msgId, user_id: profile?.user_id });
         }
       } else {
-        await supabase.from('message_likes').insert({ message_id: msgId, user_id: profile?.user_id, reaction_type: type });
+        await (supabase as any).from('message_likes').insert({ message_id: msgId, user_id: profile?.user_id, reaction_type: type });
       }
     },
     onSuccess: () => {
@@ -477,7 +470,6 @@ export const AdminCommunity = () => {
   const handleDateSelect = (date: Date | undefined) => {
     if (!date) return;
     setCalendarDate(date);
-    setIsCalendarOpen(false);
     const dateId = format(date, 'yyyy-MM-dd');
     const element = document.getElementById(`date-${dateId}`);
     if (element) {
@@ -488,117 +480,175 @@ export const AdminCommunity = () => {
     }
   };
 
-  return (
-    <div className="flex h-[100dvh] w-full bg-[#fdfbf7] relative overflow-hidden">
-      <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
-        <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
-          <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Megaphone className="h-5 w-5 text-red-600" /> Admin Chat</h2>
-        </div>
-        <ScrollArea className="flex-1">
-          <div className="p-2 space-y-1">
-            {isLoadingGroups ? <div className="p-6 text-center text-gray-500"><Loader2 className="animate-spin mx-auto" /></div> : 
-             allGroups.map((group) => (
-              <div key={`${group.batch_name}-${group.subject_name}`} onClick={() => setSelectedGroup(group)}
-                className={`p-3 rounded-lg cursor-pointer transition-colors flex items-center gap-3 ${selectedGroup?.batch_name === group.batch_name && selectedGroup?.subject_name === group.subject_name ? 'bg-teal-50 border-teal-200 border' : 'hover:bg-gray-100 border border-transparent'}`}>
-                <div className="h-10 w-10 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold shrink-0">{group.subject_name[0]}</div>
-                <div className="overflow-hidden text-left"><p className="font-semibold text-gray-900 truncate">{group.subject_name}</p><p className="text-xs text-gray-500 truncate">{group.batch_name}</p></div>
-              </div>
-            ))}
-          </div>
-        </ScrollArea>
-      </div>
+  const showChatView = isMobile ? selectedGroup !== null : true;
+  const showSidebar = isMobile ? selectedGroup === null : true;
 
-      {!selectedGroup && (
-        <div className={`flex-1 flex flex-col items-center justify-center bg-gray-50 text-gray-400 ${isMobile ? 'hidden' : 'flex'}`}>
-          <Users className="h-10 w-10 text-teal-200 mb-4" />
-          <p className="text-lg font-medium text-gray-600">Select a group to manage</p>
+  return (
+    <div className="flex h-full w-full bg-background overflow-hidden">
+      
+      {/* SIDEBAR */}
+      {showSidebar && (
+        <div className={`bg-card border-r border-border flex flex-col h-full ${isMobile ? 'w-full' : 'w-72 flex-shrink-0'}`}>
+          <div className="p-4 border-b border-border bg-muted/30 flex-shrink-0">
+            <h2 className="font-bold text-lg flex items-center gap-2 text-foreground">
+              <Megaphone className="h-5 w-5 text-destructive" /> 
+              Admin Chat
+            </h2>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-2 space-y-1">
+              {isLoadingGroups ? (
+                <div className="p-6 text-center text-muted-foreground">
+                  <Loader2 className="animate-spin mx-auto" />
+                </div>
+              ) : (
+                allGroups.map((group) => (
+                  <div 
+                    key={`${group.batch_name}-${group.subject_name}`} 
+                    onClick={() => setSelectedGroup(group)}
+                    className={`p-3 rounded-lg cursor-pointer transition-colors flex items-center gap-3 ${
+                      selectedGroup?.batch_name === group.batch_name && selectedGroup?.subject_name === group.subject_name 
+                        ? 'bg-primary/10 border-primary/30 border' 
+                        : 'hover:bg-muted border border-transparent'
+                    }`}
+                  >
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold shrink-0">
+                      {group.subject_name[0]}
+                    </div>
+                    <div className="overflow-hidden text-left">
+                      <p className="font-semibold text-foreground truncate">{group.subject_name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{group.batch_name}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      {selectedGroup && (
-        <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-[#fdfbf7]' : 'w-full'}`}>
-          <div className="px-4 py-3 bg-white border-b flex items-center justify-between shadow-sm z-20 relative">
+      {/* EMPTY STATE */}
+      {!isMobile && !selectedGroup && (
+        <div className="flex-1 flex flex-col items-center justify-center bg-muted/20 text-muted-foreground">
+          <Users className="h-10 w-10 text-primary/30 mb-4" />
+          <p className="text-lg font-medium text-foreground/60">Select a group to manage</p>
+        </div>
+      )}
+
+      {/* CHAT AREA */}
+      {showChatView && selectedGroup && (
+        <div className={`flex flex-col h-full ${isMobile ? 'fixed inset-0 z-50 bg-background' : 'flex-1'}`}>
+          
+          {/* Fixed Header */}
+          <div className="px-4 py-3 bg-card border-b border-border flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-3">
-              {isMobile && <Button variant="ghost" size="icon" onClick={() => { setSelectedGroup(null); }}><ArrowLeft className="h-5 w-5" /></Button>}
-              <Avatar className="h-9 w-9 border border-gray-200">
-                <AvatarFallback className="bg-teal-600 text-white font-bold rounded-full">{selectedGroup.subject_name[0]}</AvatarFallback>
+              {isMobile && (
+                <Button variant="ghost" size="icon" onClick={() => setSelectedGroup(null)} className="-ml-2 mr-1">
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+              )}
+              <Avatar className="h-9 w-9 border border-border">
+                <AvatarFallback className="bg-primary text-primary-foreground font-bold">
+                  {selectedGroup.subject_name[0]}
+                </AvatarFallback>
               </Avatar>
               <div>
-                <h3 className="font-bold text-gray-800 leading-none flex items-center gap-2 text-base">
+                <h3 className="font-bold text-foreground leading-none text-base">
                   {selectedGroup.subject_name}
                 </h3>
-                <p className="text-xs text-gray-500 font-medium mt-0.5">{selectedGroup.batch_name} (Admin View)</p>
+                <p className="text-xs text-muted-foreground font-medium mt-0.5">
+                  {selectedGroup.batch_name} (Admin View)
+                </p>
               </div>
             </div>
           </div>
 
-          <div className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: `url('/logoofficial.png')`, backgroundSize: '60px', backgroundRepeat: 'repeat', backgroundPosition: 'center' }} />
+          {/* Watermark */}
+          <div 
+            className="absolute inset-0 z-0 opacity-[0.02] pointer-events-none"
+            style={{ backgroundImage: `url('/logoofficial.png')`, backgroundSize: '60px', backgroundRepeat: 'repeat', backgroundPosition: 'center' }} 
+          />
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 z-10 pb-24 md:pb-4" ref={scrollAreaRef}>
+          {/* Scrollable Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 z-10" ref={scrollAreaRef}>
             <div className="flex justify-center mb-6 mt-2">
-                <div className="text-gray-400 text-[10px] font-medium flex items-center gap-1.5 select-none bg-gray-200/50 px-3 py-1 rounded-full border border-gray-200 backdrop-blur-sm">
-                    <Lock className="h-3 w-3" />
-                    <span>Messages are end-to-end encrypted. No one outside of this chat can read them.</span>
-                </div>
+              <div className="text-muted-foreground text-[10px] font-medium flex items-center gap-1.5 select-none bg-muted/50 px-3 py-1 rounded-full border border-border backdrop-blur-sm">
+                <Lock className="h-3 w-3" />
+                <span>Messages are end-to-end encrypted.</span>
+              </div>
             </div>
 
-            {isLoadingMessages ? <div className="flex justify-center p-10"><Loader2 className="animate-spin h-8 w-8 text-teal-400" /></div> : 
-             Object.keys(groupedMessages).length === 0 ? <div className="text-center py-20 text-gray-400 text-sm">No messages yet. Break the ice!</div> :
-             Object.entries(groupedMessages).map(([dateKey, dateMessages]) => (
-               <div key={dateKey} id={`date-${dateKey}`} className="space-y-3">
-                 <div className="flex justify-center sticky top-0 z-10 py-2">
-                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                        <PopoverTrigger asChild>
-                            <div className="bg-white/90 backdrop-blur border border-gray-200 text-gray-500 text-[11px] font-medium px-3 py-0.5 rounded-full shadow-sm cursor-pointer hover:bg-gray-50 transition-colors select-none">
-                                {isToday(parseISO(dateKey)) ? 'Today' : isYesterday(parseISO(dateKey)) ? 'Yesterday' : format(parseISO(dateKey), 'MMMM d, yyyy')}
-                            </div>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 bg-white" align="center">
-                            <Calendar
-                                mode="single"
-                                selected={calendarDate}
-                                onSelect={handleDateSelect}
-                                initialFocus
-                                modifiers={{ highlighted: activeDates }}
-                                modifiersStyles={{ highlighted: { fontWeight: 'bold', color: '#4a3728', textDecoration: 'underline' } }}
-                            />
-                        </PopoverContent>
+            {isLoadingMessages ? (
+              <div className="flex justify-center p-10">
+                <Loader2 className="animate-spin h-8 w-8 text-primary/50" />
+              </div>
+            ) : Object.keys(groupedMessages).length === 0 ? (
+              <div className="text-center py-20 text-muted-foreground text-sm">
+                No messages yet. Break the ice!
+              </div>
+            ) : (
+              Object.entries(groupedMessages).map(([dateKey, dateMessages]) => (
+                <div key={dateKey} id={`date-${dateKey}`} className="space-y-3">
+                  <div className="flex justify-center sticky top-0 z-10 py-2">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <div className="bg-card/90 backdrop-blur border border-border text-muted-foreground text-[11px] font-medium px-3 py-0.5 rounded-full shadow-sm cursor-pointer hover:bg-muted transition-colors select-none">
+                          {isToday(parseISO(dateKey)) ? 'Today' : isYesterday(parseISO(dateKey)) ? 'Yesterday' : format(parseISO(dateKey), 'MMMM d, yyyy')}
+                        </div>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0 bg-card" align="center">
+                        <Calendar
+                          mode="single"
+                          selected={calendarDate}
+                          onSelect={handleDateSelect}
+                          initialFocus
+                          modifiers={{ highlighted: activeDates }}
+                          modifiersStyles={{ highlighted: { fontWeight: 'bold', textDecoration: 'underline' } }}
+                        />
+                      </PopoverContent>
                     </Popover>
-                 </div>
-                 <AnimatePresence>
-                 {dateMessages.map((msg) => (
-                    <MessageItemAdmin
-                       key={msg.id}
-                       msg={msg}
-                       isMe={msg.user_id === profile?.user_id}
-                       replyData={messageMap.get(msg.reply_to_id || '')} // Admin map has all messages
-                       replyText={messageMap.get(msg.reply_to_id || '')?.content || 'Message'}
-                       onReply={setReplyingTo}
-                       onDelete={(id) => setDeleteId(id)}
-                       onReact={(msgId, type) => toggleReactionMutation.mutate({ msgId, type })}
-                       profile={profile}
-                     />
-                 ))}
-                 </AnimatePresence>
-               </div>
-             ))}
-             <div ref={messagesEndRef} />
+                  </div>
+                  <AnimatePresence>
+                    {dateMessages.map((msg) => (
+                      <MessageItemAdmin
+                        key={msg.id}
+                        msg={msg}
+                        isMe={msg.user_id === profile?.user_id}
+                        replyData={messageMap.get(msg.reply_to_id || '')}
+                        replyText={messageMap.get(msg.reply_to_id || '')?.content || 'Message'}
+                        onReply={setReplyingTo}
+                        onDelete={(id) => setDeleteId(id)}
+                        onReact={(msgId, type) => toggleReactionMutation.mutate({ msgId, type })}
+                        profile={profile}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </div>
+              ))
+            )}
+            <div ref={messagesEndRef} />
           </div>
 
-          <div className="p-3 md:p-4 bg-white border-t z-20">
+          {/* Fixed Input Area */}
+          <div className="p-3 bg-card border-t border-border flex-shrink-0 z-20">
             {replyingTo && (
-              <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg mb-3 border-l-4 border-teal-500">
+              <div className="flex items-center justify-between bg-muted p-3 rounded-lg mb-3 border-l-4 border-primary">
                 <div className="flex flex-col px-2">
-                    <span className="text-xs font-bold text-teal-600">Replying to...</span>
-                    <span className="text-xs text-gray-500 truncate">{replyingTo.content}</span>
+                  <span className="text-xs font-bold text-primary">Replying to...</span>
+                  <span className="text-xs text-muted-foreground truncate">{replyingTo.content}</span>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => setReplyingTo(null)}><X className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" onClick={() => setReplyingTo(null)}>
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
             )}
 
-            <div className="flex items-end gap-2 bg-gray-50 p-2 rounded-xl border border-gray-200">
+            <div className="flex items-end gap-2 bg-muted p-2 rounded-xl border border-border">
               <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={(e) => e.target.files && setSelectedImage(e.target.files[0])} />
-              <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()}><Paperclip className="h-5 w-5 text-gray-500" /></Button>
+              <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()}>
+                <Paperclip className="h-5 w-5 text-muted-foreground" />
+              </Button>
               
               <Input 
                 value={messageText} 
@@ -615,10 +665,14 @@ export const AdminCommunity = () => {
                 className="h-10 w-10 rounded-lg data-[state=on]:bg-rose-100 data-[state=on]:text-rose-600" 
                 aria-label="Toggle priority"
               >
-                <AlertCircle className={`h-5 w-5 ${isPriority ? 'fill-rose-600 text-rose-600' : 'text-gray-400'}`} />
+                <AlertCircle className={`h-5 w-5 ${isPriority ? 'fill-rose-600 text-rose-600' : 'text-muted-foreground'}`} />
               </Toggle>
 
-              <Button onClick={handleSend} disabled={(!messageText.trim() && !selectedImage) || isUploading} className={`h-10 w-10 p-0 rounded-lg ${isPriority ? 'bg-rose-600 hover:bg-rose-700' : 'bg-teal-700 hover:bg-teal-800'}`}>
+              <Button 
+                onClick={handleSend} 
+                disabled={(!messageText.trim() && !selectedImage) || isUploading} 
+                className={`h-10 w-10 p-0 rounded-lg ${isPriority ? 'bg-rose-600 hover:bg-rose-700' : ''}`}
+              >
                 {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5 ml-0.5" />}
               </Button>
             </div>
@@ -626,14 +680,16 @@ export const AdminCommunity = () => {
           
           <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
             <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Message?</AlertDialogTitle>
-                    <AlertDialogDescription>This message will be removed for everyone.</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => deleteId && deleteMessageMutation.mutate(deleteId)} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
-                </AlertDialogFooter>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Message?</AlertDialogTitle>
+                <AlertDialogDescription>This message will be removed for everyone.</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={() => deleteId && deleteMessageMutation.mutate(deleteId)} className="bg-destructive hover:bg-destructive/90">
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
         </div>

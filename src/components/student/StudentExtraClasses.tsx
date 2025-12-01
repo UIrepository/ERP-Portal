@@ -1,4 +1,3 @@
-
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -8,21 +7,38 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Calendar, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 
+interface ExtraClass {
+  id: string;
+  subject: string;
+  batch: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  reason?: string;
+  link?: string;
+}
+
 export const StudentExtraClasses = () => {
   const { profile } = useAuth();
 
   const { data: extraClasses } = useQuery({
-    queryKey: ['student-extra-classes'],
-    queryFn: async () => {
-      const { data } = await supabase
+    queryKey: ['student-extra-classes', profile?.batch, profile?.subjects],
+    queryFn: async (): Promise<ExtraClass[]> => {
+      // Using type assertion since extra_classes table may not be in generated types
+      const { data, error } = await (supabase as any)
         .from('extra_classes')
         .select('*')
-        .eq('batch', profile?.batch)
+        .eq('batch', profile?.batch?.[0])
         .in('subject', profile?.subjects || [])
         .order('date', { ascending: true });
-      return data || [];
+      
+      if (error) {
+        console.error('Error fetching extra classes:', error);
+        return [];
+      }
+      return (data || []) as ExtraClass[];
     },
-    enabled: !!profile?.batch && !!profile?.subjects
+    enabled: !!profile?.batch?.length && !!profile?.subjects?.length
   });
 
   const upcomingClasses = extraClasses?.filter(cls => new Date(cls.date) >= new Date()) || [];
@@ -33,7 +49,7 @@ export const StudentExtraClasses = () => {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Extra Classes</h2>
         <div className="flex gap-2">
-          <Badge variant="outline">Batch: {profile?.batch}</Badge>
+          <Badge variant="outline">Batch: {profile?.batch?.join(', ')}</Badge>
           <Badge variant="outline">Subjects: {profile?.subjects?.join(', ')}</Badge>
         </div>
       </div>

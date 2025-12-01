@@ -32,10 +32,11 @@ export const StudentChatTeacher = () => {
   const { data: teachers } = useQuery({
     queryKey: ['batch-teachers'],
     queryFn: async () => {
+      // Using type assertion since 'teacher' role might not be in generated types
       const { data } = await supabase
         .from('profiles')
         .select('*')
-        .eq('role', 'teacher')
+        .eq('role', 'teacher' as any)
         .eq('batch', profile?.batch)
         .contains('subjects', profile?.subjects || []);
       return data || [];

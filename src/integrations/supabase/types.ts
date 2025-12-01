@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.12 (cd3cf9e)"
@@ -20,7 +20,7 @@ export type Database = {
           created_at: string | null
           details: Json | null
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           resource_id: string | null
           resource_type: string | null
           user_agent: string | null
@@ -31,7 +31,7 @@ export type Database = {
           created_at?: string | null
           details?: Json | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           resource_id?: string | null
           resource_type?: string | null
           user_agent?: string | null
@@ -42,7 +42,7 @@ export type Database = {
           created_at?: string | null
           details?: Json | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           resource_id?: string | null
           resource_type?: string | null
           user_agent?: string | null
@@ -112,153 +112,162 @@ export type Database = {
         }
         Relationships: []
       }
-      chat_logs: {
+      community_messages: {
         Row: {
           batch: string
+          content: string | null
+          created_at: string
           id: string
-          message: string
-          receiver_id: string | null
-          sender_id: string | null
+          image_url: string | null
+          is_deleted: boolean | null
+          is_priority: boolean | null
+          reply_to_id: string | null
           subject: string
-          timestamp: string
+          user_id: string
         }
         Insert: {
           batch: string
+          content?: string | null
+          created_at?: string
           id?: string
-          message: string
-          receiver_id?: string | null
-          sender_id?: string | null
+          image_url?: string | null
+          is_deleted?: boolean | null
+          is_priority?: boolean | null
+          reply_to_id?: string | null
           subject: string
-          timestamp?: string
+          user_id: string
         }
         Update: {
           batch?: string
+          content?: string | null
+          created_at?: string
           id?: string
-          message?: string
-          receiver_id?: string | null
-          sender_id?: string | null
+          image_url?: string | null
+          is_deleted?: boolean | null
+          is_priority?: boolean | null
+          reply_to_id?: string | null
           subject?: string
-          timestamp?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_messages_reply_to_id_fkey"
+            columns: ["reply_to_id"]
+            isOneToOne: false
+            referencedRelation: "community_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      debug_logs: {
+        Row: {
+          created_at: string | null
+          id: number
+          message: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: number
+          message?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: number
+          message?: string | null
         }
         Relationships: []
       }
-      chat_messages: {
+      doubt_answers: {
         Row: {
-          batch: string
+          answer_text: string
           created_at: string
+          doubt_id: string
           id: string
-          message: string
-          receiver_role: string
-          sender_id: string
-          sender_name: string
-          subject: string
+          user_id: string
         }
         Insert: {
-          batch: string
+          answer_text: string
           created_at?: string
+          doubt_id: string
           id?: string
-          message: string
-          receiver_role: string
-          sender_id: string
-          sender_name: string
-          subject: string
+          user_id: string
         }
         Update: {
-          batch?: string
+          answer_text?: string
           created_at?: string
+          doubt_id?: string
           id?: string
-          message?: string
-          receiver_role?: string
-          sender_id?: string
-          sender_name?: string
-          subject?: string
+          user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "doubt_answers_doubt_id_fkey"
+            columns: ["doubt_id"]
+            isOneToOne: false
+            referencedRelation: "doubts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doubt_answers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       doubts: {
         Row: {
-          id: string;
-          recording_id: string;
-          user_id: string;
-          question_text: string;
-          created_at: string;
-          batch: string;
-          subject: string;
-        };
+          batch: string | null
+          created_at: string
+          id: string
+          question_text: string
+          recording_id: string
+          subject: string | null
+          user_id: string
+        }
         Insert: {
-          id?: string;
-          recording_id: string;
-          user_id: string;
-          question_text: string;
-          created_at?: string;
-          batch: string;
-          subject: string;
-        };
+          batch?: string | null
+          created_at?: string
+          id?: string
+          question_text: string
+          recording_id: string
+          subject?: string | null
+          user_id: string
+        }
         Update: {
-          id?: string;
-          recording_id?: string;
-          user_id?: string;
-          question_text?: string;
-          created_at?: string;
-          batch?: string;
-          subject?: string;
-        };
+          batch?: string | null
+          created_at?: string
+          id?: string
+          question_text?: string
+          recording_id?: string
+          subject?: string | null
+          user_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "doubts_recording_id_fkey";
-            columns: ["recording_id"];
-            isOneToOne: false;
-            referencedRelation: "recordings";
-            referencedColumns: ["id"];
+            foreignKeyName: "doubts_recording_id_fkey"
+            columns: ["recording_id"]
+            isOneToOne: false
+            referencedRelation: "recordings"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "doubts_user_id_fkey";
-            columns: ["user_id"];
-            isOneToOne: false;
-            referencedRelation: "profiles";
-            referencedColumns: ["user_id"];
-          }
-        ];
-      };
-      doubt_answers: {
-        Row: {
-          id: string;
-          doubt_id: string;
-          user_id: string;
-          answer_text: string;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          doubt_id: string;
-          user_id: string;
-          answer_text: string;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          doubt_id?: string;
-          user_id?: string;
-          answer_text?: string;
-          created_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "doubt_answers_doubt_id_fkey";
-            columns: ["doubt_id"];
-            isOneToOne: false;
-            referencedRelation: "doubts";
-            referencedColumns: ["id"];
+            foreignKeyName: "doubts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
-          {
-            foreignKeyName: "doubt_answers_user_id_fkey";
-            columns: ["user_id"];
-            isOneToOne: false;
-            referencedRelation: "profiles";
-            referencedColumns: ["user_id"];
-          }
-        ];
-      };
+        ]
+      }
       dpp_content: {
         Row: {
           batch: string
@@ -331,48 +340,6 @@ export type Database = {
         }
         Relationships: []
       }
-      extra_classes: {
-        Row: {
-          batch: string
-          created_at: string
-          created_by: string | null
-          date: string
-          end_time: string
-          id: string
-          link: string | null
-          reason: string | null
-          start_time: string
-          subject: string
-          updated_at: string
-        }
-        Insert: {
-          batch: string
-          created_at?: string
-          created_by?: string | null
-          date: string
-          end_time: string
-          id?: string
-          link?: string | null
-          reason?: string | null
-          start_time: string
-          subject: string
-          updated_at?: string
-        }
-        Update: {
-          batch?: string
-          created_at?: string
-          created_by?: string | null
-          date?: string
-          end_time?: string
-          id?: string
-          link?: string | null
-          reason?: string | null
-          start_time?: string
-          subject?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       feedback: {
         Row: {
           batch: string
@@ -415,36 +382,6 @@ export type Database = {
         }
         Relationships: []
       }
-      founder_chat_messages: {
-        Row: {
-          created_at: string
-          id: string
-          is_from_student: boolean
-          message: string
-          student_batch: string
-          student_id: string
-          student_name: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          is_from_student?: boolean
-          message: string
-          student_batch: string
-          student_id: string
-          student_name: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          is_from_student?: boolean
-          message?: string
-          student_batch?: string
-          student_id?: string
-          student_name?: string
-        }
-        Relationships: []
-      }
       meeting_links: {
         Row: {
           batch: string
@@ -471,6 +408,45 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      message_likes: {
+        Row: {
+          created_at: string | null
+          id: string
+          message_id: string
+          reaction_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message_id: string
+          reaction_type?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message_id?: string
+          reaction_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_likes_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "community_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_likes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       notes: {
         Row: {
@@ -512,36 +488,42 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          created_by_name: string | null
           id: string
           is_active: boolean
           message: string
           target_batch: string | null
           target_role: Database["public"]["Enums"]["user_role"] | null
           target_subject: string | null
+          target_user_id: string | null
           title: string
           updated_at: string
         }
         Insert: {
           created_at?: string
           created_by?: string | null
+          created_by_name?: string | null
           id?: string
           is_active?: boolean
           message: string
           target_batch?: string | null
           target_role?: Database["public"]["Enums"]["user_role"] | null
           target_subject?: string | null
+          target_user_id?: string | null
           title: string
           updated_at?: string
         }
         Update: {
           created_at?: string
           created_by?: string | null
+          created_by_name?: string | null
           id?: string
           is_active?: boolean
           message?: string
           target_batch?: string | null
           target_role?: Database["public"]["Enums"]["user_role"] | null
           target_subject?: string | null
+          target_user_id?: string | null
           title?: string
           updated_at?: string
         }
@@ -558,7 +540,7 @@ export type Database = {
           is_active: boolean
           name: string
           premium_access: boolean | null
-          role: Database["public"]["Enums"]["user_role"]
+          role: Database["public"]["Enums"]["user_role"] | null
           subjects: string[] | null
           updated_at: string
           user_id: string
@@ -573,7 +555,7 @@ export type Database = {
           is_active?: boolean
           name: string
           premium_access?: boolean | null
-          role?: Database["public"]["Enums"]["user_role"]
+          role?: Database["public"]["Enums"]["user_role"] | null
           subjects?: string[] | null
           updated_at?: string
           user_id: string
@@ -588,7 +570,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           premium_access?: boolean | null
-          role?: Database["public"]["Enums"]["user_role"]
+          role?: Database["public"]["Enums"]["user_role"] | null
           subjects?: string[] | null
           updated_at?: string
           user_id?: string
@@ -632,6 +614,7 @@ export type Database = {
         Row: {
           batch: string
           created_at: string
+          date: string | null
           day_of_week: number
           end_time: string
           id: string
@@ -643,6 +626,7 @@ export type Database = {
         Insert: {
           batch: string
           created_at?: string
+          date?: string | null
           day_of_week: number
           end_time: string
           id?: string
@@ -654,6 +638,7 @@ export type Database = {
         Update: {
           batch?: string
           created_at?: string
+          date?: string | null
           day_of_week?: number
           end_time?: string
           id?: string
@@ -662,71 +647,75 @@ export type Database = {
           subject?: string
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "fk_schedule_meeting_link"
-            columns: ["link"]
-            isOneToOne: false
-            referencedRelation: "meeting_links"
-            referencedColumns: ["link"]
-          },
-        ]
+        Relationships: []
       }
       student_activities: {
         Row: {
           activity_type: string
+          batch: string | null
           created_at: string
           description: string
           id: string
           metadata: Json | null
+          subject: string | null
           user_id: string
         }
         Insert: {
           activity_type: string
+          batch?: string | null
           created_at?: string
           description: string
           id?: string
           metadata?: Json | null
+          subject?: string | null
           user_id: string
         }
         Update: {
           activity_type?: string
+          batch?: string | null
           created_at?: string
           description?: string
           id?: string
           metadata?: Json | null
+          subject?: string | null
           user_id?: string
         }
         Relationships: []
       }
       ui_ki_padhai_content: {
         Row: {
+          batch: string | null
           category: string | null
           created_at: string | null
           description: string | null
           id: string
           is_active: boolean | null
           link: string
+          subject: string | null
           title: string
           updated_at: string | null
         }
         Insert: {
+          batch?: string | null
           category?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
           link: string
+          subject?: string | null
           title: string
           updated_at?: string | null
         }
         Update: {
+          batch?: string | null
           category?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
           link?: string
+          subject?: string | null
           title?: string
           updated_at?: string | null
         }
@@ -757,13 +746,21 @@ export type Database = {
           subject_name?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_enrollments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       user_sessions: {
         Row: {
           device_info: string | null
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           is_active: boolean | null
           last_activity: string | null
           login_time: string | null
@@ -772,7 +769,7 @@ export type Database = {
         Insert: {
           device_info?: string | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           is_active?: boolean | null
           last_activity?: string | null
           login_time?: string | null
@@ -781,7 +778,7 @@ export type Database = {
         Update: {
           device_info?: string | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           is_active?: boolean | null
           last_activity?: string | null
           login_time?: string | null
@@ -794,67 +791,86 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_expired_chat_images: { Args: never; Returns: undefined }
       get_all_options: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
-          type: string
           name: string
+          type: string
         }[]
       }
       get_current_ongoing_class: {
         Args: { user_batch: string; user_subjects: string[] }
         Returns: {
-          subject: string
           batch: string
-          start_time: string
           end_time: string
           meeting_link: string
+          start_time: string
+          subject: string
         }[]
       }
-      get_current_user_batch: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      get_current_user_batch: { Args: never; Returns: string }
       get_current_user_role: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
-      get_current_user_subjects: {
-        Args: Record<PropertyKey, never>
-        Returns: string[]
-      }
+      get_current_user_subjects: { Args: never; Returns: string[] }
       get_schedules_with_links_filtered_by_enrollment: {
         Args: {
-          p_user_id: string
-          p_day_of_week?: number
           p_current_time?: string
+          p_day_of_week?: number
           p_is_active_link?: boolean
+          p_target_date?: string
+          p_user_id: string
         }
         Returns: {
-          id: string
-          subject: string
           batch: string
-          day_of_week: number
-          start_time: string
-          end_time: string
-          link: string
           created_at: string
-          updated_at: string
+          date: string
+          day_of_week: number
+          end_time: string
+          id: string
+          link: string
           meeting_link_url: string
+          start_time: string
+          subject: string
+          updated_at: string
         }[]
+      }
+      get_upcoming_classes_for_teacher: {
+        Args: { p_user_id: string }
+        Returns: {
+          batch: string
+          created_at: string
+          date: string | null
+          day_of_week: number
+          end_time: string
+          id: string
+          link: string | null
+          start_time: string
+          subject: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "schedules"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       update_profile_allotment: {
         Args: {
-          p_user_email: string
           p_new_batches: string[]
           p_new_subjects: string[]
+          p_user_email: string
         }
         Returns: undefined
       }
     }
     Enums: {
       exam_type: "mock" | "final" | "practice"
-      user_role: "student" | "teacher" | "super_admin"
+      user_role: "student" | "super_admin"
+      user_role_old: "student" | "teacher" | "super_admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -983,7 +999,8 @@ export const Constants = {
   public: {
     Enums: {
       exam_type: ["mock", "final", "practice"],
-      user_role: ["student", "teacher", "super_admin"],
+      user_role: ["student", "super_admin"],
+      user_role_old: ["student", "teacher", "super_admin"],
     },
   },
 } as const
