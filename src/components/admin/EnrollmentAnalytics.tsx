@@ -91,23 +91,41 @@ export const EnrollmentAnalytics = () => {
   }, [queryClient]);
 
   // --- Data Fetching ---
-  const { data: enrollments = [], isLoading: isLoadingEnrollments, isError, error } = useQuery<Enrollment[]>({
+  const { data: enrollments = [], isLoading: isLoadingEnrollments, isError, error } = useQuery({
     queryKey: ['enrollment-analytics-enrollments'],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryFn: async (): Promise<Enrollment[]> => {
+      // Fetch enrollments
+      const { data: enrollmentData, error: enrollmentError } = await supabase
         .from('user_enrollments')
-        .select(`
-          batch_name,
-          subject_name,
-          profiles ( name, email )
-        `);
+        .select('batch_name, subject_name, user_id');
 
-      if (error) {
-          console.error("Error fetching enrollments:", error)
-          throw error;
-      };
+      if (enrollmentError) {
+          console.error("Error fetching enrollments:", enrollmentError)
+          throw enrollmentError;
+      }
+
+      // Fetch profiles separately
+      const userIds = [...new Set(enrollmentData?.map(e => e.user_id) || [])];
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id, name, email')
+        .in('user_id', userIds);
+
+      if (profilesError) {
+          console.error("Error fetching profiles:", profilesError)
+          throw profilesError;
+      }
+
+      // Join the data manually
+      const profilesMap = new Map(profilesData?.map(p => [p.user_id, { name: p.name, email: p.email }]) || []);
       
-      return data.filter(e => e.profiles) as Enrollment[];
+      return (enrollmentData || [])
+        .map(e => ({
+          batch_name: e.batch_name,
+          subject_name: e.subject_name,
+          profiles: profilesMap.get(e.user_id) || null
+        }))
+        .filter(e => e.profiles !== null) as Enrollment[];
     },
   });
 
@@ -244,15 +262,14 @@ export const EnrollmentAnalytics = () => {
                       <Legend />
                         {analyticsData.allSubjects
                             .filter(subject => selectedSubject === 'all' || selectedSubject === subject)
-                            .map((subject, index, arr) => (
-                            <Bar key={subject} dataKey={subject} stackId="a" shape={<RoundedBar />}>
-                                {analyticsData.chartData.map((entry, entryIndex) => {
-                                    const isFirst = index === 0;
-                                    const isLast = index === arr.length - 1;
-                                    const radius: [number, number, number, number] = [isFirst ? 8 : 0, isLast ? 8 : 0, isLast ? 8 : 0, isFirst ? 8 : 0];
-                                    return <Cell key={`cell-${entryIndex}`} fill={COLORS[analyticsData.allSubjects.indexOf(subject) % COLORS.length]} radius={radius}/>
-                                })}
-                            </Bar>
+                            .map((subject, index) => (
+                            <Bar 
+                              key={subject} 
+                              dataKey={subject} 
+                              stackId="a" 
+                              fill={COLORS[analyticsData.allSubjects.indexOf(subject) % COLORS.length]}
+                              radius={[4, 4, 0, 0]}
+                            />
                         ))}
                     </BarChart>
                   </ResponsiveContainer>

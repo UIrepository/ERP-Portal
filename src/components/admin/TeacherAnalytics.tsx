@@ -19,10 +19,11 @@ export const TeacherAnalytics = () => {
   const { data: teachers = [], isLoading: isLoadingTeachers } = useQuery<TeacherProfile[]>({
     queryKey: ['teacher-analytics-profiles'],
     queryFn: async () => {
+      // Using type assertion since 'teacher' role might not be in generated types
       const { data, error } = await supabase
         .from('profiles')
         .select('batch, subjects')
-        .eq('role', 'teacher');
+        .eq('role', 'teacher' as any);
       if (error) throw error;
       return data || [];
     },
