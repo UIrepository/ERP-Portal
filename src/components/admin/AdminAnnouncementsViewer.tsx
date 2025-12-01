@@ -14,9 +14,9 @@ interface Announcement {
   title: string;
   message: string;
   created_at: string;
-  created_by_name: string | null;
-  target_batch: string | null;
-  target_subject: string | null;
+  created_by_name: string;
+  target_batch: string;
+  target_subject: string;
 }
 
 const AnnouncementSkeleton = () => (
@@ -41,19 +41,19 @@ const AnnouncementSkeleton = () => (
 export const AdminAnnouncementsViewer = () => {
     const queryClient = useQueryClient();
 
-    const { data: announcements, isLoading } = useQuery({
+    const { data: announcements, isLoading } = useQuery<Announcement[]>({
         queryKey: ['admin-all-announcements'],
-        queryFn: async (): Promise<Announcement[]> => {
+        queryFn: async () => {
             const { data, error } = await supabase
                 .from('notifications')
-                .select('id, title, message, created_at, created_by_name, target_batch, target_subject')
+                .select('*')
                 .order('created_at', { ascending: false });
             
             if (error) {
                 console.error("Error fetching announcements:", error);
                 throw error;
             }
-            return (data || []) as Announcement[];
+            return data || [];
         },
     });
 

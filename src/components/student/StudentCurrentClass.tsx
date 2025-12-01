@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -13,7 +13,7 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { ExternalLink, Clock, Calendar, Video, Radio, CheckCircle2, ArrowRight } from 'lucide-react';
+import { ExternalLink, Clock, Calendar, AlertTriangle, Video, Radio, CheckCircle2, ArrowRight } from 'lucide-react';
 import { format, differenceInSeconds, isSameDay } from 'date-fns';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -44,37 +44,45 @@ interface StudentCurrentClassProps {
     onTabChange: (tab: string) => void;
 }
 
-// --- Helper: Stateless Countdown (Fixes "Not Moving" Issue) ---
+// --- Helper: Countdown Timer ---
 const Countdown = ({ targetDate }: { targetDate: Date }) => {
-  // We use the current time directly since the parent re-renders this component every second.
-  // This prevents the interval cleanup bug that was freezing the timer.
-  const now = new Date();
-  const totalSeconds = differenceInSeconds(targetDate, now);
-  
-  if (totalSeconds <= 0) {
-      return <Badge className="bg-green-600 text-white animate-pulse">Live Now!</Badge>;
+  const calculateTimeLeft = () => {
+    const totalSeconds = differenceInSeconds(targetDate, new Date());
+    if (totalSeconds <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0, isLive: true, isStartingSoon: false };
+    const days = Math.floor(totalSeconds / (3600 * 24));
+    const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+    const isStartingSoon = days === 0 && hours === 0 && minutes < 15 && totalSeconds > 0;
+    return { days, hours, minutes, seconds, isLive: false, isStartingSoon };
+  };
+
+  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft);
+
+  useEffect(() => {
+    const timer = setInterval(() => setTimeLeft(calculateTimeLeft()), 1000);
+    return () => clearInterval(timer);
+  }, [targetDate]);
+
+  if (timeLeft.isLive) {
+    return <Badge className="bg-green-600 text-white animate-pulse">Live Now!</Badge>;
   }
 
-  const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = Math.floor(totalSeconds % 60);
-  const isStartingSoon = hours === 0 && minutes < 15;
-
   return (
-    <div className={`flex items-center gap-3 font-mono text-lg ${isStartingSoon ? 'text-orange-500 animate-pulse' : 'text-slate-700'}`}>
-      <div className="flex flex-col items-center bg-white border border-gray-200 px-3 py-1 rounded-md shadow-sm min-w-[60px]">
-         <span className="text-xl font-bold">{String(hours).padStart(2, '0')}</span>
-         <span className="text-[10px] text-gray-400 uppercase tracking-wider">Hrs</span>
+    <div className={`flex items-center gap-3 font-mono text-lg ${timeLeft.isStartingSoon ? 'text-orange-500 animate-pulse' : 'text-slate-700'}`}>
+      <div className="flex flex-col items-center bg-white border border-gray-200 px-3 py-1 rounded-md shadow-sm">
+         <span className="text-xl font-bold">{String(timeLeft.hours).padStart(2, '0')}</span>
+         <span className="text-[10px] text-gray-400 uppercase">Hrs</span>
       </div>
-      <span className="font-bold text-gray-300 pb-4">:</span>
-      <div className="flex flex-col items-center bg-white border border-gray-200 px-3 py-1 rounded-md shadow-sm min-w-[60px]">
-         <span className="text-xl font-bold">{String(minutes).padStart(2, '0')}</span>
-         <span className="text-[10px] text-gray-400 uppercase tracking-wider">Min</span>
+      <span className="font-bold text-gray-300">:</span>
+      <div className="flex flex-col items-center bg-white border border-gray-200 px-3 py-1 rounded-md shadow-sm">
+         <span className="text-xl font-bold">{String(timeLeft.minutes).padStart(2, '0')}</span>
+         <span className="text-[10px] text-gray-400 uppercase">Min</span>
       </div>
-      <span className="font-bold text-gray-300 pb-4">:</span>
-      <div className="flex flex-col items-center bg-white border border-gray-200 px-3 py-1 rounded-md shadow-sm min-w-[60px]">
-         <span className="text-xl font-bold text-indigo-600">{String(seconds).padStart(2, '0')}</span>
-         <span className="text-[10px] text-gray-400 uppercase tracking-wider">Sec</span>
+      <span className="font-bold text-gray-300">:</span>
+      <div className="flex flex-col items-center bg-white border border-gray-200 px-3 py-1 rounded-md shadow-sm">
+         <span className="text-xl font-bold text-primary">{String(timeLeft.seconds).padStart(2, '0')}</span>
+         <span className="text-[10px] text-gray-400 uppercase">Sec</span>
       </div>
     </div>
   );
@@ -85,7 +93,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   
-  // Real-time clock: This drives the whole page updates every second
+  // Real-time clock
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
@@ -128,7 +136,6 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
       const nowTime = new Date();
       const bufferMinutes = 15; 
       
-      // Strict Time Window Check
       const validClasses = data.filter((schedule: any) => {
           const [h, m] = schedule.start_time.split(':');
           const startTime = new Date(nowTime);
@@ -137,7 +144,6 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
           return nowTime >= validJoinTime; 
       });
 
-      // Strict Deduplication (Subject + Start Time)
       const uniqueMap = new Map();
       validClasses.forEach((cls: any) => {
           const key = `${cls.subject}-${cls.start_time}`;
@@ -179,7 +185,6 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
   const { pastClasses, futureClasses, nextClass } = useMemo(() => {
     if (!allSchedules) return { pastClasses: [], futureClasses: [], nextClass: null };
 
-    // Deduplicate Full List
     const uniqueSchedules = new Map();
     allSchedules.forEach(s => {
        const key = `${s.subject}-${s.start_time}`;
@@ -315,7 +320,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
                         </div>
                         
                         <div className="flex flex-col items-center justify-center bg-white p-6 rounded-2xl border border-indigo-100 shadow-sm min-w-[240px]">
-                            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-3">Starts In</p>
+                            <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-3">Starting In</p>
                             <Countdown targetDate={nextClass.nextOccurrence} />
                         </div>
 
@@ -323,7 +328,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
                              <Button 
                                 onClick={() => window.open(nextClass.meeting_link_url, '_blank')}
                                 size="lg"
-                                className="w-full md:w-auto shadow-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-8 h-12"
+                                className="w-full md:w-auto shadow-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-8"
                              >
                                 Open Class Link <ArrowRight className="ml-2 h-4 w-4" /> 
                              </Button>

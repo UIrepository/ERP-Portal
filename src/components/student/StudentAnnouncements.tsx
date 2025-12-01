@@ -12,9 +12,9 @@ interface Announcement {
   title: string;
   message: string;
   created_at: string;
-  created_by_name: string | null;
-  target_batch: string | null;
-  target_subject: string | null;
+  created_by_name: string;
+  target_batch: string;
+  target_subject: string;
 }
 
 interface UserEnrollment {
@@ -69,19 +69,19 @@ export const StudentAnnouncements = () => {
         enabled: !!profile?.user_id && profile.role === 'student',
     });
 
-    const { data: announcements, isLoading: isLoadingAnnouncements } = useQuery({
+    const { data: announcements, isLoading: isLoadingAnnouncements } = useQuery<Announcement[]>({
         queryKey: ['student-announcements', profile?.user_id],
-        queryFn: async (): Promise<Announcement[]> => {
+        queryFn: async () => {
             const { data, error } = await supabase
                 .from('notifications')
-                .select('id, title, message, created_at, created_by_name, target_batch, target_subject')
+                .select('*')
                 .order('created_at', { ascending: false });
             
             if (error) {
                 console.error("Error fetching announcements:", error);
                 throw error;
             }
-            return (data || []) as Announcement[];
+            return data || [];
         },
         enabled: !!profile?.user_id && profile.role === 'student' && !!userEnrollments && userEnrollments.length > 0,
     });

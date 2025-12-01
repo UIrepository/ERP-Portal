@@ -21,11 +21,10 @@ export const AdminTeacherManager = () => {
   const { data: teachers = [] } = useQuery({
     queryKey: ['admin-teachers'],
     queryFn: async () => {
-      // Using type assertion since 'teacher' role might not be in generated types
       const { data } = await supabase
         .from('profiles')
         .select('*')
-        .eq('role', 'teacher' as any)
+        .eq('role', 'teacher')
         .order('created_at', { ascending: false });
       return data || [];
     },
