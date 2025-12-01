@@ -25,9 +25,12 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <header className="border-b bg-card sticky top-0 z-30">
-        <div className="flex h-16 items-center justify-between px-4 sm:px-6">
+    // FIX: Use h-screen and overflow-hidden to prevent global window scrolling
+    <div className="flex flex-col h-screen bg-background overflow-hidden">
+      
+      {/* Header - Fixed height (flex-none) */}
+      <header className="border-b bg-card flex-none h-16 z-30">
+        <div className="flex h-full items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-4">
             {/* Mobile Sidebar Toggle */}
             <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
@@ -40,18 +43,16 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
               <SheetContent side="left" className="w-72 p-0">
                  <SheetHeader className="sr-only">
                     <SheetTitle>Sidebar Menu</SheetTitle>
-                    <SheetDescription>
-                        Navigate through the portal sections.
-                    </SheetDescription>
+                    <SheetDescription>Navigate through the portal sections.</SheetDescription>
                  </SheetHeader>
                  <Sidebar activeTab={activeTab} onTabChange={(tab) => {
                    onTabChange(tab);
-                   setIsSidebarOpen(false); // Close sidebar on tab change
+                   setIsSidebarOpen(false); 
                  }} />
               </SheetContent>
             </Sheet>
             
-            <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-12 w-auto hidden sm:block" />
+            <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-10 w-auto hidden sm:block" />
           </div>
           
           <div className="flex items-center space-x-4">
@@ -85,30 +86,17 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
         </div>
       </header>
 
+      {/* Main Content Area - Uses Flex to fill remaining height */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Desktop Sidebar */}
-        <aside className="hidden md:block h-full w-64 border-r">
+        {/* Desktop Sidebar - Fixed width */}
+        <aside className="hidden md:flex w-64 flex-col border-r bg-card h-full">
           <Sidebar activeTab={activeTab} onTabChange={onTabChange} />
         </aside>
         
-        {/* Main Content */}
-        <main className="flex-1 overflow-y-auto flex flex-col">
-            <div className="flex-1">
-                {children}
-            </div>
-            <footer className="py-6 border-t bg-card/30 mt-auto">
-                <p className="text-center text-sm text-muted-foreground font-medium">
-                    Built and Maintained by <a 
-                      href="https://www.neuralai.in/about" 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="hover:underline"
-                      style={{ fontFamily: '"Zen Dots", sans-serif' }}
-                    >
-                      <span className="text-teal-700">Neural</span> AI
-                    </a>
-                </p>
-            </footer>
+        {/* Main Viewport - No internal padding causing scroll, exact fit */}
+        <main className="flex-1 flex flex-col overflow-hidden relative w-full h-full">
+            {children}
+            {/* Footer removed from here to prevent floating issues in chat */}
         </main>
       </div>
     </div>
