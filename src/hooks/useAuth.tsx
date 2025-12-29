@@ -70,6 +70,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (session?.user) {
           // Fetch user profile and resolve role
           setTimeout(async () => {
+            // Call the role sync RPC to ensure user_id is linked and roles are synced
+            try {
+              await supabase.rpc('check_user_role_sync');
+            } catch (err) {
+              console.warn('Role sync check failed:', err);
+            }
+
             const { data: profileData } = await supabase
               .from('profiles')
               .select('*')

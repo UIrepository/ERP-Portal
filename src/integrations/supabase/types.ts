@@ -961,6 +961,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      check_user_role_sync: { Args: never; Returns: Json }
       delete_expired_chat_images: { Args: never; Returns: undefined }
       get_all_options: {
         Args: never
