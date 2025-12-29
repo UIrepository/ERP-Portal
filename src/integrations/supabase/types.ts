@@ -58,6 +58,30 @@ export type Database = {
           },
         ]
       }
+      admins: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          name: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          name: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          name?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       analytics_events: {
         Row: {
           batch: string | null
@@ -181,6 +205,33 @@ export type Database = {
           created_at?: string | null
           id?: number
           message?: string | null
+        }
+        Relationships: []
+      }
+      direct_messages: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          receiver_id: string
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          receiver_id: string
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          receiver_id?: string
+          sender_id?: string
         }
         Relationships: []
       }
@@ -379,6 +430,33 @@ export type Database = {
           subject?: string
           submitted_by?: string | null
           teacher_quality?: number
+        }
+        Relationships: []
+      }
+      managers: {
+        Row: {
+          assigned_batches: string[] | null
+          created_at: string | null
+          email: string
+          id: string
+          name: string
+          user_id: string | null
+        }
+        Insert: {
+          assigned_batches?: string[] | null
+          created_at?: string | null
+          email: string
+          id?: string
+          name: string
+          user_id?: string | null
+        }
+        Update: {
+          assigned_batches?: string[] | null
+          created_at?: string | null
+          email?: string
+          id?: string
+          name?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -610,6 +688,59 @@ export type Database = {
         }
         Relationships: []
       }
+      schedule_requests: {
+        Row: {
+          batch: string
+          created_at: string | null
+          id: string
+          new_date: string
+          new_end_time: string
+          new_start_time: string
+          reason: string | null
+          requested_by: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["schedule_request_status"] | null
+          subject: string
+        }
+        Insert: {
+          batch: string
+          created_at?: string | null
+          id?: string
+          new_date: string
+          new_end_time: string
+          new_start_time: string
+          reason?: string | null
+          requested_by: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["schedule_request_status"] | null
+          subject: string
+        }
+        Update: {
+          batch?: string
+          created_at?: string | null
+          id?: string
+          new_date?: string
+          new_end_time?: string
+          new_start_time?: string
+          reason?: string | null
+          requested_by?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["schedule_request_status"] | null
+          subject?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schedules: {
         Row: {
           batch: string
@@ -679,6 +810,36 @@ export type Database = {
           metadata?: Json | null
           subject?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      teachers: {
+        Row: {
+          assigned_batches: string[] | null
+          assigned_subjects: string[] | null
+          created_at: string | null
+          email: string
+          id: string
+          name: string
+          user_id: string | null
+        }
+        Insert: {
+          assigned_batches?: string[] | null
+          assigned_subjects?: string[] | null
+          created_at?: string | null
+          email: string
+          id?: string
+          name: string
+          user_id?: string | null
+        }
+        Update: {
+          assigned_batches?: string[] | null
+          assigned_subjects?: string[] | null
+          created_at?: string | null
+          email?: string
+          id?: string
+          name?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -815,6 +976,10 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"]
       }
       get_current_user_subjects: { Args: never; Returns: string[] }
+      get_manager_batches: {
+        Args: { check_user_id?: string }
+        Returns: string[]
+      }
       get_schedules_with_links_filtered_by_enrollment: {
         Args: {
           p_current_time?: string
@@ -837,6 +1002,14 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_teacher_batches: {
+        Args: { check_user_id?: string }
+        Returns: string[]
+      }
+      get_teacher_subjects: {
+        Args: { check_user_id?: string }
+        Returns: string[]
+      }
       get_upcoming_classes_for_teacher: {
         Args: { p_user_id: string }
         Returns: {
@@ -858,6 +1031,13 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_user_role_from_tables: {
+        Args: { check_user_id?: string }
+        Returns: string
+      }
+      is_admin: { Args: { check_user_id?: string }; Returns: boolean }
+      is_manager: { Args: { check_user_id?: string }; Returns: boolean }
+      is_teacher: { Args: { check_user_id?: string }; Returns: boolean }
       update_profile_allotment: {
         Args: {
           p_new_batches: string[]
@@ -869,6 +1049,7 @@ export type Database = {
     }
     Enums: {
       exam_type: "mock" | "final" | "practice"
+      schedule_request_status: "pending" | "approved" | "rejected"
       user_role: "student" | "super_admin"
       user_role_old: "student" | "teacher" | "super_admin"
     }
@@ -999,6 +1180,7 @@ export const Constants = {
   public: {
     Enums: {
       exam_type: ["mock", "final", "practice"],
+      schedule_request_status: ["pending", "approved", "rejected"],
       user_role: ["student", "super_admin"],
       user_role_old: ["student", "teacher", "super_admin"],
     },
