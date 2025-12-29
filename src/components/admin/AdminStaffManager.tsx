@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Plus, Trash2, User, Shield, Users, Loader2, Mail, Edit } from 'lucide-react';
+import { Plus, Trash2, User, Shield, Users, Loader2, Mail, Edit, Clock, CheckCircle } from 'lucide-react';
 
 export const AdminStaffManager = () => {
   const { user } = useAuth();
@@ -220,50 +220,67 @@ export const AdminStaffManager = () => {
 
     return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {staffList.map((staff) => (
-          <Card key={staff.id} className="hover:shadow-md transition-shadow">
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-primary/10 rounded-full">
-                    {type === 'admins' ? <Shield className="h-5 w-5 text-primary" /> : 
-                     type === 'managers' ? <Users className="h-5 w-5 text-primary" /> :
-                     <User className="h-5 w-5 text-primary" />}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">{staff.name}</h3>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
-                      <Mail className="h-3 w-3" />
-                      {staff.email}
+        {staffList.map((staff) => {
+          const hasSignedUp = !!staff.user_id;
+          return (
+            <Card key={staff.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-primary/10 rounded-full">
+                      {type === 'admins' ? <Shield className="h-5 w-5 text-primary" /> : 
+                       type === 'managers' ? <Users className="h-5 w-5 text-primary" /> :
+                       <User className="h-5 w-5 text-primary" />}
                     </div>
-                    {staff.assigned_batches?.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {staff.assigned_batches.map((batch: string) => (
-                          <Badge key={batch} variant="outline" className="text-xs">{batch}</Badge>
-                        ))}
+                    <div>
+                      <h3 className="font-semibold">{staff.name}</h3>
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                        <Mail className="h-3 w-3" />
+                        {staff.email}
                       </div>
-                    )}
-                    {staff.assigned_subjects?.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {staff.assigned_subjects.map((subject: string) => (
-                          <Badge key={subject} variant="secondary" className="text-xs">{subject}</Badge>
-                        ))}
+                      {/* Status Indicator */}
+                      <div className="mt-2">
+                        {hasSignedUp ? (
+                          <Badge variant="default" className="bg-green-500/20 text-green-700 border-green-500/30 hover:bg-green-500/30">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Active
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="bg-amber-500/20 text-amber-700 border-amber-500/30 hover:bg-amber-500/30">
+                            <Clock className="h-3 w-3 mr-1" />
+                            Pending Signup
+                          </Badge>
+                        )}
                       </div>
-                    )}
+                      {staff.assigned_batches?.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {staff.assigned_batches.map((batch: string) => (
+                            <Badge key={batch} variant="outline" className="text-xs">{batch}</Badge>
+                          ))}
+                        </div>
+                      )}
+                      {staff.assigned_subjects?.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {staff.assigned_subjects.map((subject: string) => (
+                            <Badge key={subject} variant="secondary" className="text-xs">{subject}</Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button size="icon" variant="ghost" onClick={() => openEditDialog(staff)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => deleteStaff.mutate(staff.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-                <div className="flex gap-1">
-                  <Button size="icon" variant="ghost" onClick={() => openEditDialog(staff)}>
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button size="icon" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => deleteStaff.mutate(staff.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     );
   };
