@@ -28,31 +28,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = React.useState(true);
   const [resolvedRole, setResolvedRole] = React.useState<ExtendedRole | null>(null);
 
-  // Function to resolve role from role-specific tables
-  const resolveUserRole = React.useCallback(async (userId: string): Promise<ExtendedRole> => {
-    // Check admin table first (highest privilege)
+  // Function to resolve role from role-specific tables (checks both user_id and email)
+  const resolveUserRole = React.useCallback(async (userId: string, userEmail: string): Promise<ExtendedRole> => {
+    // Check admin table first (highest privilege) - by user_id OR email
     const { data: adminData } = await supabase
       .from('admins')
       .select('id')
-      .eq('user_id', userId)
+      .or(`user_id.eq.${userId},email.eq.${userEmail}`)
       .maybeSingle();
     
     if (adminData) return 'admin';
 
-    // Check manager table
+    // Check manager table - by user_id OR email
     const { data: managerData } = await supabase
       .from('managers')
       .select('id')
-      .eq('user_id', userId)
+      .or(`user_id.eq.${userId},email.eq.${userEmail}`)
       .maybeSingle();
     
     if (managerData) return 'manager';
 
-    // Check teacher table
+    // Check teacher table - by user_id OR email
     const { data: teacherData } = await supabase
       .from('teachers')
       .select('id')
-      .eq('user_id', userId)
+      .or(`user_id.eq.${userId},email.eq.${userEmail}`)
       .maybeSingle();
     
     if (teacherData) return 'teacher';
@@ -77,8 +77,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               .single();
             setProfile(profileData);
             
-            // Resolve the actual role from role tables
-            const role = await resolveUserRole(session.user.id);
+            // Resolve the actual role from role tables (using both user_id and email)
+            const role = await resolveUserRole(session.user.id, session.user.email || '');
             setResolvedRole(role);
             
             setLoading(false);
