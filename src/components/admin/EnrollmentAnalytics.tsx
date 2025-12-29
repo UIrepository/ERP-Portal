@@ -91,23 +91,41 @@ export const EnrollmentAnalytics = () => {
   }, [queryClient]);
 
   // --- Data Fetching ---
-  const { data: enrollments = [], isLoading: isLoadingEnrollments, isError, error } = useQuery<Enrollment[]>({
+  const { data: enrollments = [], isLoading: isLoadingEnrollments, isError, error } = useQuery({
     queryKey: ['enrollment-analytics-enrollments'],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    queryFn: async (): Promise<Enrollment[]> => {
+      // Fetch enrollments with email
+      const { data: enrollmentData, error: enrollError } = await supabase
         .from('user_enrollments')
-        .select(`
-          batch_name,
-          subject_name,
-          profiles ( name, email )
-        `);
+        .select('batch_name, subject_name, user_id, email');
 
-      if (error) {
-          console.error("Error fetching enrollments:", error)
-          throw error;
-      };
-      
-      return data.filter(e => e.profiles) as Enrollment[];
+      if (enrollError) {
+          console.error("Error fetching enrollments:", enrollError)
+          throw enrollError;
+      }
+
+      // Fetch all profiles
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id, name, email');
+
+      if (profilesError) {
+          console.error("Error fetching profiles:", profilesError)
+          throw profilesError;
+      }
+
+      // Map profiles by user_id
+      const profilesMap = new Map<string, { name: string; email: string }>();
+      profilesData?.forEach(p => profilesMap.set(p.user_id, { name: p.name, email: p.email }));
+
+      // Join data manually
+      return (enrollmentData || [])
+        .map(e => ({
+          batch_name: e.batch_name,
+          subject_name: e.subject_name,
+          profiles: profilesMap.get(e.user_id) || null
+        }))
+        .filter(e => e.profiles) as Enrollment[];
     },
   });
 
@@ -245,13 +263,7 @@ export const EnrollmentAnalytics = () => {
                         {analyticsData.allSubjects
                             .filter(subject => selectedSubject === 'all' || selectedSubject === subject)
                             .map((subject, index, arr) => (
-                            <Bar key={subject} dataKey={subject} stackId="a" shape={<RoundedBar />}>
-                                {analyticsData.chartData.map((entry, entryIndex) => {
-                                    const isFirst = index === 0;
-                                    const isLast = index === arr.length - 1;
-                                    const radius: [number, number, number, number] = [isFirst ? 8 : 0, isLast ? 8 : 0, isLast ? 8 : 0, isFirst ? 8 : 0];
-                                    return <Cell key={`cell-${entryIndex}`} fill={COLORS[analyticsData.allSubjects.indexOf(subject) % COLORS.length]} radius={radius}/>
-                                })}
+                            <Bar key={subject} dataKey={subject} stackId="a" fill={COLORS[analyticsData.allSubjects.indexOf(subject) % COLORS.length]} radius={[4, 4, 0, 0]}>
                             </Bar>
                         ))}
                     </BarChart>

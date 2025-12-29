@@ -22,9 +22,9 @@ export const TeacherAnalytics = () => {
       const { data, error } = await supabase
         .from('profiles')
         .select('batch, subjects')
-        .eq('role', 'teacher');
+        .eq('role', 'teacher' as any);
       if (error) throw error;
-      return data || [];
+      return (data || []) as TeacherProfile[];
     },
   });
 
