@@ -35,8 +35,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       .from('admins')
       .select('id')
       .or(`user_id.eq.${userId},email.eq.${userEmail}`)
+      .limit(1)
       .maybeSingle();
-    
+
     if (adminData) return 'admin';
 
     // Check manager table - by user_id OR email
@@ -44,8 +45,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       .from('managers')
       .select('id')
       .or(`user_id.eq.${userId},email.eq.${userEmail}`)
+      .limit(1)
       .maybeSingle();
-    
+
     if (managerData) return 'manager';
 
     // Check teacher table - by user_id OR email
@@ -53,8 +55,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       .from('teachers')
       .select('id')
       .or(`user_id.eq.${userId},email.eq.${userEmail}`)
+      .limit(1)
       .maybeSingle();
-    
+
     if (teacherData) return 'teacher';
 
     // Default to student
@@ -70,9 +73,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (session?.user) {
           // Fetch user profile and resolve role
           setTimeout(async () => {
-            // Call the role sync RPC to ensure user_id is linked and roles are synced
+            const userId = session.user.id;
+            const userEmail = session.user.email || '';
+
+            // Call the role sync RPC and use its detected_role as the primary source of truth
+            let detectedRole: ExtendedRole | null = null;
             try {
-              await supabase.rpc('check_user_role_sync');
+              const { data, error } = await supabase.rpc('check_user_role_sync');
+              if (error) throw error;
+              const roleFromRpc = (data as any)?.detected_role as ExtendedRole | undefined;
+              if (roleFromRpc && ['admin', 'manager', 'teacher', 'student'].includes(roleFromRpc)) {
+                detectedRole = roleFromRpc;
+              }
             } catch (err) {
               console.warn('Role sync check failed:', err);
             }
@@ -80,14 +92,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             const { data: profileData } = await supabase
               .from('profiles')
               .select('*')
-              .eq('user_id', session.user.id)
+              .eq('user_id', userId)
               .single();
             setProfile(profileData);
-            
-            // Resolve the actual role from role tables (using both user_id and email)
-            const role = await resolveUserRole(session.user.id, session.user.email || '');
+
+            // Resolve the actual role from role tables (fallback if RPC failed)
+            const role = detectedRole ?? (await resolveUserRole(userId, userEmail));
             setResolvedRole(role);
-            
+
             setLoading(false);
           }, 0);
         } else {

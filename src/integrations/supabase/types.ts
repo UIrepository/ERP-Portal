@@ -1060,7 +1060,7 @@ export type Database = {
     Enums: {
       exam_type: "mock" | "final" | "practice"
       schedule_request_status: "pending" | "approved" | "rejected"
-      user_role: "student" | "super_admin"
+      user_role: "student" | "super_admin" | "manager" | "admin"
       user_role_old: "student" | "teacher" | "super_admin"
     }
     CompositeTypes: {
@@ -1191,7 +1191,7 @@ export const Constants = {
     Enums: {
       exam_type: ["mock", "final", "practice"],
       schedule_request_status: ["pending", "approved", "rejected"],
-      user_role: ["student", "super_admin"],
+      user_role: ["student", "super_admin", "manager", "admin"],
       user_role_old: ["student", "teacher", "super_admin"],
     },
   },
