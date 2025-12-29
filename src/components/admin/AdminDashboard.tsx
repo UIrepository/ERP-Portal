@@ -7,8 +7,8 @@ import { EnrollmentAnalytics } from './EnrollmentAnalytics';
 import { TeacherAnalytics } from './TeacherAnalytics';
 import { AdminCreateAnnouncement } from './AdminCreateAnnouncement';
 import { AdminAnnouncementsViewer } from './AdminAnnouncementsViewer';
-// IMPORT NEW ADMIN COMMUNITY COMPONENT
 import { AdminCommunity } from './AdminCommunity';
+import { AdminStaffManager } from './AdminStaffManager';
 
 interface AdminDashboardProps {
   activeTab: string;
@@ -16,9 +16,9 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard = ({ activeTab, onTabChange }: AdminDashboardProps) => {
-  const { profile } = useAuth();
+  const { profile, resolvedRole } = useAuth();
 
-  if (profile?.role !== 'super_admin') {
+  if (resolvedRole !== 'admin') {
     return (
       <div className="p-6 text-center">
         <h1 className="text-2xl font-bold text-destructive">Access Denied</h1>
@@ -31,6 +31,8 @@ export const AdminDashboard = ({ activeTab, onTabChange }: AdminDashboardProps) 
     switch (activeTab) {
       case 'enrollment-analytics':
         return <EnrollmentAnalytics />;
+      case 'staff-manager':
+        return <AdminStaffManager />;
       case 'teacher-analytics':
         return <TeacherAnalytics />;
       case 'schedules':
@@ -43,13 +45,11 @@ export const AdminDashboard = ({ activeTab, onTabChange }: AdminDashboardProps) 
         return <AdminCreateAnnouncement />;
       case 'announcement-history':
         return <AdminAnnouncementsViewer />;
-      // RENDER NEW ADMIN COMMUNITY COMPONENT
       case 'community-admin':
         return <AdminCommunity />;
       case 'monitoring':
         return <MonitoringDashboard />;
       default:
-        // Fallback to the first available tab
         return <EnrollmentAnalytics />;
     }
   };
