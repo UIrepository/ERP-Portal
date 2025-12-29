@@ -19,7 +19,10 @@ import {
   LogOut,
   Megaphone,
   History,
-  Phone, 
+  Phone,
+  ClipboardList,
+  UserCog,
+  GraduationCap,
 } from 'lucide-react';
 
 import {
@@ -39,14 +42,13 @@ interface SidebarProps {
   onTabChange: (tab: string) => void;
 }
 
-// Define the structure for an enrollment record from the user_enrollments table
 interface UserEnrollment {
     batch_name: string;
     subject_name: string;
 }
 
 export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, resolvedRole } = useAuth();
   const queryClient = useQueryClient();
 
   const ADMIN_WHATSAPP_NUMBER = '916297143798'; 
@@ -55,10 +57,8 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const getWhatsAppLink = (studentName: string, batchName: string) => {
       const name = studentName || 'Student';
       const batch = batchName || 'your batch'; 
-      
       let message = WHATSAPP_MESSAGE_TEMPLATE.replace('(NAME)', name);
       message = message.replace('(BATCH_NAME)', batch);
-      
       const encodedMessage = encodeURIComponent(message);
       return `https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${encodedMessage}`;
   };
@@ -70,7 +70,6 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
       window.open(whatsappLink, '_blank');
   };
 
-  // Fetch user's specific enrollments for sidebar display
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['sidebarUserEnrollments', profile?.user_id],
     queryFn: async () => {
@@ -79,16 +78,12 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
             .from('user_enrollments')
             .select('batch_name, subject_name')
             .eq('user_id', profile.user_id);
-        if (error) {
-            console.error("Error fetching sidebar user enrollments:", error);
-            return [];
-        }
+        if (error) return [];
         return data || [];
     },
-    enabled: !!profile?.user_id
+    enabled: !!profile?.user_id && resolvedRole === 'student'
   });
 
-  // Extract unique batches and subjects from the fetched enrollments for display
   const availableBatches = useMemo(() => {
     return Array.from(new Set(userEnrollments?.map(e => e.batch_name) || [])).sort();
   }, [userEnrollments]);
@@ -97,44 +92,16 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     return Array.from(new Set(userEnrollments?.map(e => e.subject_name) || [])).sort();
   }, [userEnrollments]);
 
-  // Set up real-time subscriptions for sidebar data
   useEffect(() => {
-    if (!profile?.user_id) return;
-
+    if (!profile?.user_id || resolvedRole !== 'student') return;
     const channel = supabase
       .channel('sidebar-realtime-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_enrollments',
-          filter: `user_id=eq.${profile.user_id}`
-        },
-        () => {
-          console.log('Real-time update: user_enrollments changed');
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_enrollments', filter: `user_id=eq.${profile.user_id}` }, () => {
           queryClient.invalidateQueries({ queryKey: ['sidebarUserEnrollments'] });
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'profiles',
-          filter: `user_id=eq.${profile.user_id}`
-        },
-        () => {
-          console.log('Real-time update: profiles changed');
-          queryClient.invalidateQueries({ queryKey: ['sidebarUserEnrollments'] });
-        }
-      )
+      })
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [profile?.user_id, queryClient]);
+    return () => { supabase.removeChannel(channel); };
+  }, [profile?.user_id, queryClient, resolvedRole]);
 
   const studentTabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -151,8 +118,23 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     { id: 'contact-admin', label: 'Contact Admin', icon: Phone }, 
   ];
 
+  const teacherTabs = [
+    { id: 'teacher-schedule', label: 'My Schedule', icon: Calendar },
+    { id: 'teacher-recordings', label: 'My Recordings', icon: Video },
+    { id: 'teacher-schedule-requests', label: 'Schedule Requests', icon: ClipboardList },
+    { id: 'teacher-messages', label: 'Messages', icon: MessageSquare },
+  ];
+
+  const managerTabs = [
+    { id: 'manager-overview', label: 'Batch Overview', icon: LayoutDashboard },
+    { id: 'manager-schedule-requests', label: 'Schedule Requests', icon: ClipboardList },
+    { id: 'manager-teachers', label: 'Teachers', icon: UserCog },
+    { id: 'manager-students', label: 'Students', icon: GraduationCap },
+  ];
+
   const adminTabs = [
     { id: 'enrollment-analytics', label: 'Student Analytics', icon: BarChart2 },
+    { id: 'staff-manager', label: 'Staff Management', icon: UserCog },
     { id: 'community-admin', label: 'Community Chat', icon: Users }, 
     { id: 'schedules', label: 'Schedules', icon: Calendar },
     { id: 'meeting-manager', label: 'Meeting Links', icon: LinkIcon },
@@ -162,13 +144,22 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   ];
 
   const getTabs = () => {
-    switch (profile?.role) {
-      case 'student':
-        return studentTabs;
-      case 'super_admin':
-        return adminTabs;
-      default:
-        return [];
+    switch (resolvedRole) {
+      case 'student': return studentTabs;
+      case 'teacher': return teacherTabs;
+      case 'manager': return managerTabs;
+      case 'admin': return adminTabs;
+      default: return [];
+    }
+  };
+
+  const getPortalName = () => {
+    switch (resolvedRole) {
+      case 'student': return 'Student Portal';
+      case 'teacher': return 'Teacher Portal';
+      case 'manager': return 'Manager Portal';
+      case 'admin': return 'Admin Portal';
+      default: return 'Portal';
     }
   };
 
