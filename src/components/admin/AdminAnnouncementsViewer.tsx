@@ -41,19 +41,19 @@ const AnnouncementSkeleton = () => (
 export const AdminAnnouncementsViewer = () => {
     const queryClient = useQueryClient();
 
-    const { data: announcements, isLoading } = useQuery<Announcement[]>({
+    const { data: announcements, isLoading } = useQuery({
         queryKey: ['admin-all-announcements'],
-        queryFn: async () => {
+        queryFn: async (): Promise<Announcement[]> => {
             const { data, error } = await supabase
                 .from('notifications')
-                .select('*')
+                .select('id, title, message, created_at, created_by_name, target_batch, target_subject')
                 .order('created_at', { ascending: false });
             
             if (error) {
                 console.error("Error fetching announcements:", error);
                 throw error;
             }
-            return data || [];
+            return (data || []) as Announcement[];
         },
     });
 

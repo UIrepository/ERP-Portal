@@ -24,7 +24,7 @@ export const AdminTeacherManager = () => {
       const { data } = await supabase
         .from('profiles')
         .select('*')
-        .eq('role', 'teacher')
+        .eq('role', 'teacher' as any)
         .order('created_at', { ascending: false });
       return data || [];
     },

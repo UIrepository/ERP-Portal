@@ -35,8 +35,8 @@ export const StudentChatTeacher = () => {
       const { data } = await supabase
         .from('profiles')
         .select('*')
-        .eq('role', 'teacher')
-        .eq('batch', profile?.batch)
+        .eq('role', 'teacher' as any)
+        .eq('batch', profile?.batch as any)
         .contains('subjects', profile?.subjects || []);
       return data || [];
     },

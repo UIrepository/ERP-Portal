@@ -351,9 +351,9 @@ export const AdminCommunity = () => {
     setMessageText(''); setSelectedImage(null); setReplyingTo(null); setIsPriority(false);
   }, [selectedGroup]);
 
-  const { data: messages = [], isLoading: isLoadingMessages } = useQuery<CommunityMessage[]>({
+  const { data: messages = [], isLoading: isLoadingMessages } = useQuery({
     queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
-    queryFn: async () => {
+    queryFn: async (): Promise<CommunityMessage[]> => {
       if (!selectedGroup) return [];
       const { data, error } = await supabase
         .from('community_messages')
@@ -362,7 +362,7 @@ export const AdminCommunity = () => {
         .eq('subject', selectedGroup.subject_name)
         .order('created_at', { ascending: true });
       if (error) throw error;
-      return data as any[];
+      return (data || []) as CommunityMessage[];
     },
     enabled: !!selectedGroup
   });
@@ -402,7 +402,7 @@ export const AdminCommunity = () => {
   const sendMessageMutation = useMutation({
     mutationFn: async ({ text, image, replyId, priority }: { text: string; image: File | null; replyId: string | null, priority: boolean }) => {
       if (!profile?.user_id || !selectedGroup) return;
-      let imageUrl = null;
+      let imageUrl: string | null = null;
       if (image) {
         setIsUploading(true);
         const fileExt = image.name.split('.').pop();
@@ -413,7 +413,7 @@ export const AdminCommunity = () => {
         imageUrl = data.publicUrl;
         setIsUploading(false);
       }
-      const { error } = await supabase.from('community_messages').insert({
+      const insertData = {
         content: text,
         image_url: imageUrl,
         user_id: profile.user_id,
@@ -421,7 +421,8 @@ export const AdminCommunity = () => {
         subject: selectedGroup.subject_name,
         reply_to_id: replyId,
         is_priority: priority
-      });
+      };
+      const { error } = await supabase.from('community_messages').insert(insertData as any);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -434,7 +435,7 @@ export const AdminCommunity = () => {
   const deleteMessageMutation = useMutation({
     mutationFn: async (id: string) => {
       // Admins should be able to delete any message
-      const { error } = await supabase.from('community_messages').update({ is_deleted: true }).eq('id', id);
+      const { error } = await supabase.from('community_messages').update({ is_deleted: true } as any).eq('id', id);
       if (error) throw error;
       return id;
     },
@@ -451,12 +452,12 @@ export const AdminCommunity = () => {
       const existingReaction = messages.find(m => m.id === msgId)?.message_likes.find(l => l.user_id === profile?.user_id);
       if (existingReaction) {
         if (existingReaction.reaction_type === type) {
-          await supabase.from('message_likes').delete().match({ message_id: msgId, user_id: profile?.user_id });
+          await supabase.from('message_likes').delete().eq('message_id', msgId).eq('user_id', profile?.user_id || '');
         } else {
-          await supabase.from('message_likes').update({ reaction_type: type }).match({ message_id: msgId, user_id: profile?.user_id });
+          await supabase.from('message_likes').update({ reaction_type: type } as any).eq('message_id', msgId).eq('user_id', profile?.user_id || '');
         }
       } else {
-        await supabase.from('message_likes').insert({ message_id: msgId, user_id: profile?.user_id, reaction_type: type });
+        await supabase.from('message_likes').insert({ message_id: msgId, user_id: profile?.user_id, reaction_type: type } as any);
       }
     },
     onSuccess: () => {
