@@ -165,26 +165,13 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
 
   const tabs = getTabs();
 
-  const getPortalName = () => {
-     switch (profile?.role) {
-      case 'student':
-        return 'Student Portal';
-      case 'super_admin':
-        return 'Admin Portal';
-      default:
-        return 'Portal';
-    }
-  }
-
   const formatArrayString = (arr: string | string[] | null | undefined) => {
     if (!arr) return '';
-
     if (Array.isArray(arr)) {
       return arr.map(item =>
         typeof item === 'string' ? item.replace(/[\\"]/g, '') : item
       ).join(', ');
     }
-
     try {
       const parsed = JSON.parse(arr);
       if (Array.isArray(parsed)) {
@@ -192,15 +179,11 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
           typeof item === 'string' ? item.replace(/[\\"]/g, '') : item
         ).join(', ');
       }
-    } catch (e) {
-      // JSON parsing failed, treat as a raw string and clean it
-    }
-
+    } catch (e) {}
     return String(arr).replace(/[\\"\\[\\]]/g, '');
   };
 
   return (
-    // MODIFIED: Added overflow-y-auto to the main container for mobile scrolling
     <div className="w-full bg-white border-r border-gray-200 h-full flex flex-col overflow-y-auto">
       <div className="p-4 border-b border-gray-200 shrink-0">
         <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-16 w-auto mx-auto mb-4 md:hidden" />
@@ -209,30 +192,20 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
         </h2>
         <p className="text-sm text-gray-500 mt-1">{profile?.name}</p>
         
-        {/* Updated to display batches from availableBatches */}
-        {profile?.role === 'student' && availableBatches.length > 0 && (
+        {resolvedRole === 'student' && availableBatches.length > 0 && (
           <p className="text-xs text-gray-500 mt-1">Batch: {availableBatches.join(', ')}</p>
         )}
-        {/* Updated to display subjects from availableSubjects */}
-        {profile?.role === 'student' && availableSubjects.length > 0 && (
+        {resolvedRole === 'student' && availableSubjects.length > 0 && (
           <p className="text-xs text-gray-500 mt-1">Subjects: {availableSubjects.join(', ')}</p>
         )}
-
-        {/* Display loading state for enrollments */}
-        {profile?.role === 'student' && isLoadingEnrollments && (
+        {resolvedRole === 'student' && isLoadingEnrollments && (
              <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
                 <span className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-gray-400"></span>
                 Loading enrollments...
              </p>
         )}
-        {/* If no enrollments and not loading, display a message */}
-        {profile?.role === 'student' && !isLoadingEnrollments && availableBatches.length === 0 && availableSubjects.length === 0 && (
+        {resolvedRole === 'student' && !isLoadingEnrollments && availableBatches.length === 0 && availableSubjects.length === 0 && (
              <p className="text-xs text-gray-500 mt-1">No enrollments found.</p>
-        )}
-
-        {/* For Teacher/Admin roles, if profile.batch/subjects still exist in DB, keep old display */}
-        {(profile?.role === 'super_admin') && profile?.batch && (
-            <p className="text-xs text-gray-500 mt-1">Batch: {formatArrayString(profile.batch)}</p>
         )}
       </div>
       
