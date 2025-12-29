@@ -952,6 +952,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      backfill_role_table_user_ids: {
+        Args: never
+        Returns: {
+          email: string
+          status: string
+          table_name: string
+          user_id: string
+        }[]
+      }
       delete_expired_chat_images: { Args: never; Returns: undefined }
       get_all_options: {
         Args: never
