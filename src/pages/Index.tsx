@@ -5,26 +5,30 @@ import { AuthPage } from '@/components/AuthPage';
 import { Layout } from '@/components/Layout';
 import { StudentDashboard } from '@/components/StudentDashboard';
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
-import { LoadingSpinner } from '@/components/LoadingSpinner'; // Import the new component
+import { TeacherDashboard } from '@/components/teacher/TeacherDashboard';
+import { ManagerDashboard } from '@/components/manager/ManagerDashboard';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 const Index = () => {
-  const { user, loading, profile } = useAuth();
+  const { user, loading, profile, resolvedRole } = useAuth();
 
   const getInitialTab = () => {
-    if (profile?.role === 'super_admin') {
-      return 'enrollment-analytics';
+    switch (resolvedRole) {
+      case 'admin': return 'enrollment-analytics';
+      case 'manager': return 'manager-overview';
+      case 'teacher': return 'teacher-schedule';
+      default: return 'dashboard';
     }
-    return 'dashboard';
   };
 
   const [activeTab, setActiveTab] = useState(getInitialTab());
 
   useEffect(() => {
     setActiveTab(getInitialTab());
-  }, [profile?.role]);
+  }, [resolvedRole]);
 
   if (loading) {
-    return <LoadingSpinner />; // Use the new loading spinner
+    return <LoadingSpinner />;
   }
 
   if (!user) {
@@ -32,16 +36,20 @@ const Index = () => {
   }
 
   const renderDashboard = () => {
-    switch (profile?.role) {
+    switch (resolvedRole) {
       case 'student':
         return <StudentDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
-      case 'super_admin':
+      case 'teacher':
+        return <TeacherDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
+      case 'manager':
+        return <ManagerDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
+      case 'admin':
         return <AdminDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
       default:
         return (
           <div className="p-6 text-center">
             <h1 className="text-2xl font-bold text-destructive">Access Denied</h1>
-            <p className="text-muted-foreground mt-2">You do not have a valid role to access the dashboard. Please contact administrator for assistance.</p>
+            <p className="text-muted-foreground mt-2">You do not have a valid role.</p>
           </div>
         );
     }
