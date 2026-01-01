@@ -23,6 +23,7 @@ import {
   ClipboardList,
   UserCog,
   GraduationCap,
+  Contact, // Using Contact icon for Directory
 } from 'lucide-react';
 
 import {
@@ -103,7 +104,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     return () => { supabase.removeChannel(channel); };
   }, [profile?.user_id, queryClient, resolvedRole]);
 
-  // --- STUDENT TABS ---
+  // --- 1. STUDENT TABS ---
   const studentTabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'announcements', label: 'Announcements', icon: Megaphone },
@@ -120,7 +121,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     { id: 'contact-admin', label: 'Contact Admin', icon: Phone }, 
   ];
 
-  // --- TEACHER TABS (Already had Messages) ---
+  // --- 2. TEACHER TABS ---
   const teacherTabs = [
     { id: 'teacher-schedule', label: 'My Schedule', icon: Calendar },
     { id: 'teacher-recordings', label: 'My Recordings', icon: Video },
@@ -128,19 +129,20 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     { id: 'teacher-messages', label: 'Messages', icon: MessageSquare },
   ];
 
-  // --- MANAGER TABS (Added Messages) ---
+  // --- 3. MANAGER TABS ---
   const managerTabs = [
     { id: 'manager-overview', label: 'Batch Overview', icon: LayoutDashboard },
-    { id: 'manager-messages', label: 'Messages', icon: MessageSquare }, // <--- ADDED THIS
+    { id: 'manager-messages', label: 'Messages', icon: MessageSquare },
     { id: 'manager-schedule-requests', label: 'Schedule Requests', icon: ClipboardList },
     { id: 'manager-teachers', label: 'Teachers', icon: UserCog },
     { id: 'manager-students', label: 'Students', icon: GraduationCap },
   ];
 
-  // --- ADMIN TABS (Added Messages) ---
+  // --- 4. ADMIN TABS (Updated) ---
   const adminTabs = [
     { id: 'enrollment-analytics', label: 'Student Analytics', icon: BarChart2 },
-    { id: 'admin-messages', label: 'Messages / Inbox', icon: MessageSquare }, // <--- ADDED THIS
+    { id: 'admin-messages', label: 'Messages / Inbox', icon: MessageSquare },
+    { id: 'directory', label: 'Student Directory', icon: Contact }, // <--- ADDED
     { id: 'staff-manager', label: 'Staff Management', icon: UserCog },
     { id: 'community-admin', label: 'Community Chat', icon: Users }, 
     { id: 'schedules', label: 'Schedules', icon: Calendar },
@@ -172,7 +174,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
 
   const tabs = getTabs();
 
-  // (Kept this helper function you had originally)
+  // Helper for array formatting if needed
   const formatArrayString = (arr: string | string[] | null | undefined) => {
     if (!arr) return '';
     if (Array.isArray(arr)) {
