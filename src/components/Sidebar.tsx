@@ -103,7 +103,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     return () => { supabase.removeChannel(channel); };
   }, [profile?.user_id, queryClient, resolvedRole]);
 
-  // --- 1. STUDENT TABS ---
+  // --- STUDENT TABS ---
   const studentTabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'announcements', label: 'Announcements', icon: Megaphone },
@@ -120,27 +120,27 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     { id: 'contact-admin', label: 'Contact Admin', icon: Phone }, 
   ];
 
-  // --- 2. TEACHER TABS (Added Messages) ---
+  // --- TEACHER TABS (Already had Messages) ---
   const teacherTabs = [
     { id: 'teacher-schedule', label: 'My Schedule', icon: Calendar },
     { id: 'teacher-recordings', label: 'My Recordings', icon: Video },
     { id: 'teacher-schedule-requests', label: 'Schedule Requests', icon: ClipboardList },
-    { id: 'teacher-messages', label: 'Messages', icon: MessageSquare }, // <--- ADDED
+    { id: 'teacher-messages', label: 'Messages', icon: MessageSquare },
   ];
 
-  // --- 3. MANAGER TABS (Added Messages) ---
+  // --- MANAGER TABS (Added Messages) ---
   const managerTabs = [
     { id: 'manager-overview', label: 'Batch Overview', icon: LayoutDashboard },
-    { id: 'manager-messages', label: 'Messages', icon: MessageSquare }, // <--- ADDED
+    { id: 'manager-messages', label: 'Messages', icon: MessageSquare }, // <--- ADDED THIS
     { id: 'manager-schedule-requests', label: 'Schedule Requests', icon: ClipboardList },
     { id: 'manager-teachers', label: 'Teachers', icon: UserCog },
     { id: 'manager-students', label: 'Students', icon: GraduationCap },
   ];
 
-  // --- 4. ADMIN TABS (Added Messages) ---
+  // --- ADMIN TABS (Added Messages) ---
   const adminTabs = [
     { id: 'enrollment-analytics', label: 'Student Analytics', icon: BarChart2 },
-    { id: 'admin-messages', label: 'Messages / Inbox', icon: MessageSquare }, // <--- ADDED
+    { id: 'admin-messages', label: 'Messages / Inbox', icon: MessageSquare }, // <--- ADDED THIS
     { id: 'staff-manager', label: 'Staff Management', icon: UserCog },
     { id: 'community-admin', label: 'Community Chat', icon: Users }, 
     { id: 'schedules', label: 'Schedules', icon: Calendar },
@@ -172,6 +172,25 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
 
   const tabs = getTabs();
 
+  // (Kept this helper function you had originally)
+  const formatArrayString = (arr: string | string[] | null | undefined) => {
+    if (!arr) return '';
+    if (Array.isArray(arr)) {
+      return arr.map(item =>
+        typeof item === 'string' ? item.replace(/[\\"]/g, '') : item
+      ).join(', ');
+    }
+    try {
+      const parsed = JSON.parse(arr);
+      if (Array.isArray(parsed)) {
+        return parsed.map(item =>
+          typeof item === 'string' ? item.replace(/[\\"]/g, '') : item
+        ).join(', ');
+      }
+    } catch (e) {}
+    return String(arr).replace(/[\\"\\[\\]]/g, '');
+  };
+
   return (
     <div className="w-full bg-white border-r border-gray-200 h-full flex flex-col overflow-y-auto">
       <div className="p-4 border-b border-gray-200 shrink-0">
@@ -183,6 +202,18 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
         
         {resolvedRole === 'student' && availableBatches.length > 0 && (
           <p className="text-xs text-gray-500 mt-1">Batch: {availableBatches.join(', ')}</p>
+        )}
+        {resolvedRole === 'student' && availableSubjects.length > 0 && (
+          <p className="text-xs text-gray-500 mt-1">Subjects: {availableSubjects.join(', ')}</p>
+        )}
+        {resolvedRole === 'student' && isLoadingEnrollments && (
+             <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                <span className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-gray-400"></span>
+                Loading enrollments...
+             </p>
+        )}
+        {resolvedRole === 'student' && !isLoadingEnrollments && availableBatches.length === 0 && availableSubjects.length === 0 && (
+             <p className="text-xs text-gray-500 mt-1">No enrollments found.</p>
         )}
       </div>
       
