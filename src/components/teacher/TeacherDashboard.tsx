@@ -42,7 +42,7 @@ export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardPro
         <h1 className="text-2xl font-bold text-foreground">Welcome, {profile?.name}</h1>
         <p className="text-muted-foreground">Teacher Dashboard</p>
       </div>
-      {renderTabContent()}
+      {renderTabConten()}
     </div>
   );
 };
