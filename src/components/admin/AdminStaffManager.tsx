@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -62,9 +62,10 @@ interface MultiSelectProps {
   selected: string[];
   onChange: (selected: string[]) => void;
   placeholder?: string;
+  disabled?: boolean;
 }
 
-const MultiSelect = ({ options, selected, onChange, placeholder }: MultiSelectProps) => {
+const MultiSelect = ({ options, selected, onChange, placeholder, disabled }: MultiSelectProps) => {
   const [open, setOpen] = useState(false);
 
   const handleSelect = (value: string) => {
@@ -88,6 +89,7 @@ const MultiSelect = ({ options, selected, onChange, placeholder }: MultiSelectPr
           role="combobox"
           aria-expanded={open}
           className="w-full justify-between h-auto min-h-[40px] px-3 py-2"
+          disabled={disabled}
         >
           <div className="flex flex-wrap gap-1 text-left">
             {selected.length === 0 && (
@@ -118,24 +120,26 @@ const MultiSelect = ({ options, selected, onChange, placeholder }: MultiSelectPr
           <CommandList>
             <CommandEmpty>No results found.</CommandEmpty>
             <CommandGroup>
-              {options.map((option) => (
-                <CommandItem
-                  key={option}
-                  onSelect={() => handleSelect(option)}
-                  className="cursor-pointer"
-                >
-                  <div
-                    className={`mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary ${
-                      selected.includes(option)
-                        ? "bg-primary text-primary-foreground"
-                        : "opacity-50 [&_svg]:invisible"
-                    }`}
+              <ScrollArea className="h-64">
+                {options.map((option) => (
+                  <CommandItem
+                    key={option}
+                    onSelect={() => handleSelect(option)}
+                    className="cursor-pointer"
                   >
-                    <Check className="h-3 w-3" />
-                  </div>
-                  <span>{option}</span>
-                </CommandItem>
-              ))}
+                    <div
+                      className={`mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary ${
+                        selected.includes(option)
+                          ? "bg-primary text-primary-foreground"
+                          : "opacity-50 [&_svg]:invisible"
+                      }`}
+                    >
+                      <Check className="h-3 w-3" />
+                    </div>
+                    <span>{option}</span>
+                  </CommandItem>
+                ))}
+              </ScrollArea>
             </CommandGroup>
           </CommandList>
         </Command>
@@ -168,8 +172,7 @@ export const AdminStaffManager = () => {
         .select('*');
       if (tError) throw tError;
 
-      // Fetch managers (using profiles table for now as a fallback if no managers table exists yet, 
-      // or assume you might create a managers table later. For now, we look at profiles with role 'manager')
+      // Fetch managers 
       const { data: managers, error: mError } = await supabase
         .from('profiles')
         .select('*')
@@ -189,11 +192,11 @@ export const AdminStaffManager = () => {
 
       const formattedManagers = managers.map((m) => ({
         id: m.id,
-        user_id: m.user_id, // Important for linking
+        user_id: m.user_id,
         name: m.name || 'Unknown',
         email: m.email || '',
         role: 'manager' as const,
-        batches: [], // Managers might not have these columns in profiles yet
+        batches: [],
         subjects: [],
       }));
 
@@ -201,20 +204,45 @@ export const AdminStaffManager = () => {
     },
   });
 
-  // 2. Fetch Unique Batches & Subjects for Dropdowns
-  const { data: uniqueData } = useQuery({
-    queryKey: ['unique-batches-subjects'],
+  // 2. Fetch Raw Enrollments (Batch + Subject Pairs)
+  const { data: rawEnrollments } = useQuery({
+    queryKey: ['raw-enrollments-staff'],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('user_enrollments')
         .select('batch_name, subject_name');
       
-      const batches = Array.from(new Set(data?.map(d => d.batch_name).filter(Boolean))).sort() as string[];
-      const subjects = Array.from(new Set(data?.map(d => d.subject_name).filter(Boolean))).sort() as string[];
-      
-      return { batches, subjects };
+      if (error) {
+        console.error("Error fetching enrollments", error);
+        return [];
+      }
+      return data || [];
     }
   });
+
+  // 3. Compute Unique Batches
+  const uniqueBatches = useMemo(() => {
+    const batches = new Set(rawEnrollments?.map(e => e.batch_name).filter(Boolean));
+    return Array.from(batches).sort();
+  }, [rawEnrollments]);
+
+  // 4. Compute Dynamic Subjects based on Selected Batches
+  const availableSubjects = useMemo(() => {
+    if (selectedBatches.length === 0 || !rawEnrollments) return [];
+
+    // Filter enrollments where the batch is in the selected list
+    const filteredEnrollments = rawEnrollments.filter(e => 
+      e.batch_name && selectedBatches.includes(e.batch_name) && e.subject_name
+    );
+
+    // Create formatted strings "Subject (Batch)"
+    const subjectOptions = new Set(
+      filteredEnrollments.map(e => `${e.subject_name} (${e.batch_name})`)
+    );
+
+    return Array.from(subjectOptions).sort();
+  }, [selectedBatches, rawEnrollments]);
+
 
   const handleCreateStaff = async () => {
     if (!newStaffName || !newStaffEmail) {
@@ -224,36 +252,15 @@ export const AdminStaffManager = () => {
 
     setIsSubmitting(true);
     try {
-      // 1. Create Auth User (Backend Function usually handles this, but here we might just insert into tables)
-      // NOTE: In a real app, you usually invite a user via supabase.auth.admin.inviteUserByEmail
-      // For this demo, we will assume we are just creating the PROFILE record.
-      // Ideally, the user should sign up themselves, or you use an Edge Function to create them.
-      
-      // Let's look for an existing user or just insert into the specific tables.
-      // Since we can't create Auth users from client side without Service Role, 
-      // we will assume we are just adding metadata for a user who WILL sign up, 
-      // OR we are updating an existing user.
-      
-      // However, to make this functional for YOU right now:
-      // We will insert into the 'teachers' table directly. 
-      // The trigger will likely handle the profile sync if you have one.
-
       if (newStaffRole === 'teacher') {
         const { error } = await supabase.from('teachers').insert({
           name: newStaffName,
           email: newStaffEmail,
           assigned_batches: selectedBatches,
-          assigned_subjects: selectedSubjects,
-          // We don't have a user_id yet if they haven't signed up. 
-          // This might be a "Pre-allocation".
+          assigned_subjects: selectedSubjects, 
         });
         if (error) throw error;
       } else {
-        // For managers, we might update the profiles table directly if the user exists,
-        // or we need a 'managers' table. Assuming profiles for now.
-        // If the user doesn't exist in Auth, we can't really insert into profiles (FK constraint).
-        // So usually you create a "Invite" or just insert into a 'managers' table if you have one.
-        
         toast({ title: "Manager Setup", description: "Manager creation usually requires the user to sign up first. Feature coming soon." });
         return;
       }
@@ -280,8 +287,6 @@ export const AdminStaffManager = () => {
       if (role === 'teacher') {
         await supabase.from('teachers').delete().eq('id', id);
       } else {
-        // For managers (profiles), we usually just downgrade them to 'student' or delete?
-        // Let's just update role to NULL or 'student'
         await supabase.from('profiles').update({ role: 'student' }).eq('id', id);
       }
       toast({ title: "Deleted", description: "Staff member removed." });
@@ -352,21 +357,32 @@ export const AdminStaffManager = () => {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Assigned Batches</label>
                     <MultiSelect 
-                      options={uniqueData?.batches || []} 
+                      options={uniqueBatches} 
                       selected={selectedBatches}
-                      onChange={setSelectedBatches}
+                      onChange={(newBatches) => {
+                         setSelectedBatches(newBatches);
+                         // Optional: Clear subjects if the batch they belong to is removed? 
+                         // For now, we keep them to prevent accidental data loss, 
+                         // but user can manually remove.
+                      }}
                       placeholder="Select batches..."
                     />
                   </div>
                   
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Assigned Subjects</label>
+                    <label className="text-sm font-medium">Assigned Subjects (Filtered by Batch)</label>
                     <MultiSelect 
-                      options={uniqueData?.subjects || []} 
+                      options={availableSubjects} 
                       selected={selectedSubjects}
                       onChange={setSelectedSubjects}
-                      placeholder="Select subjects..."
+                      placeholder={selectedBatches.length > 0 ? "Select subjects..." : "Select a batch first"}
+                      disabled={selectedBatches.length === 0}
                     />
+                    {selectedBatches.length === 0 && (
+                        <p className="text-[10px] text-muted-foreground">
+                            * Please select a batch to see available subjects.
+                        </p>
+                    )}
                   </div>
                 </>
               )}
@@ -442,6 +458,9 @@ export const AdminStaffManager = () => {
                         ))
                         : <span className="text-muted-foreground text-xs">-</span>
                       }
+                      {member.subjects && member.subjects.length > 2 && (
+                          <Badge variant="outline" className="text-[10px]">+{member.subjects.length - 2}</Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
