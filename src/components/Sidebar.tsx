@@ -103,12 +103,15 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     return () => { supabase.removeChannel(channel); };
   }, [profile?.user_id, queryClient, resolvedRole]);
 
+  // --- UPDATED STUDENT TABS HERE ---
   const studentTabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'announcements', label: 'Announcements', icon: Megaphone },
     { id: 'community', label: 'Community', icon: Users },
     { id: 'schedule', label: 'Class Schedule', icon: Calendar },
     { id: 'current-class', label: 'Ongoing Class', icon: Clock },
+    // Added Connect/Mentors Tab
+    { id: 'connect', label: 'Mentors & Connect', icon: UserCog },
     { id: 'recordings', label: 'Recordings', icon: Video },
     { id: 'notes', label: 'Notes', icon: FileText },
     { id: 'dpp', label: 'DPP Section', icon: Target },
@@ -210,16 +213,10 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
       </div>
       
       <div className="flex flex-col flex-grow">
-          {/* Note: The 'nav' element is already set up for scrolling the tabs with 'overflow-y-auto'. 
-             The change above ensures the header and footer are also visible if content overflows. */}
           <nav className="overflow-y-auto p-4 space-y-2">
               {tabs.map((tab) => {
                 const isContactAdminTab = tab.id === 'contact-admin';
-                
-                // Logic to determine if the current tab is a Community tab
                 const isCommunityTab = tab.id === 'community' || tab.id === 'community-admin';
-                
-                // Mock notification state (shows badge if it's the community tab AND it's NOT the active tab)
                 const hasNewGroupMessage = isCommunityTab && tab.id !== activeTab; 
 
                 if (isContactAdminTab) {
@@ -256,7 +253,6 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
                     );
                 }
 
-                // Default rendering for all other tabs, wrapped in a relative div for the badge
                 return (
                     <div key={tab.id} className="relative">
                         <Button
@@ -271,7 +267,6 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
                             <tab.icon className="mr-3 h-4 w-4" />
                             {tab.label}
                         </Button>
-                        {/* Notification dot/badge */}
                         {hasNewGroupMessage && (
                             <span 
                                 className="absolute top-1 right-2 h-3 w-3 rounded-full bg-red-500 border-2 border-white animate-pulse" 
