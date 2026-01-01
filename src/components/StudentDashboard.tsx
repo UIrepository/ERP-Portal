@@ -9,8 +9,9 @@ import { StudentUIKiPadhai } from './student/StudentUIKiPadhai';
 import { StudentFeedback } from './student/StudentFeedback';
 import { StudentExams } from './student/StudentExams';
 import { StudentAnnouncements } from './student/StudentAnnouncements';
-import { StudentCommunity } from './student/StudentCommunity'; // 1. Ensure this import exists
-import { FileText, Video, Target, MessageSquare, Calendar, Clock, Crown, BookOpen } from 'lucide-react';
+import { StudentCommunity } from './student/StudentCommunity';
+import { StudentConnect } from './student/StudentConnect'; // <--- NEW IMPORT
+import { FileText, Video, Target, MessageSquare, Calendar, Clock, Users } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffect, useMemo } from 'react';
@@ -38,7 +39,6 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
   const { profile } = useAuth();
   const queryClient = useQueryClient();
 
-  // Fetch user's specific enrollments
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['dashboardUserEnrollments', profile?.user_id],
     queryFn: async () => {
@@ -61,7 +61,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
     return Array.from(new Set(userEnrollments?.map(e => e.subject_name) || [])).sort();
   }, [userEnrollments]);
 
-  const { data: analyticsData, refetch: refetchAnalytics, isLoading: isLoadingAnalytics } = useQuery<AnalyticsData>({
+  const { data: analyticsData, isLoading: isLoadingAnalytics } = useQuery<AnalyticsData>({
     queryKey: ['student-analytics', profile?.user_id, userEnrollments],
     queryFn: async () => {
       if (!profile?.user_id || !userEnrollments || userEnrollments.length === 0) {
@@ -102,7 +102,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
     enabled: !!profile?.user_id && !isLoadingEnrollments && userEnrollments && userEnrollments.length > 0,
   });
 
-  const { data: recentActivities, refetch: refetchActivities } = useQuery({
+  const { data: recentActivities } = useQuery({
     queryKey: ['student-activities', profile?.user_id],
     queryFn: async () => {
       if (!profile?.user_id) return [];
@@ -156,9 +156,10 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
   
   const renderTabContent = () => {
     switch (activeTab) {
+      case 'connect': // <--- NEW CASE
+        return <StudentConnect />;
       case 'announcements':
         return <StudentAnnouncements />;
-      // 2. THIS IS THE CRITICAL PART THAT WAS MISSING OR BROKEN
       case 'community':
         return <StudentCommunity />;
       case 'schedule':
@@ -195,59 +196,44 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          <Card className="transform hover:-translate-y-1 transition-transform duration-300 ease-in-out bg-gradient-to-br from-blue-100 to-blue-200 border-blue-200 shadow-lg rounded-xl">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-blue-800">Notes Downloaded</p>
-                  <p className="text-3xl font-bold text-blue-900 mt-1">{isDashboardLoading ? <Skeleton className="h-8 w-16 bg-blue-200"/> : analyticsData?.totalNotes || 0}</p>
-                </div>
-                <div className="p-3 bg-white/50 rounded-full">
-                  <FileText className="h-6 w-6 text-blue-600" />
-                </div>
+          {/* Analytics Cards */}
+          <Card className="transform hover:-translate-y-1 transition-transform bg-gradient-to-br from-blue-100 to-blue-200 border-blue-200 shadow-lg rounded-xl">
+            <CardContent className="p-6 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-800">Notes</p>
+                <p className="text-3xl font-bold text-blue-900 mt-1">{isDashboardLoading ? <Skeleton className="h-8 w-16 bg-blue-200"/> : analyticsData?.totalNotes || 0}</p>
               </div>
+              <div className="p-3 bg-white/50 rounded-full"><FileText className="h-6 w-6 text-blue-600" /></div>
             </CardContent>
           </Card>
           
-          <Card className="transform hover:-translate-y-1 transition-transform duration-300 ease-in-out bg-gradient-to-br from-green-100 to-green-200 border-green-200 shadow-lg rounded-xl">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-green-800">Recordings Watched</p>
-                  <p className="text-3xl font-bold text-green-900 mt-1">{isDashboardLoading ? <Skeleton className="h-8 w-16 bg-green-200"/> : analyticsData?.totalRecordings || 0}</p>
-                </div>
-                 <div className="p-3 bg-white/50 rounded-full">
-                  <Video className="h-6 w-6 text-green-600" />
-                </div>
+          <Card className="transform hover:-translate-y-1 transition-transform bg-gradient-to-br from-green-100 to-green-200 border-green-200 shadow-lg rounded-xl">
+            <CardContent className="p-6 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-green-800">Recordings</p>
+                <p className="text-3xl font-bold text-green-900 mt-1">{isDashboardLoading ? <Skeleton className="h-8 w-16 bg-green-200"/> : analyticsData?.totalRecordings || 0}</p>
               </div>
+              <div className="p-3 bg-white/50 rounded-full"><Video className="h-6 w-6 text-green-600" /></div>
             </CardContent>
           </Card>
           
-          <Card className="transform hover:-translate-y-1 transition-transform duration-300 ease-in-out bg-gradient-to-br from-yellow-100 to-yellow-200 border-yellow-200 shadow-lg rounded-xl">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-yellow-800">DPPs Attempted</p>
-                  <p className="text-3xl font-bold text-yellow-900 mt-1">{isDashboardLoading ? <Skeleton className="h-8 w-16 bg-yellow-200"/> : analyticsData?.totalDPP || 0}</p>
-                </div>
-                 <div className="p-3 bg-white/50 rounded-full">
-                  <Target className="h-6 w-6 text-yellow-600" />
-                </div>
+          <Card className="transform hover:-translate-y-1 transition-transform bg-gradient-to-br from-yellow-100 to-yellow-200 border-yellow-200 shadow-lg rounded-xl">
+            <CardContent className="p-6 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-yellow-800">DPPs</p>
+                <p className="text-3xl font-bold text-yellow-900 mt-1">{isDashboardLoading ? <Skeleton className="h-8 w-16 bg-yellow-200"/> : analyticsData?.totalDPP || 0}</p>
               </div>
+              <div className="p-3 bg-white/50 rounded-full"><Target className="h-6 w-6 text-yellow-600" /></div>
             </CardContent>
           </Card>
           
-          <Card className="transform hover:-translate-y-1 transition-transform duration-300 ease-in-out bg-gradient-to-br from-rose-100 to-rose-200 border-rose-200 shadow-lg rounded-xl">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-rose-800">Feedback Submitted</p>
-                  <p className="text-3xl font-bold text-rose-900 mt-1">{isDashboardLoading ? <Skeleton className="h-8 w-16 bg-rose-200"/> : analyticsData?.feedbackSubmitted || 0}</p>
-                </div>
-                 <div className="p-3 bg-white/50 rounded-full">
-                  <MessageSquare className="h-6 w-6 text-rose-600" />
-                </div>
+          <Card className="transform hover:-translate-y-1 transition-transform bg-gradient-to-br from-rose-100 to-rose-200 border-rose-200 shadow-lg rounded-xl">
+            <CardContent className="p-6 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-rose-800">Feedback</p>
+                <p className="text-3xl font-bold text-rose-900 mt-1">{isDashboardLoading ? <Skeleton className="h-8 w-16 bg-rose-200"/> : analyticsData?.feedbackSubmitted || 0}</p>
               </div>
+              <div className="p-3 bg-white/50 rounded-full"><MessageSquare className="h-6 w-6 text-rose-600" /></div>
             </CardContent>
           </Card>
         </div>
@@ -257,7 +243,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
           {[
             { title: 'Class Schedule', subtitle: 'View your classes', icon: Calendar, tab: 'schedule', color: 'blue' },
             { title: 'Current Class', subtitle: 'Join ongoing class', icon: Clock, tab: 'current-class', color: 'green' },
-            { title: 'Recordings', subtitle: 'Watch past lectures', icon: Video, tab: 'recordings', color: 'yellow' },
+            { title: 'Connect / Mentors', subtitle: 'Chat with teachers', icon: Users, tab: 'connect', color: 'purple' }, // <--- NEW LINK
             { title: 'Notes', subtitle: 'Download materials', icon: FileText, tab: 'notes', color: 'rose' }
           ].map((item, index) => (
             <Card 
