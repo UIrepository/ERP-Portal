@@ -170,17 +170,15 @@ export const AdminStaffManager = () => {
         .select('*');
       if (tError) throw tError;
 
-      // Fetch managers from the specific 'managers' table
+      // Fetch managers
       const { data: managers, error: mError } = await supabase
         .from('managers')
         .select('*');
       
       if (mError) {
         console.error('Error fetching managers:', mError);
-        // Fallback for older schema versions if needed
       }
 
-      // Normalize data structure for teachers
       const formattedTeachers = (teachers || []).map((t) => ({
         id: t.id,
         user_id: t.user_id,
@@ -191,7 +189,6 @@ export const AdminStaffManager = () => {
         subjects: t.assigned_subjects || [],
       }));
 
-      // Normalize data structure for managers
       const formattedManagers = (managers || []).map((m) => ({
         id: m.id,
         user_id: m.user_id,
@@ -199,14 +196,14 @@ export const AdminStaffManager = () => {
         email: m.email,
         role: 'manager' as const,
         batches: m.assigned_batches || [],
-        subjects: [], // Managers generally don't have assigned subjects in this schema
+        subjects: [],
       }));
 
       return [...formattedTeachers, ...formattedManagers];
     },
   });
 
-  // 2. Fetch Raw Enrollments (Batch + Subject Pairs)
+  // 2. Fetch Raw Enrollments
   const { data: rawEnrollments } = useQuery({
     queryKey: ['raw-enrollments-staff'],
     queryFn: async () => {
@@ -228,16 +225,14 @@ export const AdminStaffManager = () => {
     return Array.from(batches).sort();
   }, [rawEnrollments]);
 
-  // 4. Compute Dynamic Subjects based on Selected Batches (Only needed for Teachers)
+  // 4. Compute Dynamic Subjects (Only for Teachers)
   const availableSubjects = useMemo(() => {
     if (selectedBatches.length === 0 || !rawEnrollments) return [];
 
-    // Filter enrollments where the batch is in the selected list
     const filteredEnrollments = rawEnrollments.filter(e => 
       e.batch_name && selectedBatches.includes(e.batch_name) && e.subject_name
     );
 
-    // Create formatted strings "Subject (Batch)"
     const subjectOptions = new Set(
       filteredEnrollments.map(e => `${e.subject_name} (${e.batch_name})`)
     );
@@ -263,12 +258,10 @@ export const AdminStaffManager = () => {
         });
         if (error) throw error;
       } else {
-        // Handle Manager Creation
         const { error } = await supabase.from('managers').insert({
           name: newStaffName,
           email: newStaffEmail,
           assigned_batches: selectedBatches, 
-          // Managers table doesn't have assigned_subjects, so we skip it
         });
         
         if (error) throw error;
@@ -332,7 +325,7 @@ export const AdminStaffManager = () => {
                   <Input 
                     value={newStaffName} 
                     onChange={(e) => setNewStaffName(e.target.value)} 
-                    placeholder="John Doe" 
+                    placeholder="Enter staff name" 
                   />
                 </div>
                 <div className="space-y-2">
@@ -341,7 +334,6 @@ export const AdminStaffManager = () => {
                     value={newStaffRole} 
                     onValueChange={(val: any) => {
                       setNewStaffRole(val);
-                      // Clear subjects when switching to manager since they don't use them
                       if (val === 'manager') setSelectedSubjects([]);
                     }}
                   >
@@ -361,11 +353,11 @@ export const AdminStaffManager = () => {
                 <Input 
                   value={newStaffEmail} 
                   onChange={(e) => setNewStaffEmail(e.target.value)} 
-                  placeholder="john@example.com" 
+                  placeholder="Enter email address" 
                 />
               </div>
 
-              {/* BATCH SELECTOR - NOW VISIBLE FOR BOTH ROLES */}
+              {/* BATCH SELECTOR - VISIBLE FOR BOTH ROLES */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Assigned Batches</label>
                 <MultiSelect 
