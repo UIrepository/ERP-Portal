@@ -3,6 +3,7 @@ import { ManagerBatchOverview } from './ManagerBatchOverview';
 import { ManagerScheduleRequests } from './ManagerScheduleRequests';
 import { ManagerTeachers } from './ManagerTeachers';
 import { ManagerStudents } from './ManagerStudents';
+import { StaffInbox } from '@/components/shared/StaffInbox'; // <--- NEW IMPORT
 
 interface ManagerDashboardProps {
   activeTab: string;
@@ -31,6 +32,8 @@ export const ManagerDashboard = ({ activeTab, onTabChange }: ManagerDashboardPro
         return <ManagerTeachers />;
       case 'manager-students':
         return <ManagerStudents />;
+      case 'manager-messages': // <--- NEW CASE
+        return <StaffInbox />;
       default:
         return <ManagerBatchOverview />;
     }
