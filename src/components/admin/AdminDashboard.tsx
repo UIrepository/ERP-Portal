@@ -59,7 +59,7 @@ export const AdminDashboard = ({ activeTab, onTabChange }: AdminDashboardProps) 
 
   return (
     <div className="p-6">
-      {renderTabContent()}
+      {renderTabConten()}
     </div>
   );
 };
