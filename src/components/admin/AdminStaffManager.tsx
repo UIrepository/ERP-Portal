@@ -42,13 +42,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Loader2,
   Plus,
   Trash2,
   Shield,
-  UserCog,
   GraduationCap,
   Check,
   ChevronsUpDown,
@@ -162,7 +160,7 @@ export const AdminStaffManager = () => {
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 1. Fetch Staff List
+  // 1. Fetch Staff List (Combined Teachers & Managers)
   const { data: staff, isLoading } = useQuery({
     queryKey: ['admin-staff'],
     queryFn: async () => {
@@ -172,15 +170,18 @@ export const AdminStaffManager = () => {
         .select('*');
       if (tError) throw tError;
 
-      // Fetch managers 
+      // Fetch managers from the specific 'managers' table
       const { data: managers, error: mError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', 'manager');
-      if (mError) throw mError;
+        .from('managers')
+        .select('*');
+      
+      if (mError) {
+        console.error('Error fetching managers:', mError);
+        // Fallback for older schema versions if needed
+      }
 
-      // Normalize data structure
-      const formattedTeachers = teachers.map((t) => ({
+      // Normalize data structure for teachers
+      const formattedTeachers = (teachers || []).map((t) => ({
         id: t.id,
         user_id: t.user_id,
         name: t.name,
@@ -190,14 +191,15 @@ export const AdminStaffManager = () => {
         subjects: t.assigned_subjects || [],
       }));
 
-      const formattedManagers = managers.map((m) => ({
+      // Normalize data structure for managers
+      const formattedManagers = (managers || []).map((m) => ({
         id: m.id,
         user_id: m.user_id,
-        name: m.name || 'Unknown',
-        email: m.email || '',
+        name: m.name,
+        email: m.email,
         role: 'manager' as const,
-        batches: [],
-        subjects: [],
+        batches: m.assigned_batches || [],
+        subjects: [], // Managers generally don't have assigned subjects in this schema
       }));
 
       return [...formattedTeachers, ...formattedManagers];
@@ -226,7 +228,7 @@ export const AdminStaffManager = () => {
     return Array.from(batches).sort();
   }, [rawEnrollments]);
 
-  // 4. Compute Dynamic Subjects based on Selected Batches
+  // 4. Compute Dynamic Subjects based on Selected Batches (Only needed for Teachers)
   const availableSubjects = useMemo(() => {
     if (selectedBatches.length === 0 || !rawEnrollments) return [];
 
@@ -261,8 +263,15 @@ export const AdminStaffManager = () => {
         });
         if (error) throw error;
       } else {
-        toast({ title: "Manager Setup", description: "Manager creation usually requires the user to sign up first. Feature coming soon." });
-        return;
+        // Handle Manager Creation
+        const { error } = await supabase.from('managers').insert({
+          name: newStaffName,
+          email: newStaffEmail,
+          assigned_batches: selectedBatches, 
+          // Managers table doesn't have assigned_subjects, so we skip it
+        });
+        
+        if (error) throw error;
       }
 
       toast({ title: "Success", description: `${newStaffRole} added successfully.` });
@@ -274,7 +283,8 @@ export const AdminStaffManager = () => {
       queryClient.invalidateQueries({ queryKey: ['admin-staff'] });
 
     } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      console.error(error);
+      toast({ title: "Error", description: error.message || "Failed to create staff member", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -287,7 +297,7 @@ export const AdminStaffManager = () => {
       if (role === 'teacher') {
         await supabase.from('teachers').delete().eq('id', id);
       } else {
-        await supabase.from('profiles').update({ role: 'student' }).eq('id', id);
+        await supabase.from('managers').delete().eq('id', id);
       }
       toast({ title: "Deleted", description: "Staff member removed." });
       queryClient.invalidateQueries({ queryKey: ['admin-staff'] });
@@ -329,7 +339,11 @@ export const AdminStaffManager = () => {
                   <label className="text-sm font-medium">Role</label>
                   <Select 
                     value={newStaffRole} 
-                    onValueChange={(val: any) => setNewStaffRole(val)}
+                    onValueChange={(val: any) => {
+                      setNewStaffRole(val);
+                      // Clear subjects when switching to manager since they don't use them
+                      if (val === 'manager') setSelectedSubjects([]);
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -351,24 +365,21 @@ export const AdminStaffManager = () => {
                 />
               </div>
 
-              {/* DYNAMIC MULTI-SELECT DROPDOWNS */}
-              {newStaffRole === 'teacher' && (
-                <>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Assigned Batches</label>
-                    <MultiSelect 
-                      options={uniqueBatches} 
-                      selected={selectedBatches}
-                      onChange={(newBatches) => {
-                         setSelectedBatches(newBatches);
-                         // Optional: Clear subjects if the batch they belong to is removed? 
-                         // For now, we keep them to prevent accidental data loss, 
-                         // but user can manually remove.
-                      }}
-                      placeholder="Select batches..."
-                    />
-                  </div>
+              {/* BATCH SELECTOR - NOW VISIBLE FOR BOTH ROLES */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Assigned Batches</label>
+                <MultiSelect 
+                  options={uniqueBatches} 
+                  selected={selectedBatches}
+                  onChange={(newBatches) => {
+                     setSelectedBatches(newBatches);
+                  }}
+                  placeholder="Select batches..."
+                />
+              </div>
                   
+              {/* SUBJECT SELECTOR - ONLY FOR TEACHERS */}
+              {newStaffRole === 'teacher' && (
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Assigned Subjects (Filtered by Batch)</label>
                     <MultiSelect 
@@ -384,7 +395,6 @@ export const AdminStaffManager = () => {
                         </p>
                     )}
                   </div>
-                </>
               )}
 
             </div>
