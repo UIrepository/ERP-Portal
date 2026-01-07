@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -26,6 +26,24 @@ export const TeacherScheduleRequests = () => {
     new_end_time: '',
     reason: ''
   });
+
+  // Added Real-time subscription so teachers see approval status instantly
+  useEffect(() => {
+    const channel = supabase
+      .channel('teacher-schedule-requests')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'schedule_requests' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['teacherScheduleRequests'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const { data: teacherInfo } = useQuery({
     queryKey: ['teacherInfo', user?.id],
@@ -179,7 +197,7 @@ export const TeacherScheduleRequests = () => {
         </Card>
       ) : (
         <div className="grid gap-4">
-          {requests.map((request) => (
+          {requests.map((request: any) => (
             <Card key={request.id}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
