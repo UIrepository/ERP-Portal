@@ -6,14 +6,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { CheckCircle, XCircle, Clock, Calendar, User } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Calendar, User, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
 
 export const ManagerScheduleRequests = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Added Real-time subscription so managers see requests instantly
   useEffect(() => {
     const channel = supabase
       .channel('manager-schedule-requests')
@@ -63,20 +62,50 @@ export const ManagerScheduleRequests = () => {
     enabled: !!managerInfo
   });
 
-  const updateRequest = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: 'approved' | 'rejected' }) => {
+  // Dual-update mutation
+  const handleRequest = useMutation({
+    mutationFn: async ({ request, status }: { request: any; status: 'approved' | 'rejected' }) => {
+      
+      // If approving, we MUST update the actual schedule table
+      if (status === 'approved' && request.schedule_id) {
+        // 1. Update the actual schedule
+        const { error: scheduleError } = await supabase
+          .from('schedules')
+          .update({
+            date: request.new_date,
+            start_time: request.new_start_time,
+            end_time: request.new_end_time,
+            // Calculate new day of week from date
+            day_of_week: new Date(request.new_date).getDay()
+          })
+          .eq('id', request.schedule_id);
+          
+        if (scheduleError) {
+            console.error("Schedule Update Failed", scheduleError);
+            throw new Error('Failed to update the class schedule');
+        }
+      }
+
+      // 2. Update the request status
       const { error } = await supabase
         .from('schedule_requests')
-        .update({ status, reviewed_by: user?.id, reviewed_at: new Date().toISOString() })
-        .eq('id', id);
+        .update({ 
+          status, 
+          reviewed_by: user?.id, 
+          reviewed_at: new Date().toISOString() 
+        })
+        .eq('id', request.id);
+        
       if (error) throw error;
     },
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ['managerScheduleRequests'] });
-      toast.success(`Request ${status}`);
+      // Also invalidate schedules so everyone sees the change immediately
+      queryClient.invalidateQueries({ queryKey: ['admin-all-schedules'] }); 
+      toast.success(`Request ${status} and schedule updated if approved`);
     },
-    onError: () => {
-      toast.error('Failed to update request');
+    onError: (err) => {
+      toast.error(err.message || 'Failed to process request');
     }
   });
 
@@ -116,41 +145,52 @@ export const ManagerScheduleRequests = () => {
       ) : (
         <div className="grid gap-4">
           {requests.map((request: any) => (
-            <Card key={request.id}>
+            <Card key={request.id} className={request.status === 'pending' ? 'border-l-4 border-l-yellow-400' : ''}>
               <CardContent className="p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="font-semibold">{request.subject}</h3>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold text-lg">{request.subject}</h3>
                       <Badge variant="outline">{request.batch}</Badge>
                       {getStatusBadge(request.status || 'pending')}
                     </div>
-                    <p className="text-sm text-muted-foreground mb-1">
-                      By: {request.teachers?.name || 'Unknown Teacher'}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Requested: {format(new Date(request.new_date), 'MMM d, yyyy')} • {request.new_start_time} - {request.new_end_time}
-                    </p>
+                    
+                    <div className="text-sm text-muted-foreground space-y-1">
+                        <div className="flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            <span>Teacher: {request.teachers?.name || 'Unknown'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4" />
+                            <span>New Proposal: </span>
+                            <span className="font-medium text-foreground">{format(new Date(request.new_date), 'MMM d, yyyy')} • {request.new_start_time} - {request.new_end_time}</span>
+                        </div>
+                    </div>
+
                     {request.reason && (
-                      <p className="text-sm mt-2 bg-muted p-2 rounded">{request.reason}</p>
+                      <p className="text-sm bg-muted p-2 rounded mt-2 border-l-2 border-primary/20 pl-3">
+                        {request.reason}
+                      </p>
                     )}
                   </div>
+
                   {request.status === 'pending' && (
-                    <div className="flex gap-2 ml-4">
+                    <div className="flex sm:flex-col gap-2 w-full sm:w-auto min-w-[100px]">
                       <Button
                         size="sm"
-                        variant="outline"
-                        className="text-green-600 hover:text-green-700"
-                        onClick={() => updateRequest.mutate({ id: request.id, status: 'approved' })}
+                        className="bg-green-600 hover:bg-green-700 flex-1"
+                        onClick={() => handleRequest.mutate({ request, status: 'approved' })}
+                        disabled={handleRequest.isPending}
                       >
                         <CheckCircle className="h-4 w-4 mr-1" />
                         Approve
                       </Button>
                       <Button
                         size="sm"
-                        variant="outline"
-                        className="text-red-600 hover:text-red-700"
-                        onClick={() => updateRequest.mutate({ id: request.id, status: 'rejected' })}
+                        variant="destructive"
+                        className="flex-1"
+                        onClick={() => handleRequest.mutate({ request, status: 'rejected' })}
+                        disabled={handleRequest.isPending}
                       >
                         <XCircle className="h-4 w-4 mr-1" />
                         Reject
