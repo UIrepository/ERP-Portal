@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Clock, Calendar, CheckCircle, XCircle, Loader2, ArrowRight, AlertCircle, Filter } from 'lucide-react';
+import { Plus, Clock, Calendar, CheckCircle, XCircle, Loader2, ArrowRight, Filter, AlertCircle } from 'lucide-react';
 import { format, isSameDay, parseISO, getDay } from 'date-fns';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -21,7 +21,7 @@ export const TeacherScheduleRequests = () => {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   
-  // State for the wizard-like flow
+  // State for the wizard-like flow to ensure we capture the schedule_id
   const [filterDate, setFilterDate] = useState<string>(''); // Date Filter State
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>('');
   const [formData, setFormData] = useState({
@@ -49,7 +49,7 @@ export const TeacherScheduleRequests = () => {
     };
   }, [queryClient]);
 
-  // 1. Fetch Teacher Info
+  // Fetch teacher info to get assigned batches and subjects
   const { data: teacherInfo } = useQuery({
     queryKey: ['teacherInfo', user?.id],
     queryFn: async () => {
@@ -64,7 +64,7 @@ export const TeacherScheduleRequests = () => {
     enabled: !!user?.id
   });
 
-  // 2. Fetch Teacher's Existing Schedules 
+  // Fetch Teacher's Existing Schedules to populate the dropdown
   const { data: mySchedules, isLoading: isLoadingSchedules } = useQuery({
     queryKey: ['teacherSchedules', teacherInfo?.id],
     queryFn: async () => {
@@ -91,7 +91,7 @@ export const TeacherScheduleRequests = () => {
     enabled: !!teacherInfo
   });
 
-  // 3. Helper: Filter Schedules by Selected Date
+  // Helper: Filter Schedules by Selected Date for the dropdown
   const getFilteredSchedules = () => {
     if (!mySchedules || !filterDate) return [];
 
@@ -111,7 +111,7 @@ export const TeacherScheduleRequests = () => {
 
   const filteredSchedules = getFilteredSchedules();
 
-  // 4. Fetch Previous Requests
+  // Fetch Previous Requests
   const { data: requests, isLoading: isLoadingRequests } = useQuery({
     queryKey: ['teacherScheduleRequests', teacherInfo?.id],
     queryFn: async () => {
@@ -127,17 +127,18 @@ export const TeacherScheduleRequests = () => {
     enabled: !!teacherInfo?.id
   });
 
-  // 5. Create Request Mutation
+  // Create Request Mutation
   const createRequest = useMutation({
     mutationFn: async () => {
-      if (!teacherInfo?.id || !selectedScheduleId) throw new Error('Missing info');
+      if (!teacherInfo?.id) throw new Error('Teacher info not found');
+      if (!selectedScheduleId) throw new Error('Please select a class to reschedule');
       
       // Find the full schedule object based on the ID selected
       const selectedClass = mySchedules?.find(s => s.id === selectedScheduleId);
       
       if (!selectedClass) throw new Error('Invalid class selected');
 
-      // CRITICAL FIX: Include schedule_id in the insert
+      // CRITICAL FIX: Include schedule_id in the insert so managers can update it later
       const { error } = await supabase
         .from('schedule_requests')
         .insert({
@@ -154,7 +155,8 @@ export const TeacherScheduleRequests = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success('Reschedule request submitted successfully');
+      queryClient.invalidateQueries({ queryKey: ['teacherScheduleRequests'] });
+      toast.success('Schedule request submitted successfully');
       setIsDialogOpen(false);
       // Reset form
       setFormData({ new_date: '', new_start_time: '', new_end_time: '', reason: '' });
@@ -325,7 +327,7 @@ export const TeacherScheduleRequests = () => {
         </Card>
       ) : (
         <div className="grid gap-4">
-          {requests.map((request) => (
+          {requests.map((request: any) => (
             <Card key={request.id}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
