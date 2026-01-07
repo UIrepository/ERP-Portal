@@ -70,7 +70,7 @@ export const ManagerScheduleRequests = () => {
       if (status === 'approved') {
         if (!request.schedule_id) {
            console.warn("No schedule_id found on this request. Cannot update schedule automatically.");
-           // We continue to approve the request status, but warn the user in console.
+           throw new Error("Cannot auto-update: This is an old request without a schedule link.");
         } else {
             // Update the actual class time
             const { error: scheduleError } = await supabase
