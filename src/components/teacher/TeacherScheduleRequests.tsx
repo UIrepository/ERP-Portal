@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Clock, Calendar, CheckCircle, XCircle, Loader2, ArrowRight, AlertCircle } from 'lucide-react';
+import { Plus, Clock, Calendar, CheckCircle, XCircle, Loader2, ArrowRight, AlertCircle, Info } from 'lucide-react';
 import { format } from 'date-fns';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -49,7 +49,7 @@ export const TeacherScheduleRequests = () => {
   }, [queryClient]);
 
   // 1. Fetch Teacher Info
-  const { data: teacherInfo } = useQuery({
+  const { data: teacherInfo, isLoading: isLoadingTeacher } = useQuery({
     queryKey: ['teacherInfo', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -64,28 +64,25 @@ export const TeacherScheduleRequests = () => {
   });
 
   // 2. Fetch Teacher's Existing Schedules 
-  // Simplified logic: Grab batches/subjects from teacher table -> Fetch matching schedules
-  const { data: mySchedules } = useQuery({
+  // Strategy: Fetch by BATCH first, then filter by SUBJECT in memory for robustness
+  const { data: mySchedules, isLoading: isLoadingSchedules } = useQuery({
     queryKey: ['teacherSchedules', teacherInfo?.id],
     queryFn: async () => {
-      // If teacher info isn't loaded yet, return empty
       if (!teacherInfo) return [];
 
-      // Safely handle nulls by defaulting to empty arrays
       const batches = teacherInfo.assigned_batches || [];
       const subjects = teacherInfo.assigned_subjects || [];
 
-      // If no batches or subjects are assigned, we can't find schedules
-      if (batches.length === 0 || subjects.length === 0) {
-        console.log('Teacher has no assigned batches or subjects');
+      if (batches.length === 0) {
+        console.log('Teacher has no assigned batches');
         return [];
       }
       
+      // Fetch ALL schedules for the teacher's batches
       const { data, error } = await supabase
         .from('schedules')
         .select('*')
         .in('batch', batches)
-        .in('subject', subjects)
         .order('day_of_week')
         .order('start_time');
 
@@ -94,13 +91,17 @@ export const TeacherScheduleRequests = () => {
         throw error;
       }
       
-      return data || [];
+      // Filter in memory: Only keep schedules where the subject matches the teacher's assigned subjects
+      // This is safer than a complex SQL query if there are slight naming mismatches
+      const filtered = (data || []).filter(schedule => subjects.includes(schedule.subject));
+      
+      return filtered;
     },
     enabled: !!teacherInfo
   });
 
   // 3. Fetch Previous Requests
-  const { data: requests, isLoading } = useQuery({
+  const { data: requests, isLoading: isLoadingRequests } = useQuery({
     queryKey: ['teacherScheduleRequests', teacherInfo?.id],
     queryFn: async () => {
       if (!teacherInfo?.id) return [];
@@ -124,8 +125,7 @@ export const TeacherScheduleRequests = () => {
       
       if (!selectedClass) throw new Error('Invalid class selected');
 
-      // Security check: Ensure teacher is actually assigned to this subject
-      // (Using the safe accessor ?. to prevent crashes if array is somehow missing)
+      // Security check: Double verify subject assignment
       if (!teacherInfo.assigned_subjects?.includes(selectedClass.subject)) {
         throw new Error('You are not authorized to update this subject');
       }
@@ -176,6 +176,8 @@ export const TeacherScheduleRequests = () => {
     return `${schedule.subject} (${schedule.batch}) on ${day} at ${time}`;
   };
 
+  const isLoading = isLoadingTeacher || isLoadingRequests;
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -204,7 +206,11 @@ export const TeacherScheduleRequests = () => {
               {/* Step 1: Select Existing Class */}
               <div className="space-y-2">
                 <Label>Select Your Class</Label>
-                {mySchedules && mySchedules.length > 0 ? (
+                {isLoadingSchedules ? (
+                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Loading your classes...
+                   </div>
+                ) : mySchedules && mySchedules.length > 0 ? (
                   <Select value={selectedScheduleId} onValueChange={setSelectedScheduleId}>
                     <SelectTrigger>
                       <SelectValue placeholder="Choose a class to reschedule..." />
@@ -218,12 +224,22 @@ export const TeacherScheduleRequests = () => {
                     </SelectContent>
                   </Select>
                 ) : (
-                  <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-md flex items-start gap-2">
-                    <AlertCircle className="h-4 w-4 mt-0.5" />
-                    <span>
-                      No scheduled classes found. 
-                      (Checked batches: {teacherInfo?.assigned_batches?.join(', ') || 'None'})
-                    </span>
+                  <div className="space-y-3">
+                    <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-md flex items-start gap-2 border border-amber-200">
+                      <AlertCircle className="h-5 w-5 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="font-semibold">No classes found matching your profile.</p>
+                        <p className="mt-1">We couldn't find any schedule entries that match both your assigned batches and subjects.</p>
+                      </div>
+                    </div>
+                    {/* Debug Info to help the user understand WHY */}
+                    <div className="text-xs text-muted-foreground bg-muted p-3 rounded-md border">
+                        <p className="font-semibold mb-1 flex items-center gap-1"><Info className="h-3 w-3"/> System Debug Info:</p>
+                        <ul className="list-disc pl-4 space-y-1">
+                            <li>Your Assigned Batches: {teacherInfo?.assigned_batches?.length ? teacherInfo.assigned_batches.join(', ') : <span className="text-red-500">None</span>}</li>
+                            <li>Your Assigned Subjects: {teacherInfo?.assigned_subjects?.length ? teacherInfo.assigned_subjects.join(', ') : <span className="text-red-500">None</span>}</li>
+                        </ul>
+                    </div>
                   </div>
                 )}
               </div>
@@ -231,8 +247,8 @@ export const TeacherScheduleRequests = () => {
               {/* Step 2: Show form only if class selected */}
               {selectedScheduleId && (
                 <div className="space-y-4 border-t pt-4 animate-in slide-in-from-top-2 fade-in">
-                  <div className="bg-blue-50 p-3 rounded-md text-sm text-blue-700 mb-2">
-                    <span className="font-semibold">Note:</span> Requesting change for {mySchedules?.find(s => s.id === selectedScheduleId)?.subject}
+                  <div className="bg-blue-50 p-3 rounded-md text-sm text-blue-700 mb-2 border border-blue-100">
+                    <span className="font-semibold">Selected Class:</span> {mySchedules?.find(s => s.id === selectedScheduleId)?.subject} ({mySchedules?.find(s => s.id === selectedScheduleId)?.batch})
                   </div>
 
                   <div className="space-y-2">
