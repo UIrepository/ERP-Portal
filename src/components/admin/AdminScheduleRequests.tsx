@@ -6,14 +6,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { CheckCircle, XCircle, Clock, Calendar, User } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Calendar, User, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 
 export const AdminScheduleRequests = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Real-time subscription
+  // Real-time listener
   useEffect(() => {
     const channel = supabase
       .channel('admin-schedule-requests')
@@ -34,7 +34,7 @@ export const AdminScheduleRequests = () => {
   const { data: requests, isLoading } = useQuery({
     queryKey: ['adminScheduleRequests'],
     queryFn: async () => {
-      // Admins see ALL requests from ALL batches
+      // Admins see ALL requests
       const { data, error } = await supabase
         .from('schedule_requests')
         .select(`
@@ -54,8 +54,8 @@ export const AdminScheduleRequests = () => {
       // LOGIC: If approving, update the actual schedule table
       if (status === 'approved') {
         if (!request.schedule_id) {
-           console.warn("No schedule_id found on this request. Cannot update schedule automatically.");
-           // We continue to approve the request status, but warn the user.
+           console.warn("No schedule_id found on this request.");
+           // We continue but cannot update the schedule table
         } else {
             const { error: scheduleError } = await supabase
               .from('schedules')
@@ -63,7 +63,6 @@ export const AdminScheduleRequests = () => {
                 date: request.new_date,
                 start_time: request.new_start_time,
                 end_time: request.new_end_time,
-                // Optional: Recalculate day of week if needed
                 day_of_week: new Date(request.new_date).getDay()
               })
               .eq('id', request.schedule_id);
@@ -89,7 +88,7 @@ export const AdminScheduleRequests = () => {
     },
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ['adminScheduleRequests'] });
-      // Force refresh of schedules so the new time shows up immediately everywhere
+      // Force refresh of schedules so the new time shows up immediately
       queryClient.invalidateQueries({ queryKey: ['admin-all-schedules'] });
       toast.success(`Request ${status} successfully`);
     },
@@ -172,11 +171,12 @@ export const AdminScheduleRequests = () => {
                       </div>
                     )}
 
-                    {/* Helper text if this is an old request without ID */}
+                    {/* Safety Alert for Old Requests */}
                     {request.status === 'pending' && !request.schedule_id && (
-                        <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded mt-2 border border-amber-200">
-                           ⚠️ Old Request: This request is missing a schedule link. Approving it will update the status but <strong>will not</strong> automatically change the class time. You may need to update the schedule manually.
-                        </p>
+                        <div className="flex gap-2 items-start text-xs text-amber-700 bg-amber-50 p-2 rounded border border-amber-200 mt-2">
+                           <AlertTriangle className="h-4 w-4 shrink-0" />
+                           <p><strong>Warning:</strong> This is a legacy request (missing ID). Approving it will update the status but <strong>will NOT</strong> auto-update the schedule. You must change the schedule manually.</p>
+                        </div>
                     )}
                   </div>
 
