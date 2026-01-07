@@ -63,22 +63,37 @@ export const TeacherScheduleRequests = () => {
     enabled: !!user?.id
   });
 
-  // 2. Fetch Teacher's Existing Schedules (STRICTLY FILTERED BY SUBJECT)
+  // 2. Fetch Teacher's Existing Schedules 
+  // Simplified logic: Grab batches/subjects from teacher table -> Fetch matching schedules
   const { data: mySchedules } = useQuery({
     queryKey: ['teacherSchedules', teacherInfo?.id],
     queryFn: async () => {
-      if (!teacherInfo?.assigned_batches?.length || !teacherInfo?.assigned_subjects?.length) return [];
+      // If teacher info isn't loaded yet, return empty
+      if (!teacherInfo) return [];
+
+      // Safely handle nulls by defaulting to empty arrays
+      const batches = teacherInfo.assigned_batches || [];
+      const subjects = teacherInfo.assigned_subjects || [];
+
+      // If no batches or subjects are assigned, we can't find schedules
+      if (batches.length === 0 || subjects.length === 0) {
+        console.log('Teacher has no assigned batches or subjects');
+        return [];
+      }
       
       const { data, error } = await supabase
         .from('schedules')
         .select('*')
-        .in('batch', teacherInfo.assigned_batches)
-        // This is the CRITICAL check: Only fetch schedules for subjects this teacher is assigned to
-        .in('subject', teacherInfo.assigned_subjects) 
+        .in('batch', batches)
+        .in('subject', subjects)
         .order('day_of_week')
         .order('start_time');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching schedules:', error);
+        throw error;
+      }
+      
       return data || [];
     },
     enabled: !!teacherInfo
@@ -107,8 +122,10 @@ export const TeacherScheduleRequests = () => {
       
       const selectedClass = mySchedules?.find(s => s.id === selectedScheduleId);
       
-      // Double check security validation
       if (!selectedClass) throw new Error('Invalid class selected');
+
+      // Security check: Ensure teacher is actually assigned to this subject
+      // (Using the safe accessor ?. to prevent crashes if array is somehow missing)
       if (!teacherInfo.assigned_subjects?.includes(selectedClass.subject)) {
         throw new Error('You are not authorized to update this subject');
       }
@@ -203,7 +220,10 @@ export const TeacherScheduleRequests = () => {
                 ) : (
                   <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-md flex items-start gap-2">
                     <AlertCircle className="h-4 w-4 mt-0.5" />
-                    <span>No scheduled classes found for your assigned subjects.</span>
+                    <span>
+                      No scheduled classes found. 
+                      (Checked batches: {teacherInfo?.assigned_batches?.join(', ') || 'None'})
+                    </span>
                   </div>
                 )}
               </div>
