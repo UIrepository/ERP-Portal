@@ -13,6 +13,7 @@ export const ManagerScheduleRequests = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  // Listen for real-time changes
   useEffect(() => {
     const channel = supabase
       .channel('manager-schedule-requests')
@@ -65,25 +66,31 @@ export const ManagerScheduleRequests = () => {
   const handleRequest = useMutation({
     mutationFn: async ({ request, status }: { request: any; status: 'approved' | 'rejected' }) => {
       
-      // If approving, update the actual schedule
-      if (status === 'approved' && request.schedule_id) {
-        const { error: scheduleError } = await supabase
-          .from('schedules')
-          .update({
-            date: request.new_date,
-            start_time: request.new_start_time,
-            end_time: request.new_end_time,
-            day_of_week: new Date(request.new_date).getDay()
-          })
-          .eq('id', request.schedule_id);
-          
-        if (scheduleError) {
-            console.error("Schedule Update Failed", scheduleError);
-            throw new Error('Failed to update the class schedule');
+      // LOGIC: If approving, update the actual schedule table
+      if (status === 'approved') {
+        if (!request.schedule_id) {
+           console.warn("No schedule_id found on this request. Cannot update schedule automatically.");
+           // We continue to approve the request status, but warn the user.
+        } else {
+            const { error: scheduleError } = await supabase
+              .from('schedules')
+              .update({
+                date: request.new_date,
+                start_time: request.new_start_time,
+                end_time: request.new_end_time,
+                // Optional: Recalculate day of week if needed
+                day_of_week: new Date(request.new_date).getDay()
+              })
+              .eq('id', request.schedule_id);
+              
+            if (scheduleError) {
+                console.error("Schedule Update Failed", scheduleError);
+                throw new Error('Failed to update the class schedule. Check permissions.');
+            }
         }
       }
 
-      // Update the request status
+      // Update the request status to approved/rejected
       const { error } = await supabase
         .from('schedule_requests')
         .update({ 
@@ -97,8 +104,9 @@ export const ManagerScheduleRequests = () => {
     },
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ['managerScheduleRequests'] });
+      // Force refresh of schedules so the new time shows up immediately
       queryClient.invalidateQueries({ queryKey: ['admin-all-schedules'] }); 
-      toast.success(`Request ${status} and schedule updated if approved`);
+      toast.success(`Request ${status} successfully`);
     },
     onError: (err) => {
       toast.error(err.message || 'Failed to process request');
@@ -167,6 +175,13 @@ export const ManagerScheduleRequests = () => {
                       <p className="text-sm bg-muted p-2 rounded mt-2 border-l-2 border-primary/20 pl-3">
                         {request.reason}
                       </p>
+                    )}
+                    
+                    {/* Helper text if this is an old request without ID */}
+                    {request.status === 'pending' && !request.schedule_id && (
+                        <p className="text-xs text-amber-600 bg-amber-50 p-1 rounded inline-block">
+                           ⚠️ Old Request: Schedule won't auto-update.
+                        </p>
                     )}
                   </div>
 
