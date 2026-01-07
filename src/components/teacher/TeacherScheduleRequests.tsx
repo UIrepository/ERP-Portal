@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Clock, Calendar, CheckCircle, XCircle, Loader2, ArrowRight } from 'lucide-react';
+import { Plus, Clock, Calendar, CheckCircle, XCircle, Loader2, ArrowRight, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -63,17 +63,18 @@ export const TeacherScheduleRequests = () => {
     enabled: !!user?.id
   });
 
-  // 2. Fetch Teacher's Existing Schedules (For the Dropdown)
+  // 2. Fetch Teacher's Existing Schedules (STRICTLY FILTERED BY SUBJECT)
   const { data: mySchedules } = useQuery({
     queryKey: ['teacherSchedules', teacherInfo?.id],
     queryFn: async () => {
-      if (!teacherInfo?.assigned_batches?.length) return [];
+      if (!teacherInfo?.assigned_batches?.length || !teacherInfo?.assigned_subjects?.length) return [];
       
       const { data, error } = await supabase
         .from('schedules')
         .select('*')
         .in('batch', teacherInfo.assigned_batches)
-        .in('subject', teacherInfo.assigned_subjects || [])
+        // This is the CRITICAL check: Only fetch schedules for subjects this teacher is assigned to
+        .in('subject', teacherInfo.assigned_subjects) 
         .order('day_of_week')
         .order('start_time');
 
@@ -105,13 +106,18 @@ export const TeacherScheduleRequests = () => {
       if (!teacherInfo?.id || !selectedScheduleId) throw new Error('Missing info');
       
       const selectedClass = mySchedules?.find(s => s.id === selectedScheduleId);
-      if (!selectedClass) throw new Error('Selected class not found');
+      
+      // Double check security validation
+      if (!selectedClass) throw new Error('Invalid class selected');
+      if (!teacherInfo.assigned_subjects?.includes(selectedClass.subject)) {
+        throw new Error('You are not authorized to update this subject');
+      }
 
       const { error } = await supabase
         .from('schedule_requests')
         .insert({
           requested_by: teacherInfo.id,
-          schedule_id: selectedScheduleId, // Critical: Link to the specific schedule
+          schedule_id: selectedScheduleId,
           batch: selectedClass.batch,
           subject: selectedClass.subject,
           new_date: formData.new_date,
@@ -180,26 +186,37 @@ export const TeacherScheduleRequests = () => {
               
               {/* Step 1: Select Existing Class */}
               <div className="space-y-2">
-                <Label>Select Class to Reschedule</Label>
-                <Select value={selectedScheduleId} onValueChange={setSelectedScheduleId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a class..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {mySchedules?.map((schedule) => (
-                      <SelectItem key={schedule.id} value={schedule.id}>
-                        {getScheduleLabel(schedule)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Select Your Class</Label>
+                {mySchedules && mySchedules.length > 0 ? (
+                  <Select value={selectedScheduleId} onValueChange={setSelectedScheduleId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a class to reschedule..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {mySchedules.map((schedule) => (
+                        <SelectItem key={schedule.id} value={schedule.id}>
+                          {getScheduleLabel(schedule)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-md flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 mt-0.5" />
+                    <span>No scheduled classes found for your assigned subjects.</span>
+                  </div>
+                )}
               </div>
 
               {/* Step 2: Show form only if class selected */}
               {selectedScheduleId && (
                 <div className="space-y-4 border-t pt-4 animate-in slide-in-from-top-2 fade-in">
+                  <div className="bg-blue-50 p-3 rounded-md text-sm text-blue-700 mb-2">
+                    <span className="font-semibold">Note:</span> Requesting change for {mySchedules?.find(s => s.id === selectedScheduleId)?.subject}
+                  </div>
+
                   <div className="space-y-2">
-                    <Label>New Date</Label>
+                    <Label>Proposed Date</Label>
                     <Input 
                       type="date" 
                       value={formData.new_date} 
