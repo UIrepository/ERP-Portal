@@ -13,6 +13,7 @@ export const AdminScheduleRequests = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  // Real-time subscription
   useEffect(() => {
     const channel = supabase
       .channel('admin-schedule-requests')
@@ -33,6 +34,7 @@ export const AdminScheduleRequests = () => {
   const { data: requests, isLoading } = useQuery({
     queryKey: ['adminScheduleRequests'],
     queryFn: async () => {
+      // Admins see ALL requests from ALL batches
       const { data, error } = await supabase
         .from('schedule_requests')
         .select(`
@@ -49,25 +51,31 @@ export const AdminScheduleRequests = () => {
   const handleRequest = useMutation({
     mutationFn: async ({ request, status }: { request: any; status: 'approved' | 'rejected' }) => {
       
-      if (status === 'approved' && request.schedule_id) {
-         // Update the actual schedule
-         const { error: scheduleError } = await supabase
-           .from('schedules')
-           .update({
-             date: request.new_date,
-             start_time: request.new_start_time,
-             end_time: request.new_end_time,
-             day_of_week: new Date(request.new_date).getDay()
-           })
-           .eq('id', request.schedule_id);
-           
-         if (scheduleError) {
-             console.error("Schedule Update Failed", scheduleError);
-             throw new Error('Failed to update the class schedule');
-         }
-       }
+      // LOGIC: If approving, update the actual schedule table
+      if (status === 'approved') {
+        if (!request.schedule_id) {
+           console.warn("No schedule_id found on this request. Cannot update schedule automatically.");
+           // We continue to approve the request status, but warn the user.
+        } else {
+            const { error: scheduleError } = await supabase
+              .from('schedules')
+              .update({
+                date: request.new_date,
+                start_time: request.new_start_time,
+                end_time: request.new_end_time,
+                // Optional: Recalculate day of week if needed
+                day_of_week: new Date(request.new_date).getDay()
+              })
+              .eq('id', request.schedule_id);
+              
+            if (scheduleError) {
+                console.error("Schedule Update Failed", scheduleError);
+                throw new Error('Failed to update the class schedule. Check permissions.');
+            }
+        }
+      }
 
-      // Update Request Status
+      // Update the request status
       const { error } = await supabase
         .from('schedule_requests')
         .update({ 
@@ -76,12 +84,14 @@ export const AdminScheduleRequests = () => {
           reviewed_at: new Date().toISOString() 
         })
         .eq('id', request.id);
+        
       if (error) throw error;
     },
     onSuccess: (_, { status }) => {
-      toast.success(`Request ${status} and schedule updated`);
       queryClient.invalidateQueries({ queryKey: ['adminScheduleRequests'] });
+      // Force refresh of schedules so the new time shows up immediately everywhere
       queryClient.invalidateQueries({ queryKey: ['admin-all-schedules'] });
+      toast.success(`Request ${status} successfully`);
     },
     onError: (err) => {
       toast.error(err.message || 'Failed to update request');
@@ -160,6 +170,13 @@ export const AdminScheduleRequests = () => {
                         <span className="font-semibold block mb-1">Reason:</span>
                         {request.reason}
                       </div>
+                    )}
+
+                    {/* Helper text if this is an old request without ID */}
+                    {request.status === 'pending' && !request.schedule_id && (
+                        <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded mt-2 border border-amber-200">
+                           ⚠️ Old Request: This request is missing a schedule link. Approving it will update the status but <strong>will not</strong> automatically change the class time. You may need to update the schedule manually.
+                        </p>
                     )}
                   </div>
 
