@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -5,12 +6,30 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { CheckCircle, XCircle, Clock, Calendar } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Calendar, User } from 'lucide-react';
 import { format } from 'date-fns';
 
 export const ManagerScheduleRequests = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+
+  // Added Real-time subscription so managers see requests instantly
+  useEffect(() => {
+    const channel = supabase
+      .channel('manager-schedule-requests')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'schedule_requests' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['managerScheduleRequests'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const { data: managerInfo } = useQuery({
     queryKey: ['managerInfo', user?.id],
