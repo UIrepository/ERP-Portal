@@ -142,7 +142,8 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const adminTabs = [
     { id: 'enrollment-analytics', label: 'Student Analytics', icon: BarChart2 },
     { id: 'admin-messages', label: 'Messages / Inbox', icon: MessageSquare },
-    { id: 'directory', label: 'Student Directory', icon: Contact }, // <--- ADDED
+    { id: 'schedule-requests', label: 'Schedule Requests', icon: ClipboardList }, // <--- ADDED THIS LINE
+    { id: 'directory', label: 'Student Directory', icon: Contact },
     { id: 'staff-manager', label: 'Staff Management', icon: UserCog },
     { id: 'community-admin', label: 'Community Chat', icon: Users }, 
     { id: 'schedules', label: 'Schedules', icon: Calendar },
