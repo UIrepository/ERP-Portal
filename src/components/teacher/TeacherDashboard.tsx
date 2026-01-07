@@ -2,7 +2,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { TeacherSchedule } from './TeacherSchedule';
 import { TeacherRecordings } from './TeacherRecordings';
 import { TeacherScheduleRequests } from './TeacherScheduleRequests';
-import { StaffInbox } from '@/components/shared/StaffInbox'; // <--- NEW IMPORT (Replaced TeacherMessages)
+import { StaffInbox } from '@/components/shared/StaffInbox';
+import { TeacherFeedbackViewer } from './TeacherFeedbackViewer'; // <--- NEW IMPORT
 
 interface TeacherDashboardProps {
   activeTab: string;
@@ -30,7 +31,9 @@ export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardPro
       case 'teacher-schedule-requests':
         return <TeacherScheduleRequests />;
       case 'teacher-messages':
-        return <StaffInbox />; // <--- NOW USES SHARED INBOX
+        return <StaffInbox />;
+      case 'teacher-feedback': // <--- NEW CASE
+        return <TeacherFeedbackViewer />;
       default:
         return <TeacherSchedule />;
     }
