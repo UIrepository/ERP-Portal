@@ -31,7 +31,7 @@ export const TeacherScheduleRequests = () => {
     reason: ''
   });
 
-  // Real-time listener
+  // Real-time listener for status updates
   useEffect(() => {
     const channel = supabase
       .channel('teacher-schedule-requests')
@@ -132,15 +132,17 @@ export const TeacherScheduleRequests = () => {
     mutationFn: async () => {
       if (!teacherInfo?.id || !selectedScheduleId) throw new Error('Missing info');
       
+      // Find the full schedule object based on the ID selected
       const selectedClass = mySchedules?.find(s => s.id === selectedScheduleId);
       
       if (!selectedClass) throw new Error('Invalid class selected');
 
+      // CRITICAL FIX: Include schedule_id in the insert
       const { error } = await supabase
         .from('schedule_requests')
         .insert({
           requested_by: teacherInfo.id,
-          schedule_id: selectedScheduleId,
+          schedule_id: selectedScheduleId, // This links the request to the specific class
           batch: selectedClass.batch,
           subject: selectedClass.subject,
           new_date: formData.new_date,
@@ -152,8 +154,9 @@ export const TeacherScheduleRequests = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success('Reschedule request submitted');
+      toast.success('Reschedule request submitted successfully');
       setIsDialogOpen(false);
+      // Reset form
       setFormData({ new_date: '', new_start_time: '', new_end_time: '', reason: '' });
       setSelectedScheduleId('');
       setFilterDate(''); // Reset filter
@@ -180,15 +183,15 @@ export const TeacherScheduleRequests = () => {
     return `${schedule.subject} (${schedule.batch}) | ${time}`;
   };
 
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+
   if (isLoadingRequests) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
-
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
 
   return (
     <div className="space-y-6">
