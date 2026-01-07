@@ -24,6 +24,7 @@ import {
   UserCog,
   GraduationCap,
   Contact, // Using Contact icon for Directory
+  Star, // <--- ADDED STAR IMPORT
 } from 'lucide-react';
 
 import {
@@ -121,11 +122,12 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     { id: 'contact-admin', label: 'Contact Admin', icon: Phone }, 
   ];
 
-  // --- 2. TEACHER TABS ---
+  // --- 2. TEACHER TABS (Updated) ---
   const teacherTabs = [
     { id: 'teacher-schedule', label: 'My Schedule', icon: Calendar },
     { id: 'teacher-recordings', label: 'My Recordings', icon: Video },
     { id: 'teacher-schedule-requests', label: 'Schedule Requests', icon: ClipboardList },
+    { id: 'teacher-feedback', label: 'Feedback', icon: Star }, // <--- ADDED FEEDBACK TAB
     { id: 'teacher-messages', label: 'Messages', icon: MessageSquare },
   ];
 
@@ -142,8 +144,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const adminTabs = [
     { id: 'enrollment-analytics', label: 'Student Analytics', icon: BarChart2 },
     { id: 'admin-messages', label: 'Messages / Inbox', icon: MessageSquare },
-    { id: 'schedule-requests', label: 'Schedule Requests', icon: ClipboardList }, // <--- ADDED THIS LINE
-    { id: 'directory', label: 'Student Directory', icon: Contact },
+    { id: 'directory', label: 'Student Directory', icon: Contact }, // <--- ADDED
     { id: 'staff-manager', label: 'Staff Management', icon: UserCog },
     { id: 'community-admin', label: 'Community Chat', icon: Users }, 
     { id: 'schedules', label: 'Schedules', icon: Calendar },
