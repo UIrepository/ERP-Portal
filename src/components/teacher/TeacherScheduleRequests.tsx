@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Clock, Calendar, CheckCircle, XCircle, Loader2, ArrowRight, Filter, AlertCircle } from 'lucide-react';
+import { Plus, Clock, Calendar, CheckCircle, XCircle, Loader2, ArrowRight, AlertCircle, Filter } from 'lucide-react';
 import { format, isSameDay, parseISO, getDay } from 'date-fns';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -21,7 +21,7 @@ export const TeacherScheduleRequests = () => {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   
-  // State for the wizard-like flow to ensure we capture the schedule_id
+  // State for the wizard-like flow
   const [filterDate, setFilterDate] = useState<string>(''); // Date Filter State
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>('');
   const [formData, setFormData] = useState({
@@ -64,7 +64,7 @@ export const TeacherScheduleRequests = () => {
     enabled: !!user?.id
   });
 
-  // Fetch Teacher's Existing Schedules to populate the dropdown
+  // Fetch Teacher's Existing Schedules 
   const { data: mySchedules, isLoading: isLoadingSchedules } = useQuery({
     queryKey: ['teacherSchedules', teacherInfo?.id],
     queryFn: async () => {
@@ -327,7 +327,7 @@ export const TeacherScheduleRequests = () => {
         </Card>
       ) : (
         <div className="grid gap-4">
-          {requests.map((request: any) => (
+          {requests.map((request) => (
             <Card key={request.id}>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
