@@ -15,7 +15,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
@@ -51,6 +50,7 @@ import {
   Check,
   ChevronsUpDown,
   X,
+  Edit,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -151,6 +151,9 @@ export const AdminStaffManager = () => {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  
+  // Edit State
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Form State
   const [newStaffName, setNewStaffName] = useState('');
@@ -241,7 +244,7 @@ export const AdminStaffManager = () => {
   }, [selectedBatches, rawEnrollments]);
 
 
-  const handleCreateStaff = async () => {
+  const handleSaveStaff = async () => {
     if (!newStaffName || !newStaffEmail) {
       toast({ title: "Missing Fields", description: "Name and Email are required.", variant: "destructive" });
       return;
@@ -249,35 +252,54 @@ export const AdminStaffManager = () => {
 
     setIsSubmitting(true);
     try {
-      if (newStaffRole === 'teacher') {
-        const { error } = await supabase.from('teachers').insert({
-          name: newStaffName,
-          email: newStaffEmail,
-          assigned_batches: selectedBatches,
-          assigned_subjects: selectedSubjects, 
-        });
-        if (error) throw error;
+      if (editingId) {
+        // Update existing staff
+        if (newStaffRole === 'teacher') {
+          const { error } = await supabase.from('teachers').update({
+            name: newStaffName,
+            // Email is intentionally not updated here to avoid auth mismatches
+            assigned_batches: selectedBatches,
+            assigned_subjects: selectedSubjects, 
+          }).eq('id', editingId);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from('managers').update({
+            name: newStaffName,
+            // Email is intentionally not updated here to avoid auth mismatches
+            assigned_batches: selectedBatches, 
+          }).eq('id', editingId);
+          if (error) throw error;
+        }
+        toast({ title: "Success", description: "Staff details updated successfully." });
       } else {
-        const { error } = await supabase.from('managers').insert({
-          name: newStaffName,
-          email: newStaffEmail,
-          assigned_batches: selectedBatches, 
-        });
-        
-        if (error) throw error;
+        // Create new staff
+        if (newStaffRole === 'teacher') {
+          const { error } = await supabase.from('teachers').insert({
+            name: newStaffName,
+            email: newStaffEmail,
+            assigned_batches: selectedBatches,
+            assigned_subjects: selectedSubjects, 
+          });
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from('managers').insert({
+            name: newStaffName,
+            email: newStaffEmail,
+            assigned_batches: selectedBatches, 
+          });
+          
+          if (error) throw error;
+        }
+        toast({ title: "Success", description: `${newStaffRole} added successfully.` });
       }
 
-      toast({ title: "Success", description: `${newStaffRole} added successfully.` });
       setIsDialogOpen(false);
-      setNewStaffName('');
-      setNewStaffEmail('');
-      setSelectedBatches([]);
-      setSelectedSubjects([]);
+      resetForm();
       queryClient.invalidateQueries({ queryKey: ['admin-staff'] });
 
     } catch (error: any) {
       console.error(error);
-      toast({ title: "Error", description: error.message || "Failed to create staff member", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to save staff member", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -301,6 +323,30 @@ export const AdminStaffManager = () => {
     }
   };
 
+  const handleEditClick = (member: any) => {
+    setEditingId(member.id);
+    setNewStaffName(member.name);
+    setNewStaffEmail(member.email);
+    setNewStaffRole(member.role);
+    setSelectedBatches(member.batches || []);
+    setSelectedSubjects(member.subjects || []);
+    setIsDialogOpen(true);
+  };
+
+  const resetForm = () => {
+    setEditingId(null);
+    setNewStaffName('');
+    setNewStaffEmail('');
+    setNewStaffRole('teacher');
+    setSelectedBatches([]);
+    setSelectedSubjects([]);
+  };
+
+  const openAddDialog = () => {
+    resetForm();
+    setIsDialogOpen(true);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -308,15 +354,14 @@ export const AdminStaffManager = () => {
           <h2 className="text-2xl font-bold tracking-tight">Staff Management</h2>
           <p className="text-muted-foreground">Manage Teachers and Managers access.</p>
         </div>
+        <Button onClick={openAddDialog}>
+          <Plus className="mr-2 h-4 w-4" /> Add Staff
+        </Button>
+        
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" /> Add Staff
-            </Button>
-          </DialogTrigger>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
-              <DialogTitle>Add New Staff Member</DialogTitle>
+              <DialogTitle>{editingId ? "Edit Staff Member" : "Add New Staff Member"}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4">
@@ -336,6 +381,7 @@ export const AdminStaffManager = () => {
                       setNewStaffRole(val);
                       if (val === 'manager') setSelectedSubjects([]);
                     }}
+                    disabled={!!editingId} // Disable role change during edit to simplify logic
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -353,7 +399,8 @@ export const AdminStaffManager = () => {
                 <Input 
                   value={newStaffEmail} 
                   onChange={(e) => setNewStaffEmail(e.target.value)} 
-                  placeholder="Enter email address" 
+                  placeholder="Enter email address"
+                  disabled={!!editingId} // Disable email change during edit
                 />
               </div>
 
@@ -392,8 +439,8 @@ export const AdminStaffManager = () => {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleCreateStaff} disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create Account"}
+              <Button onClick={handleSaveStaff} disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : (editingId ? "Save Changes" : "Create Account")}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -466,15 +513,25 @@ export const AdminStaffManager = () => {
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => handleDelete(member.id, member.role)}
-                      disabled={isDeleting === member.id}
-                    >
-                      {isDeleting === member.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <Trash2 className="h-4 w-4" />}
-                    </Button>
+                    <div className="flex justify-end gap-2">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                            onClick={() => handleEditClick(member)}
+                        >
+                            <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => handleDelete(member.id, member.role)}
+                        disabled={isDeleting === member.id}
+                        >
+                        {isDeleting === member.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <Trash2 className="h-4 w-4" />}
+                        </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
