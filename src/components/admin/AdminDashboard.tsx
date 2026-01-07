@@ -11,6 +11,7 @@ import { AdminCommunity } from './AdminCommunity';
 import { AdminStaffManager } from './AdminStaffManager';
 import { StaffInbox } from '@/components/shared/StaffInbox';
 import { AdminDirectory } from './AdminDirectory'; // <--- NEW IMPORT
+import { AdminScheduleRequests } from './AdminScheduleRequests'; // <--- ADDED THIS IMPORT
 
 interface AdminDashboardProps {
   activeTab: string;
@@ -55,6 +56,8 @@ export const AdminDashboard = ({ activeTab, onTabChange }: AdminDashboardProps) 
         return <StaffInbox />;
       case 'directory': // <--- NEW CASE
         return <AdminDirectory />;
+      case 'schedule-requests': // <--- ADDED THIS CASE
+        return <AdminScheduleRequests />;
       default:
         return <EnrollmentAnalytics />;
     }
