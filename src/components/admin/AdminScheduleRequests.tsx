@@ -13,7 +13,6 @@ export const AdminScheduleRequests = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Real-time subscription for instant updates on the admin side
   useEffect(() => {
     const channel = supabase
       .channel('admin-schedule-requests')
@@ -34,7 +33,6 @@ export const AdminScheduleRequests = () => {
   const { data: requests, isLoading } = useQuery({
     queryKey: ['adminScheduleRequests'],
     queryFn: async () => {
-      // Admins see ALL requests regardless of batch
       const { data, error } = await supabase
         .from('schedule_requests')
         .select(`
@@ -48,8 +46,28 @@ export const AdminScheduleRequests = () => {
     },
   });
 
-  const updateRequest = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: 'approved' | 'rejected' }) => {
+  const handleRequest = useMutation({
+    mutationFn: async ({ request, status }: { request: any; status: 'approved' | 'rejected' }) => {
+      
+      if (status === 'approved' && request.schedule_id) {
+         // 1. Update the actual schedule
+         const { error: scheduleError } = await supabase
+           .from('schedules')
+           .update({
+             date: request.new_date,
+             start_time: request.new_start_time,
+             end_time: request.new_end_time,
+             day_of_week: new Date(request.new_date).getDay()
+           })
+           .eq('id', request.schedule_id);
+           
+         if (scheduleError) {
+             console.error("Schedule Update Failed", scheduleError);
+             throw new Error('Failed to update the class schedule');
+         }
+       }
+
+      // 2. Update Request Status
       const { error } = await supabase
         .from('schedule_requests')
         .update({ 
@@ -57,15 +75,16 @@ export const AdminScheduleRequests = () => {
           reviewed_by: user?.id, 
           reviewed_at: new Date().toISOString() 
         })
-        .eq('id', id);
+        .eq('id', request.id);
       if (error) throw error;
     },
     onSuccess: (_, { status }) => {
-      toast.success(`Request ${status} successfully`);
+      toast.success(`Request ${status} and schedule updated`);
       queryClient.invalidateQueries({ queryKey: ['adminScheduleRequests'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-all-schedules'] });
     },
-    onError: () => {
-      toast.error('Failed to update request');
+    onError: (err) => {
+      toast.error(err.message || 'Failed to update request');
     }
   });
 
@@ -148,8 +167,8 @@ export const AdminScheduleRequests = () => {
                     <div className="flex md:flex-col gap-2 justify-center min-w-[120px]">
                       <Button
                         className="bg-green-600 hover:bg-green-700 w-full"
-                        onClick={() => updateRequest.mutate({ id: request.id, status: 'approved' })}
-                        disabled={updateRequest.isPending}
+                        onClick={() => handleRequest.mutate({ request, status: 'approved' })}
+                        disabled={handleRequest.isPending}
                       >
                         <CheckCircle className="h-4 w-4 mr-2" />
                         Approve
@@ -157,8 +176,8 @@ export const AdminScheduleRequests = () => {
                       <Button
                         variant="destructive"
                         className="w-full"
-                        onClick={() => updateRequest.mutate({ id: request.id, status: 'rejected' })}
-                        disabled={updateRequest.isPending}
+                        onClick={() => handleRequest.mutate({ request, status: 'rejected' })}
+                        disabled={handleRequest.isPending}
                       >
                         <XCircle className="h-4 w-4 mr-2" />
                         Reject
