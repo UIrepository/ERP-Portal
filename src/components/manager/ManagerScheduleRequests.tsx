@@ -62,20 +62,17 @@ export const ManagerScheduleRequests = () => {
     enabled: !!managerInfo
   });
 
-  // Dual-update mutation
   const handleRequest = useMutation({
     mutationFn: async ({ request, status }: { request: any; status: 'approved' | 'rejected' }) => {
       
-      // If approving, we MUST update the actual schedule table
+      // If approving, update the actual schedule
       if (status === 'approved' && request.schedule_id) {
-        // 1. Update the actual schedule
         const { error: scheduleError } = await supabase
           .from('schedules')
           .update({
             date: request.new_date,
             start_time: request.new_start_time,
             end_time: request.new_end_time,
-            // Calculate new day of week from date
             day_of_week: new Date(request.new_date).getDay()
           })
           .eq('id', request.schedule_id);
@@ -86,7 +83,7 @@ export const ManagerScheduleRequests = () => {
         }
       }
 
-      // 2. Update the request status
+      // Update the request status
       const { error } = await supabase
         .from('schedule_requests')
         .update({ 
@@ -100,7 +97,6 @@ export const ManagerScheduleRequests = () => {
     },
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ['managerScheduleRequests'] });
-      // Also invalidate schedules so everyone sees the change immediately
       queryClient.invalidateQueries({ queryKey: ['admin-all-schedules'] }); 
       toast.success(`Request ${status} and schedule updated if approved`);
     },
