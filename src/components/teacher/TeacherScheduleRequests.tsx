@@ -11,8 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Clock, Calendar, CheckCircle, XCircle, Loader2, ArrowRight, AlertCircle, Info } from 'lucide-react';
-import { format, isSameDay } from 'date-fns';
+import { Plus, Clock, Calendar, CheckCircle, XCircle, Loader2, ArrowRight, AlertCircle, Filter } from 'lucide-react';
+import { format, isSameDay, parseISO, getDay } from 'date-fns';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -22,6 +22,7 @@ export const TeacherScheduleRequests = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   
   // State for the wizard-like flow
+  const [filterDate, setFilterDate] = useState<string>(''); // NEW: Date Filter State
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>('');
   const [formData, setFormData] = useState({
     new_date: '',
@@ -49,7 +50,7 @@ export const TeacherScheduleRequests = () => {
   }, [queryClient]);
 
   // 1. Fetch Teacher Info
-  const { data: teacherInfo, isLoading: isLoadingTeacher } = useQuery({
+  const { data: teacherInfo } = useQuery({
     queryKey: ['teacherInfo', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -64,7 +65,6 @@ export const TeacherScheduleRequests = () => {
   });
 
   // 2. Fetch Teacher's Existing Schedules 
-  // FIX: Fetch by BATCH only. Do NOT filter by subject strictly, so "Maths 1" shows up even if assigned "Maths".
   const { data: mySchedules, isLoading: isLoadingSchedules } = useQuery({
     queryKey: ['teacherSchedules', teacherInfo?.id],
     queryFn: async () => {
@@ -73,30 +73,45 @@ export const TeacherScheduleRequests = () => {
       const batches = teacherInfo.assigned_batches || [];
 
       if (batches.length === 0) {
-        console.log('Teacher has no assigned batches');
         return [];
       }
       
       // Fetch ALL schedules for the teacher's batches
+      // We will filter them in the UI based on the selected date
       const { data, error } = await supabase
         .from('schedules')
         .select('*')
         .in('batch', batches)
-        .order('date', { ascending: true }) // Show dated classes (like today's) first
-        .order('day_of_week')
         .order('start_time');
 
-      if (error) {
-        console.error('Error fetching schedules:', error);
-        throw error;
-      }
+      if (error) throw error;
       
       return data || [];
     },
     enabled: !!teacherInfo
   });
 
-  // 3. Fetch Previous Requests
+  // 3. Helper: Filter Schedules by Selected Date
+  const getFilteredSchedules = () => {
+    if (!mySchedules || !filterDate) return [];
+
+    const selectedDateObj = parseISO(filterDate);
+    const selectedDayOfWeek = getDay(selectedDateObj); // 0 = Sunday, 1 = Monday...
+
+    return mySchedules.filter(schedule => {
+      // Case A: Specific Date Schedule (e.g., Extra Class, Exam)
+      if (schedule.date) {
+        return isSameDay(parseISO(schedule.date), selectedDateObj);
+      }
+      // Case B: Recurring Schedule (Weekly)
+      // Show if the day_of_week matches the selected date's day
+      return schedule.day_of_week === selectedDayOfWeek;
+    });
+  };
+
+  const filteredSchedules = getFilteredSchedules();
+
+  // 4. Fetch Previous Requests
   const { data: requests, isLoading: isLoadingRequests } = useQuery({
     queryKey: ['teacherScheduleRequests', teacherInfo?.id],
     queryFn: async () => {
@@ -112,7 +127,7 @@ export const TeacherScheduleRequests = () => {
     enabled: !!teacherInfo?.id
   });
 
-  // 4. Create Request Mutation
+  // 5. Create Request Mutation
   const createRequest = useMutation({
     mutationFn: async () => {
       if (!teacherInfo?.id || !selectedScheduleId) throw new Error('Missing info');
@@ -120,18 +135,6 @@ export const TeacherScheduleRequests = () => {
       const selectedClass = mySchedules?.find(s => s.id === selectedScheduleId);
       
       if (!selectedClass) throw new Error('Invalid class selected');
-
-      // Validation: Warning instead of Block? 
-      // We'll allow it but log a warning if subject doesn't match exactly.
-      const isAssignedSubject = teacherInfo.assigned_subjects?.some(
-        s => selectedClass.subject.toLowerCase().includes(s.toLowerCase()) || 
-             s.toLowerCase().includes(selectedClass.subject.toLowerCase())
-      );
-
-      if (!isAssignedSubject) {
-        console.warn("Subject mismatch warning: Teacher attempting to move a class that might not be theirs.");
-        // We allow it to proceed because naming conventions (Maths vs Maths 1) are common issues.
-      }
 
       const { error } = await supabase
         .from('schedule_requests')
@@ -153,6 +156,7 @@ export const TeacherScheduleRequests = () => {
       setIsDialogOpen(false);
       setFormData({ new_date: '', new_start_time: '', new_end_time: '', reason: '' });
       setSelectedScheduleId('');
+      setFilterDate(''); // Reset filter
     },
     onError: (error) => {
       toast.error('Failed to submit request');
@@ -173,25 +177,10 @@ export const TeacherScheduleRequests = () => {
 
   const getScheduleLabel = (schedule: any) => {
     const time = `${schedule.start_time.slice(0, 5)} - ${schedule.end_time.slice(0, 5)}`;
-    let dayStr = '';
-    
-    // Check if it's a specific date
-    if (schedule.date) {
-      const dateObj = new Date(schedule.date);
-      dayStr = format(dateObj, 'MMM d (EEE)');
-      if (isSameDay(dateObj, new Date())) {
-        dayStr = 'Today';
-      }
-    } else {
-      dayStr = DAYS[schedule.day_of_week];
-    }
-
-    return `${schedule.subject} (${schedule.batch}) - ${dayStr} at ${time}`;
+    return `${schedule.subject} (${schedule.batch}) | ${time}`;
   };
 
-  const isLoading = isLoadingTeacher || isLoadingRequests;
-
-  if (isLoading) {
+  if (isLoadingRequests) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -199,12 +188,14 @@ export const TeacherScheduleRequests = () => {
     );
   }
 
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold">My Schedule Requests</h2>
-          <p className="text-muted-foreground">Propose timing changes for your existing classes</p>
+          <p className="text-muted-foreground">Propose timing changes for your upcoming classes</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
@@ -216,50 +207,67 @@ export const TeacherScheduleRequests = () => {
             </DialogHeader>
             <div className="space-y-4 py-4">
               
-              {/* Step 1: Select Existing Class */}
+              {/* Step 1: Filter by Date */}
               <div className="space-y-2">
-                <Label>Select Class</Label>
-                {isLoadingSchedules ? (
-                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" /> Loading batch schedules...
-                   </div>
-                ) : mySchedules && mySchedules.length > 0 ? (
-                  <Select value={selectedScheduleId} onValueChange={setSelectedScheduleId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a class to reschedule..." />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[300px]">
-                      {mySchedules.map((schedule) => (
-                        <SelectItem key={schedule.id} value={schedule.id}>
-                          {getScheduleLabel(schedule)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-md flex items-start gap-2 border border-amber-200">
-                      <AlertCircle className="h-5 w-5 mt-0.5 shrink-0" />
-                      <div>
-                        <p className="font-semibold">No classes found for your batches.</p>
-                        <p className="mt-1">We couldn't find any schedule entries for batches: {teacherInfo?.assigned_batches?.join(', ')}.</p>
-                      </div>
-                    </div>
-                  </div>
+                <Label className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-primary" />
+                  Select Class Date
+                </Label>
+                <div className="flex gap-2">
+                   <Input 
+                      type="date" 
+                      min={todayStr}
+                      value={filterDate} 
+                      onChange={(e) => {
+                        setFilterDate(e.target.value);
+                        setSelectedScheduleId(''); // Reset selection when date changes
+                      }}
+                      className="flex-1"
+                    />
+                </div>
+                {!filterDate && (
+                  <p className="text-xs text-muted-foreground">Please select the date of the class you want to reschedule.</p>
                 )}
               </div>
 
-              {/* Step 2: Show form only if class selected */}
+              {/* Step 2: Select Class (Filtered) */}
+              {filterDate && (
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                  <Label>Select Class to Move</Label>
+                  {filteredSchedules.length > 0 ? (
+                    <Select value={selectedScheduleId} onValueChange={setSelectedScheduleId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select class..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredSchedules.map((schedule) => (
+                          <SelectItem key={schedule.id} value={schedule.id}>
+                            {getScheduleLabel(schedule)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="text-sm text-amber-600 bg-amber-50 p-3 rounded-md flex items-start gap-2 border border-amber-200">
+                      <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                      <span>No classes found for {format(parseISO(filterDate), 'MMM d, yyyy')}.</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Step 3: Show form only if class selected */}
               {selectedScheduleId && (
                 <div className="space-y-4 border-t pt-4 animate-in slide-in-from-top-2 fade-in">
                   <div className="bg-blue-50 p-3 rounded-md text-sm text-blue-700 mb-2 border border-blue-100">
-                    <span className="font-semibold">Selected:</span> {getScheduleLabel(mySchedules?.find(s => s.id === selectedScheduleId))}
+                     <span className="font-semibold">Rescheduling:</span> {mySchedules?.find(s => s.id === selectedScheduleId)?.subject}
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Proposed Date</Label>
+                    <Label>New Proposed Date</Label>
                     <Input 
                       type="date" 
+                      min={todayStr}
                       value={formData.new_date} 
                       onChange={(e) => setFormData(prev => ({ ...prev, new_date: e.target.value }))} 
                     />
@@ -289,14 +297,14 @@ export const TeacherScheduleRequests = () => {
                     <Textarea 
                       value={formData.reason} 
                       onChange={(e) => setFormData(prev => ({ ...prev, reason: e.target.value }))} 
-                      placeholder="Why is this change needed?"
+                      placeholder="Why do you need to reschedule this class?"
                       className="resize-none h-20"
                     />
                   </div>
                   
                   <Button onClick={() => createRequest.mutate()} disabled={createRequest.isPending} className="w-full">
                     {createRequest.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Submit Proposal
+                    Submit Request
                   </Button>
                 </div>
               )}
