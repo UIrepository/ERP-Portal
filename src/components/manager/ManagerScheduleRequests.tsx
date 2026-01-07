@@ -69,24 +69,30 @@ export const ManagerScheduleRequests = () => {
       // LOGIC: If approving, update the actual schedule table
       if (status === 'approved') {
         if (!request.schedule_id) {
-           console.warn("No schedule_id found on this request. Cannot update schedule automatically.");
            throw new Error("Cannot auto-update: This is an old request without a schedule link.");
         } else {
-            // Update the actual class time
-            const { error: scheduleError } = await supabase
+            console.log("Updating Schedule ID:", request.schedule_id);
+
+            // Update the actual class time and return the data to verify it worked
+            const { data: updatedData, error: scheduleError } = await supabase
               .from('schedules')
               .update({
                 date: request.new_date,
                 start_time: request.new_start_time,
                 end_time: request.new_end_time,
-                // Recalculate day of week in case the date changed
+                // Recalculate day of week in case the date changed (0=Sun, 6=Sat)
                 day_of_week: new Date(request.new_date).getDay()
               })
-              .eq('id', request.schedule_id);
+              .eq('id', request.schedule_id)
+              .select();
               
             if (scheduleError) {
                 console.error("Schedule Update Failed", scheduleError);
-                throw new Error('Failed to update the class schedule. Check permissions.');
+                throw new Error(`DB Error: ${scheduleError.message}`);
+            }
+
+            if (!updatedData || updatedData.length === 0) {
+               throw new Error("Permission Denied: Schedule not updated. Check RLS policies.");
             }
         }
       }
