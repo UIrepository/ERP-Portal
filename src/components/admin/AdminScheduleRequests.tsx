@@ -50,7 +50,7 @@ export const AdminScheduleRequests = () => {
     mutationFn: async ({ request, status }: { request: any; status: 'approved' | 'rejected' }) => {
       
       if (status === 'approved' && request.schedule_id) {
-         // 1. Update the actual schedule
+         // Update the actual schedule
          const { error: scheduleError } = await supabase
            .from('schedules')
            .update({
@@ -67,7 +67,7 @@ export const AdminScheduleRequests = () => {
          }
        }
 
-      // 2. Update Request Status
+      // Update Request Status
       const { error } = await supabase
         .from('schedule_requests')
         .update({ 
