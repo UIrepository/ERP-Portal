@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Star, MessageSquare, Calendar, User, Filter, X } from 'lucide-react';
+import { Star, MessageSquare, Calendar, User, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -33,12 +33,15 @@ export const TeacherFeedbackViewer = () => {
   const { data: feedbackList, isLoading } = useQuery({
     queryKey: ['teacherFeedback', teacherInfo?.assigned_batches, teacherInfo?.assigned_subjects],
     queryFn: async () => {
-        if (!teacherInfo?.assigned_batches?.length || !teacherInfo?.assigned_subjects?.length) return [];
+        // Safety check: If teacher has no assignments, don't fetch anything
+        if (!teacherInfo?.assigned_batches?.length || !teacherInfo?.assigned_subjects?.length) {
+            return [];
+        }
 
         const { data, error } = await supabase
             .from('feedback')
             .select('*')
-            // Only fetch feedback relevant to this teacher's batches and subjects
+            // CRITICAL: This enforces that teachers ONLY see feedback for their specific batches/subjects
             .in('batch', teacherInfo.assigned_batches)
             .in('subject', teacherInfo.assigned_subjects)
             .order('created_at', { ascending: false });
@@ -49,7 +52,7 @@ export const TeacherFeedbackViewer = () => {
     enabled: !!teacherInfo
   });
 
-  // 3. Client-side Filtering
+  // 3. Client-side Filtering (for the dropdowns)
   const filteredFeedback = feedbackList?.filter(item => {
       if (selectedBatch !== 'all' && item.batch !== selectedBatch) return false;
       if (selectedSubject !== 'all' && item.subject !== selectedSubject) return false;
@@ -61,7 +64,6 @@ export const TeacherFeedbackViewer = () => {
     setSelectedSubject('all');
   };
 
-  // Helper for Star Rating
   const StarDisplay = ({ rating, label }: { rating: number, label: string }) => (
     <div className="flex items-center justify-between text-xs mb-1">
         <span className="text-muted-foreground">{label}</span>
@@ -118,7 +120,8 @@ export const TeacherFeedbackViewer = () => {
                     <MessageSquare className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
                     <h3 className="font-semibold text-lg">No feedback found</h3>
                     <p className="text-muted-foreground text-sm max-w-sm mt-1">
-                        There is no feedback available matching your current filter criteria.
+                        We couldn't find any feedback for your assigned Batches ({teacherInfo?.assigned_batches?.join(', ') || 'None'}) 
+                        and Subjects ({teacherInfo?.assigned_subjects?.join(', ') || 'None'}).
                     </p>
                 </CardContent>
             </Card>
