@@ -56,6 +56,7 @@ export const AdminScheduleRequests = () => {
         if (!request.schedule_id) {
            console.warn("No schedule_id found on this request.");
            // We continue but cannot update the schedule table
+           throw new Error("Cannot auto-update: This is an old request without a schedule link.");
         } else {
             const { error: scheduleError } = await supabase
               .from('schedules')
