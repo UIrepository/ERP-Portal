@@ -6,14 +6,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { CheckCircle, XCircle, Clock, Calendar, User, ArrowRight } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Calendar, User, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 
 export const ManagerScheduleRequests = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Listen for real-time changes
+  // Real-time listener to refresh data automatically
   useEffect(() => {
     const channel = supabase
       .channel('manager-schedule-requests')
@@ -70,15 +70,16 @@ export const ManagerScheduleRequests = () => {
       if (status === 'approved') {
         if (!request.schedule_id) {
            console.warn("No schedule_id found on this request. Cannot update schedule automatically.");
-           // We continue to approve the request status, but warn the user.
+           // We continue to approve the request status, but warn the user in console.
         } else {
+            // Update the actual class time
             const { error: scheduleError } = await supabase
               .from('schedules')
               .update({
                 date: request.new_date,
                 start_time: request.new_start_time,
                 end_time: request.new_end_time,
-                // Optional: Recalculate day of week if needed
+                // Recalculate day of week in case the date changed
                 day_of_week: new Date(request.new_date).getDay()
               })
               .eq('id', request.schedule_id);
@@ -90,7 +91,7 @@ export const ManagerScheduleRequests = () => {
         }
       }
 
-      // Update the request status to approved/rejected
+      // Update the request status
       const { error } = await supabase
         .from('schedule_requests')
         .update({ 
@@ -104,12 +105,12 @@ export const ManagerScheduleRequests = () => {
     },
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ['managerScheduleRequests'] });
-      // Force refresh of schedules so the new time shows up immediately
+      // Force refresh of schedules so the new time shows up immediately in other views
       queryClient.invalidateQueries({ queryKey: ['admin-all-schedules'] }); 
       toast.success(`Request ${status} successfully`);
     },
     onError: (err) => {
-      toast.error(err.message || 'Failed to process request');
+      toast.error(err.message || 'Failed to update request');
     }
   });
 
@@ -177,11 +178,12 @@ export const ManagerScheduleRequests = () => {
                       </p>
                     )}
                     
-                    {/* Helper text if this is an old request without ID */}
+                    {/* Safety Alert for Old Requests */}
                     {request.status === 'pending' && !request.schedule_id && (
-                        <p className="text-xs text-amber-600 bg-amber-50 p-1 rounded inline-block">
-                           ⚠️ Old Request: Schedule won't auto-update.
-                        </p>
+                        <div className="flex gap-2 items-start text-xs text-amber-700 bg-amber-50 p-2 rounded border border-amber-200 mt-2">
+                           <AlertTriangle className="h-4 w-4 shrink-0" />
+                           <p><strong>Legacy Request:</strong> This request is missing the schedule link. Approving will NOT update the class time automatically.</p>
+                        </div>
                     )}
                   </div>
 
