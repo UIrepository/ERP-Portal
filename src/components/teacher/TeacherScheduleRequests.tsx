@@ -22,7 +22,7 @@ export const TeacherScheduleRequests = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   
   // State for the wizard-like flow
-  const [filterDate, setFilterDate] = useState<string>(''); // NEW: Date Filter State
+  const [filterDate, setFilterDate] = useState<string>(''); // Date Filter State
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>('');
   const [formData, setFormData] = useState({
     new_date: '',
