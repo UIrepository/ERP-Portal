@@ -200,9 +200,9 @@ export const TeacherRecordings = () => {
                 </div>
                 
                 <div className="mt-5 pt-4 border-t">
-                    {recording.link ? (
+                    {recording.embed_link ? (
                       <a 
-                        href={recording.link} 
+                        href={recording.embed_link} 
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="inline-flex items-center justify-center w-full px-4 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90 transition-colors gap-2 group/link"
