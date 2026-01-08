@@ -1,6 +1,7 @@
 // src/pages/Index.tsx
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useMaintenanceMode } from '@/hooks/useMaintenanceMode';
 import { AuthPage } from '@/components/AuthPage';
 import { Layout } from '@/components/Layout';
 import { StudentDashboard } from '@/components/StudentDashboard';
@@ -8,9 +9,11 @@ import { AdminDashboard } from '@/components/admin/AdminDashboard';
 import { TeacherDashboard } from '@/components/teacher/TeacherDashboard';
 import { ManagerDashboard } from '@/components/manager/ManagerDashboard';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { MaintenancePage } from '@/components/MaintenancePage';
 
 const Index = () => {
   const { user, loading, profile, resolvedRole } = useAuth();
+  const { shouldShowMaintenance, maintenanceMessage, isLoading: maintenanceLoading } = useMaintenanceMode(user?.email ?? undefined);
 
   const getInitialTab = () => {
     switch (resolvedRole) {
@@ -27,12 +30,17 @@ const Index = () => {
     setActiveTab(getInitialTab());
   }, [resolvedRole]);
 
-  if (loading) {
+  if (loading || maintenanceLoading) {
     return <LoadingSpinner />;
   }
 
   if (!user) {
     return <AuthPage />;
+  }
+
+  // Show maintenance page if user is logged in but not verified
+  if (shouldShowMaintenance) {
+    return <MaintenancePage message={maintenanceMessage} />;
   }
 
   const renderDashboard = () => {

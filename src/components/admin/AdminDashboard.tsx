@@ -10,8 +10,9 @@ import { AdminAnnouncementsViewer } from './AdminAnnouncementsViewer';
 import { AdminCommunity } from './AdminCommunity';
 import { AdminStaffManager } from './AdminStaffManager';
 import { StaffInbox } from '@/components/shared/StaffInbox';
-import { AdminDirectory } from './AdminDirectory'; // <--- NEW IMPORT
-import { AdminScheduleRequests } from './AdminScheduleRequests'; // <--- ADDED THIS IMPORT
+import { AdminDirectory } from './AdminDirectory';
+import { AdminScheduleRequests } from './AdminScheduleRequests';
+import { AdminMaintenanceManager } from './AdminMaintenanceManager';
 
 interface AdminDashboardProps {
   activeTab: string;
@@ -54,10 +55,12 @@ export const AdminDashboard = ({ activeTab, onTabChange }: AdminDashboardProps) 
         return <MonitoringDashboard />;
       case 'admin-messages':
         return <StaffInbox />;
-      case 'directory': // <--- NEW CASE
+      case 'directory':
         return <AdminDirectory />;
-      case 'schedule-requests': // <--- ADDED THIS CASE
+      case 'schedule-requests':
         return <AdminScheduleRequests />;
+      case 'maintenance':
+        return <AdminMaintenanceManager />;
       default:
         return <EnrollmentAnalytics />;
     }

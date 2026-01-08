@@ -23,8 +23,9 @@ import {
   ClipboardList,
   UserCog,
   GraduationCap,
-  Contact, // Using Contact icon for Directory
-  Star, // <--- ADDED STAR IMPORT
+  Contact,
+  Star,
+  Wrench,
 } from 'lucide-react';
 
 import {
@@ -144,7 +145,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const adminTabs = [
     { id: 'enrollment-analytics', label: 'Student Analytics', icon: BarChart2 },
     { id: 'admin-messages', label: 'Messages / Inbox', icon: MessageSquare },
-    { id: 'directory', label: 'Student Directory', icon: Contact }, // <--- ADDED
+    { id: 'directory', label: 'Student Directory', icon: Contact },
     { id: 'staff-manager', label: 'Staff Management', icon: UserCog },
     { id: 'community-admin', label: 'Community Chat', icon: Users }, 
     { id: 'schedules', label: 'Schedules', icon: Calendar },
@@ -152,6 +153,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     { id: 'feedback-viewer', label: 'Feedback Viewer', icon: MessageSquare },
     { id: 'create-announcement', label: 'Create Announcement', icon: Megaphone },
     { id: 'announcement-history', label: 'Announcement History', icon: History },
+    { id: 'maintenance', label: 'Maintenance Mode', icon: Wrench },
   ];
 
   const getTabs = () => {

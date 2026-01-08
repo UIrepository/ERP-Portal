@@ -466,6 +466,30 @@ export type Database = {
         }
         Relationships: []
       }
+      maintenance_settings: {
+        Row: {
+          id: string
+          is_maintenance_mode: boolean
+          maintenance_message: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          is_maintenance_mode?: boolean
+          maintenance_message?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          is_maintenance_mode?: boolean
+          maintenance_message?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       managers: {
         Row: {
           assigned_batches: string[] | null
@@ -987,6 +1011,27 @@ export type Database = {
           last_activity?: string | null
           login_time?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      verified_maintenance_users: {
+        Row: {
+          added_by: string | null
+          created_at: string
+          email: string
+          id: string
+        }
+        Insert: {
+          added_by?: string | null
+          created_at?: string
+          email: string
+          id?: string
+        }
+        Update: {
+          added_by?: string | null
+          created_at?: string
+          email?: string
+          id?: string
         }
         Relationships: []
       }
