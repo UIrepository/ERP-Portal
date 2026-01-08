@@ -136,6 +136,39 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_messages: {
+        Row: {
+          batch: string | null
+          created_at: string | null
+          id: string
+          message: string
+          receiver_role: string | null
+          sender_id: string
+          sender_name: string | null
+          subject: string | null
+        }
+        Insert: {
+          batch?: string | null
+          created_at?: string | null
+          id?: string
+          message: string
+          receiver_role?: string | null
+          sender_id: string
+          sender_name?: string | null
+          subject?: string | null
+        }
+        Update: {
+          batch?: string | null
+          created_at?: string | null
+          id?: string
+          message?: string
+          receiver_role?: string | null
+          sender_id?: string
+          sender_name?: string | null
+          subject?: string | null
+        }
+        Relationships: []
+      }
       community_messages: {
         Row: {
           batch: string
@@ -700,6 +733,7 @@ export type Database = {
           requested_by: string
           reviewed_at: string | null
           reviewed_by: string | null
+          schedule_id: string | null
           status: Database["public"]["Enums"]["schedule_request_status"] | null
           subject: string
         }
@@ -714,6 +748,7 @@ export type Database = {
           requested_by: string
           reviewed_at?: string | null
           reviewed_by?: string | null
+          schedule_id?: string | null
           status?: Database["public"]["Enums"]["schedule_request_status"] | null
           subject: string
         }
@@ -728,6 +763,7 @@ export type Database = {
           requested_by?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
+          schedule_id?: string | null
           status?: Database["public"]["Enums"]["schedule_request_status"] | null
           subject?: string
         }
@@ -737,6 +773,13 @@ export type Database = {
             columns: ["requested_by"]
             isOneToOne: false
             referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_requests_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "schedules"
             referencedColumns: ["id"]
           },
         ]
@@ -952,6 +995,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      app_is_admin: { Args: never; Returns: boolean }
       backfill_role_table_user_ids: {
         Args: never
         Returns: {
@@ -961,6 +1005,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      check_is_admin_or_manager: { Args: never; Returns: boolean }
       check_user_role_sync: { Args: never; Returns: Json }
       delete_expired_chat_images: { Args: never; Returns: undefined }
       get_all_options: {
