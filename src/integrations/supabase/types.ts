@@ -1000,7 +1000,7 @@ export type Database = {
           email: string | null
           id: string
           subject_name: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           batch_name: string
@@ -1008,7 +1008,7 @@ export type Database = {
           email?: string | null
           id?: string
           subject_name: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           batch_name?: string
@@ -1016,7 +1016,7 @@ export type Database = {
           email?: string | null
           id?: string
           subject_name?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
