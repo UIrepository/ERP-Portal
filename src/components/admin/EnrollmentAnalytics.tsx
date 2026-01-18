@@ -1,15 +1,14 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, paymentsClient } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
-import { Users, Loader2, AlertTriangle, Filter, Search } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Users, Loader2, AlertTriangle, Filter, Search, GraduationCap } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { GraduationCap } from 'lucide-react';
 
-// --- Interfaces for our data structures ---
+// --- Interfaces ---
 interface Enrollment {
   batch_name: string;
   subject_name: string;
@@ -25,10 +24,9 @@ interface StudentEnrollmentInfo {
   enrollments: { batch: string; subject: string }[];
 }
 
-// --- New Royal Color Palette ---
+// --- Constants ---
 const COLORS = ["#2563eb", "#dc2626", "#7c3aed", "#db2777", "#16a34a", "#ea580c", "#0ea5e9"];
 
-// --- Custom Tooltip for a better feel ---
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
@@ -47,41 +45,20 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-// --- Custom Shape for selectively rounded corners ---
-const getPath = (x: number, y: number, width: number, height: number, radius: [number, number, number, number]) => {
-    const [tl, tr, br, bl] = radius;
-    return `M${x + tl},${y}
-            L${x + width - tr},${y}
-            Q${x + width},${y} ${x + width},${y + tr}
-            L${x + width},${y + height - br}
-            Q${x + width},${y + height} ${x + width - br},${y + height}
-            L${x + bl},${y + height}
-            Q${x},${y + height} ${x},${y + height - bl}
-            L${x},${y + tl}
-            Q${x},${y} ${x + tl},${y}
-            Z`;
-};
-
-const RoundedBar = (props: any) => {
-    const { fill, x, y, width, height, radius } = props;
-    return <path d={getPath(x, y, width, height, radius)} stroke="none" fill={fill} />;
-};
-
-
 export const EnrollmentAnalytics = () => {
   const [selectedSubject, setSelectedSubject] = useState<string>('all');
   const [selectedBatch, setSelectedBatch] = useState<string>('all');
   const queryClient = useQueryClient();
 
   // --- Real-time Subscription ---
+  // Note: This subscription listens to your LOCAL user_enrollments table. 
+  // If you want it to listen to the payments table, you would need to enable Realtime on the external Supabase project.
   useEffect(() => {
     const channel = supabase
       .channel('admin-enrollment-analytics-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_enrollments' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['enrollment-analytics-enrollments'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['enrollment-analytics-enrollments'] });
+        // Even though we fetch from payments, we might want to refresh if local mapping changes (optional)
+        queryClient.invalidateQueries({ queryKey: ['enrollment-analytics-payments'] });
       })
       .subscribe();
 
@@ -90,48 +67,47 @@ export const EnrollmentAnalytics = () => {
     };
   }, [queryClient]);
 
-  // --- Data Fetching ---
+  // --- Data Fetching from EXTERNAL Payments Table ---
   const { data: enrollments = [], isLoading: isLoadingEnrollments, isError, error } = useQuery({
-    queryKey: ['enrollment-analytics-enrollments'],
+    queryKey: ['enrollment-analytics-payments'],
     queryFn: async (): Promise<Enrollment[]> => {
-      // Fetch enrollments with email
-      const { data: enrollmentData, error: enrollError } = await supabase
-        .from('user_enrollments')
-        .select('batch_name, subject_name, user_id, email');
+      
+      // 1. Fetch data from the external project
+      const { data: paymentsData, error: paymentsError } = await paymentsClient
+        .from('payments')
+        .select('batch, courses, customer_email')
+        // Optional: .eq('status', 'captured') // Uncomment if you only want successful payments
+        .order('created_at', { ascending: false });
 
-      if (enrollError) {
-          console.error("Error fetching enrollments:", enrollError)
-          throw enrollError;
+      if (paymentsError) {
+          console.error("Error fetching external payments:", paymentsError);
+          throw paymentsError;
       }
 
-      // Fetch all profiles
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('user_id, name, email');
+      // 2. Map external fields to your internal app structure
+      const mappedEnrollments: Enrollment[] = (paymentsData || []).map((row: any) => {
+        const email = row.customer_email || 'unknown@example.com';
+        // Extract name from email (everything before @) since 'name' column is missing in payments schema
+        const derivedName = email.split('@')[0];
 
-      if (profilesError) {
-          console.error("Error fetching profiles:", profilesError)
-          throw profilesError;
-      }
+        return {
+          batch_name: row.batch || 'Unassigned',
+          subject_name: row.courses || 'General',
+          profiles: {
+            name: derivedName, // Using derived name
+            email: email
+          }
+        };
+      });
 
-      // Map profiles by user_id
-      const profilesMap = new Map<string, { name: string; email: string }>();
-      profilesData?.forEach(p => profilesMap.set(p.user_id, { name: p.name, email: p.email }));
-
-      // Join data manually
-      return (enrollmentData || [])
-        .map(e => ({
-          batch_name: e.batch_name,
-          subject_name: e.subject_name,
-          profiles: profilesMap.get(e.user_id) || null
-        }))
-        .filter(e => e.profiles) as Enrollment[];
+      return mappedEnrollments;
     },
   });
 
   // --- Data Processing ---
   const analyticsData = useMemo(() => {
     const studentMap = new Map<string, StudentEnrollmentInfo>();
+    
     enrollments.forEach(enrollment => {
       if (enrollment.profiles) {
         const email = enrollment.profiles.email;
@@ -142,14 +118,23 @@ export const EnrollmentAnalytics = () => {
             enrollments: [],
           });
         }
-        studentMap.get(email)?.enrollments.push({
-          batch: enrollment.batch_name,
-          subject: enrollment.subject_name,
-        });
+        
+        // Check for duplicates (same batch & subject for same user)
+        const existingEnrollments = studentMap.get(email)?.enrollments || [];
+        const isDuplicate = existingEnrollments.some(
+            e => e.batch === enrollment.batch_name && e.subject === enrollment.subject_name
+        );
+
+        if (!isDuplicate) {
+            studentMap.get(email)?.enrollments.push({
+              batch: enrollment.batch_name,
+              subject: enrollment.subject_name,
+            });
+        }
       }
     });
-    const allStudents = Array.from(studentMap.values());
 
+    const allStudents = Array.from(studentMap.values());
     const allBatches = Array.from(new Set(enrollments.map(e => e.batch_name))).sort();
     const allSubjects = Array.from(new Set(enrollments.map(e => e.subject_name))).sort();
 
@@ -162,6 +147,7 @@ export const EnrollmentAnalytics = () => {
     const chartData = (selectedBatch === 'all' ? allBatches : [selectedBatch]).map(batch => {
         const batchData: Record<string, any> = { name: batch };
         allSubjects.forEach(subject => {
+            // Count occurrences in raw enrollments
             batchData[subject] = enrollments.filter(e => e.batch_name === batch && e.subject_name === subject).length;
         });
         return batchData;
@@ -191,9 +177,9 @@ export const EnrollmentAnalytics = () => {
       return (
         <Card className="m-6 text-center py-20 bg-white rounded-lg border-dashed border-2 border-red-400 shadow-sm">
             <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-destructive">Failed to Load Enrollment Data</h3>
-            <p className="text-muted-foreground mt-2">There was an error fetching the required data.</p>
-            <p className="text-sm text-gray-500 mt-4"><strong>Error:</strong> {error?.message}</p>
+            <h3 className="text-xl font-semibold text-destructive">Failed to Load External Data</h3>
+            <p className="text-muted-foreground mt-2">Could not connect to the payments database.</p>
+            <p className="text-sm text-gray-500 mt-4"><strong>Error:</strong> {error instanceof Error ? error.message : 'Unknown error'}</p>
         </Card>
       )
   }
@@ -202,8 +188,9 @@ export const EnrollmentAnalytics = () => {
     <div className="p-4 md:p-6 space-y-6 bg-gray-50/70 min-h-full">
       <div className="px-1">
         <h1 className="text-3xl font-bold text-gray-800 tracking-tight">Student Enrollment Analytics</h1>
-        <p className="text-muted-foreground mt-1">An interactive overview of your student population.</p>
+        <p className="text-muted-foreground mt-1">Live data from Payment Records.</p>
       </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <Card className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -214,6 +201,7 @@ export const EnrollmentAnalytics = () => {
               <div className="text-2xl font-bold">{analyticsData.totalStudents}</div>
             </CardContent>
           </Card>
+          
           <Card className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">Filter by Batch</CardTitle>
@@ -221,7 +209,7 @@ export const EnrollmentAnalytics = () => {
             </CardHeader>
             <CardContent>
                 <Select value={selectedBatch} onValueChange={setSelectedBatch}>
-                    <SelectTrigger className="focus:ring-2 focus:ring-primary focus:ring-offset-2"><SelectValue placeholder="Select Batch" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Select Batch" /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">All Batches</SelectItem>
                         {analyticsData.allBatches.map(batch => (<SelectItem key={batch} value={batch}>{batch}</SelectItem>))}
@@ -229,6 +217,7 @@ export const EnrollmentAnalytics = () => {
                 </Select>
             </CardContent>
           </Card>
+
           <Card className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium">Filter by Subject</CardTitle>
@@ -236,7 +225,7 @@ export const EnrollmentAnalytics = () => {
             </CardHeader>
             <CardContent>
                 <Select value={selectedSubject} onValueChange={setSelectedSubject}>
-                    <SelectTrigger className="focus:ring-2 focus:ring-primary focus:ring-offset-2"><SelectValue placeholder="Select Subject" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Select Subject" /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">All Subjects</SelectItem>
                         {analyticsData.allSubjects.map(subject => (<SelectItem key={subject} value={subject}>{subject}</SelectItem>))}
@@ -245,12 +234,13 @@ export const EnrollmentAnalytics = () => {
             </CardContent>
           </Card>
       </div>
+
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="lg:col-span-3">
              <Card className="shadow-lg h-full">
                 <CardHeader>
                   <CardTitle>Enrollment Distribution</CardTitle>
-                  <CardDescription>Students by subject across different batches.</CardDescription>
+                  <CardDescription>Students by Subject (Courses) across Batches.</CardDescription>
                 </CardHeader>
                 <CardContent className="pl-2">
                   <ResponsiveContainer width="100%" height={500}>
@@ -262,9 +252,8 @@ export const EnrollmentAnalytics = () => {
                       <Legend />
                         {analyticsData.allSubjects
                             .filter(subject => selectedSubject === 'all' || selectedSubject === subject)
-                            .map((subject, index, arr) => (
-                            <Bar key={subject} dataKey={subject} stackId="a" fill={COLORS[analyticsData.allSubjects.indexOf(subject) % COLORS.length]} radius={[4, 4, 0, 0]}>
-                            </Bar>
+                            .map((subject) => (
+                            <Bar key={subject} dataKey={subject} stackId="a" fill={COLORS[analyticsData.allSubjects.indexOf(subject) % COLORS.length]} radius={[4, 4, 0, 0]} />
                         ))}
                     </BarChart>
                   </ResponsiveContainer>
@@ -298,7 +287,6 @@ export const EnrollmentAnalytics = () => {
                         <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
                             <Search className="h-12 w-12 mb-4" />
                             <p className="font-semibold">No students found</p>
-                            <p className="text-sm">Try adjusting your filters.</p>
                         </div>
                     )}
                 </CardContent>
