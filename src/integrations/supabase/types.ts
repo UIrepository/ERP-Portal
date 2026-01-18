@@ -664,6 +664,50 @@ export type Database = {
         }
         Relationships: []
       }
+      payments: {
+        Row: {
+          amount: number | null
+          created_at: string
+          id: string
+          order_id: string
+          payment_id: string | null
+          payment_mode: string | null
+          raw_response: Json | null
+          status: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          id?: string
+          order_id: string
+          payment_id?: string | null
+          payment_mode?: string | null
+          raw_response?: Json | null
+          status?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          id?: string
+          order_id?: string
+          payment_id?: string | null
+          payment_mode?: string | null
+          raw_response?: Json | null
+          status?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           bank_details: Json | null
