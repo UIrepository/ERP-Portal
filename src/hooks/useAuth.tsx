@@ -96,9 +96,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               .single();
             setProfile(profileData);
 
-            // Resolve the actual role from role tables (fallback if RPC failed)
+          // Resolve the actual role from role tables (fallback if RPC failed)
             const role = detectedRole ?? (await resolveUserRole(userId, userEmail));
             setResolvedRole(role);
+
+            // Link user enrollments from external payments
+            try {
+              await supabase.functions.invoke('link-user-enrollments', {
+                body: {
+                  email: userEmail,
+                  user_id: userId
+                }
+              });
+              console.log('User enrollments linked successfully');
+            } catch (err) {
+              console.warn('Failed to link enrollments:', err);
+            }
 
             setLoading(false);
           }, 0);
