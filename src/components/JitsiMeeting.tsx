@@ -24,11 +24,13 @@ declare global {
   }
 }
 
-const CONNECTION_TIMEOUT_MS = 45000; // Increased to 45 seconds
+const CONNECTION_TIMEOUT_MS = 45000; // 45 seconds timeout
 const SCRIPT_POLL_INTERVAL_MS = 100;
-const SCRIPT_MAX_POLL_ATTEMPTS = 50; // 5 seconds max for script loading
+const SCRIPT_MAX_POLL_ATTEMPTS = 50; // 5 seconds max for script polling
 
-// Helper function to inject a fresh script
+// --- Script Loading Helpers ---
+
+// Helper function to inject a fresh Jitsi script
 const injectNewScript = (): Promise<void> => {
   return new Promise((resolve, reject) => {
     console.log('[Jitsi] Injecting new script...');
@@ -36,9 +38,10 @@ const injectNewScript = (): Promise<void> => {
     script.src = 'https://meet.jit.si/external_api.js';
     script.async = true;
     
+    // Set a timeout for the script resource itself to load
     const timeoutId = setTimeout(() => {
       reject(new Error('Script load timed out'));
-    }, 15000); // 15 second timeout for script load
+    }, 15000); // 15 seconds
     
     script.onload = () => {
       clearTimeout(timeoutId);
@@ -55,6 +58,7 @@ const injectNewScript = (): Promise<void> => {
 };
 
 // Robust script loading with polling fallback
+// This ensures we don't try to initialize before window.JitsiMeetExternalAPI is defined
 const loadJitsiScript = (): Promise<void> => {
   return new Promise((resolve, reject) => {
     console.log('[Jitsi] Checking script status...');
@@ -66,7 +70,7 @@ const loadJitsiScript = (): Promise<void> => {
       return;
     }
     
-    // Check for existing script tag
+    // Check for existing script tag in the DOM
     const existingScript = document.querySelector('script[src*="external_api.js"]') as HTMLScriptElement;
     
     if (existingScript) {
@@ -84,7 +88,7 @@ const loadJitsiScript = (): Promise<void> => {
           clearInterval(pollInterval);
           console.log('[Jitsi] Existing script timed out, removing and injecting new script');
           
-          // Remove old script and inject fresh one
+          // Remove old script and inject fresh one to force reload
           try {
             existingScript.remove();
           } catch (e) {
@@ -103,7 +107,7 @@ const loadJitsiScript = (): Promise<void> => {
   });
 };
 
-// Wait for Jitsi API to become available after script loads
+// Wait for Jitsi API constructor to become available after script loads
 const waitForJitsiAPI = (): Promise<boolean> => {
   return new Promise((resolve) => {
     let attempts = 0;
@@ -127,6 +131,8 @@ const waitForJitsiAPI = (): Promise<boolean> => {
   });
 };
 
+// --- Main Component ---
+
 export const JitsiMeeting = ({
   roomName,
   displayName,
@@ -140,43 +146,50 @@ export const JitsiMeeting = ({
   const jitsiContainerRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<any>(null);
   
-  // State
+  // UI State
   const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [isVideoMuted, setIsVideoMuted] = useState(false);
-  const [isLoading, setIsLoading] = useState(false); // Changed default to false (waits for user click)
-  const [hasJoined, setHasJoined] = useState(false); // New state: "Has user clicked Join?"
+  const [isLoading, setIsLoading] = useState(false); // Default false, waits for user to click "Join"
+  const [hasJoined, setHasJoined] = useState(false); // Track if user clicked the "Join Class" button
   const [connectionError, setConnectionError] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Loading video system...');
   const [showFallbackPrompt, setShowFallbackPrompt] = useState(false);
 
-  // Auth & Refs
+  // Data & Refs
   const { profile, resolvedRole } = useAuth();
   const joinTimeRef = useRef<Date | null>(null);
+  
+  // Initialization Refs (Prevent race conditions)
   const connectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isInitializingRef = useRef(false);
-  const isLoadingRef = useRef(false); // Ref to track loading state for timeout callback
+  const isLoadingRef = useRef(false); 
   const progressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // FIX: Store latest props in a ref to avoid re-initialization on prop changes (Tab Switch Fix)
+  // FIX: Store latest props in a ref to avoid re-initialization on prop changes (e.g. Tab Switch)
   const propsRef = useRef({ displayName, userEmail, subject, batch, scheduleId, onClose, resolvedRole, profile });
 
-  // Update refs when props change
+  // Update refs when props change (Sync)
   useEffect(() => {
     propsRef.current = { displayName, userEmail, subject, batch, scheduleId, onClose, resolvedRole, profile };
     
     // Dynamically update display name if changed without re-joining
     if (apiRef.current && displayName) {
-        apiRef.current.executeCommand('displayName', displayName);
+        try {
+          apiRef.current.executeCommand('displayName', displayName);
+        } catch (e) {
+          console.warn('[Jitsi] Failed to update display name', e);
+        }
     }
   }, [displayName, userEmail, subject, batch, scheduleId, onClose, resolvedRole, profile]);
 
   // FIX: URL Management - Update browser URL to reflect meeting state
+  // This ensures that if the user refreshes or switches tabs, the context feels persistent
   useEffect(() => {
     const originalUrl = window.location.href;
     const meetingPath = `/class/${batch.replace(/\s+/g, '-').toLowerCase()}/${subject.replace(/\s+/g, '-').toLowerCase()}`;
     
-    // Push state to browser history so URL looks correct
+    // Push state to browser history so URL looks correct (like a dedicated meeting page)
     window.history.pushState({ path: meetingPath }, '', meetingPath);
 
     return () => {
@@ -206,7 +219,8 @@ export const JitsiMeeting = ({
     toast.info('Meeting opened in new tab');
   }, [getSanitizedRoomName]);
 
-  // Record attendance when joining
+  // --- Attendance Logic ---
+
   const recordAttendance = useCallback(async () => {
     const currentProps = propsRef.current;
     if (!currentProps.profile?.user_id) return;
@@ -233,7 +247,6 @@ export const JitsiMeeting = ({
     }
   }, []); // Empty dependencies, uses propsRef
 
-  // Update attendance when leaving
   const updateAttendanceOnLeave = useCallback(async () => {
     const currentProps = propsRef.current;
     if (!currentProps.profile?.user_id || !joinTimeRef.current) return;
@@ -257,6 +270,8 @@ export const JitsiMeeting = ({
     }
   }, []); // Empty dependencies, uses propsRef
 
+  // --- Jitsi Initialization Logic ---
+
   const initializeJitsi = useCallback(async () => {
     // Prevent double initialization
     if (isInitializingRef.current) {
@@ -276,7 +291,7 @@ export const JitsiMeeting = ({
     }
 
     // Step 1: Try to load script if needed
-    setLoadingState(true); // Manually set loading true here
+    setLoadingState(true);
     setLoadingMessage('Loading video system...');
     try {
       await loadJitsiScript();
@@ -303,13 +318,10 @@ export const JitsiMeeting = ({
       return;
     }
 
-    // Clear any existing timeouts
-    if (connectionTimeoutRef.current) {
-      clearTimeout(connectionTimeoutRef.current);
-    }
-    if (progressTimeoutRef.current) {
-      clearTimeout(progressTimeoutRef.current);
-    }
+    // Clear any existing timeouts to prevent interference
+    if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+    if (progressTimeoutRef.current) clearTimeout(progressTimeoutRef.current);
+    if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current);
 
     // Set progressive loading message
     setLoadingMessage('Connecting to class...');
@@ -334,7 +346,7 @@ export const JitsiMeeting = ({
         console.error('[Jitsi] Connection timeout after', CONNECTION_TIMEOUT_MS, 'ms');
         setLoadingState(false);
         setConnectionError(true);
-        // toast.error('Connection timed out. Try opening in a new tab.'); // Optional: Don't spam toasts
+        // We don't spam toast here, visual error state is enough
         isInitializingRef.current = false;
       }
     }, CONNECTION_TIMEOUT_MS);
@@ -418,15 +430,10 @@ export const JitsiMeeting = ({
       apiRef.current.addEventListeners({
         videoConferenceJoined: () => {
           console.log('[Jitsi] Successfully joined video conference');
-          if (connectionTimeoutRef.current) {
-            clearTimeout(connectionTimeoutRef.current);
-          }
-          if (progressTimeoutRef.current) {
-            clearTimeout(progressTimeoutRef.current);
-          }
-          if (fallbackTimeoutRef.current) {
-            clearTimeout(fallbackTimeoutRef.current);
-          }
+          if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+          if (progressTimeoutRef.current) clearTimeout(progressTimeoutRef.current);
+          if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current);
+          
           setLoadingState(false);
           setConnectionError(false);
           isInitializingRef.current = false;
@@ -450,7 +457,11 @@ export const JitsiMeeting = ({
 
       // Set subject as meeting title
       if (currentProps.subject) {
-        apiRef.current.executeCommand('subject', `${currentProps.subject} - ${currentProps.batch}`);
+        setTimeout(() => {
+          if(apiRef.current) {
+            apiRef.current.executeCommand('subject', `${currentProps.subject} - ${currentProps.batch}`);
+          }
+        }, 1000);
       }
       
       console.log('[Jitsi] Meeting initialization complete, waiting for join...');
@@ -460,52 +471,34 @@ export const JitsiMeeting = ({
       setConnectionError(true);
       setLoadingState(false);
       isInitializingRef.current = false;
-      if (connectionTimeoutRef.current) {
-        clearTimeout(connectionTimeoutRef.current);
-      }
-      if (progressTimeoutRef.current) {
-        clearTimeout(progressTimeoutRef.current);
-      }
-      if (fallbackTimeoutRef.current) {
-        clearTimeout(fallbackTimeoutRef.current);
-      }
+      if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+      if (progressTimeoutRef.current) clearTimeout(progressTimeoutRef.current);
+      if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current);
     }
   }, [getSanitizedRoomName, recordAttendance, updateAttendanceOnLeave, setLoadingState]); 
-  // REMOVED: displayName, subject, etc from dependencies to prevent re-init on prop churn.
 
   // Handle user clicking the "Join" button
   const handleStartClass = () => {
+    // FIX: Only set state. Let the useEffect trigger the logic.
+    // This prevents double initialization race conditions.
     setHasJoined(true);
-    // Initialize will be called by useEffect when hasJoined becomes true? 
-    // Actually, let's call it directly or let the effect handle it.
-    // Ideally, we want an effect that listens to `hasJoined`.
-    // But since we want to keep logic simple, let's just trigger it.
-    // However, existing effect below handles cleanup.
-    // Let's modify the main effect.
   };
 
   // Main Effect: Controls initialization based on hasJoined state
   useEffect(() => {
     if (!hasJoined) return; // Wait for user action
 
-    setLoadingState(true);
-    setConnectionError(false);
-    setLoadingMessage('Loading video system...');
-    setShowFallbackPrompt(false);
-    isInitializingRef.current = false;
-    initializeJitsi();
+    // Only initialize if not already initializing and no API exists
+    if (!isInitializingRef.current && !apiRef.current) {
+        initializeJitsi();
+    }
 
     return () => {
       console.log('[Jitsi] Cleaning up...');
-      if (connectionTimeoutRef.current) {
-        clearTimeout(connectionTimeoutRef.current);
-      }
-      if (progressTimeoutRef.current) {
-        clearTimeout(progressTimeoutRef.current);
-      }
-      if (fallbackTimeoutRef.current) {
-        clearTimeout(fallbackTimeoutRef.current);
-      }
+      if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+      if (progressTimeoutRef.current) clearTimeout(progressTimeoutRef.current);
+      if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current);
+      
       if (apiRef.current) {
         updateAttendanceOnLeave();
         try {
@@ -517,7 +510,7 @@ export const JitsiMeeting = ({
       }
       isInitializingRef.current = false;
     };
-  }, [hasJoined, initializeJitsi, setLoadingState, updateAttendanceOnLeave]);
+  }, [hasJoined, initializeJitsi, updateAttendanceOnLeave]);
 
   const handleRetry = useCallback(async () => {
     console.log('[Jitsi] Retrying connection...');
@@ -533,15 +526,9 @@ export const JitsiMeeting = ({
     }
     
     // Clear timeouts
-    if (connectionTimeoutRef.current) {
-      clearTimeout(connectionTimeoutRef.current);
-    }
-    if (progressTimeoutRef.current) {
-      clearTimeout(progressTimeoutRef.current);
-    }
-    if (fallbackTimeoutRef.current) {
-      clearTimeout(fallbackTimeoutRef.current);
-    }
+    if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+    if (progressTimeoutRef.current) clearTimeout(progressTimeoutRef.current);
+    if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current);
     
     // Remove existing script to force fresh load
     const existingScript = document.querySelector('script[src*="external_api.js"]');
@@ -576,12 +563,9 @@ export const JitsiMeeting = ({
 
   const handleClose = useCallback(() => {
     updateAttendanceOnLeave();
-    if (connectionTimeoutRef.current) {
-      clearTimeout(connectionTimeoutRef.current);
-    }
-    if (progressTimeoutRef.current) {
-      clearTimeout(progressTimeoutRef.current);
-    }
+    if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
+    if (progressTimeoutRef.current) clearTimeout(progressTimeoutRef.current);
+    
     if (apiRef.current) {
       try {
         apiRef.current.dispose();
@@ -589,6 +573,8 @@ export const JitsiMeeting = ({
         console.error('[Jitsi] Error disposing on close:', e);
       }
     }
+    
+    // Call props close
     if (propsRef.current.onClose) {
         propsRef.current.onClose();
     }
