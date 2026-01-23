@@ -11,6 +11,7 @@ import { Video, Clock, Calendar, Users, UserCheck, Eye, Filter } from 'lucide-re
 import { format, isToday, parse, isBefore, isAfter } from 'date-fns';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { generateJitsiRoomName } from '@/lib/jitsiUtils';
 
 interface Schedule {
   id: string;
@@ -152,9 +153,8 @@ export const AdminJoinClass = () => {
   };
 
   const handleJoinClass = (cls: Schedule) => {
-    const today = format(new Date(), 'yyyy-MM-dd');
     setActiveMeeting({
-      roomName: `${cls.batch}-${cls.subject}-${today}`,
+      roomName: generateJitsiRoomName(cls.batch, cls.subject),
       subject: cls.subject,
       batch: cls.batch,
       scheduleId: cls.id

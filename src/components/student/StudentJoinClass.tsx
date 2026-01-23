@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Video, Clock, Calendar, Users } from 'lucide-react';
-import { format, isToday, parse, isBefore, isAfter, addMinutes } from 'date-fns';
+import { format, isToday, parse, isBefore, isAfter } from 'date-fns';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
+import { generateJitsiRoomName } from '@/lib/jitsiUtils';
 
 interface Schedule {
   id: string;
@@ -116,9 +117,8 @@ export const StudentJoinClass = () => {
   };
 
   const handleJoinClass = (cls: Schedule) => {
-    const today = format(new Date(), 'yyyy-MM-dd');
     setActiveMeeting({
-      roomName: `${cls.batch}-${cls.subject}-${today}`,
+      roomName: generateJitsiRoomName(cls.batch, cls.subject),
       subject: cls.subject,
       batch: cls.batch,
       scheduleId: cls.id

@@ -10,6 +10,7 @@ import { Video, Clock, Calendar, Users, UserCheck } from 'lucide-react';
 import { format, isToday, parse, isBefore, isAfter } from 'date-fns';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { generateJitsiRoomName, subjectsMatch } from '@/lib/jitsiUtils';
 
 interface Schedule {
   id: string;
@@ -120,10 +121,15 @@ export const TeacherJoinClass = () => {
     const assignedSubjects = teacher.assigned_subjects || [];
     
     return schedules.filter(schedule => {
-      // Check if teacher is assigned to this batch AND subject
+      // Check if teacher is assigned to this batch
       const isAssignedBatch = assignedBatches.includes(schedule.batch);
-      const isAssignedSubject = assignedSubjects.includes(schedule.subject);
-      if (!isAssignedBatch || !isAssignedSubject) return false;
+      if (!isAssignedBatch) return false;
+      
+      // Check if teacher is assigned to this subject (using normalized matching)
+      const isAssignedSubject = assignedSubjects.some(assigned => 
+        subjectsMatch(assigned, schedule.subject)
+      );
+      if (!isAssignedSubject) return false;
       
       // Check if this schedule is for today
       if (schedule.date) {
@@ -163,9 +169,8 @@ export const TeacherJoinClass = () => {
   };
 
   const handleStartClass = (cls: Schedule) => {
-    const today = format(new Date(), 'yyyy-MM-dd');
     setActiveMeeting({
-      roomName: `${cls.batch}-${cls.subject}-${today}`,
+      roomName: generateJitsiRoomName(cls.batch, cls.subject),
       subject: cls.subject,
       batch: cls.batch,
       scheduleId: cls.id
