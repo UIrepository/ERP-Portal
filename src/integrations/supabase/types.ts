@@ -169,6 +169,59 @@ export type Database = {
         }
         Relationships: []
       }
+      class_attendance: {
+        Row: {
+          batch: string
+          class_date: string
+          created_at: string | null
+          duration_minutes: number | null
+          id: string
+          joined_at: string | null
+          left_at: string | null
+          schedule_id: string | null
+          subject: string
+          user_id: string
+          user_name: string | null
+          user_role: string | null
+        }
+        Insert: {
+          batch: string
+          class_date?: string
+          created_at?: string | null
+          duration_minutes?: number | null
+          id?: string
+          joined_at?: string | null
+          left_at?: string | null
+          schedule_id?: string | null
+          subject: string
+          user_id: string
+          user_name?: string | null
+          user_role?: string | null
+        }
+        Update: {
+          batch?: string
+          class_date?: string
+          created_at?: string | null
+          duration_minutes?: number | null
+          id?: string
+          joined_at?: string | null
+          left_at?: string | null
+          schedule_id?: string | null
+          subject?: string
+          user_id?: string
+          user_name?: string | null
+          user_role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "class_attendance_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       community_messages: {
         Row: {
           batch: string

@@ -3,7 +3,8 @@ import { ManagerBatchOverview } from './ManagerBatchOverview';
 import { ManagerScheduleRequests } from './ManagerScheduleRequests';
 import { ManagerTeachers } from './ManagerTeachers';
 import { ManagerStudents } from './ManagerStudents';
-import { StaffInbox } from '@/components/shared/StaffInbox'; // <--- NEW IMPORT
+import { StaffInbox } from '@/components/shared/StaffInbox';
+import { ManagerJoinClass } from './ManagerJoinClass';
 
 interface ManagerDashboardProps {
   activeTab: string;
@@ -26,13 +27,15 @@ export const ManagerDashboard = ({ activeTab, onTabChange }: ManagerDashboardPro
     switch (activeTab) {
       case 'manager-overview':
         return <ManagerBatchOverview />;
+      case 'manager-join-class':
+        return <ManagerJoinClass />;
       case 'manager-schedule-requests':
         return <ManagerScheduleRequests />;
       case 'manager-teachers':
         return <ManagerTeachers />;
       case 'manager-students':
         return <ManagerStudents />;
-      case 'manager-messages': // <--- NEW CASE
+      case 'manager-messages':
         return <StaffInbox />;
       default:
         return <ManagerBatchOverview />;
