@@ -13,6 +13,7 @@ import { StaffInbox } from '@/components/shared/StaffInbox';
 import { AdminDirectory } from './AdminDirectory';
 import { AdminScheduleRequests } from './AdminScheduleRequests';
 import { AdminMaintenanceManager } from './AdminMaintenanceManager';
+import { AdminJoinClass } from './AdminJoinClass';
 
 interface AdminDashboardProps {
   activeTab: string;
@@ -35,6 +36,8 @@ export const AdminDashboard = ({ activeTab, onTabChange }: AdminDashboardProps) 
     switch (activeTab) {
       case 'enrollment-analytics':
         return <EnrollmentAnalytics />;
+      case 'admin-join-class':
+        return <AdminJoinClass />;
       case 'staff-manager':
         return <AdminStaffManager />;
       case 'teacher-analytics':

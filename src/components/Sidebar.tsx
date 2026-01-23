@@ -112,6 +112,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     { id: 'announcements', label: 'Announcements', icon: Megaphone },
     { id: 'community', label: 'Community', icon: Users },
     { id: 'schedule', label: 'Class Schedule', icon: Calendar },
+    { id: 'join-class', label: 'Join Class', icon: Video },
     { id: 'current-class', label: 'Ongoing Class', icon: Clock },
     { id: 'connect', label: 'Mentors & Connect', icon: UserCog },
     { id: 'recordings', label: 'Recordings', icon: Video },
@@ -123,9 +124,10 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     { id: 'contact-admin', label: 'Contact Admin', icon: Phone }, 
   ];
 
-  // --- 2. TEACHER TABS (Updated) ---
+  // --- 2. TEACHER TABS ---
   const teacherTabs = [
     { id: 'teacher-schedule', label: 'My Schedule', icon: Calendar },
+    { id: 'teacher-join-class', label: 'Join Class', icon: Video },
     { id: 'teacher-recordings', label: 'My Recordings', icon: Video },
     { id: 'teacher-schedule-requests', label: 'Schedule Requests', icon: ClipboardList },
     { id: 'teacher-feedback', label: 'Feedback', icon: Star },
@@ -135,21 +137,22 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   // --- 3. MANAGER TABS ---
   const managerTabs = [
     { id: 'manager-overview', label: 'Batch Overview', icon: LayoutDashboard },
+    { id: 'manager-join-class', label: 'Join Class', icon: Video },
     { id: 'manager-messages', label: 'Messages', icon: MessageSquare },
     { id: 'manager-schedule-requests', label: 'Schedule Requests', icon: ClipboardList },
     { id: 'manager-teachers', label: 'Teachers', icon: UserCog },
     { id: 'manager-students', label: 'Students', icon: GraduationCap },
   ];
 
-  // --- 4. ADMIN TABS (Updated) ---
+  // --- 4. ADMIN TABS ---
   const adminTabs = [
     { id: 'enrollment-analytics', label: 'Student Analytics', icon: BarChart2 },
+    { id: 'admin-join-class', label: 'Join Class', icon: Video },
     { id: 'admin-messages', label: 'Messages / Inbox', icon: MessageSquare },
     { id: 'directory', label: 'Student Directory', icon: Contact },
     { id: 'staff-manager', label: 'Staff Management', icon: UserCog },
     { id: 'community-admin', label: 'Community Chat', icon: Users }, 
     { id: 'schedules', label: 'Schedules', icon: Calendar },
-    // --- ADDED MISSING SCHEDULE REQUESTS TAB HERE ---
     { id: 'schedule-requests', label: 'Schedule Requests', icon: ClipboardList },
     { id: 'meeting-manager', label: 'Meeting Links', icon: LinkIcon },
     { id: 'feedback-viewer', label: 'Feedback Viewer', icon: MessageSquare },
