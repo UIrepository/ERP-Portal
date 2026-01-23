@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, MonitorUp, X, RefreshCw, ExternalLink } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, MonitorUp, X, RefreshCw, ExternalLink, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { generateJitsiRoomName } from '@/lib/jitsiUtils';
 
 interface JitsiMeetingProps {
   roomName: string;
@@ -149,19 +150,22 @@ export const JitsiMeeting = ({
   const isInitializingRef = useRef(false);
   const isLoadingRef = useRef(true); // Ref to track loading state for timeout callback
   const progressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [showFallbackPrompt, setShowFallbackPrompt] = useState(false);
 
   // Helper to update loading state with ref sync
   const setLoadingState = useCallback((loading: boolean) => {
     isLoadingRef.current = loading;
     setIsLoading(loading);
+    if (!loading) {
+      setShowFallbackPrompt(false);
+    }
   }, []);
 
-  // Generate sanitized room name for Jitsi
-  // Using simpler pattern to avoid triggering security features on meet.jit.si
+  // Generate sanitized room name for Jitsi using shared utility
   const getSanitizedRoomName = useCallback(() => {
-    const cleanName = roomName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-    return `class${cleanName}`;
-  }, [roomName]);
+    return generateJitsiRoomName(batch, subject);
+  }, [batch, subject]);
 
   // Open meeting in new tab as fallback
   const openInNewTab = useCallback(() => {
@@ -274,6 +278,15 @@ export const JitsiMeeting = ({
 
     // Set progressive loading message
     setLoadingMessage('Connecting to class...');
+    
+    // Show fallback prompt after 10 seconds if still loading
+    fallbackTimeoutRef.current = setTimeout(() => {
+      if (isLoadingRef.current) {
+        setShowFallbackPrompt(true);
+        console.log('[Jitsi] Showing fallback prompt after 10s');
+      }
+    }, 10000);
+    
     progressTimeoutRef.current = setTimeout(() => {
       if (isLoadingRef.current) {
         setLoadingMessage('Almost there...');
@@ -374,6 +387,9 @@ export const JitsiMeeting = ({
           if (progressTimeoutRef.current) {
             clearTimeout(progressTimeoutRef.current);
           }
+          if (fallbackTimeoutRef.current) {
+            clearTimeout(fallbackTimeoutRef.current);
+          }
           setLoadingState(false);
           setConnectionError(false);
           isInitializingRef.current = false;
@@ -410,6 +426,9 @@ export const JitsiMeeting = ({
       if (progressTimeoutRef.current) {
         clearTimeout(progressTimeoutRef.current);
       }
+      if (fallbackTimeoutRef.current) {
+        clearTimeout(fallbackTimeoutRef.current);
+      }
     }
   }, [roomName, displayName, subject, batch, recordAttendance, updateAttendanceOnLeave, onClose, setLoadingState, getSanitizedRoomName]);
 
@@ -417,6 +436,7 @@ export const JitsiMeeting = ({
     setLoadingState(true);
     setConnectionError(false);
     setLoadingMessage('Loading video system...');
+    setShowFallbackPrompt(false);
     isInitializingRef.current = false;
     initializeJitsi();
 
@@ -427,6 +447,9 @@ export const JitsiMeeting = ({
       }
       if (progressTimeoutRef.current) {
         clearTimeout(progressTimeoutRef.current);
+      }
+      if (fallbackTimeoutRef.current) {
+        clearTimeout(fallbackTimeoutRef.current);
       }
       if (apiRef.current) {
         updateAttendanceOnLeave();
@@ -461,6 +484,9 @@ export const JitsiMeeting = ({
     if (progressTimeoutRef.current) {
       clearTimeout(progressTimeoutRef.current);
     }
+    if (fallbackTimeoutRef.current) {
+      clearTimeout(fallbackTimeoutRef.current);
+    }
     
     // Remove existing script to force fresh load
     const existingScript = document.querySelector('script[src*="external_api.js"]');
@@ -477,6 +503,7 @@ export const JitsiMeeting = ({
     setLoadingState(true);
     setConnectionError(false);
     setLoadingMessage('Reloading video system...');
+    setShowFallbackPrompt(false);
     
     // Small delay to ensure cleanup
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -531,18 +558,56 @@ export const JitsiMeeting = ({
       {/* Loading state */}
       {isLoading && !connectionError && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-20">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
-            <p className="text-white">{loadingMessage}</p>
-            <p className="text-gray-400 text-sm mt-2">This may take a few seconds</p>
-            <Button 
-              variant="link" 
-              onClick={openInNewTab}
-              className="text-blue-400 hover:text-blue-300 mt-4"
-            >
-              <ExternalLink className="mr-2 h-4 w-4" />
-              Having trouble? Open in new tab
-            </Button>
+          <div className="text-center max-w-md px-4">
+            {!showFallbackPrompt ? (
+              <>
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                <p className="text-white">{loadingMessage}</p>
+                <p className="text-gray-400 text-sm mt-2">This may take a few seconds</p>
+                <Button 
+                  variant="link" 
+                  onClick={openInNewTab}
+                  className="text-blue-400 hover:text-blue-300 mt-4"
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Having trouble? Open in new tab
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="h-12 w-12 rounded-full bg-yellow-500/20 flex items-center justify-center mx-auto mb-4">
+                  <AlertTriangle className="h-6 w-6 text-yellow-400" />
+                </div>
+                <p className="text-white text-lg font-semibold">Taking longer than expected</p>
+                <p className="text-gray-400 text-sm mt-2 mb-6">
+                  The embedded video may be blocked by your browser. Try opening in a new tab for a better experience.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Button 
+                    onClick={openInNewTab}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Open in New Tab
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={handleRetry}
+                    className="border-gray-500 text-gray-300 hover:bg-gray-700"
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Try Again
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    onClick={handleClose}
+                    className="text-gray-300 hover:text-white hover:bg-white/10"
+                  >
+                    Close
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
