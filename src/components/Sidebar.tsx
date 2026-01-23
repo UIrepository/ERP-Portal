@@ -128,7 +128,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     { id: 'teacher-schedule', label: 'My Schedule', icon: Calendar },
     { id: 'teacher-recordings', label: 'My Recordings', icon: Video },
     { id: 'teacher-schedule-requests', label: 'Schedule Requests', icon: ClipboardList },
-    { id: 'teacher-feedback', label: 'Feedback', icon: Star }, // <--- ADDED FEEDBACK TAB
+    { id: 'teacher-feedback', label: 'Feedback', icon: Star },
     { id: 'teacher-messages', label: 'Messages', icon: MessageSquare },
   ];
 
@@ -149,6 +149,8 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     { id: 'staff-manager', label: 'Staff Management', icon: UserCog },
     { id: 'community-admin', label: 'Community Chat', icon: Users }, 
     { id: 'schedules', label: 'Schedules', icon: Calendar },
+    // --- ADDED MISSING SCHEDULE REQUESTS TAB HERE ---
+    { id: 'schedule-requests', label: 'Schedule Requests', icon: ClipboardList },
     { id: 'meeting-manager', label: 'Meeting Links', icon: LinkIcon },
     { id: 'feedback-viewer', label: 'Feedback Viewer', icon: MessageSquare },
     { id: 'create-announcement', label: 'Create Announcement', icon: Megaphone },
