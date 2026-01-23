@@ -439,6 +439,8 @@ export const AdminJoinClass = () => {
           batch={activeMeeting.batch}
           scheduleId={activeMeeting.scheduleId}
           onClose={() => setActiveMeeting(null)}
+          userRole="admin"
+          userEmail={user?.email}
         />
       )}
     </div>
