@@ -712,7 +712,7 @@ export const JitsiMeeting = ({
           </Button>
           
           <Button
-            variant={secondary" : "secondary"}
+            variant="secondary"
             size="lg"
             onClick={toggleShareScreen}
             className="rounded-full w-14 h-14"
