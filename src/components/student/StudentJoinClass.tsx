@@ -26,7 +26,7 @@ interface UserEnrollment {
 }
 
 export const StudentJoinClass = () => {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [activeMeeting, setActiveMeeting] = useState<{
     roomName: string;
     subject: string;
@@ -273,7 +273,7 @@ export const StudentJoinClass = () => {
       {activeMeeting && (
         <JitsiMeeting
           roomName={activeMeeting.roomName}
-          displayName={profile?.name || 'Student'}
+          displayName={user?.user_metadata?.full_name || user?.user_metadata?.name || profile?.name || 'Student'}
           subject={activeMeeting.subject}
           batch={activeMeeting.batch}
           scheduleId={activeMeeting.scheduleId}

@@ -32,7 +32,7 @@ interface Attendance {
 }
 
 export const AdminJoinClass = () => {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const queryClient = useQueryClient();
   const [activeMeeting, setActiveMeeting] = useState<{
     roomName: string;
@@ -434,7 +434,7 @@ export const AdminJoinClass = () => {
       {activeMeeting && (
         <JitsiMeeting
           roomName={activeMeeting.roomName}
-          displayName={profile?.name || 'Admin'}
+          displayName={user?.user_metadata?.full_name || user?.user_metadata?.name || profile?.name || 'Admin'}
           subject={activeMeeting.subject}
           batch={activeMeeting.batch}
           scheduleId={activeMeeting.scheduleId}
