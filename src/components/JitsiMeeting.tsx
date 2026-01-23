@@ -153,6 +153,33 @@ export const JitsiMeeting = ({
   const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [showFallbackPrompt, setShowFallbackPrompt] = useState(false);
 
+  // FIX: Store latest props in a ref to avoid re-initialization on prop changes
+  const propsRef = useRef({ displayName, userEmail, subject, batch, scheduleId, onClose, resolvedRole, profile });
+
+  // Update refs when props change
+  useEffect(() => {
+    propsRef.current = { displayName, userEmail, subject, batch, scheduleId, onClose, resolvedRole, profile };
+    
+    // Dynamically update display name if changed without re-joining
+    if (apiRef.current && displayName) {
+        apiRef.current.executeCommand('displayName', displayName);
+    }
+  }, [displayName, userEmail, subject, batch, scheduleId, onClose, resolvedRole, profile]);
+
+  // FIX: URL Management - Update browser URL to reflect meeting state
+  useEffect(() => {
+    const originalUrl = window.location.href;
+    const meetingPath = `/class/${batch.replace(/\s+/g, '-').toLowerCase()}/${subject.replace(/\s+/g, '-').toLowerCase()}`;
+    
+    // Push state to browser history so URL looks correct
+    window.history.pushState({ path: meetingPath }, '', meetingPath);
+
+    return () => {
+      // Restore original URL when meeting closes
+      window.history.pushState({ path: originalUrl }, '', originalUrl);
+    };
+  }, [batch, subject]);
+
   // Helper to update loading state with ref sync
   const setLoadingState = useCallback((loading: boolean) => {
     isLoadingRef.current = loading;
@@ -176,17 +203,18 @@ export const JitsiMeeting = ({
 
   // Record attendance when joining
   const recordAttendance = useCallback(async () => {
-    if (!profile?.user_id) return;
+    const currentProps = propsRef.current;
+    if (!currentProps.profile?.user_id) return;
     
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
       await supabase.from('class_attendance').upsert({
-        user_id: profile.user_id,
-        user_name: displayName || profile.name,
-        user_role: resolvedRole,
-        schedule_id: scheduleId,
-        batch,
-        subject,
+        user_id: currentProps.profile.user_id,
+        user_name: currentProps.displayName || currentProps.profile.name,
+        user_role: currentProps.resolvedRole,
+        schedule_id: currentProps.scheduleId,
+        batch: currentProps.batch,
+        subject: currentProps.subject,
         class_date: today,
         joined_at: new Date().toISOString()
       }, { 
@@ -198,11 +226,12 @@ export const JitsiMeeting = ({
     } catch (error) {
       console.error('[Jitsi] Error recording attendance:', error);
     }
-  }, [profile, displayName, resolvedRole, scheduleId, batch, subject]);
+  }, []); // Empty dependencies, uses propsRef
 
   // Update attendance when leaving
   const updateAttendanceOnLeave = useCallback(async () => {
-    if (!profile?.user_id || !joinTimeRef.current) return;
+    const currentProps = propsRef.current;
+    if (!currentProps.profile?.user_id || !joinTimeRef.current) return;
     
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
@@ -214,14 +243,14 @@ export const JitsiMeeting = ({
           left_at: new Date().toISOString(),
           duration_minutes: durationMinutes
         })
-        .eq('user_id', profile.user_id)
+        .eq('user_id', currentProps.profile.user_id)
         .eq('class_date', today)
-        .eq('batch', batch)
-        .eq('subject', subject);
+        .eq('batch', currentProps.batch)
+        .eq('subject', currentProps.subject);
     } catch (error) {
       console.error('[Jitsi] Error updating attendance on leave:', error);
     }
-  }, [profile, batch, subject]);
+  }, []); // Empty dependencies, uses propsRef
 
   const initializeJitsi = useCallback(async () => {
     // Prevent double initialization
@@ -305,9 +334,11 @@ export const JitsiMeeting = ({
     }, CONNECTION_TIMEOUT_MS);
 
     const domain = 'meet.jit.si';
+    // FIX: Get fresh data from refs
     const sanitizedRoomName = getSanitizedRoomName();
+    const currentProps = propsRef.current;
     
-    console.log(`[Jitsi] Creating meeting room: ${sanitizedRoomName} for user: ${displayName}`);
+    console.log(`[Jitsi] Creating meeting room: ${sanitizedRoomName} for user: ${currentProps.displayName}`);
     
     const options = {
       roomName: sanitizedRoomName,
@@ -315,8 +346,8 @@ export const JitsiMeeting = ({
       height: '100%',
       parentNode: jitsiContainerRef.current,
       userInfo: {
-        displayName: displayName,
-        email: userEmail || undefined,
+        displayName: currentProps.displayName,
+        email: currentProps.userEmail || undefined,
       },
       configOverwrite: {
         // Skip pre-join screen entirely
@@ -402,15 +433,18 @@ export const JitsiMeeting = ({
         readyToClose: () => {
           console.log('[Jitsi] Ready to close');
           updateAttendanceOnLeave();
-          onClose();
+          // Call latest onClose from ref
+          if (propsRef.current.onClose) {
+              propsRef.current.onClose();
+          }
         },
         audioMuteStatusChanged: ({ muted }: { muted: boolean }) => setIsAudioMuted(muted),
         videoMuteStatusChanged: ({ muted }: { muted: boolean }) => setIsVideoMuted(muted),
       });
 
       // Set subject as meeting title
-      if (subject) {
-        apiRef.current.executeCommand('subject', `${subject} - ${batch}`);
+      if (currentProps.subject) {
+        apiRef.current.executeCommand('subject', `${currentProps.subject} - ${currentProps.batch}`);
       }
       
       console.log('[Jitsi] Meeting initialization complete, waiting for join...');
@@ -430,7 +464,8 @@ export const JitsiMeeting = ({
         clearTimeout(fallbackTimeoutRef.current);
       }
     }
-  }, [roomName, displayName, subject, batch, recordAttendance, updateAttendanceOnLeave, onClose, setLoadingState, getSanitizedRoomName]);
+  }, [getSanitizedRoomName, recordAttendance, updateAttendanceOnLeave, setLoadingState]); 
+  // REMOVED: displayName, subject, etc from dependencies to prevent re-init on prop churn.
 
   useEffect(() => {
     setLoadingState(true);
@@ -534,8 +569,10 @@ export const JitsiMeeting = ({
         console.error('[Jitsi] Error disposing on close:', e);
       }
     }
-    onClose();
-  }, [updateAttendanceOnLeave, onClose]);
+    if (propsRef.current.onClose) {
+        propsRef.current.onClose();
+    }
+  }, [updateAttendanceOnLeave]);
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
@@ -675,7 +712,7 @@ export const JitsiMeeting = ({
           </Button>
           
           <Button
-            variant="secondary"
+            variant={secondary" : "secondary"}
             size="lg"
             onClick={toggleShareScreen}
             className="rounded-full w-14 h-14"
