@@ -391,6 +391,8 @@ export const TeacherJoinClass = () => {
           batch={activeMeeting.batch}
           scheduleId={activeMeeting.scheduleId}
           onClose={() => setActiveMeeting(null)}
+          userRole="teacher"
+          userEmail={user?.email}
         />
       )}
     </div>

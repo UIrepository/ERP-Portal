@@ -13,6 +13,8 @@ interface JitsiMeetingProps {
   batch: string;
   scheduleId: string | null;
   onClose: () => void;
+  userRole?: 'teacher' | 'student' | 'admin' | 'manager';
+  userEmail?: string;
 }
 
 declare global {
@@ -124,13 +126,15 @@ const waitForJitsiAPI = (): Promise<boolean> => {
   });
 };
 
-export const JitsiMeeting = ({ 
-  roomName, 
-  displayName, 
-  subject, 
-  batch, 
-  scheduleId, 
-  onClose 
+export const JitsiMeeting = ({
+  roomName,
+  displayName,
+  subject,
+  batch,
+  scheduleId,
+  onClose,
+  userRole = 'student',
+  userEmail
 }: JitsiMeetingProps) => {
   const jitsiContainerRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<any>(null);
@@ -153,8 +157,10 @@ export const JitsiMeeting = ({
   }, []);
 
   // Generate sanitized room name for Jitsi
+  // Using simpler pattern to avoid triggering security features on meet.jit.si
   const getSanitizedRoomName = useCallback(() => {
-    return `teachgrid-${roomName.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase()}`;
+    const cleanName = roomName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    return `class${cleanName}`;
   }, [roomName]);
 
   // Open meeting in new tab as fallback
@@ -296,14 +302,47 @@ export const JitsiMeeting = ({
       height: '100%',
       parentNode: jitsiContainerRef.current,
       userInfo: {
-        displayName: displayName
+        displayName: displayName,
+        email: userEmail || undefined,
       },
       configOverwrite: {
+        // Skip pre-join screen entirely
         prejoinPageEnabled: false,
+        prejoinConfig: {
+          enabled: false
+        },
+        
+        // Audio/Video settings
         startWithAudioMuted: false,
         startWithVideoMuted: false,
+        
+        // Disable deep linking and invite functions
         disableDeepLinking: true,
         disableInviteFunctions: true,
+        
+        // CRITICAL: Disable lobby/waiting room - allows anyone to join without moderator
+        lobby: {
+          autoKnock: true,
+          enableChat: false
+        },
+        hideLobbyButton: true,
+        enableLobbyChat: false,
+        
+        // Security settings to allow open rooms without warnings
+        enableInsecureRoomNameWarning: false,
+        requireDisplayName: false,
+        
+        // Disable welcome/close pages
+        enableWelcomePage: false,
+        enableClosePage: false,
+        
+        // Additional settings to ensure smooth joining
+        startAudioOnly: false,
+        disableModeratorIndicator: false,
+        
+        // Disable notifications about lobby
+        notifications: [],
+        disabledNotifications: ['lobby.notificationTitle'],
       },
       interfaceConfigOverwrite: {
         TOOLBAR_BUTTONS: [
@@ -315,6 +354,10 @@ export const JitsiMeeting = ({
         DEFAULT_REMOTE_DISPLAY_NAME: 'Participant',
         MOBILE_APP_PROMO: false,
         DISABLE_JOIN_LEAVE_NOTIFICATIONS: false,
+        DISABLE_PRESENCE_STATUS: true,
+        GENERATE_ROOMNAMES_ON_WELCOME_PAGE: false,
+        SHOW_CHROME_EXTENSION_BANNER: false,
+        HIDE_INVITE_MORE_HEADER: true,
       }
     };
 

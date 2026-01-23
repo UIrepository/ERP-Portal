@@ -278,6 +278,8 @@ export const StudentJoinClass = () => {
           batch={activeMeeting.batch}
           scheduleId={activeMeeting.scheduleId}
           onClose={() => setActiveMeeting(null)}
+          userRole="student"
+          userEmail={user?.email}
         />
       )}
     </div>
