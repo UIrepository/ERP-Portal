@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, MonitorUp, X, RefreshCw, ExternalLink, AlertTriangle } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, MonitorUp, X, RefreshCw, ExternalLink, AlertTriangle, Play } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { format } from 'date-fns';
@@ -139,21 +139,26 @@ export const JitsiMeeting = ({
 }: JitsiMeetingProps) => {
   const jitsiContainerRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<any>(null);
+  
+  // State
   const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [isVideoMuted, setIsVideoMuted] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // Changed default to false (waits for user click)
+  const [hasJoined, setHasJoined] = useState(false); // New state: "Has user clicked Join?"
   const [connectionError, setConnectionError] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Loading video system...');
+  const [showFallbackPrompt, setShowFallbackPrompt] = useState(false);
+
+  // Auth & Refs
   const { profile, resolvedRole } = useAuth();
   const joinTimeRef = useRef<Date | null>(null);
   const connectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isInitializingRef = useRef(false);
-  const isLoadingRef = useRef(true); // Ref to track loading state for timeout callback
+  const isLoadingRef = useRef(false); // Ref to track loading state for timeout callback
   const progressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [showFallbackPrompt, setShowFallbackPrompt] = useState(false);
 
-  // FIX: Store latest props in a ref to avoid re-initialization on prop changes
+  // FIX: Store latest props in a ref to avoid re-initialization on prop changes (Tab Switch Fix)
   const propsRef = useRef({ displayName, userEmail, subject, batch, scheduleId, onClose, resolvedRole, profile });
 
   // Update refs when props change
@@ -271,6 +276,7 @@ export const JitsiMeeting = ({
     }
 
     // Step 1: Try to load script if needed
+    setLoadingState(true); // Manually set loading true here
     setLoadingMessage('Loading video system...');
     try {
       await loadJitsiScript();
@@ -328,7 +334,7 @@ export const JitsiMeeting = ({
         console.error('[Jitsi] Connection timeout after', CONNECTION_TIMEOUT_MS, 'ms');
         setLoadingState(false);
         setConnectionError(true);
-        toast.error('Connection timed out. Try opening in a new tab.');
+        // toast.error('Connection timed out. Try opening in a new tab.'); // Optional: Don't spam toasts
         isInitializingRef.current = false;
       }
     }, CONNECTION_TIMEOUT_MS);
@@ -467,7 +473,21 @@ export const JitsiMeeting = ({
   }, [getSanitizedRoomName, recordAttendance, updateAttendanceOnLeave, setLoadingState]); 
   // REMOVED: displayName, subject, etc from dependencies to prevent re-init on prop churn.
 
+  // Handle user clicking the "Join" button
+  const handleStartClass = () => {
+    setHasJoined(true);
+    // Initialize will be called by useEffect when hasJoined becomes true? 
+    // Actually, let's call it directly or let the effect handle it.
+    // Ideally, we want an effect that listens to `hasJoined`.
+    // But since we want to keep logic simple, let's just trigger it.
+    // However, existing effect below handles cleanup.
+    // Let's modify the main effect.
+  };
+
+  // Main Effect: Controls initialization based on hasJoined state
   useEffect(() => {
+    if (!hasJoined) return; // Wait for user action
+
     setLoadingState(true);
     setConnectionError(false);
     setLoadingMessage('Loading video system...');
@@ -497,7 +517,7 @@ export const JitsiMeeting = ({
       }
       isInitializingRef.current = false;
     };
-  }, [initializeJitsi, setLoadingState, updateAttendanceOnLeave]);
+  }, [hasJoined, initializeJitsi, setLoadingState, updateAttendanceOnLeave]);
 
   const handleRetry = useCallback(async () => {
     console.log('[Jitsi] Retrying connection...');
@@ -591,6 +611,33 @@ export const JitsiMeeting = ({
           <X className="h-5 w-5" />
         </Button>
       </div>
+
+      {/* NEW: Start Class Overlay - Solves Browser Autoplay Blocking */}
+      {!hasJoined && !isLoading && !connectionError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-20">
+          <div className="text-center max-w-md px-4 animate-in fade-in zoom-in duration-300">
+            <div className="h-20 w-20 rounded-full bg-blue-600/20 flex items-center justify-center mx-auto mb-6">
+              <Video className="h-10 w-10 text-blue-500" />
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-2">Ready to Join?</h3>
+            <p className="text-gray-400 mb-8">
+              Class: {subject} <br/>
+              Batch: {batch}
+            </p>
+            <Button 
+              size="lg" 
+              onClick={handleStartClass}
+              className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-6 h-auto rounded-full shadow-lg shadow-blue-900/20 transition-transform hover:scale-105"
+            >
+              <Play className="mr-2 h-5 w-5 fill-current" />
+              Join Class Now
+            </Button>
+            <p className="text-xs text-gray-500 mt-6">
+              Clicking join ensures a stable connection to the classroom.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Loading state */}
       {isLoading && !connectionError && (
@@ -689,7 +736,7 @@ export const JitsiMeeting = ({
       )}
 
       {/* Custom Controls Bar */}
-      {!connectionError && (
+      {!connectionError && hasJoined && !isLoading && (
         <div className="absolute bottom-0 left-0 right-0 bg-gray-900/90 backdrop-blur p-4 flex justify-center gap-4 z-10">
           <Button
             variant={isAudioMuted ? "destructive" : "secondary"}
@@ -734,7 +781,7 @@ export const JitsiMeeting = ({
       )}
 
       {/* Jitsi Container */}
-      <div ref={jitsiContainerRef} className="flex-1 pt-16 pb-20" />
+      <div ref={jitsiContainerRef} className={`flex-1 pt-16 pb-20 w-full h-full ${!hasJoined ? 'hidden' : ''}`} />
     </div>
   );
 };
