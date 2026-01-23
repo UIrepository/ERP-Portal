@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, MonitorUp, X, RefreshCw } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, MonitorUp, X, RefreshCw, ExternalLink } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { format } from 'date-fns';
@@ -21,80 +21,106 @@ declare global {
   }
 }
 
-const CONNECTION_TIMEOUT_MS = 30000;
-const API_CHECK_INTERVAL_MS = 500;
-const API_MAX_ATTEMPTS = 20;
+const CONNECTION_TIMEOUT_MS = 45000; // Increased to 45 seconds
+const SCRIPT_POLL_INTERVAL_MS = 100;
+const SCRIPT_MAX_POLL_ATTEMPTS = 50; // 5 seconds max for script loading
 
-// Wait for Jitsi API to become available
-const waitForJitsiAPI = (): Promise<boolean> => {
-  return new Promise((resolve) => {
-    let attempts = 0;
-    const checkAPI = () => {
-      attempts++;
-      console.log(`[Jitsi] Checking for API availability... attempt ${attempts}/${API_MAX_ATTEMPTS}`);
-      
-      if (window.JitsiMeetExternalAPI) {
-        console.log('[Jitsi] API is available');
-        resolve(true);
-      } else if (attempts >= API_MAX_ATTEMPTS) {
-        console.error('[Jitsi] API not available after maximum attempts');
-        resolve(false);
-      } else {
-        setTimeout(checkAPI, API_CHECK_INTERVAL_MS);
-      }
-    };
-    checkAPI();
-  });
-};
-
-// Dynamically load Jitsi script if not present
-const loadJitsiScript = (): Promise<void> => {
+// Helper function to inject a fresh script
+const injectNewScript = (): Promise<void> => {
   return new Promise((resolve, reject) => {
-    console.log('[Jitsi] Attempting to load script...');
-    
-    if (window.JitsiMeetExternalAPI) {
-      console.log('[Jitsi] API already available, skipping script load');
-      resolve();
-      return;
-    }
-    
-    const existingScript = document.querySelector('script[src*="external_api.js"]');
-    if (existingScript) {
-      console.log('[Jitsi] Script tag exists, waiting for load...');
-      const handleLoad = () => {
-        console.log('[Jitsi] Existing script loaded');
-        resolve();
-      };
-      const handleError = () => {
-        console.error('[Jitsi] Existing script failed to load');
-        reject(new Error('Failed to load existing Jitsi script'));
-      };
-      existingScript.addEventListener('load', handleLoad);
-      existingScript.addEventListener('error', handleError);
-      
-      // If script is already loaded (cached), API should be available
-      setTimeout(() => {
-        if (window.JitsiMeetExternalAPI) {
-          resolve();
-        }
-      }, 100);
-      return;
-    }
-    
-    // Dynamically add script
-    console.log('[Jitsi] Dynamically injecting script...');
+    console.log('[Jitsi] Injecting new script...');
     const script = document.createElement('script');
     script.src = 'https://meet.jit.si/external_api.js';
     script.async = true;
+    
+    const timeoutId = setTimeout(() => {
+      reject(new Error('Script load timed out'));
+    }, 15000); // 15 second timeout for script load
+    
     script.onload = () => {
+      clearTimeout(timeoutId);
       console.log('[Jitsi] Script loaded successfully');
       resolve();
     };
     script.onerror = () => {
+      clearTimeout(timeoutId);
       console.error('[Jitsi] Script failed to load');
       reject(new Error('Failed to load Jitsi script'));
     };
     document.head.appendChild(script);
+  });
+};
+
+// Robust script loading with polling fallback
+const loadJitsiScript = (): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    console.log('[Jitsi] Checking script status...');
+    
+    // If API is already available, resolve immediately
+    if (window.JitsiMeetExternalAPI) {
+      console.log('[Jitsi] API already loaded');
+      resolve();
+      return;
+    }
+    
+    // Check for existing script tag
+    const existingScript = document.querySelector('script[src*="external_api.js"]') as HTMLScriptElement;
+    
+    if (existingScript) {
+      console.log('[Jitsi] Script tag exists, polling for API...');
+      let attempts = 0;
+      
+      const pollInterval = setInterval(() => {
+        attempts++;
+        
+        if (window.JitsiMeetExternalAPI) {
+          clearInterval(pollInterval);
+          console.log('[Jitsi] API became available after polling');
+          resolve();
+        } else if (attempts >= SCRIPT_MAX_POLL_ATTEMPTS) {
+          clearInterval(pollInterval);
+          console.log('[Jitsi] Existing script timed out, removing and injecting new script');
+          
+          // Remove old script and inject fresh one
+          try {
+            existingScript.remove();
+          } catch (e) {
+            console.warn('[Jitsi] Could not remove old script:', e);
+          }
+          
+          injectNewScript().then(resolve).catch(reject);
+        }
+      }, SCRIPT_POLL_INTERVAL_MS);
+      
+      return;
+    }
+    
+    // No existing script, inject new one
+    injectNewScript().then(resolve).catch(reject);
+  });
+};
+
+// Wait for Jitsi API to become available after script loads
+const waitForJitsiAPI = (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    let attempts = 0;
+    const maxAttempts = 30; // 15 seconds max
+    
+    const checkAPI = () => {
+      attempts++;
+      console.log(`[Jitsi] Checking for API availability... attempt ${attempts}/${maxAttempts}`);
+      
+      if (window.JitsiMeetExternalAPI) {
+        console.log('[Jitsi] API is available');
+        resolve(true);
+      } else if (attempts >= maxAttempts) {
+        console.error('[Jitsi] API not available after maximum attempts');
+        resolve(false);
+      } else {
+        setTimeout(checkAPI, 500);
+      }
+    };
+    checkAPI();
   });
 };
 
@@ -117,6 +143,26 @@ export const JitsiMeeting = ({
   const joinTimeRef = useRef<Date | null>(null);
   const connectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isInitializingRef = useRef(false);
+  const isLoadingRef = useRef(true); // Ref to track loading state for timeout callback
+  const progressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Helper to update loading state with ref sync
+  const setLoadingState = useCallback((loading: boolean) => {
+    isLoadingRef.current = loading;
+    setIsLoading(loading);
+  }, []);
+
+  // Generate sanitized room name for Jitsi
+  const getSanitizedRoomName = useCallback(() => {
+    return `teachgrid-${roomName.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase()}`;
+  }, [roomName]);
+
+  // Open meeting in new tab as fallback
+  const openInNewTab = useCallback(() => {
+    const sanitizedRoomName = getSanitizedRoomName();
+    window.open(`https://meet.jit.si/${sanitizedRoomName}`, '_blank');
+    toast.info('Meeting opened in new tab');
+  }, [getSanitizedRoomName]);
 
   // Record attendance when joining
   const recordAttendance = useCallback(async () => {
@@ -180,7 +226,7 @@ export const JitsiMeeting = ({
     if (!jitsiContainerRef.current) {
       console.error('[Jitsi] Container not found');
       setConnectionError(true);
-      setIsLoading(false);
+      setLoadingState(false);
       isInitializingRef.current = false;
       return;
     }
@@ -189,8 +235,14 @@ export const JitsiMeeting = ({
     setLoadingMessage('Loading video system...');
     try {
       await loadJitsiScript();
+      console.log('[Jitsi] Script loading completed');
     } catch (error) {
       console.error('[Jitsi] Failed to load script:', error);
+      toast.error('Failed to load video system. Please try again.');
+      setConnectionError(true);
+      setLoadingState(false);
+      isInitializingRef.current = false;
+      return;
     }
 
     // Step 2: Wait for API to become available
@@ -199,32 +251,42 @@ export const JitsiMeeting = ({
     
     if (!apiAvailable) {
       console.error('[Jitsi] API not available after waiting');
-      toast.error('Video conferencing failed to load. Please try again.');
+      toast.error('Video system failed to initialize. Please try again.');
       setConnectionError(true);
-      setIsLoading(false);
+      setLoadingState(false);
       isInitializingRef.current = false;
       return;
     }
 
-    // Clear any existing timeout
+    // Clear any existing timeouts
     if (connectionTimeoutRef.current) {
       clearTimeout(connectionTimeoutRef.current);
     }
+    if (progressTimeoutRef.current) {
+      clearTimeout(progressTimeoutRef.current);
+    }
 
-    // Set connection timeout for the actual meeting join
+    // Set progressive loading message
     setLoadingMessage('Connecting to class...');
+    progressTimeoutRef.current = setTimeout(() => {
+      if (isLoadingRef.current) {
+        setLoadingMessage('Almost there...');
+      }
+    }, 15000);
+
+    // Set connection timeout using ref to avoid stale closure
     connectionTimeoutRef.current = setTimeout(() => {
-      if (isLoading) {
-        console.error('[Jitsi] Connection timeout');
-        setIsLoading(false);
+      if (isLoadingRef.current) {
+        console.error('[Jitsi] Connection timeout after', CONNECTION_TIMEOUT_MS, 'ms');
+        setLoadingState(false);
         setConnectionError(true);
-        toast.error('Connection timed out. Please try again.');
+        toast.error('Connection timed out. Try opening in a new tab.');
         isInitializingRef.current = false;
       }
     }, CONNECTION_TIMEOUT_MS);
 
     const domain = 'meet.jit.si';
-    const sanitizedRoomName = `teachgrid-${roomName.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase()}`;
+    const sanitizedRoomName = getSanitizedRoomName();
     
     console.log(`[Jitsi] Creating meeting room: ${sanitizedRoomName} for user: ${displayName}`);
     
@@ -266,7 +328,10 @@ export const JitsiMeeting = ({
           if (connectionTimeoutRef.current) {
             clearTimeout(connectionTimeoutRef.current);
           }
-          setIsLoading(false);
+          if (progressTimeoutRef.current) {
+            clearTimeout(progressTimeoutRef.current);
+          }
+          setLoadingState(false);
           setConnectionError(false);
           isInitializingRef.current = false;
           recordAttendance();
@@ -294,16 +359,19 @@ export const JitsiMeeting = ({
       console.error('[Jitsi] Error creating meeting:', error);
       toast.error('Failed to start video meeting. Please try again.');
       setConnectionError(true);
-      setIsLoading(false);
+      setLoadingState(false);
       isInitializingRef.current = false;
       if (connectionTimeoutRef.current) {
         clearTimeout(connectionTimeoutRef.current);
       }
+      if (progressTimeoutRef.current) {
+        clearTimeout(progressTimeoutRef.current);
+      }
     }
-  }, [roomName, displayName, subject, batch, isLoading, recordAttendance, updateAttendanceOnLeave, onClose]);
+  }, [roomName, displayName, subject, batch, recordAttendance, updateAttendanceOnLeave, onClose, setLoadingState, getSanitizedRoomName]);
 
   useEffect(() => {
-    setIsLoading(true);
+    setLoadingState(true);
     setConnectionError(false);
     setLoadingMessage('Loading video system...');
     isInitializingRef.current = false;
@@ -314,14 +382,21 @@ export const JitsiMeeting = ({
       if (connectionTimeoutRef.current) {
         clearTimeout(connectionTimeoutRef.current);
       }
+      if (progressTimeoutRef.current) {
+        clearTimeout(progressTimeoutRef.current);
+      }
       if (apiRef.current) {
         updateAttendanceOnLeave();
-        apiRef.current.dispose();
+        try {
+          apiRef.current.dispose();
+        } catch (e) {
+          console.warn('[Jitsi] Error during dispose:', e);
+        }
         apiRef.current = null;
       }
       isInitializingRef.current = false;
     };
-  }, [roomName, displayName, subject, batch]);
+  }, [initializeJitsi, setLoadingState, updateAttendanceOnLeave]);
 
   const handleRetry = useCallback(async () => {
     console.log('[Jitsi] Retrying connection...');
@@ -336,25 +411,35 @@ export const JitsiMeeting = ({
       apiRef.current = null;
     }
     
-    // Clear timeout
+    // Clear timeouts
     if (connectionTimeoutRef.current) {
       clearTimeout(connectionTimeoutRef.current);
     }
+    if (progressTimeoutRef.current) {
+      clearTimeout(progressTimeoutRef.current);
+    }
+    
+    // Remove existing script to force fresh load
+    const existingScript = document.querySelector('script[src*="external_api.js"]');
+    if (existingScript) {
+      try {
+        existingScript.remove();
+        console.log('[Jitsi] Removed existing script for fresh reload');
+      } catch (e) {
+        console.warn('[Jitsi] Could not remove script:', e);
+      }
+    }
     
     isInitializingRef.current = false;
-    setIsLoading(true);
+    setLoadingState(true);
     setConnectionError(false);
     setLoadingMessage('Reloading video system...');
     
-    // Try to reload the script
-    try {
-      await loadJitsiScript();
-    } catch (e) {
-      console.error('[Jitsi] Failed to reload script:', e);
-    }
+    // Small delay to ensure cleanup
+    await new Promise(resolve => setTimeout(resolve, 500));
     
     initializeJitsi();
-  }, [initializeJitsi]);
+  }, [initializeJitsi, setLoadingState]);
 
   const toggleAudio = () => apiRef.current?.executeCommand('toggleAudio');
   const toggleVideo = () => apiRef.current?.executeCommand('toggleVideo');
@@ -368,6 +453,9 @@ export const JitsiMeeting = ({
     updateAttendanceOnLeave();
     if (connectionTimeoutRef.current) {
       clearTimeout(connectionTimeoutRef.current);
+    }
+    if (progressTimeoutRef.current) {
+      clearTimeout(progressTimeoutRef.current);
     }
     if (apiRef.current) {
       try {
@@ -404,6 +492,14 @@ export const JitsiMeeting = ({
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
             <p className="text-white">{loadingMessage}</p>
             <p className="text-gray-400 text-sm mt-2">This may take a few seconds</p>
+            <Button 
+              variant="link" 
+              onClick={openInNewTab}
+              className="text-blue-400 hover:text-blue-300 mt-4"
+            >
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Having trouble? Open in new tab
+            </Button>
           </div>
         </div>
       )}
@@ -411,21 +507,29 @@ export const JitsiMeeting = ({
       {/* Connection Error state */}
       {connectionError && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-20">
-          <div className="text-center">
+          <div className="text-center max-w-md px-4">
             <div className="h-12 w-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
               <X className="h-6 w-6 text-red-400" />
             </div>
             <p className="text-white text-lg font-semibold">Failed to connect to class</p>
             <p className="text-gray-400 text-sm mt-2 mb-6">
-              Please check your internet connection and try again
+              Please check your internet connection. If the problem persists, try opening the class in a new tab.
             </p>
-            <div className="flex gap-3 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Button 
                 onClick={handleRetry}
                 className="bg-blue-600 hover:bg-blue-700"
               >
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Try Again
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={openInNewTab}
+                className="border-blue-500 text-blue-400 hover:bg-blue-500/10"
+              >
+                <ExternalLink className="mr-2 h-4 w-4" />
+                Open in New Tab
               </Button>
               <Button 
                 variant="ghost" 
