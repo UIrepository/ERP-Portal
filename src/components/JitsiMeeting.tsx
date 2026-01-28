@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, MonitorUp, X, RefreshCw, ExternalLink, AlertTriangle, Play, Lock, Loader2 } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, MonitorUp, X, RefreshCw, ExternalLink, AlertTriangle, Play, Lock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { format } from 'date-fns';
@@ -318,7 +318,7 @@ export const JitsiMeeting = ({
         startWithVideoMuted: false,
         disableDeepLinking: true,
         disableInviteFunctions: true,
-        lobby: { autoKnock: true, enableChat: false },
+        lobby: { autoKnock: true, enableChat: true }, // Enable chat in lobby if supported
         hideLobbyButton: true,
         enableInsecureRoomNameWarning: false,
         requireDisplayName: false,
@@ -328,9 +328,12 @@ export const JitsiMeeting = ({
         startAudioOnly: false,
       },
       interfaceConfigOverwrite: {
+        // Full list of buttons to ensure Chat and others are visible
         TOOLBAR_BUTTONS: [
-          'microphone', 'camera', 'desktop', 'chat',
-          'raisehand', 'participants-pane', 'tileview', 'fullscreen'
+          'microphone', 'camera', 'desktop', 'chat', 'raisehand',
+          'participants-pane', 'tileview', 'fullscreen', 
+          'videoquality', 'filmstrip', 'settings', 
+          'hangup', 'overflowmenu' // Important for small screens
         ],
         SHOW_JITSI_WATERMARK: false,
         SHOW_WATERMARK_FOR_GUESTS: false,
@@ -345,7 +348,7 @@ export const JitsiMeeting = ({
       apiRef.current = new window.JitsiMeetExternalAPI(domain, options);
       
       // CRITICAL FIX: Hide the spinner immediately so the user can see the Jitsi UI
-      // (Even if it says "Waiting for Moderator", the user needs to see that)
+      // This reveals the "Login" or "Waiting" screen immediately
       setTimeout(() => {
           setLoadingState(false);
           isInitializingRef.current = false;
@@ -441,9 +444,12 @@ export const JitsiMeeting = ({
   }, [updateAttendanceOnLeave]);
 
   return (
+    // LAYOUT FIX: Changed from absolute positioning to flexbox column
+    // This ensures the header never covers the iframe content
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
-      {/* Header */}
-      <div className="absolute top-0 left-0 right-0 bg-gray-900/90 backdrop-blur p-4 flex justify-between items-center z-10">
+      
+      {/* Header: Relative positioning ensures it pushes content down */}
+      <div className="relative z-10 bg-gray-900/90 backdrop-blur p-4 flex justify-between items-center shrink-0 shadow-md">
         <div>
           <h2 className="text-white font-semibold">{subject}</h2>
           <p className="text-gray-300 text-sm">{batch}</p>
@@ -453,103 +459,109 @@ export const JitsiMeeting = ({
         </Button>
       </div>
 
-      {/* START SCREEN: Adaptive based on Role */}
-      {!hasJoined && !isLoading && !connectionError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-20">
-          <div className="text-center max-w-md px-4 animate-in fade-in zoom-in duration-300">
-            <div className="h-20 w-20 rounded-full bg-blue-600/20 flex items-center justify-center mx-auto mb-6">
-              {isHost ? <Lock className="h-10 w-10 text-blue-500" /> : <Video className="h-10 w-10 text-blue-500" />}
-            </div>
-            <h3 className="text-2xl font-bold text-white mb-2">
-              {isHost ? 'Start Class' : 'Ready to Join?'}
-            </h3>
-            <p className="text-gray-400 mb-8">
-              Class: {subject} <br/> Batch: {batch}
-            </p>
+      {/* Main Content Area: Takes remaining height */}
+      <div className="flex-1 relative w-full min-h-0 bg-gray-950">
+        
+        {/* START SCREEN: Adaptive based on Role */}
+        {!hasJoined && !isLoading && !connectionError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-20">
+            <div className="text-center max-w-md px-4 animate-in fade-in zoom-in duration-300">
+              <div className="h-20 w-20 rounded-full bg-blue-600/20 flex items-center justify-center mx-auto mb-6">
+                {isHost ? <Lock className="h-10 w-10 text-blue-500" /> : <Video className="h-10 w-10 text-blue-500" />}
+              </div>
+              <h3 className="text-2xl font-bold text-white mb-2">
+                {isHost ? 'Start Class' : 'Ready to Join?'}
+              </h3>
+              <p className="text-gray-400 mb-8">
+                Class: {subject} <br/> Batch: {batch}
+              </p>
 
-            {isHost ? (
-               <div className="space-y-4">
-                 <Button 
+              {isHost ? (
+                <div className="space-y-4">
+                  <Button 
+                    size="lg" 
+                    onClick={handleHostStart}
+                    className="bg-green-600 hover:bg-green-700 text-lg px-8 py-6 w-full rounded-full shadow-lg transition-transform hover:scale-105"
+                  >
+                    <ExternalLink className="mr-2 h-5 w-5" />
+                    Launch & Authenticate
+                  </Button>
+                  <p className="text-xs text-yellow-500/80 bg-yellow-500/10 p-3 rounded-lg text-left">
+                    <strong>Required:</strong> Jitsi requires you to login to create the room. 
+                    Clicking this will open a new tab where you must login/start the meeting.
+                    This window will connect automatically once you do.
+                  </p>
+                </div>
+              ) : (
+                <Button 
                   size="lg" 
-                  onClick={handleHostStart}
-                  className="bg-green-600 hover:bg-green-700 text-lg px-8 py-6 w-full rounded-full shadow-lg transition-transform hover:scale-105"
+                  onClick={handleStartClass}
+                  className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-6 h-auto rounded-full shadow-lg transition-transform hover:scale-105"
                 >
-                  <ExternalLink className="mr-2 h-5 w-5" />
-                  Launch & Authenticate
+                  <Play className="mr-2 h-5 w-5 fill-current" />
+                  Join Class Now
                 </Button>
-                <p className="text-xs text-yellow-500/80 bg-yellow-500/10 p-3 rounded-lg text-left">
-                  <strong>Required:</strong> Jitsi requires you to login to create the room. 
-                  Clicking this will open a new tab where you must login/start the meeting.
-                  This window will connect automatically once you do.
-                </p>
-               </div>
-            ) : (
-              <Button 
-                size="lg" 
-                onClick={handleStartClass}
-                className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-6 h-auto rounded-full shadow-lg transition-transform hover:scale-105"
-              >
-                <Play className="mr-2 h-5 w-5 fill-current" />
-                Join Class Now
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* LOADING STATE */}
-      {isLoading && !connectionError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900/90 z-20 pointer-events-none">
-          <div className="text-center max-w-md px-4">
-             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
-             <p className="text-white">{loadingMessage}</p>
-          </div>
-        </div>
-      )}
-
-      {/* ERROR STATE */}
-      {connectionError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-20">
-          <div className="text-center max-w-md px-4">
-            <div className="h-12 w-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
-              <X className="h-6 w-6 text-red-400" />
-            </div>
-            <p className="text-white text-lg font-semibold">Connection Failed</p>
-            <p className="text-gray-400 text-sm mt-2">
-                {isHost ? "Could not connect to the room. Did you create it in the new tab?" : "Unable to connect to class."}
-            </p>
-            <div className="flex gap-3 justify-center mt-6">
-              <Button onClick={handleRetry} className="bg-blue-600 hover:bg-blue-700">Retry</Button>
-              <Button variant="ghost" onClick={handleClose} className="text-white">Close</Button>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* CONTROLS */}
+        {/* LOADING STATE */}
+        {isLoading && !connectionError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-900/90 z-20 pointer-events-none">
+            <div className="text-center max-w-md px-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+              <p className="text-white">{loadingMessage}</p>
+            </div>
+          </div>
+        )}
+
+        {/* ERROR STATE */}
+        {connectionError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-20">
+            <div className="text-center max-w-md px-4">
+              <div className="h-12 w-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+                <X className="h-6 w-6 text-red-400" />
+              </div>
+              <p className="text-white text-lg font-semibold">Connection Failed</p>
+              <p className="text-gray-400 text-sm mt-2">
+                  {isHost ? "Could not connect to the room. Did you create it in the new tab?" : "Unable to connect to class."}
+              </p>
+              <div className="flex gap-3 justify-center mt-6">
+                <Button onClick={handleRetry} className="bg-blue-600 hover:bg-blue-700">Retry</Button>
+                <Button variant="ghost" onClick={handleClose} className="text-white">Close</Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Jitsi Iframe Container */}
+        <div 
+            ref={jitsiContainerRef} 
+            className="w-full h-full" 
+            style={{ display: hasJoined ? 'block' : 'none' }}
+        />
+      </div>
+
+      {/* CONTROLS (Floating over the video at bottom) */}
       {!connectionError && hasJoined && !isLoading && (
-        <div className="absolute bottom-0 left-0 right-0 bg-gray-900/90 backdrop-blur p-4 flex justify-center gap-4 z-10">
-          <Button variant={isAudioMuted ? "destructive" : "secondary"} size="lg" onClick={toggleAudio} className="rounded-full w-14 h-14">
-            {isAudioMuted ? <MicOff /> : <Mic />}
-          </Button>
-          <Button variant={isVideoMuted ? "destructive" : "secondary"} size="lg" onClick={toggleVideo} className="rounded-full w-14 h-14">
-            {isVideoMuted ? <VideoOff /> : <Video />}
-          </Button>
-          <Button variant="secondary" size="lg" onClick={toggleShareScreen} className="rounded-full w-14 h-14">
-            <MonitorUp />
-          </Button>
-          <Button variant="destructive" size="lg" onClick={hangUp} className="rounded-full w-14 h-14">
-            <PhoneOff />
-          </Button>
+        <div className="absolute bottom-6 left-0 right-0 flex justify-center pointer-events-none z-30">
+          <div className="bg-gray-900/80 backdrop-blur rounded-full p-2 flex gap-4 pointer-events-auto shadow-2xl border border-white/10">
+            <Button variant={isAudioMuted ? "destructive" : "secondary"} size="icon" onClick={toggleAudio} className="rounded-full w-12 h-12">
+              {isAudioMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+            </Button>
+            <Button variant={isVideoMuted ? "destructive" : "secondary"} size="icon" onClick={toggleVideo} className="rounded-full w-12 h-12">
+              {isVideoMuted ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
+            </Button>
+            <Button variant="secondary" size="icon" onClick={toggleShareScreen} className="rounded-full w-12 h-12">
+              <MonitorUp className="h-5 w-5" />
+            </Button>
+            <Button variant="destructive" size="icon" onClick={hangUp} className="rounded-full w-12 h-12">
+              <PhoneOff className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
       )}
-
-      {/* The Container is now always rendered but hidden via CSS logic if needed */}
-      <div 
-          ref={jitsiContainerRef} 
-          className="flex-1 w-full h-full min-h-[500px]" 
-          style={{ display: hasJoined ? 'block' : 'none' }}
-      />
     </div>
   );
 };
