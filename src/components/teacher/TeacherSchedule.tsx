@@ -1,14 +1,20 @@
 // src/components/teacher/TeacherSchedule.tsx
 import { useState, useMemo, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, getDay, startOfWeek, addDays, isSameDay, subDays } from 'date-fns';
-import { AlertTriangle, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { format, getDay, startOfWeek, addDays, isSameDay, subDays, parseISO } from 'date-fns';
+import { AlertTriangle, ChevronLeft, ChevronRight, BookOpen, Plus, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 // Interface for the schedule data
 interface Schedule {
@@ -70,9 +76,21 @@ const ScheduleSkeleton = () => (
 );
 
 export const TeacherSchedule = () => {
+  const { user } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [displayDate, setDisplayDate] = useState(new Date());
+  const [isAddClassOpen, setIsAddClassOpen] = useState(false);
   const queryClient = useQueryClient();
+
+  // Form State for Adding Class
+  const [newClass, setNewClass] = useState({
+    date: format(new Date(), 'yyyy-MM-dd'),
+    start_time: '',
+    end_time: '',
+    subject: '',
+    batch: '',
+    link: ''
+  });
 
   // --- Real-time Clock ---
   useEffect(() => {
@@ -108,10 +126,27 @@ export const TeacherSchedule = () => {
   }, [queryClient]);
 
   // --- Data Fetching ---
+  
+  // 1. Fetch Teacher Info for Batches
+  const { data: teacherInfo } = useQuery({
+    queryKey: ['teacherInfo', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from('teachers')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id
+  });
+
+  // 2. Fetch Schedules
   const { data: schedules, isLoading: isLoadingSchedules, isError: isErrorSchedules, error: errorSchedules } = useQuery<Schedule[]>({
     queryKey: ['teacher-all-schedules'],
     queryFn: async (): Promise<Schedule[]> => {
-        // Fetch ALL schedules to match Admin view as requested
         const { data, error } = await supabase
             .from('schedules')
             .select('*')
@@ -127,6 +162,7 @@ export const TeacherSchedule = () => {
     },
   });
 
+  // 3. Fetch Exams
   const { data: exams, isLoading: isLoadingExams, isError: isErrorExams, error: errorExams } = useQuery<Exam[]>({
     queryKey: ['teacher-all-exams'],
     queryFn: async (): Promise<Exam[]> => {
@@ -141,6 +177,46 @@ export const TeacherSchedule = () => {
         }
         return data || [];
     },
+  });
+
+  // --- Mutation: Add Class ---
+  const addClassMutation = useMutation({
+    mutationFn: async () => {
+        if (!newClass.batch || !newClass.subject || !newClass.date || !newClass.start_time || !newClass.end_time) {
+            throw new Error("Please fill in all required fields.");
+        }
+
+        const dateObj = parseISO(newClass.date);
+        const dayOfWeek = getDay(dateObj); // 0 = Sunday
+
+        const { error } = await supabase.from('schedules').insert({
+            day_of_week: dayOfWeek,
+            date: newClass.date,
+            start_time: newClass.start_time,
+            end_time: newClass.end_time,
+            subject: newClass.subject,
+            batch: newClass.batch,
+            link: newClass.link || null,
+        });
+
+        if (error) throw error;
+    },
+    onSuccess: () => {
+        toast.success("Class added successfully!");
+        setIsAddClassOpen(false);
+        setNewClass({
+            date: format(new Date(), 'yyyy-MM-dd'),
+            start_time: '',
+            end_time: '',
+            subject: '',
+            batch: '',
+            link: ''
+        });
+        queryClient.invalidateQueries({ queryKey: ['teacher-all-schedules'] });
+    },
+    onError: (error) => {
+        toast.error(`Failed to add class: ${error.message}`);
+    }
   });
 
   const isLoading = isLoadingSchedules || isLoadingExams;
@@ -203,12 +279,118 @@ export const TeacherSchedule = () => {
           <p className="text-muted-foreground mt-1">Overview of all scheduled classes and exams.</p>
         </div>
         <div className="flex flex-col items-end gap-2">
+            
+            {/* Add Class Button & Dialog */}
+            <div className="flex items-center gap-2 mb-2">
+              <Dialog open={isAddClassOpen} onOpenChange={setIsAddClassOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-primary hover:bg-primary/90">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Extra Class
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>Add Extra Class</DialogTitle>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="batch" className="text-right">
+                        Batch
+                      </Label>
+                      <Select 
+                        value={newClass.batch} 
+                        onValueChange={(val) => setNewClass({...newClass, batch: val})}
+                      >
+                        <SelectTrigger className="col-span-3">
+                          <SelectValue placeholder="Select batch" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {teacherInfo?.assigned_batches?.map((batch: string) => (
+                            <SelectItem key={batch} value={batch}>
+                              {batch}
+                            </SelectItem>
+                          )) || <SelectItem value="none" disabled>No batches assigned</SelectItem>}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="subject" className="text-right">
+                        Subject
+                      </Label>
+                      <Input
+                        id="subject"
+                        value={newClass.subject}
+                        onChange={(e) => setNewClass({...newClass, subject: e.target.value})}
+                        className="col-span-3"
+                        placeholder="e.g. Mathematics"
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="date" className="text-right">
+                        Date
+                      </Label>
+                      <Input
+                        id="date"
+                        type="date"
+                        value={newClass.date}
+                        onChange={(e) => setNewClass({...newClass, date: e.target.value})}
+                        className="col-span-3"
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="start" className="text-right">
+                        Start
+                      </Label>
+                      <Input
+                        id="start"
+                        type="time"
+                        value={newClass.start_time}
+                        onChange={(e) => setNewClass({...newClass, start_time: e.target.value})}
+                        className="col-span-3"
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="end" className="text-right">
+                        End
+                      </Label>
+                      <Input
+                        id="end"
+                        type="time"
+                        value={newClass.end_time}
+                        onChange={(e) => setNewClass({...newClass, end_time: e.target.value})}
+                        className="col-span-3"
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="link" className="text-right">
+                        Link
+                      </Label>
+                      <Input
+                        id="link"
+                        value={newClass.link}
+                        onChange={(e) => setNewClass({...newClass, link: e.target.value})}
+                        className="col-span-3"
+                        placeholder="Meeting URL (optional)"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={() => addClassMutation.mutate()} disabled={addClassMutation.isPending}>
+                      {addClassMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Add Class
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+
             <div className="flex items-center gap-4">
                 <Button variant="outline" size="icon" onClick={handlePreviousWeek}>
                     <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <div className="text-center">
-                    <p className="text-sm text-gray-500">{format(weekDates[0], 'MMM d')} - {format(weekDates[6], 'MMM d, yyyy')}</p>
+                <div className="text-center w-32">
+                    <p className="text-sm text-gray-500">{format(weekDates[0], 'MMM d')} - {format(weekDates[6], 'MMM d')}</p>
                 </div>
                 <Button variant="outline" size="icon" onClick={handleNextWeek}>
                     <ChevronRight className="h-4 w-4" />
