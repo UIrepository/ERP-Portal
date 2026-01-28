@@ -82,14 +82,13 @@ export const TeacherSchedule = () => {
   const [isAddClassOpen, setIsAddClassOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  // Form State for Adding Class
+  // Form State for Adding Class - REMOVED LINK
   const [newClass, setNewClass] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
     start_time: '',
     end_time: '',
     subject: '',
-    batch: '',
-    link: ''
+    batch: ''
   });
 
   // --- Real-time Clock ---
@@ -127,14 +126,14 @@ export const TeacherSchedule = () => {
 
   // --- Data Fetching ---
   
-  // 1. Fetch Teacher Info for Batches
+  // 1. Fetch Teacher Info for Batches AND Subjects
   const { data: teacherInfo } = useQuery({
     queryKey: ['teacherInfo', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
       const { data, error } = await supabase
         .from('teachers')
-        .select('*')
+        .select('*') // Assuming 'assigned_subjects' is a column here
         .eq('user_id', user.id)
         .single();
       if (error) throw error;
@@ -189,6 +188,7 @@ export const TeacherSchedule = () => {
         const dateObj = parseISO(newClass.date);
         const dayOfWeek = getDay(dateObj); // 0 = Sunday
 
+        // Insert without 'link' column to force Jitsi integration
         const { error } = await supabase.from('schedules').insert({
             day_of_week: dayOfWeek,
             date: newClass.date,
@@ -196,7 +196,7 @@ export const TeacherSchedule = () => {
             end_time: newClass.end_time,
             subject: newClass.subject,
             batch: newClass.batch,
-            link: newClass.link || null,
+            link: null // Explicitly null as per requirement
         });
 
         if (error) throw error;
@@ -209,8 +209,7 @@ export const TeacherSchedule = () => {
             start_time: '',
             end_time: '',
             subject: '',
-            batch: '',
-            link: ''
+            batch: ''
         });
         queryClient.invalidateQueries({ queryKey: ['teacher-all-schedules'] });
     },
@@ -294,6 +293,7 @@ export const TeacherSchedule = () => {
                     <DialogTitle>Add Extra Class</DialogTitle>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
+                    {/* Batch Selection */}
                     <div className="grid grid-cols-4 items-center gap-4">
                       <Label htmlFor="batch" className="text-right">
                         Batch
@@ -314,18 +314,30 @@ export const TeacherSchedule = () => {
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {/* Subject Selection - RESTRICTED */}
                     <div className="grid grid-cols-4 items-center gap-4">
                       <Label htmlFor="subject" className="text-right">
                         Subject
                       </Label>
-                      <Input
-                        id="subject"
-                        value={newClass.subject}
-                        onChange={(e) => setNewClass({...newClass, subject: e.target.value})}
-                        className="col-span-3"
-                        placeholder="e.g. Mathematics"
-                      />
+                      <Select 
+                        value={newClass.subject} 
+                        onValueChange={(val) => setNewClass({...newClass, subject: val})}
+                      >
+                        <SelectTrigger className="col-span-3">
+                          <SelectValue placeholder="Select subject" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {teacherInfo?.assigned_subjects?.map((subj: string) => (
+                            <SelectItem key={subj} value={subj}>
+                              {subj}
+                            </SelectItem>
+                          )) || <SelectItem value="none" disabled>No subjects assigned</SelectItem>}
+                        </SelectContent>
+                      </Select>
                     </div>
+
+                    {/* Date Selection */}
                     <div className="grid grid-cols-4 items-center gap-4">
                       <Label htmlFor="date" className="text-right">
                         Date
@@ -338,6 +350,8 @@ export const TeacherSchedule = () => {
                         className="col-span-3"
                       />
                     </div>
+
+                    {/* Time Selection */}
                     <div className="grid grid-cols-4 items-center gap-4">
                       <Label htmlFor="start" className="text-right">
                         Start
@@ -362,18 +376,8 @@ export const TeacherSchedule = () => {
                         className="col-span-3"
                       />
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="link" className="text-right">
-                        Link
-                      </Label>
-                      <Input
-                        id="link"
-                        value={newClass.link}
-                        onChange={(e) => setNewClass({...newClass, link: e.target.value})}
-                        className="col-span-3"
-                        placeholder="Meeting URL (optional)"
-                      />
-                    </div>
+
+                    {/* Link input removed entirely as requested */}
                   </div>
                   <DialogFooter>
                     <Button onClick={() => addClassMutation.mutate()} disabled={addClassMutation.isPending}>
