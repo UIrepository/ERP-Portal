@@ -1,4 +1,3 @@
-// src/components/teacher/TeacherSchedule.tsx
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -82,7 +81,7 @@ export const TeacherSchedule = () => {
   const [isAddClassOpen, setIsAddClassOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  // Form State for Adding Class - REMOVED LINK
+  // Form State for Adding Class
   const [newClass, setNewClass] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
     start_time: '',
@@ -133,7 +132,7 @@ export const TeacherSchedule = () => {
       if (!user?.id) return null;
       const { data, error } = await supabase
         .from('teachers')
-        .select('*') // Assuming 'assigned_subjects' is a column here
+        .select('*')
         .eq('user_id', user.id)
         .single();
       if (error) throw error;
@@ -188,15 +187,22 @@ export const TeacherSchedule = () => {
         const dateObj = parseISO(newClass.date);
         const dayOfWeek = getDay(dateObj); // 0 = Sunday
 
-        // Insert without 'link' column to force Jitsi integration
+        // SAFETY: Ensure subject is clean. 
+        // If "Subject (Batch)" pattern exists, strip it out.
+        let cleanSubject = newClass.subject.trim();
+        const batchSuffix = `(${newClass.batch})`;
+        if (cleanSubject.includes(batchSuffix)) {
+            cleanSubject = cleanSubject.replace(batchSuffix, '').trim();
+        }
+
         const { error } = await supabase.from('schedules').insert({
             day_of_week: dayOfWeek,
             date: newClass.date,
             start_time: newClass.start_time,
             end_time: newClass.end_time,
-            subject: newClass.subject,
-            batch: newClass.batch,
-            link: null // Explicitly null as per requirement
+            subject: cleanSubject, // Send clean subject
+            batch: newClass.batch, // Send clean batch
+            link: null // Force null as requested
         });
 
         if (error) throw error;
@@ -376,8 +382,6 @@ export const TeacherSchedule = () => {
                         className="col-span-3"
                       />
                     </div>
-
-                    {/* Link input removed entirely as requested */}
                   </div>
                   <DialogFooter>
                     <Button onClick={() => addClassMutation.mutate()} disabled={addClassMutation.isPending}>
