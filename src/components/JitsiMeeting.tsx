@@ -24,32 +24,32 @@ declare global {
   }
 }
 
-// Increased timeout to 60s to allow time for connection/authentication
+// Timeout to allow ample time for the "player" to connect
 const CONNECTION_TIMEOUT_MS = 60000; 
 const SCRIPT_POLL_INTERVAL_MS = 100;
 const SCRIPT_MAX_POLL_ATTEMPTS = 50;
 
-// --- Script Loading Helpers ---
+// --- Library Loader: Calls the Jitsi Script ---
 const injectNewScript = (): Promise<void> => {
   return new Promise((resolve, reject) => {
-    console.log('[Jitsi] Injecting new script...');
+    console.log('[Jitsi] Injecting player library...');
     const script = document.createElement('script');
     script.src = 'https://meet.jit.si/external_api.js';
     script.async = true;
     
     const timeoutId = setTimeout(() => {
-      reject(new Error('Script load timed out'));
+      reject(new Error('Player library load timed out'));
     }, 15000); 
     
     script.onload = () => {
       clearTimeout(timeoutId);
-      console.log('[Jitsi] Script loaded successfully');
+      console.log('[Jitsi] Player library loaded successfully');
       resolve();
     };
     script.onerror = () => {
       clearTimeout(timeoutId);
-      console.error('[Jitsi] Script failed to load');
-      reject(new Error('Failed to load Jitsi script'));
+      console.error('[Jitsi] Player library failed to load');
+      reject(new Error('Failed to load Jitsi player script'));
     };
     document.head.appendChild(script);
   });
@@ -57,41 +57,36 @@ const injectNewScript = (): Promise<void> => {
 
 const loadJitsiScript = (): Promise<void> => {
   return new Promise((resolve, reject) => {
-    // If API is already available, resolve immediately
+    // If library is already in memory, resolve immediately
     if (window.JitsiMeetExternalAPI) {
       resolve();
       return;
     }
     
-    // Check for existing script tag
+    // Check if script tag exists but isn't ready
     const existingScript = document.querySelector('script[src*="external_api.js"]') as HTMLScriptElement;
     
     if (existingScript) {
       let attempts = 0;
-      
       const pollInterval = setInterval(() => {
         attempts++;
-        
         if (window.JitsiMeetExternalAPI) {
           clearInterval(pollInterval);
           resolve();
         } else if (attempts >= SCRIPT_MAX_POLL_ATTEMPTS) {
           clearInterval(pollInterval);
-          // Remove old script and inject fresh one
           try {
             existingScript.remove();
           } catch (e) {
-            console.warn('[Jitsi] Could not remove old script:', e);
+            console.warn('[Jitsi] Removing stuck script:', e);
           }
-          
           injectNewScript().then(resolve).catch(reject);
         }
       }, SCRIPT_POLL_INTERVAL_MS);
-      
       return;
     }
     
-    // No existing script, inject new one
+    // Load fresh script
     injectNewScript().then(resolve).catch(reject);
   });
 };
@@ -100,7 +95,6 @@ const waitForJitsiAPI = (): Promise<boolean> => {
   return new Promise((resolve) => {
     let attempts = 0;
     const maxAttempts = 30; // 15 seconds max
-    
     const checkAPI = () => {
       attempts++;
       if (window.JitsiMeetExternalAPI) {
@@ -128,36 +122,30 @@ export const JitsiMeeting = ({
   const jitsiContainerRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<any>(null);
   
-  // UI State
+  // Player Controls State
   const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [isVideoMuted, setIsVideoMuted] = useState(false);
-  const [isLoading, setIsLoading] = useState(false); // Default false, waits for user to click
-  const [hasJoined, setHasJoined] = useState(false); // New state: "Has user clicked Join?"
+  const [isLoading, setIsLoading] = useState(false); 
+  const [hasJoined, setHasJoined] = useState(false); 
   const [connectionError, setConnectionError] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('Initializing...');
+  const [loadingMessage, setLoadingMessage] = useState('Initializing Player...');
   const [showFallbackPrompt, setShowFallbackPrompt] = useState(false);
 
-  // Auth & Refs
+  // Auth & Logic Refs
   const { profile, resolvedRole } = useAuth();
   const joinTimeRef = useRef<Date | null>(null);
-  
-  // Initialization Refs
   const connectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isInitializingRef = useRef(false);
   const isLoadingRef = useRef(false); 
   const progressTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Store latest props
   const propsRef = useRef({ displayName, userEmail, subject, batch, scheduleId, onClose, resolvedRole, profile, userRole });
-
-  // Determine if current user is a "Host" (Teacher/Admin) who must create the room
   const isHost = userRole === 'teacher' || userRole === 'admin' || userRole === 'manager';
 
-  // Update refs when props change
+  // Update refs on prop change
   useEffect(() => {
     propsRef.current = { displayName, userEmail, subject, batch, scheduleId, onClose, resolvedRole, profile, userRole };
-    
     if (apiRef.current && displayName) {
         try {
           apiRef.current.executeCommand('displayName', displayName);
@@ -167,13 +155,11 @@ export const JitsiMeeting = ({
     }
   }, [displayName, userEmail, subject, batch, scheduleId, onClose, resolvedRole, profile, userRole]);
 
-  // URL Management - Update browser URL to reflect meeting state
+  // Handle Browser URL for direct linking
   useEffect(() => {
     const originalUrl = window.location.href;
     const meetingPath = `/class/${batch.replace(/\s+/g, '-').toLowerCase()}/${subject.replace(/\s+/g, '-').toLowerCase()}`;
-    
     window.history.pushState({ path: meetingPath }, '', meetingPath);
-
     return () => {
       window.history.pushState({ path: originalUrl }, '', originalUrl);
     };
@@ -182,26 +168,24 @@ export const JitsiMeeting = ({
   const setLoadingState = useCallback((loading: boolean) => {
     isLoadingRef.current = loading;
     setIsLoading(loading);
-    if (!loading) {
-      setShowFallbackPrompt(false);
-    }
+    if (!loading) setShowFallbackPrompt(false);
   }, []);
 
   const getSanitizedRoomName = useCallback(() => {
     return generateJitsiRoomName(batch, subject);
   }, [batch, subject]);
 
+  // Backup method only
   const openInNewTab = useCallback(() => {
     const sanitizedRoomName = getSanitizedRoomName();
     window.open(`https://meet.jit.si/${sanitizedRoomName}`, '_blank');
     toast.info('Meeting opened in new tab');
   }, [getSanitizedRoomName]);
 
-  // Attendance Logic
+  // Attendance Tracking
   const recordAttendance = useCallback(async () => {
     const currentProps = propsRef.current;
     if (!currentProps.profile?.user_id) return;
-    
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
       await supabase.from('class_attendance').upsert({
@@ -213,9 +197,7 @@ export const JitsiMeeting = ({
         subject: currentProps.subject,
         class_date: today,
         joined_at: new Date().toISOString()
-      }, { 
-        onConflict: 'user_id,schedule_id,class_date'
-      });
+      }, { onConflict: 'user_id,schedule_id,class_date' });
       
       joinTimeRef.current = new Date();
       toast.success('You have joined the class');
@@ -227,14 +209,12 @@ export const JitsiMeeting = ({
   const updateAttendanceOnLeave = useCallback(async () => {
     const currentProps = propsRef.current;
     if (!currentProps.profile?.user_id || !joinTimeRef.current) return;
-    
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
       const durationMs = new Date().getTime() - joinTimeRef.current.getTime();
       const durationMinutes = Math.round(durationMs / 60000);
       
-      await supabase.from('class_attendance')
-        .update({ 
+      await supabase.from('class_attendance').update({ 
           left_at: new Date().toISOString(),
           duration_minutes: durationMinutes
         })
@@ -247,7 +227,7 @@ export const JitsiMeeting = ({
     }
   }, []);
 
-  // Jitsi Initialization
+  // --- Core Player Logic: Embeds Jitsi ---
   const initializeJitsi = useCallback(async () => {
     if (isInitializingRef.current || apiRef.current) return;
     isInitializingRef.current = true;
@@ -260,12 +240,12 @@ export const JitsiMeeting = ({
     }
 
     setLoadingState(true);
-    setLoadingMessage('Loading video system...');
+    setLoadingMessage(isHost ? 'Starting classroom player...' : 'Connecting to live stream...');
     
     try {
       await loadJitsiScript();
     } catch (error) {
-      toast.error('Failed to load video system.');
+      toast.error('Failed to load video player.');
       setConnectionError(true);
       setLoadingState(false);
       isInitializingRef.current = false;
@@ -274,7 +254,7 @@ export const JitsiMeeting = ({
 
     const apiAvailable = await waitForJitsiAPI();
     if (!apiAvailable) {
-      toast.error('Video system failed to initialize.');
+      toast.error('Player system failed to initialize.');
       setConnectionError(true);
       setLoadingState(false);
       isInitializingRef.current = false;
@@ -282,22 +262,14 @@ export const JitsiMeeting = ({
     }
 
     if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
-    if (progressTimeoutRef.current) clearTimeout(progressTimeoutRef.current);
     if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current);
 
-    // Initial message based on role
-    if (isHost) {
-        setLoadingMessage('Starting classroom environment...');
-    } else {
-        setLoadingMessage('Connecting to class...');
-    }
-    
-    // Show fallback prompt faster if it takes too long
+    // Fallback Prompts if connection is slow
     fallbackTimeoutRef.current = setTimeout(() => {
       if (isLoadingRef.current) {
         setShowFallbackPrompt(true);
         if (!isHost) {
-             setLoadingMessage('Waiting for teacher to start class...');
+             setLoadingMessage('Waiting for teacher to start stream...');
         } else {
              setLoadingMessage('Waiting for authentication...');
         }
@@ -306,8 +278,7 @@ export const JitsiMeeting = ({
     
     connectionTimeoutRef.current = setTimeout(() => {
       if (isLoadingRef.current) {
-        // Just update message, let them wait in lobby
-        setLoadingMessage('Still connecting to room...');
+         setLoadingMessage('Still connecting to room...');
       }
     }, CONNECTION_TIMEOUT_MS);
 
@@ -324,8 +295,9 @@ export const JitsiMeeting = ({
         displayName: currentProps.displayName,
         email: currentProps.userEmail || undefined,
       },
+      // Player Configuration
       configOverwrite: {
-        prejoinPageEnabled: false,
+        prejoinPageEnabled: false, // Jump straight to meeting
         startWithAudioMuted: false,
         startWithVideoMuted: false,
         disableDeepLinking: true,
@@ -340,6 +312,7 @@ export const JitsiMeeting = ({
         startAudioOnly: false,
       },
       interfaceConfigOverwrite: {
+        // Toolbar Buttons
         TOOLBAR_BUTTONS: [
           'microphone', 'camera', 'desktop', 'chat',
           'raisehand', 'participants-pane', 'tileview', 'fullscreen',
@@ -354,18 +327,19 @@ export const JitsiMeeting = ({
     };
 
     try {
+      // Call the Library to Embed
       apiRef.current = new window.JitsiMeetExternalAPI(domain, options);
       
-      // Force UI reveal immediately to show login prompts/lobby screens
+      // Reveal Player UI immediately
       setTimeout(() => {
           setLoadingState(false);
           isInitializingRef.current = false;
       }, 1500);
 
+      // Add Event Listeners
       apiRef.current.addEventListeners({
         videoConferenceJoined: () => {
           if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
-          if (progressTimeoutRef.current) clearTimeout(progressTimeoutRef.current);
           if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current);
           setLoadingState(false);
           setConnectionError(false);
@@ -394,7 +368,7 @@ export const JitsiMeeting = ({
     }
   }, [getSanitizedRoomName, recordAttendance, updateAttendanceOnLeave, setLoadingState, isHost]);
 
-  // Main Effect to trigger start
+  // Mount/Unmount Effect
   useEffect(() => {
     if (!hasJoined) return;
     
@@ -404,7 +378,6 @@ export const JitsiMeeting = ({
 
     return () => {
       if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
-      if (progressTimeoutRef.current) clearTimeout(progressTimeoutRef.current);
       if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current);
       if (apiRef.current) {
         updateAttendanceOnLeave();
@@ -415,12 +388,7 @@ export const JitsiMeeting = ({
     };
   }, [hasJoined, initializeJitsi, updateAttendanceOnLeave]);
 
-  // Special Start Handler for Hosts - NOW UNIFIED
-  const handleHostStart = () => {
-    // Direct start without new tab redirection
-    setHasJoined(true);
-  };
-
+  // Triggers the player start
   const handleStartClass = () => {
     setHasJoined(true);
   };
@@ -430,12 +398,13 @@ export const JitsiMeeting = ({
     isInitializingRef.current = false;
     setLoadingState(true);
     setConnectionError(false);
-    setLoadingMessage('Reloading...');
+    setLoadingMessage('Reloading Player...');
     setShowFallbackPrompt(false);
     await new Promise(resolve => setTimeout(resolve, 500));
     initializeJitsi();
   }, [initializeJitsi, setLoadingState]);
 
+  // Custom Player Controls
   const toggleAudio = () => apiRef.current?.executeCommand('toggleAudio');
   const toggleVideo = () => apiRef.current?.executeCommand('toggleVideo');
   const toggleShareScreen = () => apiRef.current?.executeCommand('toggleShareScreen');
@@ -447,10 +416,10 @@ export const JitsiMeeting = ({
   }, [updateAttendanceOnLeave]);
 
   return (
-    // FIX: Flexbox Column Layout ensures Header never overlaps the iframe
+    // Fixed Player Container (Full Screen Overlay)
     <div className="fixed inset-0 z-50 bg-black flex flex-col overflow-hidden">
       
-      {/* Header - Stays at top */}
+      {/* Player Header */}
       <div className="relative z-20 bg-gray-900/95 backdrop-blur border-b border-white/10 p-3 flex justify-between items-center shrink-0 shadow-sm">
         <div>
           <h2 className="text-white font-semibold text-lg leading-tight">{subject}</h2>
@@ -461,10 +430,10 @@ export const JitsiMeeting = ({
         </Button>
       </div>
 
-      {/* Content Area - Fills remaining space */}
+      {/* Main Video Area */}
       <div className="flex-1 relative w-full bg-black">
         
-        {/* START SCREEN */}
+        {/* START SCREEN (Pre-Player) */}
         {!hasJoined && !isLoading && !connectionError && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-30">
             <div className="text-center max-w-md px-4 animate-in fade-in zoom-in duration-300">
@@ -472,41 +441,28 @@ export const JitsiMeeting = ({
                 {isHost ? <Lock className="h-10 w-10 text-blue-500" /> : <Video className="h-10 w-10 text-blue-500" />}
               </div>
               <h3 className="text-2xl font-bold text-white mb-2">
-                {isHost ? 'Start Class' : 'Ready to Join?'}
+                {isHost ? 'Start Live Class' : 'Ready to Watch?'}
               </h3>
               <p className="text-gray-400 mb-8">
                 Class: {subject} <br/> Batch: {batch}
               </p>
 
-              {isHost ? (
-                 <div className="space-y-4">
-                   <Button 
-                    size="lg" 
-                    onClick={handleHostStart}
-                    className="bg-green-600 hover:bg-green-700 text-lg px-8 py-6 w-full rounded-full shadow-lg transition-transform hover:scale-105"
-                  >
-                    <Video className="mr-2 h-5 w-5" />
-                    Start Class Now
-                  </Button>
-                  <p className="text-xs text-gray-400 p-3 rounded-lg text-left">
-                    Click to launch the classroom environment.
-                  </p>
-                 </div>
-              ) : (
-                <Button 
-                  size="lg" 
-                  onClick={handleStartClass}
-                  className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-6 h-auto rounded-full shadow-lg transition-transform hover:scale-105"
-                >
-                  <Play className="mr-2 h-5 w-5 fill-current" />
-                  Join Class Now
-                </Button>
-              )}
+              <Button 
+                size="lg" 
+                onClick={handleStartClass}
+                className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-6 h-auto rounded-full shadow-lg transition-transform hover:scale-105"
+              >
+                {isHost ? (
+                    <><Video className="mr-2 h-5 w-5" /> Start Broadcast</>
+                ) : (
+                    <><Play className="mr-2 h-5 w-5 fill-current" /> Join Stream</>
+                )}
+              </Button>
             </div>
           </div>
         )}
 
-        {/* LOADING STATE */}
+        {/* LOADING / BUFFERING STATE */}
         {isLoading && !connectionError && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-30 pointer-events-none">
             <div className="text-center max-w-md px-4 pointer-events-auto">
@@ -521,12 +477,12 @@ export const JitsiMeeting = ({
                     <AlertTriangle className="h-6 w-6 text-yellow-400" />
                   </div>
                   <p className="text-white text-lg font-semibold">
-                      {isHost ? "Connection Taking Time..." : "Waiting for Teacher..."}
+                      {isHost ? "Taking longer than usual..." : "Waiting for Broadcast..."}
                   </p>
                   <p className="text-gray-400 text-sm mt-2 mb-6">
                       {isHost 
-                          ? "The classroom is taking a while to load." 
-                          : "The class hasn't started yet. Please wait for the teacher."}
+                          ? "The player is initializing." 
+                          : "The teacher hasn't started the stream yet, or connection is slow."}
                   </p>
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <Button onClick={openInNewTab} className="bg-blue-600 hover:bg-blue-700">
@@ -535,7 +491,7 @@ export const JitsiMeeting = ({
                     </Button>
                     <Button variant="outline" onClick={handleRetry} className="border-gray-500 text-gray-300">
                        <RefreshCw className="mr-2 h-4 w-4" /> 
-                       Retry Here
+                       Retry Player
                     </Button>
                   </div>
                 </>
@@ -551,9 +507,9 @@ export const JitsiMeeting = ({
               <div className="h-12 w-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
                 <X className="h-6 w-6 text-red-400" />
               </div>
-              <p className="text-white text-lg font-semibold">Connection Failed</p>
+              <p className="text-white text-lg font-semibold">Player Error</p>
               <p className="text-gray-400 text-sm mt-2">
-                  {isHost ? "Could not connect to the room." : "Unable to connect to class."}
+                  Unable to connect to the live stream.
               </p>
               <div className="flex gap-3 justify-center mt-6">
                 <Button onClick={handleRetry} className="bg-blue-600 hover:bg-blue-700">Retry</Button>
@@ -563,27 +519,27 @@ export const JitsiMeeting = ({
           </div>
         )}
 
-        {/* CONTROLS (Floating) */}
+        {/* FLOATING CONTROLS (Like a Video Player) */}
         {!connectionError && hasJoined && !isLoading && (
           <div className="absolute bottom-6 left-0 right-0 flex justify-center pointer-events-none z-40">
             <div className="bg-gray-900/80 backdrop-blur rounded-full p-2 flex gap-4 pointer-events-auto shadow-2xl border border-white/10">
-              <Button variant={isAudioMuted ? "destructive" : "secondary"} size="icon" onClick={toggleAudio} className="rounded-full w-12 h-12">
+              <Button variant={isAudioMuted ? "destructive" : "secondary"} size="icon" onClick={toggleAudio} className="rounded-full w-12 h-12" title="Toggle Mic">
                 {isAudioMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
               </Button>
-              <Button variant={isVideoMuted ? "destructive" : "secondary"} size="icon" onClick={toggleVideo} className="rounded-full w-12 h-12">
+              <Button variant={isVideoMuted ? "destructive" : "secondary"} size="icon" onClick={toggleVideo} className="rounded-full w-12 h-12" title="Toggle Camera">
                 {isVideoMuted ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
               </Button>
-              <Button variant="secondary" size="icon" onClick={toggleShareScreen} className="rounded-full w-12 h-12">
+              <Button variant="secondary" size="icon" onClick={toggleShareScreen} className="rounded-full w-12 h-12" title="Share Screen">
                 <MonitorUp className="h-5 w-5" />
               </Button>
-              <Button variant="destructive" size="icon" onClick={hangUp} className="rounded-full w-12 h-12">
+              <Button variant="destructive" size="icon" onClick={hangUp} className="rounded-full w-12 h-12" title="End Call">
                 <PhoneOff className="h-5 w-5" />
               </Button>
             </div>
           </div>
         )}
 
-        {/* Jitsi Iframe - ABSOLUTE FILL to solve whitespace */}
+        {/* Jitsi Iframe - ABSOLUTE FILL (The actual "Video") */}
         <div 
             ref={jitsiContainerRef} 
             className="absolute inset-0 w-full h-full bg-black"
