@@ -6,8 +6,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Video, Clock, Calendar, Users, AlertCircle } from 'lucide-react';
-import { format, isToday, parse, isBefore, isAfter, getDay, parseISO } from 'date-fns';
+import { Video, Clock, Calendar, Users, AlertCircle, RefreshCw } from 'lucide-react';
+import { format, isToday, parse, isBefore, isAfter, getDay, parseISO, isSameDay } from 'date-fns';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { generateJitsiRoomName } from '@/lib/jitsiUtils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -23,16 +23,11 @@ interface Schedule {
   link?: string | null;
 }
 
-interface UserEnrollment {
-  batch_name: string;
-  subject_name: string;
-}
-
 export const StudentJoinClass = () => {
-  const { profile, user } = useAuth();
+  const { user } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
   
-  // Restore: Active Meeting State for Embedded Jitsi
+  // Active Meeting State
   const [activeMeeting, setActiveMeeting] = useState<{
     roomName: string;
     subject: string;
@@ -40,79 +35,70 @@ export const StudentJoinClass = () => {
     scheduleId: string;
   } | null>(null);
 
-  // Update clock for real-time status updates
+  // Update clock every minute
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000); // Every minute
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
 
-  // 1. Fetch User Enrollments
-  const { data: enrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
-    queryKey: ['studentEnrollments', user?.id],
+  // 1. Fetch Student Details (Specifically Batch)
+  // We use the 'students' table to find the user's batch instead of relying on individual subject enrollments
+  const { data: studentData, isLoading: isLoadingStudent } = useQuery({
+    queryKey: ['studentBatch', user?.id],
     queryFn: async () => {
-      // Support both profile.user_id and auth.user.id
-      const userId = user?.id;
-      if (!userId) return [];
-      
+      if (!user?.id) return null;
       const { data, error } = await supabase
-        .from('user_enrollments')
-        .select('batch_name, subject_name')
-        .eq('user_id', userId);
+        .from('students')
+        .select('batch, id')
+        .eq('user_id', user.id)
+        .maybeSingle();
         
-      if (error) throw error;
-      return data || [];
+      if (error) {
+        console.error("Error fetching student data:", error);
+        return null;
+      }
+      return data;
     },
     enabled: !!user?.id
   });
 
-  // 2. Fetch Schedules (Optimized: Only for enrolled batches)
+  // 2. Fetch Schedules for the Student's Batch
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
-    queryKey: ['mySchedules', enrollments],
+    queryKey: ['studentSchedules', studentData?.batch],
     queryFn: async () => {
-      if (!enrollments || enrollments.length === 0) return [];
+      if (!studentData?.batch) return [];
       
-      // Extract unique batches to filter query
-      const myBatches = [...new Set(enrollments.map(e => e.batch_name))];
-
       const { data, error } = await supabase
         .from('schedules')
-        .select('id, subject, batch, day_of_week, start_time, end_time, date, link')
-        .in('batch', myBatches); // Filter DB side for performance
+        .select('*')
+        .eq('batch', studentData.batch); // Filter by Batch only
 
       if (error) throw error;
       return data || [];
     },
-    enabled: !!enrollments && enrollments.length > 0
+    enabled: !!studentData?.batch
   });
 
-  // 3. Filter and Process Schedules for Today
+  // 3. Filter Schedules for Today
   const todaysClasses = useMemo(() => {
-    if (!schedules || !enrollments || enrollments.length === 0) return [];
+    if (!schedules) return [];
     
     const today = new Date();
     const todayDayOfWeek = getDay(today); // 0 = Sun
-    const todayStr = format(today, 'yyyy-MM-dd');
-    
-    // Create a Set for O(1) enrollment lookup
-    const enrolledCombinations = new Set(
-      enrollments.map(e => `${e.batch_name}|${e.subject_name}`)
-    );
     
     return schedules.filter(schedule => {
-      // A. Check Enrollment (Batch AND Subject)
-      const isEnrolled = enrolledCombinations.has(`${schedule.batch}|${schedule.subject}`);
-      if (!isEnrolled) return false;
+      // Logic: 
+      // 1. If it has a specific date (Extra Class), match the date.
+      // 2. If it has NO date, match the day of week (Recurring Class).
       
-      // B. Check Date/Day
       if (schedule.date) {
-        // Fix: Direct string comparison avoids timezone issues with 'new Date()'
-        return schedule.date === todayStr; 
+        // Parse the DB date string (YYYY-MM-DD) and compare with today
+        return isSameDay(parseISO(schedule.date), today);
       } else {
-        // Recurring class
         return schedule.day_of_week === todayDayOfWeek;
       }
     }).sort((a, b) => a.start_time.localeCompare(b.start_time));
-  }, [schedules, enrollments]);
+  }, [schedules]);
 
   // 4. Categorize Classes (Live, Upcoming, Completed)
   const { liveClasses, upcomingClasses, completedClasses } = useMemo(() => {
@@ -122,14 +108,14 @@ export const StudentJoinClass = () => {
     const completed: Schedule[] = [];
 
     todaysClasses.forEach(cls => {
-      // Robust time parsing
+      // Parse times against today's date
       const startTime = parse(cls.start_time, 'HH:mm:ss', now);
       const endTime = parse(cls.end_time, 'HH:mm:ss', now);
       
       // Allow joining 15 mins early
-      const joinTime = new Date(startTime.getTime() - 15 * 60000);
+      const joinWindowStart = new Date(startTime.getTime() - 15 * 60000);
 
-      if (isBefore(now, joinTime)) {
+      if (isBefore(now, joinWindowStart)) {
         upcoming.push(cls);
       } else if (isAfter(now, endTime)) {
         completed.push(cls);
@@ -139,7 +125,7 @@ export const StudentJoinClass = () => {
     });
 
     return { liveClasses: live, upcomingClasses: upcoming, completedClasses: completed };
-  }, [todaysClasses, currentTime]); // Re-run when currentTime changes
+  }, [todaysClasses, currentTime]);
 
   const formatTime = (time: string) => {
     const parsed = parse(time, 'HH:mm:ss', new Date());
@@ -147,7 +133,8 @@ export const StudentJoinClass = () => {
   };
 
   const handleJoinClass = (cls: Schedule) => {
-    // Generate room name deterministically (Batch_Subject)
+    // Robust Room Name Generation
+    // If link is missing, we generate a consistent room name: Batch_Subject
     const roomName = generateJitsiRoomName(cls.batch, cls.subject);
     
     setActiveMeeting({
@@ -158,7 +145,7 @@ export const StudentJoinClass = () => {
     });
   };
 
-  const isLoading = isLoadingEnrollments || isLoadingSchedules;
+  const isLoading = isLoadingStudent || isLoadingSchedules;
 
   if (isLoading) {
     return (
@@ -172,30 +159,38 @@ export const StudentJoinClass = () => {
     );
   }
 
-  if (!enrollments || enrollments.length === 0) {
+  if (!studentData?.batch) {
     return (
       <div className="p-6">
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Users className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold">No Enrollments Found</h3>
-            <p className="text-muted-foreground text-center mt-2">
-              You are not enrolled in any classes yet.
-            </p>
-          </CardContent>
-        </Card>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>No Batch Assigned</AlertTitle>
+          <AlertDescription>
+            You are not currently assigned to any batch. Please contact your administrator.
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Join Class</h1>
-        <p className="text-muted-foreground">Today's classes • {format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Join Class</h1>
+          <p className="text-muted-foreground">
+            Schedule for <span className="font-semibold text-foreground">{studentData.batch}</span> • {format(new Date(), 'EEEE, MMMM d')}
+          </p>
+        </div>
+        <div className="text-right hidden md:block">
+            <Badge variant="outline" className="text-sm py-1 px-3">
+                <Clock className="h-3 w-3 mr-2" />
+                {format(currentTime, 'h:mm a')}
+            </Badge>
+        </div>
       </div>
 
-      {/* 1. Live Classes Section */}
+      {/* 1. Live Classes */}
       {liveClasses.length > 0 && (
         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
           <h2 className="text-lg font-semibold flex items-center gap-2 text-green-700">
@@ -213,8 +208,8 @@ export const StudentJoinClass = () => {
                     <div>
                       <h3 className="text-xl font-bold text-green-900">{cls.subject}</h3>
                       <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className="bg-white border-green-200">{cls.batch}</Badge>
-                        {cls.date && <Badge className="bg-green-200 text-green-800 hover:bg-green-300">Extra Class</Badge>}
+                        <Badge variant="outline" className="bg-white border-green-200 text-green-700">{cls.batch}</Badge>
+                        {cls.date && <Badge className="bg-green-200 text-green-800 hover:bg-green-300 border-0">Extra Class</Badge>}
                       </div>
                       <p className="text-sm mt-3 flex items-center gap-2 font-medium text-green-800">
                         <Clock className="h-4 w-4" />
@@ -237,7 +232,7 @@ export const StudentJoinClass = () => {
         </div>
       )}
 
-      {/* 2. Upcoming Classes Section */}
+      {/* 2. Upcoming Classes */}
       {upcomingClasses.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -253,7 +248,9 @@ export const StudentJoinClass = () => {
                       <h3 className="text-lg font-semibold">{cls.subject}</h3>
                       <p className="text-muted-foreground text-sm">{cls.batch}</p>
                     </div>
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-800">Upcoming</Badge>
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-200">
+                        {cls.date ? 'Extra Class' : 'Upcoming'}
+                    </Badge>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-2 rounded">
                     <Clock className="h-4 w-4" />
@@ -266,7 +263,7 @@ export const StudentJoinClass = () => {
         </div>
       )}
 
-      {/* 3. Completed Classes Section */}
+      {/* 3. Completed Classes */}
       {completedClasses.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-lg font-semibold text-muted-foreground flex items-center gap-2">
@@ -296,36 +293,43 @@ export const StudentJoinClass = () => {
 
       {/* Empty State */}
       {todaysClasses.length === 0 && (
-        <Card className="border-dashed">
+        <Card className="border-dashed bg-muted/10">
           <CardContent className="flex flex-col items-center justify-center py-16">
             <div className="bg-primary/10 p-4 rounded-full mb-4">
                 <Calendar className="h-8 w-8 text-primary" />
             </div>
             <h3 className="text-xl font-semibold">No Classes Today</h3>
             <p className="text-muted-foreground text-center mt-2 max-w-sm">
-              You don't have any scheduled classes for today. Check your schedule for upcoming sessions.
+              You don't have any classes scheduled for <span className="font-medium">{studentData.batch}</span> today.
             </p>
+            <Button variant="outline" className="mt-6" onClick={() => window.location.reload()}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh Schedule
+            </Button>
           </CardContent>
         </Card>
       )}
 
       {/* Embedded Jitsi Meeting Overlay */}
       {activeMeeting && (
-        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm p-4 md:p-8 animate-in fade-in duration-200">
-             <div className="h-full w-full max-w-7xl mx-auto flex flex-col">
-                <div className="flex justify-between items-center mb-4">
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm p-2 md:p-6 animate-in fade-in duration-200 flex flex-col">
+             <div className="w-full max-w-[1400px] mx-auto flex flex-col h-full">
+                <div className="flex justify-between items-center mb-4 px-2">
                     <div>
-                        <h2 className="text-2xl font-bold">{activeMeeting.subject}</h2>
-                        <p className="text-muted-foreground">{activeMeeting.batch} • Live Class</p>
+                        <h2 className="text-xl md:text-2xl font-bold text-foreground">{activeMeeting.subject}</h2>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span className="font-medium text-primary">● Live</span>
+                            <span>{activeMeeting.batch}</span>
+                        </div>
                     </div>
                     <Button variant="destructive" onClick={() => setActiveMeeting(null)}>
                         Leave Class
                     </Button>
                 </div>
-                <div className="flex-1 border rounded-lg overflow-hidden shadow-2xl bg-black">
+                <div className="flex-1 border rounded-xl overflow-hidden shadow-2xl bg-black relative">
                     <JitsiMeeting
                       roomName={activeMeeting.roomName}
-                      displayName={user?.user_metadata?.full_name || user?.user_metadata?.name || profile?.name || 'Student'}
+                      displayName={user?.user_metadata?.full_name || user?.user_metadata?.name || 'Student'}
                       subject={activeMeeting.subject}
                       batch={activeMeeting.batch}
                       scheduleId={activeMeeting.scheduleId}
