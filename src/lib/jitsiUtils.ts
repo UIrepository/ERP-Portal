@@ -9,10 +9,13 @@ export const generateJitsiRoomName = (batch: string, subject: string): string =>
   // Normalize: remove special chars, lowercase, combine with date
   const cleanBatch = batch.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
   const cleanSubject = subject.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-  // Using a prefix to prevent name collisions with public rooms
-  return `erp_portal_${cleanBatch}_${cleanSubject}_${today}`;
+  return `class${cleanBatch}${cleanSubject}${today}`;
 };
 
+/**
+ * Normalizes a subject name for comparison.
+ * Removes batch/quiz suffixes in parentheses: "Maths 2 (QUIZ 1)" -> "maths 2"
+ */
 export const normalizeSubjectForComparison = (subject: string): string => {
   return subject
     .replace(/\s*\([^)]*\)\s*$/, '') // Remove parentheses suffix
@@ -20,8 +23,17 @@ export const normalizeSubjectForComparison = (subject: string): string => {
     .toLowerCase();
 };
 
+/**
+ * Checks if two subject names match (using normalization).
+ * Handles cases like: "Maths 2" matching "Maths 2 (QUIZ 1)"
+ */
 export const subjectsMatch = (subject1: string, subject2: string): boolean => {
   const norm1 = normalizeSubjectForComparison(subject1);
   const norm2 = normalizeSubjectForComparison(subject2);
-  return norm1 === norm2 || norm1.includes(norm2) || norm2.includes(norm1);
+  
+  // Exact match after normalization
+  if (norm1 === norm2) return true;
+  
+  // Check if one contains the other (for partial matches)
+  return norm1.includes(norm2) || norm2.includes(norm1);
 };
