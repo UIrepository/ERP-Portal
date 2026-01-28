@@ -24,7 +24,7 @@ declare global {
   }
 }
 
-// Increased timeout to 60s to allow Teachers enough time to login in the new tab
+// Increased timeout to 60s to allow time for connection/authentication
 const CONNECTION_TIMEOUT_MS = 60000; 
 const SCRIPT_POLL_INTERVAL_MS = 100;
 const SCRIPT_MAX_POLL_ATTEMPTS = 50;
@@ -194,12 +194,8 @@ export const JitsiMeeting = ({
   const openInNewTab = useCallback(() => {
     const sanitizedRoomName = getSanitizedRoomName();
     window.open(`https://meet.jit.si/${sanitizedRoomName}`, '_blank');
-    if (isHost) {
-      toast.info('Please log in and start the meeting in the new tab.');
-    } else {
-      toast.info('Meeting opened in new tab');
-    }
-  }, [getSanitizedRoomName, isHost]);
+    toast.info('Meeting opened in new tab');
+  }, [getSanitizedRoomName]);
 
   // Attendance Logic
   const recordAttendance = useCallback(async () => {
@@ -291,12 +287,12 @@ export const JitsiMeeting = ({
 
     // Initial message based on role
     if (isHost) {
-        setLoadingMessage('Waiting for you to start meeting in new tab...');
+        setLoadingMessage('Starting classroom environment...');
     } else {
         setLoadingMessage('Connecting to class...');
     }
     
-    // RESTORED: Show fallback prompt if loading takes too long
+    // Show fallback prompt faster if it takes too long
     fallbackTimeoutRef.current = setTimeout(() => {
       if (isLoadingRef.current) {
         setShowFallbackPrompt(true);
@@ -308,17 +304,10 @@ export const JitsiMeeting = ({
       }
     }, 8000);
     
-    // RESTORED: Connection safety timeout
     connectionTimeoutRef.current = setTimeout(() => {
       if (isLoadingRef.current) {
-        if (isHost) {
-             setLoadingMessage('Still waiting for room creation...');
-        } else {
-            // NOTE: We don't error out immediately for students anymore, 
-            // because they might be waiting in the "Waiting for moderator" lobby
-            // We just let them see the screen.
-            setLoadingMessage('Still connecting...');
-        }
+        // Just update message, let them wait in lobby
+        setLoadingMessage('Still connecting to room...');
       }
     }, CONNECTION_TIMEOUT_MS);
 
@@ -366,12 +355,11 @@ export const JitsiMeeting = ({
 
     try {
       apiRef.current = new window.JitsiMeetExternalAPI(domain, options);
-
-      // CRITICAL FIX: Hide the spinner shortly after initialization 
-      // This allows the user to see the "Waiting for Moderator" screen or "Login" screen
+      
+      // Force UI reveal immediately to show login prompts/lobby screens
       setTimeout(() => {
           setLoadingState(false);
-          // We do NOT clear isInitializingRef here yet, we wait for join or close
+          isInitializingRef.current = false;
       }, 1500);
 
       apiRef.current.addEventListeners({
@@ -411,10 +399,7 @@ export const JitsiMeeting = ({
     if (!hasJoined) return;
     
     if (!isInitializingRef.current && !apiRef.current) {
-        const t = setTimeout(() => {
-            initializeJitsi();
-        }, 100);
-        return () => clearTimeout(t);
+        initializeJitsi();
     }
 
     return () => {
@@ -430,9 +415,9 @@ export const JitsiMeeting = ({
     };
   }, [hasJoined, initializeJitsi, updateAttendanceOnLeave]);
 
-  // Special Start Handler for Hosts
+  // Special Start Handler for Hosts - NOW UNIFIED
   const handleHostStart = () => {
-    openInNewTab();
+    // Direct start without new tab redirection
     setHasJoined(true);
   };
 
@@ -500,12 +485,11 @@ export const JitsiMeeting = ({
                     onClick={handleHostStart}
                     className="bg-green-600 hover:bg-green-700 text-lg px-8 py-6 w-full rounded-full shadow-lg transition-transform hover:scale-105"
                   >
-                    <ExternalLink className="mr-2 h-5 w-5" />
-                    Launch & Authenticate
+                    <Video className="mr-2 h-5 w-5" />
+                    Start Class Now
                   </Button>
-                  <p className="text-xs text-yellow-500/80 bg-yellow-500/10 p-3 rounded-lg text-left">
-                    <strong>Required:</strong> Jitsi requires you to login to create the room. 
-                    Clicking this will open a new tab where you must login/start the meeting.
+                  <p className="text-xs text-gray-400 p-3 rounded-lg text-left">
+                    Click to launch the classroom environment.
                   </p>
                  </div>
               ) : (
@@ -525,7 +509,7 @@ export const JitsiMeeting = ({
         {/* LOADING STATE */}
         {isLoading && !connectionError && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-30 pointer-events-none">
-            <div className="text-center max-w-md px-4">
+            <div className="text-center max-w-md px-4 pointer-events-auto">
               {!showFallbackPrompt ? (
                 <>
                   <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
@@ -537,13 +521,23 @@ export const JitsiMeeting = ({
                     <AlertTriangle className="h-6 w-6 text-yellow-400" />
                   </div>
                   <p className="text-white text-lg font-semibold">
-                      {isHost ? "Waiting for Room Creation..." : "Waiting for Teacher..."}
+                      {isHost ? "Connection Taking Time..." : "Waiting for Teacher..."}
                   </p>
                   <p className="text-gray-400 text-sm mt-2 mb-6">
                       {isHost 
-                          ? "We haven't detected the meeting yet. Have you started it in the new tab?" 
+                          ? "The classroom is taking a while to load." 
                           : "The class hasn't started yet. Please wait for the teacher."}
                   </p>
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <Button onClick={openInNewTab} className="bg-blue-600 hover:bg-blue-700">
+                       <ExternalLink className="mr-2 h-4 w-4" /> 
+                       Open in New Tab (Backup)
+                    </Button>
+                    <Button variant="outline" onClick={handleRetry} className="border-gray-500 text-gray-300">
+                       <RefreshCw className="mr-2 h-4 w-4" /> 
+                       Retry Here
+                    </Button>
+                  </div>
                 </>
               )}
             </div>
