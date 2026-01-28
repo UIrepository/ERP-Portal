@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, MonitorUp, X, RefreshCw, ExternalLink, AlertTriangle, Play, Lock } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, MonitorUp, X, RefreshCw, ExternalLink, AlertTriangle, Play, Lock, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { format } from 'date-fns';
@@ -253,10 +253,13 @@ export const JitsiMeeting = ({
 
   // Jitsi Initialization
   const initializeJitsi = useCallback(async () => {
-    if (isInitializingRef.current) return;
+    // Prevent double initialization
+    if (isInitializingRef.current || apiRef.current) return;
+    
     isInitializingRef.current = true;
     
     if (!jitsiContainerRef.current) {
+      console.error("Container ref is null");
       setConnectionError(true);
       setLoadingState(false);
       isInitializingRef.current = false;
@@ -296,31 +299,6 @@ export const JitsiMeeting = ({
         setLoadingMessage('Connecting to class...');
     }
     
-    // Show fallback prompt faster if it takes too long
-    fallbackTimeoutRef.current = setTimeout(() => {
-      if (isLoadingRef.current) {
-        setShowFallbackPrompt(true);
-        if (!isHost) {
-             setLoadingMessage('Waiting for teacher to start class...');
-        } else {
-             setLoadingMessage('Waiting for authentication...');
-        }
-      }
-    }, 8000);
-    
-    connectionTimeoutRef.current = setTimeout(() => {
-      if (isLoadingRef.current) {
-        // If host, we don't error out immediately, we just assume they are still logging in
-        if (isHost) {
-             setLoadingMessage('Still waiting for room creation...');
-        } else {
-            setLoadingState(false); 
-            setConnectionError(true); 
-            isInitializingRef.current = false;
-        }
-      }
-    }, CONNECTION_TIMEOUT_MS);
-
     const domain = 'meet.jit.si';
     const sanitizedRoomName = getSanitizedRoomName();
     const currentProps = propsRef.current;
@@ -347,7 +325,6 @@ export const JitsiMeeting = ({
         enableWelcomePage: false,
         enableClosePage: false,
         notifications: [],
-        // Additional settings to help with stability
         startAudioOnly: false,
       },
       interfaceConfigOverwrite: {
@@ -364,7 +341,15 @@ export const JitsiMeeting = ({
     };
 
     try {
+      // Create the API instance
       apiRef.current = new window.JitsiMeetExternalAPI(domain, options);
+      
+      // CRITICAL FIX: Hide the spinner immediately so the user can see the Jitsi UI
+      // (Even if it says "Waiting for Moderator", the user needs to see that)
+      setTimeout(() => {
+          setLoadingState(false);
+          isInitializingRef.current = false;
+      }, 1000);
 
       apiRef.current.addEventListeners({
         videoConferenceJoined: () => {
@@ -373,7 +358,6 @@ export const JitsiMeeting = ({
           if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current);
           setLoadingState(false);
           setConnectionError(false);
-          isInitializingRef.current = false;
           recordAttendance();
         },
         videoConferenceLeft: () => updateAttendanceOnLeave(),
@@ -403,7 +387,11 @@ export const JitsiMeeting = ({
     if (!hasJoined) return;
     
     if (!isInitializingRef.current && !apiRef.current) {
-        initializeJitsi();
+        // Slight delay to ensure DOM render
+        const t = setTimeout(() => {
+            initializeJitsi();
+        }, 100);
+        return () => clearTimeout(t);
     }
 
     return () => {
@@ -511,41 +499,10 @@ export const JitsiMeeting = ({
 
       {/* LOADING STATE */}
       {isLoading && !connectionError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-20">
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900/90 z-20 pointer-events-none">
           <div className="text-center max-w-md px-4">
-            {!showFallbackPrompt ? (
-              <>
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                <p className="text-white">{loadingMessage}</p>
-                {isHost && (
-                    <p className="text-gray-400 text-xs mt-2">Please ensure you have started the meeting in the other tab.</p>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="h-12 w-12 rounded-full bg-yellow-500/20 flex items-center justify-center mx-auto mb-4">
-                  <AlertTriangle className="h-6 w-6 text-yellow-400" />
-                </div>
-                <p className="text-white text-lg font-semibold">
-                    {isHost ? "Waiting for Room Creation..." : "Waiting for Teacher..."}
-                </p>
-                <p className="text-gray-400 text-sm mt-2 mb-6">
-                    {isHost 
-                        ? "We haven't detected the meeting yet. Have you started it in the new tab?" 
-                        : "The class hasn't started yet. Please wait for the teacher."}
-                </p>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Button onClick={openInNewTab} className="bg-blue-600 hover:bg-blue-700">
-                    <ExternalLink className="mr-2 h-4 w-4" /> 
-                    {isHost ? "Open in New Tab" : "Try New Tab"}
-                  </Button>
-                  <Button variant="outline" onClick={handleRetry} className="border-gray-500 text-gray-300">
-                    <RefreshCw className="mr-2 h-4 w-4" /> 
-                    {isHost ? "I have started it, Connect" : "Check Again"}
-                  </Button>
-                </div>
-              </>
-            )}
+             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+             <p className="text-white">{loadingMessage}</p>
           </div>
         </div>
       )}
@@ -587,7 +544,12 @@ export const JitsiMeeting = ({
         </div>
       )}
 
-      <div ref={jitsiContainerRef} className={`flex-1 pt-16 pb-20 w-full h-full ${!hasJoined ? 'hidden' : ''}`} />
+      {/* The Container is now always rendered but hidden via CSS logic if needed */}
+      <div 
+          ref={jitsiContainerRef} 
+          className="flex-1 w-full h-full min-h-[500px]" 
+          style={{ display: hasJoined ? 'block' : 'none' }}
+      />
     </div>
   );
 };
