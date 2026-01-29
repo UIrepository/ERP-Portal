@@ -128,6 +128,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const teacherTabs = [
     { id: 'teacher-schedule', label: 'My Schedule', icon: Calendar },
     { id: 'teacher-join-class', label: 'Join Class', icon: Video },
+    { id: 'teacher-community', label: 'Community', icon: Users },
     { id: 'teacher-recordings', label: 'My Recordings', icon: Video },
     { id: 'teacher-schedule-requests', label: 'Schedule Requests', icon: ClipboardList },
     { id: 'teacher-feedback', label: 'Feedback', icon: Star },
@@ -232,7 +233,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
           <nav className="overflow-y-auto p-4 space-y-2">
               {tabs.map((tab) => {
                 const isContactAdminTab = tab.id === 'contact-admin';
-                const isCommunityTab = tab.id === 'community' || tab.id === 'community-admin';
+                const isCommunityTab = tab.id === 'community' || tab.id === 'community-admin' || tab.id === 'teacher-community';
                 const hasNewGroupMessage = isCommunityTab && tab.id !== activeTab; 
 
                 if (isContactAdminTab) {
