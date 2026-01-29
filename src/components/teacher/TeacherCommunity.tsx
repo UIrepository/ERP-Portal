@@ -326,13 +326,12 @@ export const TeacherCommunity = () => {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(new Date());
 
-  // --- CHANGED: Fetch logic for Teachers ---
+  // --- Fetch logic for Teachers ---
   const { data: teacherGroups = [], isLoading: isLoadingGroups } = useQuery<TeacherGroup[]>({
     queryKey: ['teacher-community-groups', profile?.user_id],
     queryFn: async () => {
       if (!profile?.user_id) return [];
       
-      // Fetch teacher assignments
       const { data, error } = await supabase
         .from('teachers')
         .select('assigned_batches, assigned_subjects')
@@ -346,7 +345,6 @@ export const TeacherCommunity = () => {
 
       if (!data) return [];
 
-      // Create permutations of batches and subjects
       const groups: TeacherGroup[] = [];
       const batches = data.assigned_batches || [];
       const subjects = data.assigned_subjects || [];
