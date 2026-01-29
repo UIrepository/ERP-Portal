@@ -69,6 +69,40 @@ interface TeacherGroup {
   subject_name: string;
 }
 
+// --- Helper for Parsing/Cleaning Lists from DB ---
+// This ensures we get the EXACT string value for the batch/subject, 
+// removing only artifacts like JSON quotes or brackets, but PRESERVING case.
+const cleanList = (raw: any): string[] => {
+  if (!raw) return [];
+  
+  let list: any[] = [];
+  
+  if (Array.isArray(raw)) {
+    list = raw;
+  } else if (typeof raw === 'string') {
+    try {
+      // Try parsing as JSON first (e.g. '["Batch A", "Batch B"]')
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) list = parsed;
+      else list = [raw];
+    } catch {
+      // If not JSON, maybe comma separated? Or just a single string
+      if (raw.includes(',')) {
+        list = raw.split(',').map(s => s.trim());
+      } else {
+        list = [raw];
+      }
+    }
+  }
+
+  // Clean individual items: remove surrounding quotes if they exist double-wrapped
+  // e.g., '"Batch A"' becomes 'Batch A', but 'Batch A' stays 'Batch A'
+  return list.map(item => {
+    const str = String(item).trim();
+    return str.replace(/^["']|["']$/g, ''); 
+  }).filter(Boolean);
+};
+
 // --- Helper for Avatar Colors ---
 const getAvatarColor = (name: string) => {
   const colors = ['bg-red-100 text-red-700', 'bg-green-100 text-green-700', 'bg-blue-100 text-blue-700', 'bg-purple-100 text-purple-700', 'bg-yellow-100 text-yellow-700', 'bg-pink-100 text-pink-700'];
@@ -326,7 +360,7 @@ export const TeacherCommunity = () => {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(new Date());
 
-  // --- Fetch logic for Teachers ---
+  // --- CHANGED: Robust Fetch logic for Teachers ---
   const { data: teacherGroups = [], isLoading: isLoadingGroups } = useQuery<TeacherGroup[]>({
     queryKey: ['teacher-community-groups', profile?.user_id],
     queryFn: async () => {
@@ -346,8 +380,9 @@ export const TeacherCommunity = () => {
       if (!data) return [];
 
       const groups: TeacherGroup[] = [];
-      const batches = data.assigned_batches || [];
-      const subjects = data.assigned_subjects || [];
+      // Clean the lists to remove artifacts but preserve strict casing
+      const batches = cleanList(data.assigned_batches);
+      const subjects = cleanList(data.assigned_subjects);
 
       batches.forEach(batch => {
         subjects.forEach(subject => {
@@ -386,8 +421,8 @@ export const TeacherCommunity = () => {
           profiles (name),
           message_likes ( user_id, reaction_type )
         `)
-        .eq('batch', selectedGroup.batch_name)
-        .eq('subject', selectedGroup.subject_name)
+        .eq('batch', selectedGroup.batch_name) // STRICT MATCH
+        .eq('subject', selectedGroup.subject_name) // STRICT MATCH
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -452,10 +487,10 @@ export const TeacherCommunity = () => {
         content: text,
         image_url: imageUrl,
         user_id: profile.user_id,
-        batch: selectedGroup.batch_name,
-        subject: selectedGroup.subject_name,
+        batch: selectedGroup.batch_name, // USING EXACT NAME
+        subject: selectedGroup.subject_name, // USING EXACT NAME
         reply_to_id: replyId,
-        is_priority: false // Default to false for now
+        is_priority: false 
       };
       const { error } = await supabase.from('community_messages').insert(insertData as any);
       if (error) throw error;
