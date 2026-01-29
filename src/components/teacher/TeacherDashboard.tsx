@@ -5,6 +5,7 @@ import { TeacherScheduleRequests } from './TeacherScheduleRequests';
 import { StaffInbox } from '@/components/shared/StaffInbox';
 import { TeacherFeedbackViewer } from './TeacherFeedbackViewer';
 import { TeacherJoinClass } from './TeacherJoinClass';
+import { TeacherCommunity } from './TeacherCommunity'; 
 
 interface TeacherDashboardProps {
   activeTab: string;
@@ -29,6 +30,8 @@ export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardPro
         return <TeacherSchedule />;
       case 'teacher-join-class':
         return <TeacherJoinClass />;
+      case 'teacher-community': 
+        return <TeacherCommunity />;
       case 'teacher-recordings':
         return <TeacherRecordings />;
       case 'teacher-schedule-requests':
