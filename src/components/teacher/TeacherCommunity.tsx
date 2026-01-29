@@ -408,13 +408,22 @@ export const TeacherCommunity = () => {
       const groups: TeacherGroup[] = [];
       // Clean lists: Recursively strips [] and "" while keeping strict case/content
       const batches = cleanList(data.assigned_batches);
-      const subjects = cleanList(data.assigned_subjects);
+      const subjectsRaw = cleanList(data.assigned_subjects);
+
+      // --- CRITICAL FIX: STRIP BATCH NAMES FROM SUBJECTS ---
+      // This regex replaces any text in parentheses at the end of the string.
+      // E.g., "Physics (Batch A)" -> "Physics"
+      // This ensures the subject name strictly matches the community channel name.
+      const subjects = subjectsRaw.map(s => s.replace(/\s*\(.*?\)\s*$/g, '').trim());
 
       // Create a Set to ensure unique combinations of batch+subject
       const seen = new Set<string>();
 
       batches.forEach(batch => {
         subjects.forEach(subject => {
+          // Double check we aren't adding empty subjects
+          if (!subject) return;
+          
           const key = `${batch}_${subject}`;
           if (!seen.has(key)) {
             seen.add(key);
