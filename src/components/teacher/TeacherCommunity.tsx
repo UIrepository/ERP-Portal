@@ -70,8 +70,8 @@ interface TeacherGroup {
 }
 
 // --- Helper for Parsing/Cleaning Lists from DB ---
-// This ensures we get the EXACT string value for the batch/subject, 
-// removing only artifacts like JSON quotes or brackets, but PRESERVING case.
+// Handles double-encoded arrays or artifacts (brackets/quotes)
+// while preserving exact case and spacing of the actual name.
 const cleanList = (raw: any): string[] => {
   if (!raw) return [];
   
@@ -81,12 +81,10 @@ const cleanList = (raw: any): string[] => {
     list = raw;
   } else if (typeof raw === 'string') {
     try {
-      // Try parsing as JSON first (e.g. '["Batch A", "Batch B"]')
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) list = parsed;
       else list = [raw];
     } catch {
-      // If not JSON, maybe comma separated? Or just a single string
       if (raw.includes(',')) {
         list = raw.split(',').map(s => s.trim());
       } else {
@@ -95,12 +93,26 @@ const cleanList = (raw: any): string[] => {
     }
   }
 
-  // Clean individual items: remove surrounding quotes if they exist double-wrapped
-  // e.g., '"Batch A"' becomes 'Batch A', but 'Batch A' stays 'Batch A'
-  return list.map(item => {
-    const str = String(item).trim();
-    return str.replace(/^["']|["']$/g, ''); 
-  }).filter(Boolean);
+  // Flatten and clean items recursively to handle cases like ['["Batch A"]']
+  const flattenAndClean = (items: any[]): string[] => {
+    return items.flatMap(item => {
+      if (typeof item === 'string') {
+        const trimmed = item.trim();
+        // If it looks like a JSON array string, try to parse it
+        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) return flattenAndClean(parsed);
+          } catch {}
+        }
+        // Remove surrounding quotes if they exist
+        return trimmed.replace(/^["']|["']$/g, ''); 
+      }
+      return String(item);
+    });
+  };
+
+  return flattenAndClean(list).filter(Boolean);
 };
 
 // --- Helper for Avatar Colors ---
@@ -360,7 +372,7 @@ export const TeacherCommunity = () => {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(new Date());
 
-  // --- CHANGED: Robust Fetch logic for Teachers ---
+  // --- Fetch logic for Teachers ---
   const { data: teacherGroups = [], isLoading: isLoadingGroups } = useQuery<TeacherGroup[]>({
     queryKey: ['teacher-community-groups', profile?.user_id],
     queryFn: async () => {
@@ -380,7 +392,7 @@ export const TeacherCommunity = () => {
       if (!data) return [];
 
       const groups: TeacherGroup[] = [];
-      // Clean the lists to remove artifacts but preserve strict casing
+      // STRICTLY Clean the lists to remove artifacts ([], "") but preserve exact casing/content
       const batches = cleanList(data.assigned_batches);
       const subjects = cleanList(data.assigned_subjects);
 
@@ -421,8 +433,8 @@ export const TeacherCommunity = () => {
           profiles (name),
           message_likes ( user_id, reaction_type )
         `)
-        .eq('batch', selectedGroup.batch_name) // STRICT MATCH
-        .eq('subject', selectedGroup.subject_name) // STRICT MATCH
+        .eq('batch', selectedGroup.batch_name) // STRICT MATCH (Case Sensitive)
+        .eq('subject', selectedGroup.subject_name) // STRICT MATCH (Case Sensitive)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -487,8 +499,8 @@ export const TeacherCommunity = () => {
         content: text,
         image_url: imageUrl,
         user_id: profile.user_id,
-        batch: selectedGroup.batch_name, // USING EXACT NAME
-        subject: selectedGroup.subject_name, // USING EXACT NAME
+        batch: selectedGroup.batch_name,
+        subject: selectedGroup.subject_name,
         reply_to_id: replyId,
         is_priority: false 
       };
