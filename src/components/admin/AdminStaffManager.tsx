@@ -252,20 +252,27 @@ export const AdminStaffManager = () => {
 
     setIsSubmitting(true);
     try {
+      // --- CLEAN SUBJECTS BEFORE SAVING ---
+      // Strip " (Batch Name)" from the UI strings to save only strict subject names
+      // e.g. "Physics (Batch A)" -> "Physics"
+      const subjectsToSave = newStaffRole === 'teacher' 
+        ? Array.from(new Set(
+            selectedSubjects.map(s => s.replace(/\s*\(.*?\)\s*$/, '').trim())
+          ))
+        : [];
+
       if (editingId) {
         // Update existing staff
         if (newStaffRole === 'teacher') {
           const { error } = await supabase.from('teachers').update({
             name: newStaffName,
-            // Email is intentionally not updated here to avoid auth mismatches
             assigned_batches: selectedBatches,
-            assigned_subjects: selectedSubjects, 
+            assigned_subjects: subjectsToSave, // Save cleaned subjects
           }).eq('id', editingId);
           if (error) throw error;
         } else {
           const { error } = await supabase.from('managers').update({
             name: newStaffName,
-            // Email is intentionally not updated here to avoid auth mismatches
             assigned_batches: selectedBatches, 
           }).eq('id', editingId);
           if (error) throw error;
@@ -278,7 +285,7 @@ export const AdminStaffManager = () => {
             name: newStaffName,
             email: newStaffEmail,
             assigned_batches: selectedBatches,
-            assigned_subjects: selectedSubjects, 
+            assigned_subjects: subjectsToSave, // Save cleaned subjects
           });
           if (error) throw error;
         } else {
@@ -328,8 +335,33 @@ export const AdminStaffManager = () => {
     setNewStaffName(member.name);
     setNewStaffEmail(member.email);
     setNewStaffRole(member.role);
-    setSelectedBatches(member.batches || []);
-    setSelectedSubjects(member.subjects || []);
+    
+    // Set Batches
+    const batches = member.batches || [];
+    setSelectedBatches(batches);
+
+    // --- HYDRATE SUBJECTS FOR UI ---
+    // Match DB subjects (e.g. "Physics") to UI strings (e.g. "Physics (Batch A)")
+    // using the available enrollment data and the member's selected batches
+    let hydratedSubjects: string[] = [];
+    if (member.role === 'teacher' && rawEnrollments && member.subjects) {
+        const dbSubjects = member.subjects as string[];
+        
+        rawEnrollments.forEach(e => {
+            // Check if enrollment belongs to one of the teacher's batches
+            // AND the enrollment's subject is in the teacher's assigned DB subjects
+            if (e.batch_name && e.subject_name && 
+                batches.includes(e.batch_name) && 
+                dbSubjects.includes(e.subject_name)) {
+                
+                hydratedSubjects.push(`${e.subject_name} (${e.batch_name})`);
+            }
+        });
+        // Remove duplicates just in case
+        hydratedSubjects = Array.from(new Set(hydratedSubjects));
+    }
+    
+    setSelectedSubjects(hydratedSubjects);
     setIsDialogOpen(true);
   };
 
