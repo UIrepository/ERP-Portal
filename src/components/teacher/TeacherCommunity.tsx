@@ -70,8 +70,7 @@ interface TeacherGroup {
 }
 
 // --- Helper for Parsing/Cleaning Lists from DB ---
-// Handles double-encoded arrays or artifacts (brackets/quotes)
-// while preserving exact case and spacing of the actual name.
+// Improved to handle ['Name'] formats and aggressively strip brackets/quotes
 const cleanList = (raw: any): string[] => {
   if (!raw) return [];
   
@@ -80,39 +79,40 @@ const cleanList = (raw: any): string[] => {
   if (Array.isArray(raw)) {
     list = raw;
   } else if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    // Try JSON parse first (handles ["Name"])
     try {
-      const parsed = JSON.parse(raw);
+      const parsed = JSON.parse(trimmed);
       if (Array.isArray(parsed)) list = parsed;
-      else list = [raw];
+      else list = [parsed];
     } catch {
-      if (raw.includes(',')) {
-        list = raw.split(',').map(s => s.trim());
+      // If parsing fails, handle cases like ['Name'] or [Name]
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+         // Strip brackets
+         const content = trimmed.slice(1, -1);
+         if (content.includes(',')) {
+             list = content.split(',').map(s => s.trim());
+         } else {
+             list = [content];
+         }
+      } else if (trimmed.includes(',')) {
+        list = trimmed.split(',').map(s => s.trim());
       } else {
-        list = [raw];
+        list = [trimmed];
       }
     }
   }
 
-  // Flatten and clean items recursively to handle cases like ['["Batch A"]']
-  const flattenAndClean = (items: any[]): string[] => {
-    return items.flatMap(item => {
-      if (typeof item === 'string') {
-        const trimmed = item.trim();
-        // If it looks like a JSON array string, try to parse it
-        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-          try {
-            const parsed = JSON.parse(trimmed);
-            if (Array.isArray(parsed)) return flattenAndClean(parsed);
-          } catch {}
-        }
-        // Remove surrounding quotes if they exist
-        return trimmed.replace(/^["']|["']$/g, ''); 
-      }
-      return String(item);
-    });
-  };
-
-  return flattenAndClean(list).filter(Boolean);
+  // Final cleanup of individual items
+  return list.map(item => {
+    let str = String(item).trim();
+    // Remove surrounding quotes (single or double) if present
+    // We do this in a loop to handle double wrapping if any
+    while ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
+        str = str.slice(1, -1);
+    }
+    return str;
+  }).filter(Boolean);
 };
 
 // --- Helper for Avatar Colors ---
@@ -392,7 +392,7 @@ export const TeacherCommunity = () => {
       if (!data) return [];
 
       const groups: TeacherGroup[] = [];
-      // STRICTLY Clean the lists to remove artifacts ([], "") but preserve exact casing/content
+      // Clean lists: Strips [] and "" while keeping strict case/content
       const batches = cleanList(data.assigned_batches);
       const subjects = cleanList(data.assigned_subjects);
 
@@ -433,8 +433,8 @@ export const TeacherCommunity = () => {
           profiles (name),
           message_likes ( user_id, reaction_type )
         `)
-        .eq('batch', selectedGroup.batch_name) // STRICT MATCH (Case Sensitive)
-        .eq('subject', selectedGroup.subject_name) // STRICT MATCH (Case Sensitive)
+        .eq('batch', selectedGroup.batch_name) // STRICT MATCH
+        .eq('subject', selectedGroup.subject_name) // STRICT MATCH
         .order('created_at', { ascending: true });
 
       if (error) throw error;
