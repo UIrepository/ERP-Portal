@@ -69,53 +69,67 @@ interface TeacherGroup {
   subject_name: string;
 }
 
-// --- Helper for Parsing/Cleaning Lists from DB ---
-// Improved to handle ['Name'] formats and aggressively strip brackets/quotes
+// --- Helper for Aggressive Parsing/Cleaning ---
+// Recursively strips brackets and quotes until only the raw text remains.
 const cleanList = (raw: any): string[] => {
   if (!raw) return [];
   
   let list: any[] = [];
   
+  // 1. Normalize to array
   if (Array.isArray(raw)) {
     list = raw;
   } else if (typeof raw === 'string') {
     const trimmed = raw.trim();
-    // Try JSON parse first (handles ["Name"])
+    // Try JSON parse first
     try {
       const parsed = JSON.parse(trimmed);
       if (Array.isArray(parsed)) list = parsed;
-      else list = [parsed];
+      else list = [trimmed]; 
     } catch {
-      // If parsing fails, handle cases like ['Name'] or [Name]
+      // If parsing fails, treat as string (will be cleaned loop below)
+      // If it looks like a CSV list inside a string, split it
       if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-         // Strip brackets
-         const content = trimmed.slice(1, -1);
-         if (content.includes(',')) {
-             list = content.split(',').map(s => s.trim());
-         } else {
-             list = [content];
-         }
+          // It's a bracketed string like "['A', 'B']" that failed JSON
+          // We treat it as one item first, then let the loop strip brackets
+           list = [trimmed]; 
       } else if (trimmed.includes(',')) {
-        list = trimmed.split(',').map(s => s.trim());
+           list = trimmed.split(',');
       } else {
-        list = [trimmed];
+           list = [trimmed];
       }
     }
   }
 
-  // Final cleanup of individual items
+  // 2. Clean each item recursively
   return list.map(item => {
-    let str = String(item).trim();
-    // Remove surrounding quotes (single or double) if present
-    // We do this in a loop to handle double wrapping if any
-    while ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
-        str = str.slice(1, -1);
+    let s = String(item).trim();
+    let changed = true;
+    
+    // Loop until no more brackets or quotes can be stripped
+    while (changed) {
+        changed = false;
+        // Strip wrapping brackets [ ]
+        if (s.startsWith('[') && s.endsWith(']')) {
+            s = s.slice(1, -1).trim();
+            changed = true;
+        }
+        // Strip wrapping double quotes " "
+        if (s.startsWith('"') && s.endsWith('"')) {
+            s = s.slice(1, -1).trim();
+            changed = true;
+        }
+        // Strip wrapping single quotes ' '
+        if (s.startsWith("'") && s.endsWith("'")) {
+            s = s.slice(1, -1).trim();
+            changed = true;
+        }
     }
-    return str;
-  }).filter(Boolean);
+    return s;
+  }).filter(s => s.length > 0 && s !== 'null' && s !== 'undefined');
 };
 
-// --- Helper for Avatar Colors ---
+// --- Avatar Color Helper ---
 const getAvatarColor = (name: string) => {
   const colors = ['bg-red-100 text-red-700', 'bg-green-100 text-green-700', 'bg-blue-100 text-blue-700', 'bg-purple-100 text-purple-700', 'bg-yellow-100 text-yellow-700', 'bg-pink-100 text-pink-700'];
   let hash = 0;
@@ -125,7 +139,7 @@ const getAvatarColor = (name: string) => {
   return colors[Math.abs(hash) % colors.length];
 };
 
-// --- Swipeable Message Component ---
+// --- Message Item Component ---
 const MessageItem = ({ 
   msg, 
   isMe, 
@@ -392,16 +406,23 @@ export const TeacherCommunity = () => {
       if (!data) return [];
 
       const groups: TeacherGroup[] = [];
-      // Clean lists: Strips [] and "" while keeping strict case/content
+      // Clean lists: Recursively strips [] and "" while keeping strict case/content
       const batches = cleanList(data.assigned_batches);
       const subjects = cleanList(data.assigned_subjects);
 
+      // Create a Set to ensure unique combinations of batch+subject
+      const seen = new Set<string>();
+
       batches.forEach(batch => {
         subjects.forEach(subject => {
-          groups.push({
-            batch_name: batch,
-            subject_name: subject
-          });
+          const key = `${batch}_${subject}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            groups.push({
+                batch_name: batch,
+                subject_name: subject
+            });
+          }
         });
       });
 
