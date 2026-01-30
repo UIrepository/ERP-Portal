@@ -134,8 +134,6 @@ export const JitsiMeeting = ({
   const isLoadingRef = useRef(false); 
   const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasRecordedAttendanceRef = useRef(false);
-  
-  // Track if user intentionally clicked hangup
   const isIntentionalHangupRef = useRef(false);
 
   const propsRef = useRef({ displayName, userEmail, subject, batch, scheduleId, onClose, resolvedRole, profile, userRole });
@@ -237,9 +235,9 @@ export const JitsiMeeting = ({
             
             toast.success("Command sent. Waiting for YouTube...");
 
-            // 3. Manual Fallback
             setTimeout(() => {
-                toast.info("Stream didn't start? Click '...' > 'Start Live Stream' and paste key.", {
+                toast.info("If streaming didn't start automatically:", {
+                    description: "Click the '...' button in the bottom bar -> 'Start Live Stream', and paste the key.",
                     duration: 10000,
                     action: {
                         label: "Copy Key",
@@ -296,6 +294,23 @@ export const JitsiMeeting = ({
     const sanitizedRoomName = getSanitizedRoomName();
     const currentProps = propsRef.current;
     
+    // --- PERMISSION & ROLE CONFIGURATION ---
+    // Define toolbars based on role
+    // Teachers get FULL access (recording, mute everyone, security)
+    const TEACHER_TOOLBAR = [
+        'microphone', 'camera', 'desktop', 'chat', 'raisehand', 
+        'participants-pane', 'tileview', 'fullscreen', 'videoquality', 
+        'filmstrip', 'settings', 'hangup', 'overflowmenu', 'sharedvideo',
+        'livestreaming', 'recording', 'mute-everyone', 'security', 'stats'
+    ];
+
+    // Students get RESTRICTED access (No recording, No kick, No mute all)
+    const STUDENT_TOOLBAR = [
+        'microphone', 'camera', 'desktop', 'chat', 'raisehand', 
+        'participants-pane', 'tileview', 'fullscreen', 'videoquality', 
+        'filmstrip', 'settings', 'hangup', 'overflowmenu'
+    ];
+
     const options = {
       roomName: sanitizedRoomName,
       width: '100%',
@@ -308,19 +323,30 @@ export const JitsiMeeting = ({
         startWithVideoMuted: false,
         disableDeepLinking: true,
         disableInviteFunctions: true,
-        liveStreamingEnabled: true,
-        fileRecordingsEnabled: false, 
         
-        // CRITICAL FIX FOR 5-MIN TIMEOUT
-        // Disable P2P to force server connection (stable)
+        // Streaming Enabled (Required for API to work for teachers)
+        liveStreamingEnabled: true,
+        
+        // --- STABILITY FIXES FOR 5-MIN TIMEOUT ---
+        // 1. Disable P2P to force server usage (more stable)
         p2p: { 
             enabled: false, 
-            useStunTurn: true 
+            useStunTurn: true,
+            iceTransportPolicy: 'relay'
         },
-        // Force server even for 2 people
+        // 2. Force JVB connection even for 2 participants
         disable1On1Mode: true,
-        
-        // Prevent idle timeouts
+        // 3. Relax connection constraints
+        constraints: {
+            video: {
+                height: {
+                    ideal: 720,
+                    max: 1080,
+                    min: 180
+                }
+            }
+        },
+        // 4. Disable idle detection
         enableNoisyMicDetection: false,
         enableNoAudioDetection: false,
         
@@ -329,22 +355,21 @@ export const JitsiMeeting = ({
         enableInsecureRoomNameWarning: false,
         requireDisplayName: false,
         enableWelcomePage: false,
-        enableClosePage: false, // Prevents redirect on close
+        enableClosePage: false, 
         notifications: [],
         startAudioOnly: false,
       },
       interfaceConfigOverwrite: {
-        TOOLBAR_BUTTONS: [
-          'microphone', 'camera', 'desktop', 'chat',
-          'raisehand', 'participants-pane', 'tileview', 'fullscreen',
-          'videoquality', 'filmstrip', 'settings', 'hangup', 'overflowmenu', 'sharedvideo',
-          'livestreaming', 'recording' 
-        ],
+        // Apply the Role-Based Toolbar
+        TOOLBAR_BUTTONS: isHost ? TEACHER_TOOLBAR : STUDENT_TOOLBAR,
+        
         SHOW_JITSI_WATERMARK: false,
         SHOW_WATERMARK_FOR_GUESTS: false,
         DEFAULT_REMOTE_DISPLAY_NAME: 'Participant',
         MOBILE_APP_PROMO: false,
         HIDE_INVITE_MORE_HEADER: true,
+        // Hide the "Invite" button for students/everyone to prevent unauthorized sharing
+        SHARING_FEATURES: [], 
       }
     };
 
@@ -363,13 +388,11 @@ export const JitsiMeeting = ({
           isInitializingRef.current = false;
           recordAttendance();
         },
-        // Auto-Leave Handling
         videoConferenceLeft: () => {
             updateAttendanceOnLeave();
-            // If user didn't intentionally hang up (kicked by server), show retry
+            // Auto-reconnect if dropped (fix for random disconnects)
             if (!isIntentionalHangupRef.current) {
-                toast.warning("Disconnected from server. Attempting to reconnect...");
-                // Note: The UI usually clears on left, so we might need to handle reload
+                toast.warning("Connection dropped. Please refresh if not reconnected.");
             }
         },
         recordingStatusChanged: (payload: any) => {
@@ -426,16 +449,7 @@ export const JitsiMeeting = ({
     initializeJitsi();
   }, [initializeJitsi, setLoadingState]);
 
-  const toggleAudio = () => apiRef.current?.executeCommand('toggleAudio');
-  const toggleVideo = () => apiRef.current?.executeCommand('toggleVideo');
-  const toggleShareScreen = () => apiRef.current?.executeCommand('toggleShareScreen');
-  
-  const hangUp = () => { 
-      isIntentionalHangupRef.current = true;
-      updateAttendanceOnLeave(); 
-      apiRef.current?.executeCommand('hangup'); 
-  };
-  
+  // Cleaned up unused toggle functions since we removed the custom bar
   const handleClose = useCallback(() => {
     isIntentionalHangupRef.current = true;
     updateAttendanceOnLeave();
@@ -447,12 +461,33 @@ export const JitsiMeeting = ({
     <div className="fixed inset-0 z-50 bg-black flex flex-col overflow-hidden">
       {/* Header */}
       <div className="relative z-20 bg-gray-900/95 backdrop-blur border-b border-white/10 p-3 flex justify-between items-center shrink-0 shadow-sm">
-        <div>
-          <h2 className="text-white font-semibold text-lg leading-tight">{subject}</h2>
-          <p className="text-gray-400 text-xs">{batch}</p>
+        <div className="flex items-center gap-4">
+            <div>
+              <h2 className="text-white font-semibold text-lg leading-tight">{subject}</h2>
+              <p className="text-gray-400 text-xs">{batch}</p>
+            </div>
+            
+            {/* GO LIVE BUTTON - MOVED TO HEADER (Only for Host) */}
+            {hasJoined && !isLoading && isHost && (
+                <Button 
+                    variant={isStreaming ? "default" : "outline"} 
+                    size="sm"
+                    onClick={handleGoLive} 
+                    disabled={isStartingStream || isStreaming}
+                    className={`h-8 ${isStreaming ? 'bg-red-600 hover:bg-red-700 border-red-500 text-white' : 'border-red-500/50 text-red-500 hover:bg-red-500/10'}`}
+                >
+                    {isStartingStream ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                        <Youtube className="h-4 w-4 mr-2" />
+                    )}
+                    {isStreaming ? "Live" : "Go Live"}
+                </Button>
+            )}
         </div>
+
         <div className="flex items-center gap-2">
-           {lastStreamKey && (
+           {lastStreamKey && isHost && (
                <Button variant="outline" size="sm" onClick={() => {navigator.clipboard.writeText(lastStreamKey); toast.success("Stream Key Copied");}} className="h-8 text-xs border-white/20 text-gray-300">
                    <Copy className="h-3 w-3 mr-2" /> Key
                </Button>
@@ -524,29 +559,7 @@ export const JitsiMeeting = ({
           </div>
         )}
 
-        {/* Controls */}
-        {!connectionError && hasJoined && !isLoading && (
-          <div className="absolute bottom-6 left-0 right-0 flex justify-center pointer-events-none z-40">
-            <div className="bg-gray-900/80 backdrop-blur rounded-full p-2 flex gap-4 pointer-events-auto shadow-2xl border border-white/10">
-              <Button variant={isAudioMuted ? "destructive" : "secondary"} size="icon" onClick={toggleAudio} className="rounded-full w-12 h-12" title="Toggle Mic">{isAudioMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}</Button>
-              <Button variant={isVideoMuted ? "destructive" : "secondary"} size="icon" onClick={toggleVideo} className="rounded-full w-12 h-12" title="Toggle Camera">{isVideoMuted ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}</Button>
-              {isHost && (
-                  <Button 
-                    variant={isStreaming ? "default" : "outline"} 
-                    size="icon" 
-                    onClick={handleGoLive} 
-                    disabled={isStartingStream || isStreaming}
-                    className={`rounded-full w-12 h-12 ${isStreaming ? 'bg-red-600 hover:bg-red-700 border-red-500 text-white' : 'border-red-500/50 text-red-500 hover:bg-red-500/10'}`}
-                    title={isStreaming ? "Live on YouTube" : "Go Live"}
-                  >
-                    {isStartingStream ? <Loader2 className="h-5 w-5 animate-spin" /> : <Youtube className="h-5 w-5" />}
-                  </Button>
-              )}
-              <Button variant="secondary" size="icon" onClick={toggleShareScreen} className="rounded-full w-12 h-12" title="Share Screen"><MonitorUp className="h-5 w-5" /></Button>
-              <Button variant="destructive" size="icon" onClick={hangUp} className="rounded-full w-12 h-12" title="End Call"><PhoneOff className="h-5 w-5" /></Button>
-            </div>
-          </div>
-        )}
+        {/* Custom Toolbar REMOVED as requested */}
 
         <div ref={jitsiContainerRef} className="absolute inset-0 w-full h-full bg-black" style={{ display: hasJoined ? 'block' : 'none' }} />
       </div>
