@@ -235,6 +235,8 @@ export const JitsiMeeting = ({
             
             toast.success("Command sent. Waiting for YouTube...");
 
+            // FIXED: Removed auto-copy to clipboard in timeout (prevents NotAllowedError)
+            // Just show the notification where to find it.
             setTimeout(() => {
                 toast.info("If streaming didn't start automatically:", {
                     description: "Click the '...' button in the bottom bar -> 'Start Live Stream', and paste the key.",
@@ -247,7 +249,6 @@ export const JitsiMeeting = ({
                         }
                     }
                 });
-                navigator.clipboard.writeText(streamDetails.streamKey);
             }, 6000);
 
         } catch (e) {
@@ -295,8 +296,6 @@ export const JitsiMeeting = ({
     const currentProps = propsRef.current;
     
     // --- PERMISSION & ROLE CONFIGURATION ---
-    // Define toolbars based on role
-    // Teachers get FULL access (recording, mute everyone, security)
     const TEACHER_TOOLBAR = [
         'microphone', 'camera', 'desktop', 'chat', 'raisehand', 
         'participants-pane', 'tileview', 'fullscreen', 'videoquality', 
@@ -304,7 +303,6 @@ export const JitsiMeeting = ({
         'livestreaming', 'recording', 'mute-everyone', 'security', 'stats'
     ];
 
-    // Students get RESTRICTED access (No recording, No kick, No mute all)
     const STUDENT_TOOLBAR = [
         'microphone', 'camera', 'desktop', 'chat', 'raisehand', 
         'participants-pane', 'tileview', 'fullscreen', 'videoquality', 
@@ -324,29 +322,22 @@ export const JitsiMeeting = ({
         disableDeepLinking: true,
         disableInviteFunctions: true,
         
-        // Streaming Enabled (Required for API to work for teachers)
         liveStreamingEnabled: true,
         
-        // --- STABILITY FIXES FOR 5-MIN TIMEOUT ---
-        // 1. Disable P2P to force server usage (more stable)
+        // --- STABILITY FIXES FOR 5-MIN TIMEOUT (UPDATED) ---
+        // We REMOVE 'relay' policy to allow all connection types (Stable)
         p2p: { 
             enabled: false, 
-            useStunTurn: true,
-            iceTransportPolicy: 'relay'
+            useStunTurn: true
+            // Removed: iceTransportPolicy: 'relay' (This was causing the drop!)
         },
-        // 2. Force JVB connection even for 2 participants
-        disable1On1Mode: true,
-        // 3. Relax connection constraints
-        constraints: {
-            video: {
-                height: {
-                    ideal: 720,
-                    max: 1080,
-                    min: 180
-                }
-            }
-        },
-        // 4. Disable idle detection
+        disable1On1Mode: true, // Force JVB
+        
+        // Connection & Stream Stability
+        enableLayerSuspension: true,
+        disableSuspendVideo: true, // Keep video alive when tab is backgrounded
+        
+        // Prevent idle detection
         enableNoisyMicDetection: false,
         enableNoAudioDetection: false,
         
@@ -360,15 +351,12 @@ export const JitsiMeeting = ({
         startAudioOnly: false,
       },
       interfaceConfigOverwrite: {
-        // Apply the Role-Based Toolbar
         TOOLBAR_BUTTONS: isHost ? TEACHER_TOOLBAR : STUDENT_TOOLBAR,
-        
         SHOW_JITSI_WATERMARK: false,
         SHOW_WATERMARK_FOR_GUESTS: false,
         DEFAULT_REMOTE_DISPLAY_NAME: 'Participant',
         MOBILE_APP_PROMO: false,
         HIDE_INVITE_MORE_HEADER: true,
-        // Hide the "Invite" button for students/everyone to prevent unauthorized sharing
         SHARING_FEATURES: [], 
       }
     };
@@ -390,7 +378,6 @@ export const JitsiMeeting = ({
         },
         videoConferenceLeft: () => {
             updateAttendanceOnLeave();
-            // Auto-reconnect if dropped (fix for random disconnects)
             if (!isIntentionalHangupRef.current) {
                 toast.warning("Connection dropped. Please refresh if not reconnected.");
             }
@@ -449,7 +436,6 @@ export const JitsiMeeting = ({
     initializeJitsi();
   }, [initializeJitsi, setLoadingState]);
 
-  // Cleaned up unused toggle functions since we removed the custom bar
   const handleClose = useCallback(() => {
     isIntentionalHangupRef.current = true;
     updateAttendanceOnLeave();
@@ -467,7 +453,7 @@ export const JitsiMeeting = ({
               <p className="text-gray-400 text-xs">{batch}</p>
             </div>
             
-            {/* GO LIVE BUTTON - MOVED TO HEADER (Only for Host) */}
+            {/* GO LIVE BUTTON - Only for Host */}
             {hasJoined && !isLoading && isHost && (
                 <Button 
                     variant={isStreaming ? "default" : "outline"} 
@@ -558,8 +544,6 @@ export const JitsiMeeting = ({
             </div>
           </div>
         )}
-
-        {/* Custom Toolbar REMOVED as requested */}
 
         <div ref={jitsiContainerRef} className="absolute inset-0 w-full h-full bg-black" style={{ display: hasJoined ? 'block' : 'none' }} />
       </div>
