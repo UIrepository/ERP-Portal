@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, MonitorUp, X, RefreshCw, ExternalLink, AlertTriangle, Play, Lock } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, MonitorUp, X, RefreshCw, ExternalLink, AlertTriangle, Play, Lock, Youtube, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { generateJitsiRoomName } from '@/lib/jitsiUtils';
+import { useYoutubeStream } from '@/hooks/useYoutubeStream';
 
 interface JitsiMeetingProps {
   roomName: string;
@@ -130,6 +131,9 @@ export const JitsiMeeting = ({
   const [connectionError, setConnectionError] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('Initializing Player...');
   const [showFallbackPrompt, setShowFallbackPrompt] = useState(false);
+
+  // Use the new Custom Hook for YouTube logic
+  const { startStream, isStreaming, isStartingStream } = useYoutubeStream();
 
   // Auth & Logic Refs
   const { profile, resolvedRole } = useAuth();
@@ -268,6 +272,31 @@ export const JitsiMeeting = ({
       console.error('[Attendance] Error updating on leave:', error);
     }
   }, []);
+
+  // --- STREAMING LOGIC WRAPPER ---
+  const handleGoLive = async () => {
+    const currentProps = propsRef.current;
+
+    if (!isHost) {
+        toast.error("Only teachers can start the live stream.");
+        return;
+    }
+
+    // Call the hook to do the heavy lifting
+    const streamKey = await startStream(currentProps.batch, currentProps.subject);
+
+    // If hook returned a key, tell Jitsi to start
+    if (streamKey && apiRef.current) {
+         try {
+            apiRef.current.executeCommand('startLiveStreaming', {
+                streamKey: streamKey,
+            });
+        } catch (e) {
+            console.error("Jitsi Command Error:", e);
+            toast.error("Failed to send command to Jitsi player.");
+        }
+    }
+  };
 
   // --- Core Player Logic: Embeds Jitsi ---
   const initializeJitsi = useCallback(async () => {
@@ -580,6 +609,25 @@ export const JitsiMeeting = ({
               <Button variant={isVideoMuted ? "destructive" : "secondary"} size="icon" onClick={toggleVideo} className="rounded-full w-12 h-12" title="Toggle Camera">
                 {isVideoMuted ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
               </Button>
+
+              {/* NEW GO LIVE BUTTON */}
+              {isHost && (
+                  <Button 
+                    variant={isStreaming ? "default" : "outline"} 
+                    size="icon" 
+                    onClick={handleGoLive} 
+                    disabled={isStartingStream || isStreaming}
+                    className={`rounded-full w-12 h-12 ${isStreaming ? 'bg-red-600 hover:bg-red-700 border-red-500 text-white' : 'border-red-500/50 text-red-500 hover:bg-red-500/10'}`}
+                    title={isStreaming ? "Live on YouTube" : "Go Live"}
+                  >
+                    {isStartingStream ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                        <Youtube className="h-5 w-5" />
+                    )}
+                  </Button>
+              )}
+
               <Button variant="secondary" size="icon" onClick={toggleShareScreen} className="rounded-full w-12 h-12" title="Share Screen">
                 <MonitorUp className="h-5 w-5" />
               </Button>
