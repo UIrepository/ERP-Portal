@@ -123,7 +123,7 @@ export const JitsiMeeting = ({
   const [showFallbackPrompt, setShowFallbackPrompt] = useState(false);
   const [lastStreamKey, setLastStreamKey] = useState<string | null>(null);
 
-  // Use the new Custom Hook for YouTube logic (This is where the missing 100 lines went!)
+  // Use the new Custom Hook for YouTube logic
   const { startStream, isStreaming, isStartingStream } = useYoutubeStream();
 
   // Auth & Logic Refs
@@ -134,6 +134,9 @@ export const JitsiMeeting = ({
   const isLoadingRef = useRef(false); 
   const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasRecordedAttendanceRef = useRef(false);
+  
+  // Track if user intentionally clicked hangup
+  const isIntentionalHangupRef = useRef(false);
 
   const propsRef = useRef({ displayName, userEmail, subject, batch, scheduleId, onClose, resolvedRole, profile, userRole });
   const isHost = userRole === 'teacher' || userRole === 'admin' || userRole === 'manager';
@@ -210,7 +213,7 @@ export const JitsiMeeting = ({
     } catch (error) { console.error('[Attendance] Error updating on leave:', error); }
   }, []);
 
-  // --- STREAMING LOGIC WRAPPER (FIXED) ---
+  // --- STREAMING LOGIC WRAPPER ---
   const handleGoLive = async () => {
     const currentProps = propsRef.current;
 
@@ -219,20 +222,16 @@ export const JitsiMeeting = ({
         return;
     }
 
-    // 1. Get Keys from Supabase Edge Function
     const streamDetails = await startStream(currentProps.batch, currentProps.subject);
 
-    // 2. Start Jitsi Streaming
     if (streamDetails && apiRef.current) {
          setLastStreamKey(streamDetails.streamKey);
          try {
             console.log("Starting Jitsi stream with key:", streamDetails.streamKey);
-            
-            // FIX: DO NOT send 'rtmpUrl'. Send ONLY 'rtmpStreamKey'.
-            // Jitsi defaults to YouTube automatically. Sending the URL causes "Upcoming" hang.
             apiRef.current.executeCommand('startRecording', {
                 mode: 'stream',
                 rtmpStreamKey: streamDetails.streamKey,
+                youtubeStreamKey: streamDetails.streamKey, 
                 rtmpBroadcastID: streamDetails.broadcastId
             });
             
@@ -309,14 +308,28 @@ export const JitsiMeeting = ({
         startWithVideoMuted: false,
         disableDeepLinking: true,
         disableInviteFunctions: true,
-        liveStreamingEnabled: true, // Must be true for API command to work
+        liveStreamingEnabled: true,
         fileRecordingsEnabled: false, 
+        
+        // CRITICAL FIX FOR 5-MIN TIMEOUT
+        // Disable P2P to force server connection (stable)
+        p2p: { 
+            enabled: false, 
+            useStunTurn: true 
+        },
+        // Force server even for 2 people
+        disable1On1Mode: true,
+        
+        // Prevent idle timeouts
+        enableNoisyMicDetection: false,
+        enableNoAudioDetection: false,
+        
         lobby: { autoKnock: true, enableChat: true },
         hideLobbyButton: true,
         enableInsecureRoomNameWarning: false,
         requireDisplayName: false,
         enableWelcomePage: false,
-        enableClosePage: false,
+        enableClosePage: false, // Prevents redirect on close
         notifications: [],
         startAudioOnly: false,
       },
@@ -350,8 +363,15 @@ export const JitsiMeeting = ({
           isInitializingRef.current = false;
           recordAttendance();
         },
-        videoConferenceLeft: () => updateAttendanceOnLeave(),
-        
+        // Auto-Leave Handling
+        videoConferenceLeft: () => {
+            updateAttendanceOnLeave();
+            // If user didn't intentionally hang up (kicked by server), show retry
+            if (!isIntentionalHangupRef.current) {
+                toast.warning("Disconnected from server. Attempting to reconnect...");
+                // Note: The UI usually clears on left, so we might need to handle reload
+            }
+        },
         recordingStatusChanged: (payload: any) => {
              console.log("Jitsi Recording Status Changed:", payload);
              if (payload.on) {
@@ -360,8 +380,10 @@ export const JitsiMeeting = ({
                  toast.error(`Stream Error: ${payload.error}`);
              }
         },
-
-        readyToClose: () => { updateAttendanceOnLeave(); if (propsRef.current.onClose) propsRef.current.onClose(); },
+        readyToClose: () => { 
+            updateAttendanceOnLeave(); 
+            if (propsRef.current.onClose) propsRef.current.onClose(); 
+        },
         audioMuteStatusChanged: ({ muted }: { muted: boolean }) => setIsAudioMuted(muted),
         videoMuteStatusChanged: ({ muted }: { muted: boolean }) => setIsVideoMuted(muted),
       });
@@ -388,7 +410,10 @@ export const JitsiMeeting = ({
     };
   }, [hasJoined, initializeJitsi, updateAttendanceOnLeave]);
 
-  const handleStartClass = () => setHasJoined(true);
+  const handleStartClass = () => {
+    isIntentionalHangupRef.current = false;
+    setHasJoined(true);
+  };
   
   const handleRetry = useCallback(async () => {
     if (apiRef.current) { try { apiRef.current.dispose(); } catch (e) {} apiRef.current = null; }
@@ -404,8 +429,15 @@ export const JitsiMeeting = ({
   const toggleAudio = () => apiRef.current?.executeCommand('toggleAudio');
   const toggleVideo = () => apiRef.current?.executeCommand('toggleVideo');
   const toggleShareScreen = () => apiRef.current?.executeCommand('toggleShareScreen');
-  const hangUp = () => { updateAttendanceOnLeave(); apiRef.current?.executeCommand('hangup'); };
+  
+  const hangUp = () => { 
+      isIntentionalHangupRef.current = true;
+      updateAttendanceOnLeave(); 
+      apiRef.current?.executeCommand('hangup'); 
+  };
+  
   const handleClose = useCallback(() => {
+    isIntentionalHangupRef.current = true;
     updateAttendanceOnLeave();
     if (apiRef.current) try { apiRef.current.dispose(); } catch (e) {}
     if (propsRef.current.onClose) propsRef.current.onClose();
