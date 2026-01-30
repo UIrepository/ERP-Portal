@@ -288,12 +288,29 @@ export const JitsiMeeting = ({
     // If hook returned details, tell Jitsi to start
     if (streamDetails && apiRef.current) {
          try {
-            // Pass BOTH streamKey and broadcastId to ensure video flows correctly
             console.log("Starting Jitsi stream with key:", streamDetails.streamKey);
-            apiRef.current.executeCommand('startLiveStreaming', {
-                streamKey: streamDetails.streamKey,
-                broadcastId: streamDetails.broadcastId 
-            });
+            
+            // Method 1: Try the standard Live Streaming command
+            try {
+                apiRef.current.executeCommand('startLiveStreaming', {
+                    streamKey: streamDetails.streamKey,
+                    broadcastId: streamDetails.broadcastId 
+                });
+            } catch (innerError) {
+                console.warn("Standard startLiveStreaming failed, trying fallback...", innerError);
+                
+                // Method 2: Fallback to 'startRecording' with mode: stream
+                // This is often required for certain Jitsi versions
+                apiRef.current.executeCommand('startRecording', {
+                    mode: 'stream',
+                    rtmpStreamKey: streamDetails.streamKey,
+                    youtubeStreamKey: streamDetails.streamKey,
+                    broadcastId: streamDetails.broadcastId
+                });
+            }
+            
+            toast.success("Command sent to player. Stream should start shortly.");
+
         } catch (e) {
             console.error("Jitsi Command Error:", e);
             toast.error("Failed to send command to Jitsi player.");
@@ -376,6 +393,8 @@ export const JitsiMeeting = ({
         startWithVideoMuted: false,
         disableDeepLinking: true,
         disableInviteFunctions: true,
+        // ENABLED STREAMING HERE:
+        liveStreamingEnabled: true,
         lobby: { autoKnock: true, enableChat: true },
         hideLobbyButton: true,
         enableInsecureRoomNameWarning: false,
@@ -410,9 +429,7 @@ export const JitsiMeeting = ({
           isInitializingRef.current = false;
       }, 1500);
 
-      // --- CRITICAL FIX: Record Attendance HERE (Fallback) ---
-      // We do this immediately upon successful init to ensure it's captured
-      // even if the event listener below fails.
+      // Record Attendance Fallback
       setTimeout(() => {
         if (!hasRecordedAttendanceRef.current) {
             recordAttendance();
