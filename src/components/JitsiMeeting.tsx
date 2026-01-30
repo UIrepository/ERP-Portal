@@ -224,12 +224,8 @@ export const JitsiMeeting = ({
 
       if (error) {
           console.error('[Attendance] DB Error:', error);
-          // Don't show toast for duplicate key errors (means already joined)
-          if (error.code !== '23505') {
-             // Only show toast if it's a permission error or something critical
-             if (error.code === '42501') {
+          if (error.code === '42501') {
                  toast.error('Attendance Failed: Permission Denied. Please contact admin.');
-             }
           }
       } else {
           console.log("[Attendance] Successfully recorded.");
@@ -273,7 +269,7 @@ export const JitsiMeeting = ({
     }
   }, []);
 
-  // --- STREAMING LOGIC WRAPPER ---
+  // --- STREAMING LOGIC WRAPPER (FIXED) ---
   const handleGoLive = async () => {
     const currentProps = propsRef.current;
 
@@ -282,34 +278,26 @@ export const JitsiMeeting = ({
         return;
     }
 
-    // Call the hook to do the heavy lifting
+    // 1. Get Keys from Supabase Edge Function
     const streamDetails = await startStream(currentProps.batch, currentProps.subject);
 
-    // If hook returned details, tell Jitsi to start
+    // 2. Start Jitsi Streaming via RTMP
     if (streamDetails && apiRef.current) {
          try {
             console.log("Starting Jitsi stream with key:", streamDetails.streamKey);
             
-            // Method 1: Try the standard Live Streaming command
-            try {
-                apiRef.current.executeCommand('startLiveStreaming', {
-                    streamKey: streamDetails.streamKey,
-                    broadcastId: streamDetails.broadcastId 
-                });
-            } catch (innerError) {
-                console.warn("Standard startLiveStreaming failed, trying fallback...", innerError);
-                
-                // Method 2: Fallback to 'startRecording' with mode: stream
-                // This is often required for certain Jitsi versions
-                apiRef.current.executeCommand('startRecording', {
-                    mode: 'stream',
-                    rtmpStreamKey: streamDetails.streamKey,
-                    youtubeStreamKey: streamDetails.streamKey,
-                    broadcastId: streamDetails.broadcastId
-                });
-            }
+            // CORRECT COMMAND for Jitsi Streaming
+            // We use 'startRecording' with mode 'stream'
+            apiRef.current.executeCommand('startRecording', {
+                mode: 'stream',
+                // We pass the key in both common formats to ensure compatibility
+                rtmpStreamKey: streamDetails.streamKey,
+                youtubeStreamKey: streamDetails.streamKey,
+                // Pass broadcast ID for metadata
+                rtmpBroadcastID: streamDetails.broadcastId
+            });
             
-            toast.success("Command sent to player. Stream should start shortly.");
+            toast.success("Connection sent to YouTube. Video should appear in ~30 seconds.");
 
         } catch (e) {
             console.error("Jitsi Command Error:", e);
@@ -393,8 +381,9 @@ export const JitsiMeeting = ({
         startWithVideoMuted: false,
         disableDeepLinking: true,
         disableInviteFunctions: true,
-        // ENABLED STREAMING HERE:
+        // CRITICAL: Enable live streaming in config
         liveStreamingEnabled: true,
+        fileRecordingsEnabled: false, // Disable file recording to avoid confusion
         lobby: { autoKnock: true, enableChat: true },
         hideLobbyButton: true,
         enableInsecureRoomNameWarning: false,
@@ -405,11 +394,12 @@ export const JitsiMeeting = ({
         startAudioOnly: false,
       },
       interfaceConfigOverwrite: {
-        // Toolbar Buttons
+        // Toolbar Buttons - MUST INCLUDE 'livestreaming' FOR API TO WORK
         TOOLBAR_BUTTONS: [
           'microphone', 'camera', 'desktop', 'chat',
           'raisehand', 'participants-pane', 'tileview', 'fullscreen',
-          'videoquality', 'filmstrip', 'settings', 'hangup', 'overflowmenu', 'sharedvideo'
+          'videoquality', 'filmstrip', 'settings', 'hangup', 'overflowmenu', 'sharedvideo',
+          'livestreaming', 'recording' 
         ],
         SHOW_JITSI_WATERMARK: false,
         SHOW_WATERMARK_FOR_GUESTS: false,
