@@ -283,13 +283,16 @@ export const JitsiMeeting = ({
     }
 
     // Call the hook to do the heavy lifting
-    const streamKey = await startStream(currentProps.batch, currentProps.subject);
+    const streamDetails = await startStream(currentProps.batch, currentProps.subject);
 
-    // If hook returned a key, tell Jitsi to start
-    if (streamKey && apiRef.current) {
+    // If hook returned details, tell Jitsi to start
+    if (streamDetails && apiRef.current) {
          try {
+            // Pass BOTH streamKey and broadcastId to ensure video flows correctly
+            console.log("Starting Jitsi stream with key:", streamDetails.streamKey);
             apiRef.current.executeCommand('startLiveStreaming', {
-                streamKey: streamKey,
+                streamKey: streamDetails.streamKey,
+                broadcastId: streamDetails.broadcastId 
             });
         } catch (e) {
             console.error("Jitsi Command Error:", e);
