@@ -286,16 +286,22 @@ export const JitsiMeeting = ({
          try {
             console.log("Starting Jitsi stream with key:", streamDetails.streamKey);
             
-            // CORRECT COMMAND for Jitsi Streaming
-            // We use 'startRecording' with mode 'stream'
-            apiRef.current.executeCommand('startRecording', {
-                mode: 'stream',
-                // We pass the key in both common formats to ensure compatibility
-                rtmpStreamKey: streamDetails.streamKey,
-                youtubeStreamKey: streamDetails.streamKey,
-                // Pass broadcast ID for metadata
-                rtmpBroadcastID: streamDetails.broadcastId
-            });
+            // Construct the Full RTMP URL for YouTube
+            // This forces Jitsi to use the generic RTMP streaming mode which is more reliable
+            const youtubeRtmpUrl = `rtmp://a.rtmp.youtube.com/live2/${streamDetails.streamKey}`;
+            
+            console.log("Using RTMP URL:", youtubeRtmpUrl);
+
+            // Add a small delay to ensure player is ready to accept stream command
+            setTimeout(() => {
+                if (apiRef.current) {
+                    apiRef.current.executeCommand('startRecording', {
+                        mode: 'stream',
+                        rtmpStreamKey: streamDetails.streamKey,
+                        rtmpUrl: youtubeRtmpUrl 
+                    });
+                }
+            }, 2000);
             
             toast.success("Connection sent to YouTube. Video should appear in ~30 seconds.");
 
