@@ -18,6 +18,7 @@ export const useYoutubeStream = () => {
     toast.info("Initializing YouTube Live Stream...");
 
     try {
+      // 1. Call Edge Function to create YouTube Broadcast
       const { data: streamData, error: funcError } = await supabase.functions.invoke('create-youtube-stream', {
         body: {
           title: `${subject} - ${batch} (${format(new Date(), 'dd MMM')})`,
@@ -32,7 +33,7 @@ export const useYoutubeStream = () => {
 
       console.log("Stream created:", streamData.videoUrl);
 
-      // Save Recording Link to DB
+      // 2. Save Recording Link to DB Immediately
       const { error: dbError } = await supabase.from('recordings').insert({
         batch: batch,
         subject: subject,
@@ -50,7 +51,7 @@ export const useYoutubeStream = () => {
 
       setIsStreaming(true);
       
-      // Return BOTH key and ID - Jitsi needs both for stability
+      // Return the details needed by Jitsi
       return {
         streamKey: streamData.streamKey as string,
         broadcastId: streamData.videoId as string
