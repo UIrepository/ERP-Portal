@@ -9,7 +9,7 @@ export const useYoutubeStream = () => {
 
   /**
    * Creates a YouTube Broadcast via Edge Function and saves the link to the database.
-   * Returns the streamKey on success, or null on failure.
+   * Returns stream details on success, or null on failure.
    */
   const startStream = async (batch: string, subject: string) => {
     if (isStartingStream || isStreaming) return null;
@@ -18,8 +18,6 @@ export const useYoutubeStream = () => {
     toast.info("Initializing YouTube Live Stream...");
 
     try {
-      // 1. Call Edge Function to create YouTube Broadcast
-      // This keeps your API keys secure on the server side
       const { data: streamData, error: funcError } = await supabase.functions.invoke('create-youtube-stream', {
         body: {
           title: `${subject} - ${batch} (${format(new Date(), 'dd MMM')})`,
@@ -34,8 +32,7 @@ export const useYoutubeStream = () => {
 
       console.log("Stream created:", streamData.videoUrl);
 
-      // 2. Save Recording Link to DB Immediately
-      // This ensures students see the recording link even if the teacher disconnects
+      // Save Recording Link to DB
       const { error: dbError } = await supabase.from('recordings').insert({
         batch: batch,
         subject: subject,
@@ -52,7 +49,12 @@ export const useYoutubeStream = () => {
       }
 
       setIsStreaming(true);
-      return streamData.streamKey as string;
+      
+      // Return BOTH key and ID - Jitsi needs both for stability
+      return {
+        streamKey: streamData.streamKey as string,
+        broadcastId: streamData.videoId as string
+      };
 
     } catch (error: any) {
       console.error("Streaming Error:", error);
