@@ -6,7 +6,6 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight request
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -14,7 +13,6 @@ serve(async (req) => {
   try {
     const { title, description } = await req.json();
 
-    // 1. Get Access Token using the Refresh Token stored in Supabase Secrets
     const refreshUrl = 'https://oauth2.googleapis.com/token';
     const refreshBody = new URLSearchParams({
       client_id: Deno.env.get('YOUTUBE_CLIENT_ID') ?? '',
@@ -36,8 +34,7 @@ serve(async (req) => {
     }
     const accessToken = tokenData.access_token;
 
-    // 2. Create the Broadcast (The "Event" container)
-    // We explicitly set privacyStatus to 'unlisted'
+    // 1. Create Broadcast (Unlisted)
     const broadcastRes = await fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails', {
       method: 'POST',
       headers: {
@@ -57,18 +54,18 @@ serve(async (req) => {
         contentDetails: { 
           enableAutoStart: true, 
           enableAutoStop: true,
-          recordFromStart: true
+          recordFromStart: true,
+          latencyPreference: 'low' // Added for faster startup
         }
       }),
     });
     
     const broadcast = await broadcastRes.json();
     if (!broadcast.id) {
-        console.error('Broadcast Creation Failed:', broadcast);
         throw new Error(`Broadcast Error: ${JSON.stringify(broadcast)}`);
     }
 
-    // 3. Create the Stream (The technical ingestion point)
+    // 2. Create Stream
     const streamRes = await fetch('https://www.googleapis.com/youtube/v3/liveStreams?part=snippet,cdn', {
       method: 'POST',
       headers: {
@@ -88,29 +85,25 @@ serve(async (req) => {
 
     const stream = await streamRes.json();
     if (!stream.id) {
-        console.error('Stream Creation Failed:', stream);
         throw new Error(`Stream Error: ${JSON.stringify(stream)}`);
     }
 
-    // 4. Bind the Broadcast to the Stream
+    // 3. Bind
     const bindRes = await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?id=${broadcast.id}&streamId=${stream.id}&part=id`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${accessToken}` },
     });
     
     if (!bindRes.ok) {
-        const bindError = await bindRes.text();
-        console.error('Bind Failed:', bindError);
         throw new Error('Failed to bind stream to broadcast');
     }
 
-    // 5. Return the keys needed for Jitsi and the Database
     return new Response(
       JSON.stringify({
-        streamKey: stream.cdn.ingestionInfo.streamName, // Key for Jitsi
-        videoId: broadcast.id, // ID for Database
+        streamKey: stream.cdn.ingestionInfo.streamName,
+        videoId: broadcast.id, 
         videoUrl: `https://youtu.be/${broadcast.id}`,
-        embedLink: `https://www.youtube.com/embed/${broadcast.id}` // The link we save
+        embedLink: `https://www.youtube.com/embed/${broadcast.id}`
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
