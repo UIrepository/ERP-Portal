@@ -116,13 +116,39 @@ export const StudentJoinClass = () => {
     return format(parsed, 'h:mm a');
   };
 
-  const handleJoinClass = (cls: Schedule) => {
+  const handleJoinClass = async (cls: Schedule) => {
+    // 1. Mark Attendance immediately before redirect
+    try {
+      if (profile?.user_id) {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        await supabase.from('class_attendance').upsert({
+          user_id: profile.user_id,
+          user_name: profile.name || user?.email || 'Student',
+          user_role: 'student',
+          schedule_id: cls.id,
+          batch: cls.batch,
+          subject: cls.subject,
+          class_date: today,
+          joined_at: new Date().toISOString()
+        }, { onConflict: 'user_id,schedule_id,class_date' });
+      }
+    } catch (error) {
+      console.error("Error marking attendance:", error);
+    }
+
+    // 2. Redirect to Jitsi in new tab (Bypassing embedded iframe limit)
+    const roomUrl = `https://meet.jit.si/${encodeURIComponent(cls.batch)}/${encodeURIComponent(cls.subject)}`;
+    window.open(roomUrl, '_blank');
+    
+    // Legacy state setting (kept to not delete code, but effectively unused now)
+    /*
     setActiveMeeting({
       roomName: generateJitsiRoomName(cls.batch, cls.subject),
       subject: cls.subject,
       batch: cls.batch,
       scheduleId: cls.id
     });
+    */
   };
 
   const isLoading = isLoadingEnrollments || isLoadingSchedules;
@@ -269,7 +295,7 @@ export const StudentJoinClass = () => {
         </Card>
       )}
 
-      {/* Jitsi Meeting Overlay */}
+      {/* Jitsi Meeting Overlay (Legacy/Unused in new redirect flow) */}
       {activeMeeting && (
         <JitsiMeeting
           roomName={activeMeeting.roomName}
