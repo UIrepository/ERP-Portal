@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,11 +6,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Video, Clock, Calendar, Users, UserCheck } from 'lucide-react';
+import { Video, Clock, Calendar, Users, UserCheck, Copy, Loader2 } from 'lucide-react';
 import { format, isToday, parse, isBefore, isAfter } from 'date-fns';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { generateJitsiRoomName, subjectsMatch } from '@/lib/jitsiUtils';
+import { useYoutubeStream } from '@/hooks/useYoutubeStream';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
 
 interface Schedule {
   id: string;
@@ -47,6 +51,12 @@ export const TeacherJoinClass = () => {
     scheduleId: string;
   } | null>(null);
   const [selectedClassForAttendance, setSelectedClassForAttendance] = useState<Schedule | null>(null);
+
+  // New states for Stream Key Dialog
+  const { startStream, isStartingStream } = useYoutubeStream();
+  const [streamKey, setStreamKey] = useState<string>("");
+  const [showStreamDialog, setShowStreamDialog] = useState(false);
+  const [currentClass, setCurrentClass] = useState<Schedule | null>(null);
 
   // Fetch teacher's assignments
   const { data: teacher, isLoading: isLoadingTeacher } = useQuery<Teacher | null>({
@@ -169,13 +179,59 @@ export const TeacherJoinClass = () => {
     return format(parsed, 'h:mm a');
   };
 
-  const handleStartClass = (cls: Schedule) => {
+  const handleStartClass = async (cls: Schedule) => {
+    setCurrentClass(cls);
+
+    // 1. Mark Attendance Immediately
+    try {
+      if (profile?.user_id) {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        await supabase.from('class_attendance').upsert({
+          user_id: profile.user_id,
+          user_name: profile.name || user?.email || 'Teacher',
+          user_role: 'teacher',
+          schedule_id: cls.id,
+          batch: cls.batch,
+          subject: cls.subject,
+          class_date: today,
+          joined_at: new Date().toISOString()
+        }, { onConflict: 'user_id,schedule_id,class_date' });
+      }
+    } catch (e) {
+      console.error("Error marking attendance:", e);
+    }
+
+    // 2. Fetch Stream Key and Show Modal
+    const details = await startStream(cls.batch, cls.subject);
+    if (details?.streamKey) {
+      setStreamKey(details.streamKey);
+      setShowStreamDialog(true);
+    } else {
+      // If stream fails, allow opening Jitsi anyway? For now, we rely on the dialog flow.
+      toast.error("Could not generate stream key, please try again.");
+    }
+    
+    // Legacy: Don't set active meeting to avoid embedded player
+    /*
     setActiveMeeting({
       roomName: generateJitsiRoomName(cls.batch, cls.subject),
       subject: cls.subject,
       batch: cls.batch,
       scheduleId: cls.id
     });
+    */
+  };
+
+  const proceedToMeeting = () => {
+    if (!currentClass) return;
+    const roomUrl = `https://meet.jit.si/${encodeURIComponent(currentClass.batch)}/${encodeURIComponent(currentClass.subject)}`;
+    window.open(roomUrl, '_blank');
+    setShowStreamDialog(false);
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(streamKey);
+    toast.success("Stream key copied!");
   };
 
   const isLoading = isLoadingTeacher || isLoadingSchedules;
@@ -249,9 +305,10 @@ export const TeacherJoinClass = () => {
                       <Button 
                         size="lg" 
                         onClick={() => handleStartClass(cls)}
+                        disabled={isStartingStream}
                         className="bg-green-600 hover:bg-green-700"
                       >
-                        <Video className="mr-2 h-5 w-5" />
+                        {isStartingStream ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <Video className="mr-2 h-5 w-5" />}
                         Start Class
                       </Button>
                     </div>
@@ -340,6 +397,44 @@ export const TeacherJoinClass = () => {
         </Card>
       )}
 
+      {/* Stream Key Modal for Teachers */}
+      <Dialog open={showStreamDialog} onOpenChange={setShowStreamDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Start Live Stream</DialogTitle>
+            <DialogDescription>
+              Copy the key below, then paste it into Jitsi via "Start Live Stream" in the options menu.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center space-x-2">
+            <div className="grid flex-1 gap-2">
+              <Label htmlFor="link" className="sr-only">
+                Stream Key
+              </Label>
+              <Input
+                id="link"
+                defaultValue={streamKey}
+                readOnly
+              />
+            </div>
+            <Button type="submit" size="sm" className="px-3" onClick={copyToClipboard}>
+              <span className="sr-only">Copy</span>
+              <Copy className="h-4 w-4" />
+            </Button>
+          </div>
+          <DialogFooter className="sm:justify-start">
+            <Button
+              type="button"
+              variant="default"
+              onClick={proceedToMeeting}
+              className="w-full bg-blue-600 hover:bg-blue-700"
+            >
+              Go to Class
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Attendance Modal */}
       {selectedClassForAttendance && (
         <Card className="mt-6">
@@ -388,7 +483,7 @@ export const TeacherJoinClass = () => {
         </Card>
       )}
 
-      {/* Jitsi Meeting Overlay */}
+      {/* Jitsi Meeting Overlay (Legacy/Unused) */}
       {activeMeeting && (
         <JitsiMeeting
           roomName={activeMeeting.roomName}
