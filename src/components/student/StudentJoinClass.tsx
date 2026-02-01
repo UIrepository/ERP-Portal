@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -8,8 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Video, Clock, Calendar, Users } from 'lucide-react';
 import { format, isToday, parse, isBefore, isAfter } from 'date-fns';
-import { JitsiMeeting } from '@/components/JitsiMeeting';
-import { generateJitsiRoomName } from '@/lib/jitsiUtils';
+import { toast } from 'sonner';
 
 interface Schedule {
   id: string;
@@ -22,27 +21,22 @@ interface Schedule {
 }
 
 interface UserEnrollment {
+  id: string; // Added ID for secure link generation
   batch_name: string;
   subject_name: string;
 }
 
 export const StudentJoinClass = () => {
-  const { profile, user } = useAuth();
-  const [activeMeeting, setActiveMeeting] = useState<{
-    roomName: string;
-    subject: string;
-    batch: string;
-    scheduleId: string;
-  } | null>(null);
+  const { profile } = useAuth();
 
-  // Fetch user enrollments
+  // Fetch user enrollments with IDs
   const { data: enrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['studentEnrollments', profile?.user_id],
     queryFn: async () => {
       if (!profile?.user_id) return [];
       const { data, error } = await supabase
         .from('user_enrollments')
-        .select('batch_name, subject_name')
+        .select('id, batch_name, subject_name')
         .eq('user_id', profile.user_id);
       if (error) throw error;
       return data || [];
@@ -117,12 +111,21 @@ export const StudentJoinClass = () => {
   };
 
   const handleJoinClass = (cls: Schedule) => {
-    setActiveMeeting({
-      roomName: generateJitsiRoomName(cls.batch, cls.subject),
-      subject: cls.subject,
-      batch: cls.batch,
-      scheduleId: cls.id
-    });
+    if (!enrollments) return;
+
+    // Find the specific enrollment ID for this class
+    // This ensures the link is tied to the specific user's enrollment record
+    const enrollment = enrollments.find(
+        e => e.batch_name === cls.batch && e.subject_name === cls.subject
+    );
+
+    if (enrollment?.id) {
+        // Open the secure class session in a new tab
+        const url = `/class-session/${enrollment.id}?scheduleId=${cls.id}`;
+        window.open(url, '_blank');
+    } else {
+        toast.error("Enrollment record not found. Please contact support.");
+    }
   };
 
   const isLoading = isLoadingEnrollments || isLoadingSchedules;
@@ -267,20 +270,6 @@ export const StudentJoinClass = () => {
             </p>
           </CardContent>
         </Card>
-      )}
-
-      {/* Jitsi Meeting Overlay */}
-      {activeMeeting && (
-        <JitsiMeeting
-          roomName={activeMeeting.roomName}
-          displayName={user?.user_metadata?.full_name || user?.user_metadata?.name || profile?.name || 'Student'}
-          subject={activeMeeting.subject}
-          batch={activeMeeting.batch}
-          scheduleId={activeMeeting.scheduleId}
-          onClose={() => setActiveMeeting(null)}
-          userRole="student"
-          userEmail={user?.email}
-        />
       )}
     </div>
   );
