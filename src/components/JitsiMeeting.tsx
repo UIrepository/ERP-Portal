@@ -1,9 +1,7 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Video, VideoOff, MonitorUp, X, RefreshCw, AlertTriangle, Lock, Youtube, Loader2, Copy } from 'lucide-react';
+import { X, Youtube, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { useYoutubeStream } from '@/hooks/useYoutubeStream';
 
@@ -17,6 +15,8 @@ interface JitsiMeetingProps {
   batch: string;
   onClose: () => void;
   userRole?: 'teacher' | 'student' | 'admin' | 'manager';
+  scheduleId?: string;
+  userEmail?: string;
 }
 
 declare global {
@@ -70,6 +70,11 @@ export const JitsiMeeting = ({
       document.body.appendChild(script);
     };
     loadScript();
+    
+    // Cleanup on unmount
+    return () => {
+        if (apiRef.current) apiRef.current.dispose();
+    };
   }, []);
 
   // --- 3. INITIALIZE MEETING ---
@@ -88,26 +93,23 @@ export const JitsiMeeting = ({
         prejoinPageEnabled: false, // Instant Entry
         
         // 🔒 SECURITY: PREVENT STUDENTS FROM ACTING AS MODERATORS
-        // Even if they join first, we hide the UI controls
         disableRemoteMute: !isHost, // Only Host can mute others
         remoteVideoMenu: {
             disableKick: !isHost,   // Only Host can kick
             disableGrantModerator: true,
             disablePrivateChat: false,
         },
-        
-        // Stability Settings
         enableLayerSuspension: true,
       },
       interfaceConfigOverwrite: {
-        // Apply the Restricted Toolbar
         TOOLBAR_BUTTONS: isHost ? TEACHER_TOOLBAR : STUDENT_TOOLBAR,
-        
         SHOW_JITSI_WATERMARK: false,
         SHOW_WATERMARK_FOR_GUESTS: false,
         DEFAULT_BACKGROUND: '#111827',
         TOOLBAR_ALWAYS_VISIBLE: true,
         hideLobbyButton: !isHost, // Hide Lobby control from students
+        NATIVE_APP_NAME: 'Unknown IITians',
+        MOBILE_APP_PROMO: false
       }
     };
 
@@ -118,9 +120,13 @@ export const JitsiMeeting = ({
         setIsLoading(false);
         logAttendance();
         
-        // 🔒 TEACHER AUTO-ENABLES LOBBY (Optional Security)
-        // If you want to force approval for every student:
-        // if (isHost) apiRef.current.executeCommand('toggleLobby', true);
+        // 🔒 TEACHER AUTO-ENABLES LOBBY
+        if (isHost) {
+            setTimeout(() => {
+                apiRef.current.executeCommand('toggleLobby', true);
+                toast.info("Lobby Mode Enabled: You must approve students.");
+            }, 2000);
+        }
       },
       videoConferenceLeft: () => handleClose(),
     });
@@ -201,7 +207,7 @@ export const JitsiMeeting = ({
       {/* MEETING CONTAINER */}
       <div className="flex-1 relative bg-gray-900">
          {isLoading && (
-             <div className="absolute inset-0 flex items-center justify-center text-white">
+             <div className="absolute inset-0 flex items-center justify-center text-white z-10">
                  <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
                  <span className="ml-3 text-lg">Connecting to Secure Classroom...</span>
              </div>
