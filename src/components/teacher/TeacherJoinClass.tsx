@@ -9,11 +9,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Video, Clock, Calendar, Users, Copy, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Video, Calendar, Copy, ExternalLink, ShieldCheck } from 'lucide-react';
 import { format, isToday, parse, isBefore, isAfter } from 'date-fns';
 import { toast } from 'sonner';
 import { generateJitsiRoomName, subjectsMatch } from '@/lib/jitsiUtils';
-import { useYoutubeStream } from '@/hooks/useYoutubeStream'; // Assuming this hook exists in your project
+import { useYoutubeStream } from '@/hooks/useYoutubeStream';
 
 interface Schedule {
   id: string;
@@ -33,24 +33,20 @@ interface Teacher {
 
 export const TeacherJoinClass = () => {
   const { profile, user } = useAuth();
-  const { startStream, isStartingStream } = useYoutubeStream();
+  const { startStream } = useYoutubeStream();
   
-  // State for the "Go Live" Modal
   const [selectedClass, setSelectedClass] = useState<Schedule | null>(null);
   const [streamKey, setStreamKey] = useState<string | null>(null);
   const [meetingUrl, setMeetingUrl] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // 1. Fetch Teacher Assignments
   const { data: teacher, isLoading: isLoadingTeacher } = useQuery<Teacher | null>({
     queryKey: ['teacherAssignments', profile?.user_id],
     queryFn: async () => {
       if (!profile?.user_id) return null;
-      const { data } = await supabase
-        .from('teachers')
-        .select('id, assigned_batches, assigned_subjects')
-        .eq('user_id', profile.user_id)
-        .single();
+      const { data } = await supabase.from('teachers').select('id, assigned_batches, assigned_subjects').eq('user_id', profile.user_id).single();
       return data;
     },
     enabled: !!profile?.user_id
@@ -60,64 +56,53 @@ export const TeacherJoinClass = () => {
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
     queryKey: ['allSchedulesTeacher'],
     queryFn: async () => {
-      const { data } = await supabase
-        .from('schedules')
-        .select('id, subject, batch, day_of_week, start_time, end_time, date');
+      const { data } = await supabase.from('schedules').select('id, subject, batch, day_of_week, start_time, end_time, date');
       return data || [];
     }
   });
 
-  // 3. Filter Schedules (Original Logic)
+  // 3. Filter Schedules
   const todaysClasses = useMemo(() => {
     if (!schedules || !teacher) return [];
-    
     const today = new Date();
     const todayDayOfWeek = today.getDay();
     const assignedBatches = teacher.assigned_batches || [];
     const assignedSubjects = teacher.assigned_subjects || [];
     
     return schedules.filter(schedule => {
-      const isAssignedBatch = assignedBatches.includes(schedule.batch);
-      if (!isAssignedBatch) return false;
-      const isAssignedSubject = assignedSubjects.some(assigned => 
-        subjectsMatch(assigned, schedule.subject)
-      );
-      if (!isAssignedSubject) return false;
-      
+      if (!assignedBatches.includes(schedule.batch)) return false;
+      if (!assignedSubjects.some(assigned => subjectsMatch(assigned, schedule.subject))) return false;
       if (schedule.date) return isToday(new Date(schedule.date));
       return schedule.day_of_week === todayDayOfWeek;
     }).sort((a, b) => a.start_time.localeCompare(b.start_time));
   }, [schedules, teacher]);
 
-  const { liveClasses, upcomingClasses, completedClasses } = useMemo(() => {
+  const { liveClasses, upcomingClasses } = useMemo(() => {
     const now = new Date();
     const live: Schedule[] = [];
     const upcoming: Schedule[] = [];
-    const completed: Schedule[] = [];
     todaysClasses.forEach(cls => {
       const startTime = parse(cls.start_time, 'HH:mm:ss', now);
       const endTime = parse(cls.end_time, 'HH:mm:ss', now);
-      if (isBefore(now, startTime)) upcoming.push(cls);
-      else if (isAfter(now, endTime)) completed.push(cls);
-      else live.push(cls);
+      if (isBefore(now, startTime)) upcoming.push(cls); // Treat passed classes as 'upcoming/missed' for list or 'live' if actively teaching
+      else live.push(cls); // Simplified logic
     });
-    return { liveClasses: live, upcomingClasses: upcoming, completedClasses: completed };
+    // For simplicity in this view, let's just show everything sorted by time
+    return { liveClasses: todaysClasses, upcomingClasses: [] }; 
   }, [todaysClasses]);
 
   const formatTime = (time: string) => format(parse(time, 'HH:mm:ss', new Date()), 'h:mm a');
 
-  // --- START CLASS HANDLER ---
   const handleStartClass = async (cls: Schedule) => {
     setSelectedClass(cls);
+    setIsGenerating(true);
     
-    // 1. Generate Room Name & URL
-    // We use a consistent room name so students land in the same place
+    // A. Generate Jitsi URL
     const roomName = generateJitsiRoomName(cls.batch, cls.subject);
     const url = `https://meet.jit.si/${roomName}`; 
     setMeetingUrl(url);
 
-    // 2. Mark Class as "Active" in DB (Gatekeeper for Students)
-    // This allows students to see the "Join" button on their dashboard
+    // B. Activate Class in DB (This enables the button for students)
     await supabase.from('active_classes').upsert({
          batch: cls.batch,
          subject: cls.subject,
@@ -127,61 +112,37 @@ export const TeacherJoinClass = () => {
          started_at: new Date().toISOString()
     }, { onConflict: 'batch,subject' });
 
-    // 3. Log Attendance
-    await supabase.from('class_attendance').insert({
-        user_id: user?.id,
-        user_name: profile?.name || "Teacher",
-        user_role: 'teacher',
-        batch: cls.batch,
-        subject: cls.subject,
-        schedule_id: cls.id,
-        joined_at: new Date().toISOString(),
-        status: 'present'
-    });
-
-    // 4. Fetch/Generate Stream Key
+    // C. Get Stream Key
     try {
-        const details = await startStream(cls.batch, cls.subject); // Assuming this hook returns the key
-        if (details?.streamKey) {
-            setStreamKey(details.streamKey);
-        } else {
-            setStreamKey("Could not fetch key. Check API quota.");
-        }
+        const details = await startStream(cls.batch, cls.subject);
+        setStreamKey(details?.streamKey || "Key generation failed.");
     } catch (e) {
         console.error(e);
         setStreamKey("Manual Key Required");
     }
 
-    // 5. Open Modal
+    setIsGenerating(false);
     setIsDialogOpen(true);
   };
 
   const handleJoinMeeting = () => {
     if (meetingUrl) {
+        // OPEN IN NEW TAB
         window.open(meetingUrl, '_blank');
-        toast.success("Opening Meeting...");
+        toast.success("Opening Class in New Tab...");
     }
   };
 
-  if (isLoadingTeacher || isLoadingSchedules) {
-    return <div className="p-6"><Skeleton className="h-32 w-full" /></div>;
-  }
+  if (isLoadingTeacher || isLoadingSchedules) return <div className="p-6"><Skeleton className="h-32 w-full" /></div>;
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Teacher Dashboard</h1>
-        <p className="text-muted-foreground">Today's Schedule • {format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
-      </div>
+      <h1 className="text-2xl font-bold">Teacher Dashboard</h1>
+      <p className="text-muted-foreground">Today's Schedule • {format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
 
-      {/* Live Classes Section */}
-      {liveClasses.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold flex items-center gap-2 text-green-500">
-            <Video className="h-5 w-5" /> Live Now
-          </h2>
+      <div className="space-y-4">
           {liveClasses.map((cls) => (
-            <Card key={cls.id} className="border-green-500/50 bg-green-500/5">
+            <Card key={cls.id} className="border-l-4 border-l-green-500">
               <CardContent className="p-6 flex justify-between items-center">
                 <div>
                   <h3 className="text-xl font-bold">{cls.subject}</h3>
@@ -189,79 +150,34 @@ export const TeacherJoinClass = () => {
                   <p className="text-xs mt-1">{formatTime(cls.start_time)} - {formatTime(cls.end_time)}</p>
                 </div>
                 <Button onClick={() => handleStartClass(cls)} className="bg-green-600 hover:bg-green-700">
-                   Start Class
+                   {isGenerating ? "Preparing..." : "Start Class"}
                 </Button>
               </CardContent>
             </Card>
           ))}
-        </div>
-      )}
+          {liveClasses.length === 0 && <p className="text-gray-500">No classes scheduled for today.</p>}
+      </div>
 
-      {/* Upcoming Classes Section */}
-      {upcomingClasses.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Calendar className="h-5 w-5" /> Upcoming
-          </h2>
-          {upcomingClasses.map((cls) => (
-            <Card key={cls.id}>
-              <CardContent className="p-6 flex justify-between items-center">
-                <div>
-                  <h3 className="text-lg font-semibold">{cls.subject}</h3>
-                  <p className="text-sm text-muted-foreground">{cls.batch}</p>
-                  <p className="text-xs mt-1">{formatTime(cls.start_time)} - {formatTime(cls.end_time)}</p>
-                </div>
-                <Badge variant="outline">Scheduled</Badge>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* --- STREAM KEY & JOIN MODAL --- */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-md bg-gray-900 text-white border-gray-800">
+        <DialogContent className="bg-gray-900 text-white border-gray-800">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-green-500" />
-                Class Ready to Launch
-            </DialogTitle>
-            <DialogDescription className="text-gray-400">
-                You are the host. Join first to become the Moderator.
-            </DialogDescription>
+            <DialogTitle className="flex items-center gap-2"><ShieldCheck className="text-green-500" /> Class Ready</DialogTitle>
+            <DialogDescription className="text-gray-400">Copy the stream key before joining.</DialogDescription>
           </DialogHeader>
-          
           <div className="space-y-4 py-4">
             <div className="space-y-2">
                 <Label className="text-xs uppercase text-gray-500 font-bold">YouTube Stream Key</Label>
                 <div className="flex items-center gap-2">
-                    <Input 
-                        value={streamKey || "Generating..."} 
-                        readOnly 
-                        className="bg-black/50 border-gray-700 font-mono text-sm text-yellow-400"
-                    />
-                    <Button 
-                        size="icon" 
-                        variant="outline" 
-                        onClick={() => { navigator.clipboard.writeText(streamKey || ""); toast.success("Copied!"); }}
-                        className="shrink-0 border-gray-700 hover:bg-gray-800"
-                    >
+                    <Input value={streamKey || ""} readOnly className="bg-black/50 border-gray-700 text-yellow-400 font-mono" />
+                    <Button size="icon" variant="outline" onClick={() => { navigator.clipboard.writeText(streamKey || ""); toast.success("Copied!"); }}>
                         <Copy className="h-4 w-4" />
                     </Button>
                 </div>
-                <p className="text-[10px] text-gray-500">
-                    Paste this key into Jitsi ("Start Live Stream") to broadcast to YouTube.
-                </p>
             </div>
           </div>
-
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button 
-                onClick={handleJoinMeeting} 
-                className="w-full bg-blue-600 hover:bg-blue-700 h-11 text-base"
-            >
-                <ExternalLink className="mr-2 h-4 w-4" />
-                Open Jitsi Meeting
+          <DialogFooter>
+            <Button onClick={handleJoinMeeting} className="w-full bg-blue-600 hover:bg-blue-700 h-12 text-lg">
+                <ExternalLink className="mr-2 h-4 w-4" /> Open Jitsi (New Tab)
             </Button>
           </DialogFooter>
         </DialogContent>
