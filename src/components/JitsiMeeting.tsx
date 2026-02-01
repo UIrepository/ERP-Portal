@@ -139,47 +139,6 @@ export const JitsiMeeting = ({
   const propsRef = useRef({ displayName, userEmail, subject, batch, scheduleId, onClose, resolvedRole, profile, userRole });
   const isHost = userRole === 'teacher' || userRole === 'admin' || userRole === 'manager';
 
-  // --- RECONNECTION LOGIC ---
-  const handleRetry = useCallback(async () => {
-    console.log('[Jitsi] Retrying connection...');
-    // 1. Cleanup existing instance
-    if (apiRef.current) { 
-        try { apiRef.current.dispose(); } catch (e) { console.warn("Dispose error", e); } 
-        apiRef.current = null; 
-    }
-    
-    // 2. Reset states
-    isInitializingRef.current = false;
-    setLoadingState(true);
-    setConnectionError(false);
-    setLoadingMessage('Reconnecting to server...');
-    setShowFallbackPrompt(false);
-    
-    // 3. Wait a moment then re-init
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Trigger initialization (useEffect will pick this up or we call direct)
-    // We call directly to ensure scope validity
-    // (Defining initializeJitsi inside the component body creates a circular dependency if we call it here directly
-    //  BUT we can trigger it by ensuring state is correct. The main useEffect watches `hasJoined`.
-    //  Since `hasJoined` is already true, we might need to manually trigger `initializeJitsi` or let the effect loop handle it.)
-    //  Actually, we will define `initializeJitsi` first, then `handleRetry` can call it.
-    //  To solve the circular ref, we'll use a ref to the function or just rely on state.
-    
-    // SIMPLEST FIX: Just force the effect to run again or call the init logic.
-    // Since we set `isInitializingRef.current = false` and `apiRef.current = null`,
-    // the main useEffect should re-trigger if we toggle a dummy state or just call it.
-    // Let's call it via a ref to avoid circular deps in definition order.
-    // However, since `handleRetry` is used IN `initializeJitsi`, we can't easily call `initializeJitsi` inside `handleRetry`.
-    // Instead, we will trigger a re-mount of the player by toggling `hasJoined` briefly? No, that flashes the start screen.
-    
-    // BETTER APPROACH: We will move `initializeJitsi` into a ref or use a "reconnectTrigger" state.
-    setReconnectTrigger(prev => prev + 1);
-
-  }, []);
-
-  const [reconnectTrigger, setReconnectTrigger] = useState(0);
-
   useEffect(() => {
     propsRef.current = { displayName, userEmail, subject, batch, scheduleId, onClose, resolvedRole, profile, userRole };
     if (apiRef.current && displayName) {
@@ -252,7 +211,7 @@ export const JitsiMeeting = ({
     } catch (error) { console.error('[Attendance] Error updating on leave:', error); }
   }, []);
 
-  // --- STREAMING LOGIC ---
+  // --- STREAMING LOGIC WRAPPER ---
   const handleGoLive = async () => {
     const currentProps = propsRef.current;
 
@@ -276,6 +235,8 @@ export const JitsiMeeting = ({
             
             toast.success("Command sent. Waiting for YouTube...");
 
+            // FIXED: Removed auto-copy to clipboard in timeout (prevents NotAllowedError)
+            // Just show the notification where to find it.
             setTimeout(() => {
                 toast.info("If streaming didn't start automatically:", {
                     description: "Click the '...' button in the bottom bar -> 'Start Live Stream', and paste the key.",
@@ -297,17 +258,9 @@ export const JitsiMeeting = ({
     }
   };
 
-  // --- Core Player Logic ---
+  // --- Core Player Logic: Embeds Jitsi ---
   const initializeJitsi = useCallback(async () => {
-    // If we are already initializing or have an API instance, check if we need to dispose it (for reconnect)
-    if (isInitializingRef.current) return;
-    
-    // If api exists but we are here, it might be a re-init. Dispose first.
-    if (apiRef.current) {
-        try { apiRef.current.dispose(); } catch(e) {}
-        apiRef.current = null;
-    }
-
+    if (isInitializingRef.current || apiRef.current) return;
     isInitializingRef.current = true;
     
     if (!jitsiContainerRef.current) {
@@ -368,19 +321,23 @@ export const JitsiMeeting = ({
         startWithVideoMuted: false,
         disableDeepLinking: true,
         disableInviteFunctions: true,
+        
         liveStreamingEnabled: true,
-        fileRecordingsEnabled: false, 
         
-        // --- STABILITY FIXES ---
-        // 1. Force JVB (Disable P2P) to prevent "active speaker" timeouts
-        p2p: { enabled: false },
-        disable1On1Mode: true,
+        // --- STABILITY FIXES FOR 5-MIN TIMEOUT (UPDATED) ---
+        // We REMOVE 'relay' policy to allow all connection types (Stable)
+        p2p: { 
+            enabled: false, 
+            useStunTurn: true
+            // Removed: iceTransportPolicy: 'relay' (This was causing the drop!)
+        },
+        disable1On1Mode: true, // Force JVB
         
-        // 2. Keep connection alive even if tab is backgrounded
-        disableSuspendVideo: true,
+        // Connection & Stream Stability
         enableLayerSuspension: true,
+        disableSuspendVideo: true, // Keep video alive when tab is backgrounded
         
-        // 3. Disable idle timeouts
+        // Prevent idle detection
         enableNoisyMicDetection: false,
         enableNoAudioDetection: false,
         
@@ -421,16 +378,8 @@ export const JitsiMeeting = ({
         },
         videoConferenceLeft: () => {
             updateAttendanceOnLeave();
-            
-            // --- AUTO-REJOIN LOGIC ---
-            // If the user didn't press "Hangup", it was a timeout/kick.
             if (!isIntentionalHangupRef.current) {
-                console.log("[Jitsi] Unintentional disconnect detected. Reconnecting...");
-                toast.warning("Connection lost. Reconnecting...", { duration: 2000 });
-                // Trigger reconnect logic
-                setTimeout(() => {
-                    setReconnectTrigger(prev => prev + 1);
-                }, 1000);
+                toast.warning("Connection dropped. Please refresh if not reconnected.");
             }
         },
         recordingStatusChanged: (payload: any) => {
@@ -460,60 +409,39 @@ export const JitsiMeeting = ({
     }
   }, [getSanitizedRoomName, recordAttendance, updateAttendanceOnLeave, setLoadingState, isHost]);
 
-  // Main Effect: Watch for join status OR reconnect triggers
   useEffect(() => {
     if (!hasJoined) return;
-    
-    // Run initialization
-    initializeJitsi();
-
-    // Cleanup function
+    if (!isInitializingRef.current && !apiRef.current) initializeJitsi();
     return () => {
       if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
       if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current);
-      
-      // Only dispose if we are NOT reconnecting (reconnectTrigger handles its own cleanup via initializeJitsi logic)
-      // Actually, standard react cleanup should always run.
-      // But we need to distinguish between "Component Unmount" vs "Reconnect Update".
-      // If component unmounts, isIntentionalHangupRef doesn't matter, we just clean up.
-      
-      if (apiRef.current) {
-        updateAttendanceOnLeave();
-        try { apiRef.current.dispose(); } catch (e) {}
-        apiRef.current = null;
-      }
+      if (apiRef.current) { updateAttendanceOnLeave(); try { apiRef.current.dispose(); } catch (e) {} apiRef.current = null; }
       isInitializingRef.current = false;
     };
-  }, [hasJoined, reconnectTrigger, initializeJitsi, updateAttendanceOnLeave]); // Added reconnectTrigger
+  }, [hasJoined, initializeJitsi, updateAttendanceOnLeave]);
 
   const handleStartClass = () => {
     isIntentionalHangupRef.current = false;
     setHasJoined(true);
   };
   
-  // Cleaned up toggle functions
+  const handleRetry = useCallback(async () => {
+    if (apiRef.current) { try { apiRef.current.dispose(); } catch (e) {} apiRef.current = null; }
+    isInitializingRef.current = false;
+    setLoadingState(true);
+    setConnectionError(false);
+    setLoadingMessage('Reloading Player...');
+    setShowFallbackPrompt(false);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    initializeJitsi();
+  }, [initializeJitsi, setLoadingState]);
+
   const handleClose = useCallback(() => {
-    isIntentionalHangupRef.current = true; // Mark as intentional
+    isIntentionalHangupRef.current = true;
     updateAttendanceOnLeave();
     if (apiRef.current) try { apiRef.current.dispose(); } catch (e) {}
     if (propsRef.current.onClose) propsRef.current.onClose();
   }, [updateAttendanceOnLeave]);
-
-  // Handle manual Hangup button inside the iframe? 
-  // Jitsi's internal hangup button fires videoConferenceLeft.
-  // We need to know if the user clicked *our* controls or Jitsi's controls.
-  // Jitsi's internal button usage is hard to distinguish from a server kick.
-  // BUT: "videoConferenceLeft" fires for both.
-  // If we want to support Jitsi's internal hangup button as "Intentional", we can't easily.
-  // So we rely on our custom "End Call" button or the "X" button.
-  // If the user uses the Jitsi Toolbar Hangup, it might Auto-Reconnect. 
-  // This is a trade-off to prevent the 5-min disconnect.
-  
-  const customHangUp = () => {
-      isIntentionalHangupRef.current = true;
-      updateAttendanceOnLeave();
-      apiRef.current?.executeCommand('hangup');
-  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col overflow-hidden">
