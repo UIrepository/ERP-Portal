@@ -1,115 +1,396 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { JitsiMeeting } from '@/components/JitsiMeeting';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Video, Clock, Calendar, Users, UserCheck } from 'lucide-react';
+import { format, isToday, parse, isBefore, isAfter } from 'date-fns';
+import { JitsiMeeting } from '@/components/JitsiMeeting'; // Your secure meeting component
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { subjectsMatch } from '@/lib/jitsiUtils';
 import { toast } from 'sonner';
-import { Video } from 'lucide-react';
+
+interface Schedule {
+  id: string;
+  subject: string;
+  batch: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  date: string | null;
+}
+
+interface Teacher {
+  id: string;
+  assigned_batches: string[];
+  assigned_subjects: string[];
+}
+
+interface Attendance {
+  id: string;
+  user_name: string;
+  user_role: string;
+  joined_at: string;
+  left_at: string | null;
+}
 
 export const TeacherJoinClass = () => {
-  const { profile } = useAuth();
-  const [selectedBatch, setSelectedBatch] = useState<string>("");
-  const [selectedSubject, setSelectedSubject] = useState<string>("");
+  const { profile, user } = useAuth();
+  const queryClient = useQueryClient();
   
-  // State for the Active Meeting Room
+  // State for the Active Live Class
   const [activeMeeting, setActiveMeeting] = useState<{
     roomName: string;
     subject: string;
     batch: string;
+    scheduleId: string;
   } | null>(null);
 
-  // Hardcoded for demo - replace with your real data if needed
-  const batches = ["Unknown IITians Batch A", "Unknown IITians Batch B"];
-  const subjects = ["Physics", "Mathematics", "Chemistry"];
+  const [selectedClassForAttendance, setSelectedClassForAttendance] = useState<Schedule | null>(null);
 
-  const handleStartClass = async () => {
-    if (!selectedBatch || !selectedSubject) {
-        toast.error("Please select Batch and Subject");
-        return;
+  // 1. Fetch Teacher Profile & Assignments
+  const { data: teacher, isLoading: isLoadingTeacher } = useQuery<Teacher | null>({
+    queryKey: ['teacherAssignments', profile?.user_id],
+    queryFn: async () => {
+      if (!profile?.user_id) return null;
+      const { data, error } = await supabase
+        .from('teachers')
+        .select('id, assigned_batches, assigned_subjects')
+        .eq('user_id', profile.user_id)
+        .single();
+      if (error) return null;
+      return data;
+    },
+    enabled: !!profile?.user_id
+  });
+
+  // 2. Fetch All Schedules
+  const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
+    queryKey: ['allSchedulesTeacher'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('schedules')
+        .select('id, subject, batch, day_of_week, start_time, end_time, date');
+      if (error) throw error;
+      return data || [];
     }
+  });
 
-    // 1. GENERATE SECRET ROOM ID (Virtual Whitelist)
-    // FIX: Using native crypto.randomUUID() instead of 'uuid' package
+  // 3. Fetch Attendance (for Modal)
+  const { data: attendance, isLoading: isLoadingAttendance } = useQuery<Attendance[]>({
+    queryKey: ['classAttendance', selectedClassForAttendance?.id],
+    queryFn: async () => {
+      if (!selectedClassForAttendance) return [];
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const { data, error } = await supabase
+        .from('class_attendance')
+        .select('id, user_name, user_role, joined_at, left_at')
+        .eq('schedule_id', selectedClassForAttendance.id)
+        .eq('class_date', today)
+        .order('joined_at', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedClassForAttendance,
+    refetchInterval: 5000 
+  });
+
+  // 4. Logic: Filter Classes for Today
+  const todaysClasses = useMemo(() => {
+    if (!schedules || !teacher) return [];
+    
+    const today = new Date();
+    const todayDayOfWeek = today.getDay();
+    const assignedBatches = teacher.assigned_batches || [];
+    const assignedSubjects = teacher.assigned_subjects || [];
+    
+    return schedules.filter(schedule => {
+      // Match Batch
+      if (!assignedBatches.includes(schedule.batch)) return false;
+      
+      // Match Subject
+      const isAssignedSubject = assignedSubjects.some(assigned => 
+        subjectsMatch(assigned, schedule.subject)
+      );
+      if (!isAssignedSubject) return false;
+      
+      // Match Date/Day
+      if (schedule.date) {
+        return isToday(new Date(schedule.date));
+      } else {
+        return schedule.day_of_week === todayDayOfWeek;
+      }
+    }).sort((a, b) => a.start_time.localeCompare(b.start_time));
+  }, [schedules, teacher]);
+
+  // 5. Categorize Classes (Live/Upcoming/Completed)
+  const { liveClasses, upcomingClasses, completedClasses } = useMemo(() => {
+    const now = new Date();
+    const live: Schedule[] = [];
+    const upcoming: Schedule[] = [];
+    const completed: Schedule[] = [];
+
+    todaysClasses.forEach(cls => {
+      const startTime = parse(cls.start_time, 'HH:mm:ss', now);
+      const endTime = parse(cls.end_time, 'HH:mm:ss', now);
+      
+      if (isBefore(now, startTime)) {
+        upcoming.push(cls);
+      } else if (isAfter(now, endTime)) {
+        completed.push(cls);
+      } else {
+        live.push(cls);
+      }
+    });
+
+    return { liveClasses, upcomingClasses, completedClasses };
+  }, [todaysClasses]);
+
+  const formatTime = (time: string) => {
+    const parsed = parse(time, 'HH:mm:ss', new Date());
+    return format(parsed, 'h:mm a');
+  };
+
+  // --- 🔴 START CLASS LOGIC (SECURE) ---
+  const handleStartClass = async (cls: Schedule) => {
+    // 1. Generate SECRET Room ID (Native Crypto, no package needed)
     const secretId = crypto.randomUUID().slice(0, 8);
-    const roomName = `UnknownIITians-${selectedSubject.replace(/\s+/g, '')}-${secretId}`;
+    const roomName = `UnknownIITians-${cls.subject.replace(/\s+/g, '')}-${secretId}`;
 
-    // 2. SAVE TO DB (So students can find it)
+    // 2. Save to 'active_classes' so students can join
+    // (This acts as the "Virtual Whitelist")
     const { error } = await supabase.from('active_classes').upsert({
-        batch: selectedBatch,
-        subject: selectedSubject,
+        batch: cls.batch,
+        subject: cls.subject,
         room_id: roomName,
         teacher_id: profile?.user_id,
         started_at: new Date().toISOString()
     }, { onConflict: 'batch,subject' });
 
     if (error) {
-        toast.error("Database Error: Could not create class session.");
+        toast.error("Failed to activate class session");
         console.error(error);
         return;
     }
 
-    // 3. LAUNCH UI
-    setActiveMeeting({ roomName, subject: selectedSubject, batch: selectedBatch });
-    toast.success("Class Started! Lobby is Auto-Enabled.");
+    // 3. Launch Meeting Interface
+    setActiveMeeting({
+      roomName,
+      subject: cls.subject,
+      batch: cls.batch,
+      scheduleId: cls.id
+    });
+
+    toast.success("Class Started Securely");
   };
 
+  // --- ⏹ END CLASS LOGIC ---
   const handleEndClass = async () => {
-      if (!confirm("End the class for everyone?")) return;
+    if (!confirm("End the class for everyone?")) return;
 
-      // DELETE FROM DB (Students can no longer find/join)
-      await supabase.from('active_classes').delete().match({ 
-          batch: activeMeeting?.batch, 
-          subject: activeMeeting?.subject 
-      });
+    if (activeMeeting) {
+        // Remove from 'active_classes' so students can't find it
+        await supabase.from('active_classes').delete().match({ 
+            batch: activeMeeting.batch, 
+            subject: activeMeeting.subject 
+        });
+    }
 
-      setActiveMeeting(null);
-      window.location.reload();
+    setActiveMeeting(null);
+    queryClient.invalidateQueries({ queryKey: ['classAttendance'] }); // Refresh attendance
   };
 
-  // 🔴 LIVE CLASS UI
+
+  // --- RENDER ---
+  const isLoading = isLoadingTeacher || isLoadingSchedules;
+
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <div className="grid gap-4"><Skeleton className="h-32 w-full" /><Skeleton className="h-32 w-full" /></div>
+      </div>
+    );
+  }
+
+  // 🔴 LIVE MEETING OVERLAY
   if (activeMeeting) {
     return (
         <JitsiMeeting
             roomName={activeMeeting.roomName}
-            displayName={profile?.name || "Teacher"}
+            displayName={user?.user_metadata?.full_name || user?.user_metadata?.name || profile?.name || 'Teacher'}
             subject={activeMeeting.subject}
             batch={activeMeeting.batch}
+            scheduleId={activeMeeting.scheduleId}
+            onClose={handleEndClass} // Handles DB cleanup
             userRole="teacher"
-            onClose={handleEndClass}
+            userEmail={user?.email}
         />
     );
   }
 
-  // 🟢 SELECTION UI
+  // 🟢 SCHEDULE DASHBOARD
+  if (!teacher) {
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Users className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold">No Assignments Found</h3>
+            <p className="text-muted-foreground">You are not assigned to any batches yet.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6 flex items-center justify-center min-h-[80vh]">
-      <Card className="w-full max-w-md border-gray-700 bg-gray-800 text-white">
-        <CardHeader>
-            <CardTitle className="text-center text-blue-400">Launch Live Class</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-            <div className="space-y-2">
-                <Label>Batch</Label>
-                <Select onValueChange={setSelectedBatch}>
-                    <SelectTrigger className="bg-gray-700"><SelectValue placeholder="Select Batch" /></SelectTrigger>
-                    <SelectContent className="bg-gray-700 text-white">{batches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
-                </Select>
-            </div>
-            <div className="space-y-2">
-                <Label>Subject</Label>
-                <Select onValueChange={setSelectedSubject}>
-                    <SelectTrigger className="bg-gray-700"><SelectValue placeholder="Select Subject" /></SelectTrigger>
-                    <SelectContent className="bg-gray-700 text-white">{subjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                </Select>
-            </div>
-            <Button onClick={handleStartClass} className="w-full bg-green-600 hover:bg-green-700 h-12 text-lg">
-                <Video className="mr-2 w-5 h-5" /> Start Live Class
-            </Button>
-        </CardContent>
-      </Card>
+    <div className="p-6 space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Teacher Dashboard</h1>
+        <p className="text-muted-foreground">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+      </div>
+
+      {/* 1. Live Classes (Ready to Start) */}
+      {liveClasses.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+            </span>
+            Ready to Start
+          </h2>
+          <div className="grid gap-4">
+            {liveClasses.map((cls) => (
+              <Card key={cls.id} className="border-green-500 bg-green-900/10">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xl font-bold">{cls.subject}</h3>
+                      <p className="text-muted-foreground">{cls.batch}</p>
+                      <p className="text-sm mt-2 flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        {formatTime(cls.start_time)} - {formatTime(cls.end_time)}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => setSelectedClassForAttendance(cls)}>
+                        <UserCheck className="mr-2 h-4 w-4" /> Attendance
+                      </Button>
+                      <Button size="lg" onClick={() => handleStartClass(cls)} className="bg-green-600 hover:bg-green-700 font-bold">
+                        <Video className="mr-2 h-5 w-5" /> Start Live Class
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 2. Upcoming Classes */}
+      {upcomingClasses.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Calendar className="h-5 w-5" /> Upcoming Today
+          </h2>
+          <div className="grid gap-4">
+            {upcomingClasses.map((cls) => (
+              <Card key={cls.id}>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold">{cls.subject}</h3>
+                      <p className="text-muted-foreground text-sm">{cls.batch}</p>
+                      <p className="text-sm mt-2 flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        {formatTime(cls.start_time)} - {formatTime(cls.end_time)}
+                      </p>
+                    </div>
+                    {/* Optional: Allow starting 15 mins early */}
+                    <Badge variant="secondary">Scheduled</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 3. Completed Classes */}
+      {completedClasses.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold text-muted-foreground">Completed</h2>
+          <div className="grid gap-4">
+            {completedClasses.map((cls) => (
+              <Card key={cls.id} className="opacity-60">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold">{cls.subject}</h3>
+                      <p className="text-muted-foreground text-sm">{cls.batch}</p>
+                      <p className="text-sm mt-2 flex items-center gap-2"><Clock className="h-4 w-4" /> {formatTime(cls.start_time)} - {formatTime(cls.end_time)}</p>
+                    </div>
+                    <Button variant="outline" onClick={() => setSelectedClassForAttendance(cls)}>
+                        <UserCheck className="mr-2 h-4 w-4" /> View Attendance
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {todaysClasses.length === 0 && (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold">No Classes Today</h3>
+            <p className="text-muted-foreground">Relax! You have no classes scheduled.</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Attendance Modal (Unchanged) */}
+      {selectedClassForAttendance && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+            <Card className="w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+              <CardHeader className="flex flex-row items-center justify-between shrink-0">
+                <CardTitle className="flex items-center gap-2">
+                  <UserCheck className="h-5 w-5" /> Attendance - {selectedClassForAttendance.subject}
+                </CardTitle>
+                <Button variant="ghost" onClick={() => setSelectedClassForAttendance(null)}>Close</Button>
+              </CardHeader>
+              <CardContent className="overflow-y-auto">
+                {isLoadingAttendance ? (
+                  <Skeleton className="h-32 w-full" />
+                ) : attendance && attendance.length > 0 ? (
+                  <Table>
+                    <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Role</TableHead><TableHead>Joined</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                      {attendance.map((record) => (
+                        <TableRow key={record.id}>
+                          <TableCell className="font-medium">{record.user_name}</TableCell>
+                          <TableCell><Badge variant="outline">{record.user_role}</Badge></TableCell>
+                          <TableCell>{format(new Date(record.joined_at), 'h:mm a')}</TableCell>
+                          <TableCell>{record.left_at ? <span className="text-red-400">Left at {format(new Date(record.left_at), 'h:mm a')}</span> : <Badge className="bg-green-600">Active</Badge>}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">No attendance records found.</p>
+                )}
+              </CardContent>
+            </Card>
+        </div>
+      )}
     </div>
   );
 };
