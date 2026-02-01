@@ -1,17 +1,22 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Video, Clock, Calendar, Users, UserCheck } from 'lucide-react';
 import { format, isToday, parse, isBefore, isAfter } from 'date-fns';
-import { JitsiMeeting } from '@/components/JitsiMeeting'; // Your secure meeting component
+import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { subjectsMatch } from '@/lib/jitsiUtils';
 import { toast } from 'sonner';
+
+// 🛑 FIX: Define Helper locally to avoid Circular Dependency with jitsiUtils.ts
+const subjectsMatch = (s1: string, s2: string) => {
+  if (!s1 || !s2) return false;
+  return s1.toLowerCase().trim() === s2.toLowerCase().trim();
+};
 
 interface Schedule {
   id: string;
@@ -41,7 +46,6 @@ export const TeacherJoinClass = () => {
   const { profile, user } = useAuth();
   const queryClient = useQueryClient();
   
-  // State for the Active Live Class
   const [activeMeeting, setActiveMeeting] = useState<{
     roomName: string;
     subject: string;
@@ -51,7 +55,7 @@ export const TeacherJoinClass = () => {
 
   const [selectedClassForAttendance, setSelectedClassForAttendance] = useState<Schedule | null>(null);
 
-  // 1. Fetch Teacher Profile & Assignments
+  // 1. Fetch Teacher Assignments
   const { data: teacher, isLoading: isLoadingTeacher } = useQuery<Teacher | null>({
     queryKey: ['teacherAssignments', profile?.user_id],
     queryFn: async () => {
@@ -79,7 +83,7 @@ export const TeacherJoinClass = () => {
     }
   });
 
-  // 3. Fetch Attendance (for Modal)
+  // 3. Fetch Attendance
   const { data: attendance, isLoading: isLoadingAttendance } = useQuery<Attendance[]>({
     queryKey: ['classAttendance', selectedClassForAttendance?.id],
     queryFn: async () => {
@@ -111,7 +115,7 @@ export const TeacherJoinClass = () => {
       // Match Batch
       if (!assignedBatches.includes(schedule.batch)) return false;
       
-      // Match Subject
+      // Match Subject (Using local helper to prevent crash)
       const isAssignedSubject = assignedSubjects.some(assigned => 
         subjectsMatch(assigned, schedule.subject)
       );
@@ -126,7 +130,7 @@ export const TeacherJoinClass = () => {
     }).sort((a, b) => a.start_time.localeCompare(b.start_time));
   }, [schedules, teacher]);
 
-  // 5. Categorize Classes (Live/Upcoming/Completed)
+  // 5. Categorize Classes
   const { liveClasses, upcomingClasses, completedClasses } = useMemo(() => {
     const now = new Date();
     const live: Schedule[] = [];
@@ -154,14 +158,13 @@ export const TeacherJoinClass = () => {
     return format(parsed, 'h:mm a');
   };
 
-  // --- 🔴 START CLASS LOGIC (SECURE) ---
+  // --- START CLASS ---
   const handleStartClass = async (cls: Schedule) => {
-    // 1. Generate SECRET Room ID (Native Crypto, no package needed)
+    // 1. Generate SECURE Secret Room ID (Native Browser Crypto)
     const secretId = crypto.randomUUID().slice(0, 8);
     const roomName = `UnknownIITians-${cls.subject.replace(/\s+/g, '')}-${secretId}`;
 
-    // 2. Save to 'active_classes' so students can join
-    // (This acts as the "Virtual Whitelist")
+    // 2. Save to DB so students can join
     const { error } = await supabase.from('active_classes').upsert({
         batch: cls.batch,
         subject: cls.subject,
@@ -176,7 +179,7 @@ export const TeacherJoinClass = () => {
         return;
     }
 
-    // 3. Launch Meeting Interface
+    // 3. Launch Meeting
     setActiveMeeting({
       roomName,
       subject: cls.subject,
@@ -187,12 +190,11 @@ export const TeacherJoinClass = () => {
     toast.success("Class Started Securely");
   };
 
-  // --- ⏹ END CLASS LOGIC ---
+  // --- END CLASS ---
   const handleEndClass = async () => {
     if (!confirm("End the class for everyone?")) return;
 
     if (activeMeeting) {
-        // Remove from 'active_classes' so students can't find it
         await supabase.from('active_classes').delete().match({ 
             batch: activeMeeting.batch, 
             subject: activeMeeting.subject 
@@ -200,7 +202,7 @@ export const TeacherJoinClass = () => {
     }
 
     setActiveMeeting(null);
-    queryClient.invalidateQueries({ queryKey: ['classAttendance'] }); // Refresh attendance
+    queryClient.invalidateQueries({ queryKey: ['classAttendance'] });
   };
 
 
@@ -224,10 +226,9 @@ export const TeacherJoinClass = () => {
             displayName={user?.user_metadata?.full_name || user?.user_metadata?.name || profile?.name || 'Teacher'}
             subject={activeMeeting.subject}
             batch={activeMeeting.batch}
-            scheduleId={activeMeeting.scheduleId}
             onClose={handleEndClass} // Handles DB cleanup
             userRole="teacher"
-            userEmail={user?.email}
+            scheduleId={activeMeeting.scheduleId}
         />
     );
   }
@@ -312,7 +313,6 @@ export const TeacherJoinClass = () => {
                         {formatTime(cls.start_time)} - {formatTime(cls.end_time)}
                       </p>
                     </div>
-                    {/* Optional: Allow starting 15 mins early */}
                     <Badge variant="secondary">Scheduled</Badge>
                   </div>
                 </CardContent>
@@ -357,7 +357,7 @@ export const TeacherJoinClass = () => {
         </Card>
       )}
 
-      {/* Attendance Modal (Unchanged) */}
+      {/* Attendance Modal */}
       {selectedClassForAttendance && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
             <Card className="w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
