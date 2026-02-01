@@ -3,7 +3,7 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
-import { generateJitsiRoomName } from '@/lib/jitsiUtils';
+import { generateJitsiRoomName, subjectsMatch } from '@/lib/jitsiUtils';
 import { Loader2, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -17,9 +17,10 @@ const ClassSession = () => {
   
   const [verifying, setVerifying] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [classDetails, setClassDetails] = useState<{
+  const [sessionData, setSessionData] = useState<{
     batch: string;
     subject: string;
+    role: 'student' | 'teacher';
   } | null>(null);
 
   useEffect(() => {
@@ -27,21 +28,73 @@ const ClassSession = () => {
       if (authLoading) return;
       
       if (!user || !profile) {
-        // Allow some time for auth to settle, but if explicitly not logged in:
-        // You might want to redirect to login here
         setError("Please log in to join the class.");
         setVerifying(false);
         return;
       }
 
-      if (!enrollmentId) {
-        setError("Invalid meeting link.");
-        setVerifying(false);
-        return;
-      }
-
       try {
-        // SECURITY CHECK: Fetch enrollment and verify it belongs to the current user
+        // --- TEACHER FLOW ---
+        if (enrollmentId === 'teacher-access') {
+           if (!scheduleId) {
+             setError("Invalid schedule reference.");
+             setVerifying(false);
+             return;
+           }
+
+           // 1. Get the Schedule Details
+           const { data: schedule, error: schedError } = await supabase
+             .from('schedules')
+             .select('subject, batch')
+             .eq('id', scheduleId)
+             .single();
+             
+           if (schedError || !schedule) {
+             setError("Schedule not found.");
+             setVerifying(false);
+             return;
+           }
+
+           // 2. Verify User is a Teacher and Assigned
+           const { data: teacher, error: teacherError } = await supabase
+             .from('teachers')
+             .select('assigned_batches, assigned_subjects')
+             .eq('user_id', user.id)
+             .single();
+
+           if (teacherError || !teacher) {
+             setError("Access Denied: You are not registered as a teacher.");
+             setVerifying(false);
+             return;
+           }
+
+           // 3. Check Assignments
+           const hasBatch = teacher.assigned_batches?.includes(schedule.batch);
+           const hasSubject = teacher.assigned_subjects?.some(s => subjectsMatch(s, schedule.subject));
+
+           if (!hasBatch || !hasSubject) {
+             setError(`Access Denied: You are not assigned to ${schedule.subject} (${schedule.batch}).`);
+             setVerifying(false);
+             return;
+           }
+
+           setSessionData({
+             batch: schedule.batch,
+             subject: schedule.subject,
+             role: 'teacher'
+           });
+           setVerifying(false);
+           return;
+        }
+
+        // --- STUDENT FLOW ---
+        if (!enrollmentId) {
+            setError("Invalid link.");
+            setVerifying(false);
+            return;
+        }
+
+        // 1. Verify Enrollment Ownership
         const { data: enrollment, error: fetchError } = await supabase
           .from('user_enrollments')
           .select('user_id, batch_name, subject_name')
@@ -49,21 +102,21 @@ const ClassSession = () => {
           .single();
 
         if (fetchError || !enrollment) {
-          setError("Enrollment verification failed. This link may be invalid.");
+          setError("Enrollment verification failed.");
           setVerifying(false);
           return;
         }
 
-        // CRITICAL: Ensure the link owner matches the current user
         if (enrollment.user_id !== user.id) {
-          setError("Access Denied. This meeting link does not belong to your account.");
+          setError("Access Denied. This link belongs to another user.");
           setVerifying(false);
           return;
         }
 
-        setClassDetails({
+        setSessionData({
           batch: enrollment.batch_name,
-          subject: enrollment.subject_name
+          subject: enrollment.subject_name,
+          role: 'student'
         });
         setVerifying(false);
 
@@ -75,7 +128,7 @@ const ClassSession = () => {
     };
 
     verifyAccess();
-  }, [enrollmentId, user, profile, authLoading]);
+  }, [enrollmentId, scheduleId, user, profile, authLoading]);
 
   const handleClose = () => {
     if (window.opener) {
@@ -109,16 +162,16 @@ const ClassSession = () => {
     );
   }
 
-  if (classDetails) {
+  if (sessionData) {
     return (
       <JitsiMeeting
-        roomName={generateJitsiRoomName(classDetails.batch, classDetails.subject)}
-        displayName={profile?.name || user?.email || 'Student'}
-        subject={classDetails.subject}
-        batch={classDetails.batch}
+        roomName={generateJitsiRoomName(sessionData.batch, sessionData.subject)}
+        displayName={profile?.name || user?.email || (sessionData.role === 'teacher' ? 'Teacher' : 'Student')}
+        subject={sessionData.subject}
+        batch={sessionData.batch}
         scheduleId={scheduleId}
         onClose={handleClose}
-        userRole="student"
+        userRole={sessionData.role}
         userEmail={user?.email}
       />
     );
