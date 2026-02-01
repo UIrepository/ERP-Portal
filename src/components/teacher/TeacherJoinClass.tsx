@@ -8,9 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Video, Clock, Calendar, Users, UserCheck } from 'lucide-react';
 import { format, isToday, parse, isBefore, isAfter } from 'date-fns';
-import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { generateJitsiRoomName, subjectsMatch } from '@/lib/jitsiUtils';
+import { subjectsMatch } from '@/lib/jitsiUtils';
 
 interface Schedule {
   id: string;
@@ -37,14 +36,8 @@ interface Attendance {
 }
 
 export const TeacherJoinClass = () => {
-  const { profile, user } = useAuth();
+  const { profile } = useAuth();
   const queryClient = useQueryClient();
-  const [activeMeeting, setActiveMeeting] = useState<{
-    roomName: string;
-    subject: string;
-    batch: string;
-    scheduleId: string;
-  } | null>(null);
   const [selectedClassForAttendance, setSelectedClassForAttendance] = useState<Schedule | null>(null);
 
   // Fetch teacher's assignments
@@ -168,13 +161,12 @@ export const TeacherJoinClass = () => {
     return format(parsed, 'h:mm a');
   };
 
+  // --- UPDATED HANDLER ---
   const handleStartClass = (cls: Schedule) => {
-    setActiveMeeting({
-      roomName: generateJitsiRoomName(cls.batch, cls.subject),
-      subject: cls.subject,
-      batch: cls.batch,
-      scheduleId: cls.id
-    });
+    // Open the secure teacher session
+    // 'teacher-access' is a reserved keyword caught by ClassSession.tsx
+    const url = `/class-session/teacher-access?scheduleId=${cls.id}`;
+    window.open(url, '_blank');
   };
 
   const isLoading = isLoadingTeacher || isLoadingSchedules;
@@ -385,20 +377,6 @@ export const TeacherJoinClass = () => {
             )}
           </CardContent>
         </Card>
-      )}
-
-      {/* Jitsi Meeting Overlay */}
-      {activeMeeting && (
-        <JitsiMeeting
-          roomName={activeMeeting.roomName}
-          displayName={user?.user_metadata?.full_name || user?.user_metadata?.name || profile?.name || 'Teacher'}
-          subject={activeMeeting.subject}
-          batch={activeMeeting.batch}
-          scheduleId={activeMeeting.scheduleId}
-          onClose={() => setActiveMeeting(null)}
-          userRole="teacher"
-          userEmail={user?.email}
-        />
       )}
     </div>
   );
