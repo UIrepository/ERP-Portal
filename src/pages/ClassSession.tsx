@@ -42,7 +42,6 @@ const ClassSession = () => {
              return;
            }
 
-           // 1. Get the Schedule Details
            const { data: schedule, error: schedError } = await supabase
              .from('schedules')
              .select('subject, batch')
@@ -55,7 +54,6 @@ const ClassSession = () => {
              return;
            }
 
-           // 2. Verify User is a Teacher and Assigned
            const { data: teacher, error: teacherError } = await supabase
              .from('teachers')
              .select('assigned_batches, assigned_subjects')
@@ -68,7 +66,7 @@ const ClassSession = () => {
              return;
            }
 
-           // 3. Check Assignments
+           // Check Assignments
            const hasBatch = teacher.assigned_batches?.includes(schedule.batch);
            const hasSubject = teacher.assigned_subjects?.some(s => subjectsMatch(s, schedule.subject));
 
@@ -94,7 +92,7 @@ const ClassSession = () => {
             return;
         }
 
-        // 1. Verify Enrollment Ownership
+        // Verify Enrollment Ownership and UUID
         const { data: enrollment, error: fetchError } = await supabase
           .from('user_enrollments')
           .select('user_id, batch_name, subject_name')
@@ -107,8 +105,9 @@ const ClassSession = () => {
           return;
         }
 
+        // CRITICAL: Ensure the link matches the current user
         if (enrollment.user_id !== user.id) {
-          setError("Access Denied. This link belongs to another user.");
+          setError("Access Denied. This meeting link is unique to another user.");
           setVerifying(false);
           return;
         }
