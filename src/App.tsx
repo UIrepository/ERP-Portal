@@ -22,9 +22,11 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               
-              {/* Secure Class Session Route */}
+              {/* SECURE CLASS SESSION ROUTE */}
+              {/* This route verifies the unique link and redirects to Jitsi in a new tab */}
               <Route path="/class-session/:enrollmentId" element={<ClassSession />} />
               
+              {/* Fallback Route */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
