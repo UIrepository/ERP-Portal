@@ -1,383 +1,220 @@
-import { useState, useMemo, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Video, Clock, Calendar, Users, UserCheck } from 'lucide-react';
-import { format, isToday, parse, isBefore, isAfter } from 'date-fns';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { subjectsMatch } from '@/lib/jitsiUtils';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { ExternalLink, Video, ShieldAlert, Wifi, Power } from "lucide-react";
 
-interface Schedule {
-  id: string;
-  subject: string;
-  batch: string;
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
-  date: string | null;
-}
-
-interface Teacher {
-  id: string;
-  assigned_batches: string[];
-  assigned_subjects: string[];
-}
-
-interface Attendance {
-  id: string;
-  user_name: string;
-  user_role: string;
-  joined_at: string;
-  left_at: string | null;
-}
+// Use public Jitsi or your self-hosted instance
+const JITSI_BASE_URL = "https://meet.jit.si";
 
 export const TeacherJoinClass = () => {
-  const { profile } = useAuth();
-  const queryClient = useQueryClient();
-  const [selectedClassForAttendance, setSelectedClassForAttendance] = useState<Schedule | null>(null);
+    const { profile, user } = useAuth();
+    const [selectedBatch, setSelectedBatch] = useState<string>("");
+    const [selectedSubject, setSelectedSubject] = useState<string>("");
+    const [activeClassLink, setActiveClassLink] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch teacher's assignments
-  const { data: teacher, isLoading: isLoadingTeacher } = useQuery<Teacher | null>({
-    queryKey: ['teacherAssignments', profile?.user_id],
-    queryFn: async () => {
-      if (!profile?.user_id) return null;
-      const { data, error } = await supabase
-        .from('teachers')
-        .select('id, assigned_batches, assigned_subjects')
-        .eq('user_id', profile.user_id)
-        .single();
-      if (error) return null;
-      return data;
-    },
-    enabled: !!profile?.user_id
-  });
-
-  // Fetch all schedules
-  const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
-    queryKey: ['allSchedulesTeacher'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('schedules')
-        .select('id, subject, batch, day_of_week, start_time, end_time, date');
-      if (error) throw error;
-      return data || [];
-    }
-  });
-
-  // Fetch attendance for selected class
-  const { data: attendance, isLoading: isLoadingAttendance } = useQuery<Attendance[]>({
-    queryKey: ['classAttendance', selectedClassForAttendance?.id],
-    queryFn: async () => {
-      if (!selectedClassForAttendance) return [];
-      const today = format(new Date(), 'yyyy-MM-dd');
-      const { data, error } = await supabase
-        .from('class_attendance')
-        .select('id, user_name, user_role, joined_at, left_at')
-        .eq('schedule_id', selectedClassForAttendance.id)
-        .eq('class_date', today)
-        .order('joined_at', { ascending: true });
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!selectedClassForAttendance,
-    refetchInterval: 10000 // Refresh every 10 seconds
-  });
-
-  // Real-time attendance updates
-  useEffect(() => {
-    if (!selectedClassForAttendance) return;
-    
-    const channel = supabase
-      .channel('attendance-updates')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'class_attendance' }, 
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['classAttendance', selectedClassForAttendance.id] });
-        }
-      )
-      .subscribe();
-    
-    return () => { supabase.removeChannel(channel); };
-  }, [selectedClassForAttendance, queryClient]);
-
-  // Filter schedules for today based on teacher's assignments
-  const todaysClasses = useMemo(() => {
-    if (!schedules || !teacher) return [];
-    
-    const today = new Date();
-    const todayDayOfWeek = today.getDay();
-    const assignedBatches = teacher.assigned_batches || [];
-    const assignedSubjects = teacher.assigned_subjects || [];
-    
-    return schedules.filter(schedule => {
-      // Check if teacher is assigned to this batch
-      const isAssignedBatch = assignedBatches.includes(schedule.batch);
-      if (!isAssignedBatch) return false;
-      
-      // Check if teacher is assigned to this subject (using normalized matching)
-      const isAssignedSubject = assignedSubjects.some(assigned => 
-        subjectsMatch(assigned, schedule.subject)
-      );
-      if (!isAssignedSubject) return false;
-      
-      // Check if this schedule is for today
-      if (schedule.date) {
-        return isToday(new Date(schedule.date));
-      } else {
-        return schedule.day_of_week === todayDayOfWeek;
-      }
-    }).sort((a, b) => a.start_time.localeCompare(b.start_time));
-  }, [schedules, teacher]);
-
-  // Categorize classes
-  const { liveClasses, upcomingClasses, completedClasses } = useMemo(() => {
-    const now = new Date();
-    const live: Schedule[] = [];
-    const upcoming: Schedule[] = [];
-    const completed: Schedule[] = [];
-
-    todaysClasses.forEach(cls => {
-      const startTime = parse(cls.start_time, 'HH:mm:ss', now);
-      const endTime = parse(cls.end_time, 'HH:mm:ss', now);
-      
-      if (isBefore(now, startTime)) {
-        upcoming.push(cls);
-      } else if (isAfter(now, endTime)) {
-        completed.push(cls);
-      } else {
-        live.push(cls);
-      }
+    // Fetch Teacher's Assigned Batches/Subjects from DB
+    const { data: assignments } = useQuery({
+        queryKey: ['teacherAssignments', user?.id],
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('teachers')
+                .select('assigned_batches, assigned_subjects')
+                .eq('user_id', user?.id)
+                .single();
+            return data;
+        },
+        enabled: !!user?.id
     });
 
-    return { liveClasses: live, upcomingClasses: upcoming, completedClasses: completed };
-  }, [todaysClasses]);
+    const handleStartClass = async () => {
+        if (!selectedBatch || !selectedSubject) {
+            toast.error("Please select Batch and Subject");
+            return;
+        }
 
-  const formatTime = (time: string) => {
-    const parsed = parse(time, 'HH:mm:ss', new Date());
-    return format(parsed, 'h:mm a');
-  };
+        setIsLoading(true);
 
-  // --- UPDATED HANDLER ---
-  const handleStartClass = (cls: Schedule) => {
-    // Open the secure teacher session
-    // 'teacher-access' is a reserved keyword caught by ClassSession.tsx
-    const url = `/class-session/teacher-access?scheduleId=${cls.id}`;
-    window.open(url, '_blank');
-  };
+        // 🔒 SECURITY STEP 1: Generate a Random, Un-guessable UUID
+        // Native browser crypto - no external package needed
+        const uniqueSecret = crypto.randomUUID().slice(0, 12);
+        
+        // Clean subject name for URL (remove spaces/special chars)
+        const cleanSubject = selectedSubject.replace(/[^a-zA-Z0-9]/g, '');
+        const roomName = `UnknownIITians-${cleanSubject}-${uniqueSecret}`;
+        const meetingUrl = `${JITSI_BASE_URL}/${roomName}`;
 
-  const isLoading = isLoadingTeacher || isLoadingSchedules;
+        try {
+            // 🔒 SECURITY STEP 2: Save to DB (Gatekeeper)
+            const { error } = await supabase.from('active_classes').upsert({
+                 batch: selectedBatch,
+                 subject: selectedSubject,
+                 room_url: meetingUrl,
+                 teacher_id: user?.id,
+                 is_active: true,
+                 started_at: new Date().toISOString()
+            }, { onConflict: 'batch,subject' }); // Ensure unique active class per batch-subject
 
-  if (isLoading) {
+            if (error) throw error;
+
+            // 3. Mark Teacher Attendance
+            await supabase.from('class_attendance').insert({
+                user_id: user?.id,
+                user_name: profile?.name || "Teacher",
+                user_role: 'teacher',
+                batch: selectedBatch,
+                subject: selectedSubject,
+                joined_at: new Date().toISOString(),
+                // We leave schedule_id null for ad-hoc/dynamic classes, or you can pass it if selected
+            });
+
+            // 4. Open Class
+            window.open(meetingUrl, '_blank');
+            setActiveClassLink(meetingUrl);
+            toast.success("Secure Class Launched!");
+            
+            // Security Tip
+            setTimeout(() => {
+                toast.info("Security Tip: Enable 'Lobby Mode' in Jitsi settings to manually approve students.", { duration: 5000 });
+            }, 1000);
+
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to start class. Please try again.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleEndClass = async () => {
+        if (!confirm("Are you sure you want to end the class? This will invalidate the link for all students.")) return;
+
+        try {
+            // 🔒 SECURITY STEP 3: Delete Link from DB
+            // This immediately prevents new joins. Existing Jitsi participants stay until they leave.
+            const { error } = await supabase
+                .from('active_classes')
+                .delete()
+                .match({ batch: selectedBatch, subject: selectedSubject });
+
+            if (error) throw error;
+
+            setActiveClassLink(null);
+            toast.info("Class Ended. The link is now invalid.");
+        } catch (err) {
+            toast.error("Error ending class.");
+            console.error(err);
+        }
+    };
+
+    // --- VIEW: CLASS IS LIVE ---
+    if (activeClassLink) {
+        return (
+            <div className="flex items-center justify-center p-6 animate-in fade-in duration-500">
+                <Card className="w-full max-w-2xl bg-gray-900 border-gray-800 text-white shadow-2xl">
+                    <CardHeader className="text-center border-b border-gray-800 pb-8">
+                        <div className="flex justify-center mb-6">
+                            <div className="relative">
+                                <div className="absolute inset-0 bg-green-500 blur-xl opacity-20 animate-pulse rounded-full"></div>
+                                <div className="relative h-20 w-20 bg-gray-800 border-2 border-green-500/50 rounded-full flex items-center justify-center">
+                                    <Wifi className="h-8 w-8 text-green-500 animate-pulse" />
+                                </div>
+                            </div>
+                        </div>
+                        <CardTitle className="text-3xl font-bold text-white mb-2">
+                            Class is Live
+                        </CardTitle>
+                        <p className="text-gray-400">{selectedSubject} • {selectedBatch}</p>
+                        
+                        <div className="flex items-center justify-center gap-2 text-amber-400 bg-amber-950/30 border border-amber-900/50 p-3 rounded-lg text-sm mt-6 max-w-md mx-auto">
+                            <ShieldAlert className="w-4 h-4 shrink-0" />
+                            <span>Link is secure. Only enrolled students can join via dashboard.</span>
+                        </div>
+                    </CardHeader>
+
+                    <CardContent className="space-y-6 pt-8 px-8 pb-8">
+                        <Button 
+                            variant="outline" 
+                            onClick={() => window.open(activeClassLink, '_blank')}
+                            className="w-full h-12 text-lg border-blue-500/50 text-blue-400 hover:bg-blue-950/30"
+                        >
+                            <ExternalLink className="w-5 h-5 mr-2" /> Re-open Meeting Tab
+                        </Button>
+
+                        <div className="h-px bg-gray-800 my-4" />
+
+                        <Button 
+                            onClick={handleEndClass} 
+                            variant="destructive" 
+                            className="w-full h-14 text-lg font-bold bg-red-600 hover:bg-red-700 shadow-lg shadow-red-900/20"
+                        >
+                            <Power className="w-5 h-5 mr-2" />
+                            End Class & Expire Link
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    // --- VIEW: START CLASS ---
     return (
-      <div className="p-6 space-y-6">
-        <Skeleton className="h-8 w-64" />
-        <div className="grid gap-4">
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-32 w-full" />
+        <div className="p-6">
+            <Card className="max-w-xl mx-auto border-gray-200 dark:border-gray-800 shadow-xl">
+                <CardHeader>
+                    <CardTitle className="text-2xl flex items-center gap-2">
+                        <Video className="w-6 h-6 text-blue-600" />
+                        Launch Secure Class
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="space-y-2">
+                        <Label>Select Batch</Label>
+                        <Select onValueChange={setSelectedBatch}>
+                            <SelectTrigger className="h-12">
+                                <SelectValue placeholder="Select Batch" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {assignments?.assigned_batches?.map((b: string) => (
+                                    <SelectItem key={b} value={b}>{b}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Select Subject</Label>
+                        <Select onValueChange={setSelectedSubject}>
+                            <SelectTrigger className="h-12">
+                                <SelectValue placeholder="Select Subject" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {assignments?.assigned_subjects?.map((s: string) => (
+                                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <Button 
+                        onClick={handleStartClass} 
+                        disabled={isLoading || !selectedBatch || !selectedSubject}
+                        className="w-full h-14 text-lg font-bold bg-blue-600 hover:bg-blue-700"
+                    >
+                        {isLoading ? "Generating Secure Link..." : "Start Class Now"}
+                    </Button>
+                    
+                    <p className="text-xs text-center text-muted-foreground">
+                        This will generate a one-time secure link visible only to students in the selected batch.
+                    </p>
+                </CardContent>
+            </Card>
         </div>
-      </div>
     );
-  }
-
-  if (!teacher) {
-    return (
-      <div className="p-6">
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Users className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold">No Assignments Found</h3>
-            <p className="text-muted-foreground text-center mt-2">
-              You don't have any batch or subject assignments yet.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Join Class</h1>
-        <p className="text-muted-foreground">Today's classes • {format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
-      </div>
-
-      {/* Live Classes */}
-      {liveClasses.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-            </span>
-            Live Now
-          </h2>
-          <div className="grid gap-4">
-            {liveClasses.map((cls) => (
-              <Card key={cls.id} className="border-green-500 bg-green-50 dark:bg-green-950">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-xl font-bold">{cls.subject}</h3>
-                      <p className="text-muted-foreground">{cls.batch}</p>
-                      <p className="text-sm mt-2 flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        {formatTime(cls.start_time)} - {formatTime(cls.end_time)}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline"
-                        onClick={() => setSelectedClassForAttendance(cls)}
-                      >
-                        <UserCheck className="mr-2 h-4 w-4" />
-                        Attendance
-                      </Button>
-                      <Button 
-                        size="lg" 
-                        onClick={() => handleStartClass(cls)}
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        <Video className="mr-2 h-5 w-5" />
-                        Start Class
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Upcoming Classes */}
-      {upcomingClasses.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Upcoming Today
-          </h2>
-          <div className="grid gap-4">
-            {upcomingClasses.map((cls) => (
-              <Card key={cls.id}>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold">{cls.subject}</h3>
-                      <p className="text-muted-foreground text-sm">{cls.batch}</p>
-                      <p className="text-sm mt-2 flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        {formatTime(cls.start_time)} - {formatTime(cls.end_time)}
-                      </p>
-                    </div>
-                    <Badge variant="secondary">Upcoming</Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Completed Classes */}
-      {completedClasses.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-muted-foreground">Completed</h2>
-          <div className="grid gap-4">
-            {completedClasses.map((cls) => (
-              <Card key={cls.id} className="opacity-60">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold">{cls.subject}</h3>
-                      <p className="text-muted-foreground text-sm">{cls.batch}</p>
-                      <p className="text-sm mt-2 flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        {formatTime(cls.start_time)} - {formatTime(cls.end_time)}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline"
-                        onClick={() => setSelectedClassForAttendance(cls)}
-                      >
-                        <UserCheck className="mr-2 h-4 w-4" />
-                        View Attendance
-                      </Button>
-                      <Badge variant="outline">Completed</Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* No Classes Today */}
-      {todaysClasses.length === 0 && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold">No Classes Today</h3>
-            <p className="text-muted-foreground text-center mt-2">
-              You don't have any scheduled classes for today.
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Attendance Modal */}
-      {selectedClassForAttendance && (
-        <Card className="mt-6">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <UserCheck className="h-5 w-5" />
-              Attendance - {selectedClassForAttendance.subject} ({selectedClassForAttendance.batch})
-            </CardTitle>
-            <Button variant="ghost" onClick={() => setSelectedClassForAttendance(null)}>
-              Close
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {isLoadingAttendance ? (
-              <Skeleton className="h-32 w-full" />
-            ) : attendance && attendance.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Joined At</TableHead>
-                    <TableHead>Left At</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {attendance.map((record) => (
-                    <TableRow key={record.id}>
-                      <TableCell className="font-medium">{record.user_name}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{record.user_role}</Badge>
-                      </TableCell>
-                      <TableCell>{format(new Date(record.joined_at), 'h:mm a')}</TableCell>
-                      <TableCell>
-                        {record.left_at ? format(new Date(record.left_at), 'h:mm a') : 
-                          <Badge className="bg-green-500">In Class</Badge>}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <p className="text-center text-muted-foreground py-8">No students have joined yet.</p>
-            )}
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
 };
