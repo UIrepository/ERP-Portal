@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
-import { v4 as uuidv4 } from 'uuid'; // npm install uuid
 import { toast } from 'sonner';
 import { Video } from 'lucide-react';
 
@@ -22,7 +21,7 @@ export const TeacherJoinClass = () => {
     batch: string;
   } | null>(null);
 
-  // Hardcoded for demo - replace with your 'schedules' fetch if needed
+  // Hardcoded for demo - replace with your real data if needed
   const batches = ["Unknown IITians Batch A", "Unknown IITians Batch B"];
   const subjects = ["Physics", "Mathematics", "Chemistry"];
 
@@ -33,9 +32,8 @@ export const TeacherJoinClass = () => {
     }
 
     // 1. GENERATE SECRET ROOM ID (Virtual Whitelist)
-    // Format: UnknownIITians-[Subject]-[RandomUUID]
-    // This ensures NO ONE can guess the room name.
-    const secretId = uuidv4().slice(0, 8);
+    // FIX: Using native crypto.randomUUID() instead of 'uuid' package
+    const secretId = crypto.randomUUID().slice(0, 8);
     const roomName = `UnknownIITians-${selectedSubject.replace(/\s+/g, '')}-${secretId}`;
 
     // 2. SAVE TO DB (So students can find it)
@@ -55,7 +53,7 @@ export const TeacherJoinClass = () => {
 
     // 3. LAUNCH UI
     setActiveMeeting({ roomName, subject: selectedSubject, batch: selectedBatch });
-    toast.success("Class Started! Students can now join.");
+    toast.success("Class Started! Lobby is Auto-Enabled.");
   };
 
   const handleEndClass = async () => {
