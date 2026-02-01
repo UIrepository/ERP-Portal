@@ -23,10 +23,8 @@ const App = () => (
               <Route path="/" element={<Index />} />
               
               {/* Secure Class Session Route */}
-              {/* This route verifies the enrollmentId matches the logged-in user before allowing access */}
               <Route path="/class-session/:enrollmentId" element={<ClassSession />} />
               
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
