@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,18 +11,7 @@ import { Video, Clock, Calendar, Users, UserCheck } from 'lucide-react';
 import { format, isToday, parse, isBefore, isAfter } from 'date-fns';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { toast } from 'sonner';
-
-// 🛑 HELPER INLINED (Fixes Crash)
-const normalizeSubject = (subject: string) => {
-  return subject.replace(/\s*\([^)]*\)\s*$/, '').trim().toLowerCase();
-};
-
-const subjectsMatch = (s1: string, s2: string) => {
-  const n1 = normalizeSubject(s1);
-  const n2 = normalizeSubject(s2);
-  return n1 === n2 || n1.includes(n2) || n2.includes(n1);
-};
+import { generateJitsiRoomName, subjectsMatch } from '@/lib/jitsiUtils';
 
 interface Schedule {
   id: string;
@@ -50,17 +40,15 @@ interface Attendance {
 export const TeacherJoinClass = () => {
   const { profile, user } = useAuth();
   const queryClient = useQueryClient();
-  
   const [activeMeeting, setActiveMeeting] = useState<{
     roomName: string;
     subject: string;
     batch: string;
     scheduleId: string;
   } | null>(null);
-
   const [selectedClassForAttendance, setSelectedClassForAttendance] = useState<Schedule | null>(null);
 
-  // 1. Fetch Teacher Data
+  // Fetch teacher's assignments
   const { data: teacher, isLoading: isLoadingTeacher } = useQuery<Teacher | null>({
     queryKey: ['teacherAssignments', profile?.user_id],
     queryFn: async () => {
@@ -76,7 +64,7 @@ export const TeacherJoinClass = () => {
     enabled: !!profile?.user_id
   });
 
-  // 2. Fetch Schedules
+  // Fetch all schedules
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
     queryKey: ['allSchedulesTeacher'],
     queryFn: async () => {
@@ -88,7 +76,7 @@ export const TeacherJoinClass = () => {
     }
   });
 
-  // 3. Fetch Attendance
+  // Fetch attendance for selected class
   const { data: attendance, isLoading: isLoadingAttendance } = useQuery<Attendance[]>({
     queryKey: ['classAttendance', selectedClassForAttendance?.id],
     queryFn: async () => {
@@ -104,10 +92,27 @@ export const TeacherJoinClass = () => {
       return data || [];
     },
     enabled: !!selectedClassForAttendance,
-    refetchInterval: 5000 
+    refetchInterval: 10000 // Refresh every 10 seconds
   });
 
-  // 4. Filter Classes (The logic that was crashing)
+  // Real-time attendance updates
+  useEffect(() => {
+    if (!selectedClassForAttendance) return;
+    
+    const channel = supabase
+      .channel('attendance-updates')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'class_attendance' }, 
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['classAttendance', selectedClassForAttendance.id] });
+        }
+      )
+      .subscribe();
+    
+    return () => { supabase.removeChannel(channel); };
+  }, [selectedClassForAttendance, queryClient]);
+
+  // Filter schedules for today based on teacher's assignments
   const todaysClasses = useMemo(() => {
     if (!schedules || !teacher) return [];
     
@@ -117,14 +122,17 @@ export const TeacherJoinClass = () => {
     const assignedSubjects = teacher.assigned_subjects || [];
     
     return schedules.filter(schedule => {
-      if (!assignedBatches.includes(schedule.batch)) return false;
+      // Check if teacher is assigned to this batch
+      const isAssignedBatch = assignedBatches.includes(schedule.batch);
+      if (!isAssignedBatch) return false;
       
-      // Use local helper
+      // Check if teacher is assigned to this subject (using normalized matching)
       const isAssignedSubject = assignedSubjects.some(assigned => 
         subjectsMatch(assigned, schedule.subject)
       );
       if (!isAssignedSubject) return false;
       
+      // Check if this schedule is for today
       if (schedule.date) {
         return isToday(new Date(schedule.date));
       } else {
@@ -133,6 +141,7 @@ export const TeacherJoinClass = () => {
     }).sort((a, b) => a.start_time.localeCompare(b.start_time));
   }, [schedules, teacher]);
 
+  // Categorize classes
   const { liveClasses, upcomingClasses, completedClasses } = useMemo(() => {
     const now = new Date();
     const live: Schedule[] = [];
@@ -143,53 +152,30 @@ export const TeacherJoinClass = () => {
       const startTime = parse(cls.start_time, 'HH:mm:ss', now);
       const endTime = parse(cls.end_time, 'HH:mm:ss', now);
       
-      if (isBefore(now, startTime)) upcoming.push(cls);
-      else if (isAfter(now, endTime)) completed.push(cls);
-      else live.push(cls);
+      if (isBefore(now, startTime)) {
+        upcoming.push(cls);
+      } else if (isAfter(now, endTime)) {
+        completed.push(cls);
+      } else {
+        live.push(cls);
+      }
     });
 
-    return { liveClasses, upcomingClasses, completedClasses };
+    return { liveClasses: live, upcomingClasses: upcoming, completedClasses: completed };
   }, [todaysClasses]);
 
-  const formatTime = (time: string) => format(parse(time, 'HH:mm:ss', new Date()), 'h:mm a');
+  const formatTime = (time: string) => {
+    const parsed = parse(time, 'HH:mm:ss', new Date());
+    return format(parsed, 'h:mm a');
+  };
 
-  // --- ACTIONS ---
-  const handleStartClass = async (cls: Schedule) => {
-    const secretId = crypto.randomUUID().slice(0, 8);
-    const roomName = `UnknownIITians-${cls.subject.replace(/\s+/g, '')}-${secretId}`;
-
-    const { error } = await supabase.from('active_classes').upsert({
-        batch: cls.batch,
-        subject: cls.subject,
-        room_id: roomName,
-        teacher_id: profile?.user_id,
-        started_at: new Date().toISOString()
-    }, { onConflict: 'batch,subject' });
-
-    if (error) {
-        toast.error("Failed to activate class session");
-        return;
-    }
-
+  const handleStartClass = (cls: Schedule) => {
     setActiveMeeting({
-      roomName,
+      roomName: generateJitsiRoomName(cls.batch, cls.subject),
       subject: cls.subject,
       batch: cls.batch,
       scheduleId: cls.id
     });
-    toast.success("Class Started Securely");
-  };
-
-  const handleEndClass = async () => {
-    if (!confirm("End the class for everyone?")) return;
-    if (activeMeeting) {
-        await supabase.from('active_classes').delete().match({ 
-            batch: activeMeeting.batch, 
-            subject: activeMeeting.subject 
-        });
-    }
-    setActiveMeeting(null);
-    queryClient.invalidateQueries({ queryKey: ['classAttendance'] });
   };
 
   const isLoading = isLoadingTeacher || isLoadingSchedules;
@@ -198,23 +184,11 @@ export const TeacherJoinClass = () => {
     return (
       <div className="p-6 space-y-6">
         <Skeleton className="h-8 w-64" />
-        <div className="grid gap-4"><Skeleton className="h-32 w-full" /><Skeleton className="h-32 w-full" /></div>
+        <div className="grid gap-4">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
       </div>
-    );
-  }
-
-  if (activeMeeting) {
-    return (
-        <JitsiMeeting
-            roomName={activeMeeting.roomName}
-            displayName={user?.user_metadata?.full_name || user?.user_metadata?.name || profile?.name || 'Teacher'}
-            subject={activeMeeting.subject}
-            batch={activeMeeting.batch}
-            scheduleId={activeMeeting.scheduleId}
-            onClose={handleEndClass}
-            userRole="teacher"
-            userEmail={user?.email}
-        />
     );
   }
 
@@ -225,6 +199,9 @@ export const TeacherJoinClass = () => {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Users className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold">No Assignments Found</h3>
+            <p className="text-muted-foreground text-center mt-2">
+              You don't have any batch or subject assignments yet.
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -234,10 +211,11 @@ export const TeacherJoinClass = () => {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Teacher Dashboard</h1>
-        <p className="text-muted-foreground">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+        <h1 className="text-2xl font-bold text-foreground">Join Class</h1>
+        <p className="text-muted-foreground">Today's classes • {format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
       </div>
 
+      {/* Live Classes */}
       {liveClasses.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -245,11 +223,11 @@ export const TeacherJoinClass = () => {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
             </span>
-            Ready to Start
+            Live Now
           </h2>
           <div className="grid gap-4">
             {liveClasses.map((cls) => (
-              <Card key={cls.id} className="border-green-500 bg-green-900/10">
+              <Card key={cls.id} className="border-green-500 bg-green-50 dark:bg-green-950">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -261,11 +239,20 @@ export const TeacherJoinClass = () => {
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" onClick={() => setSelectedClassForAttendance(cls)}>
-                        <UserCheck className="mr-2 h-4 w-4" /> Attendance
+                      <Button 
+                        variant="outline"
+                        onClick={() => setSelectedClassForAttendance(cls)}
+                      >
+                        <UserCheck className="mr-2 h-4 w-4" />
+                        Attendance
                       </Button>
-                      <Button size="lg" onClick={() => handleStartClass(cls)} className="bg-green-600 hover:bg-green-700 font-bold">
-                        <Video className="mr-2 h-5 w-5" /> Start Live Class
+                      <Button 
+                        size="lg" 
+                        onClick={() => handleStartClass(cls)}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        <Video className="mr-2 h-5 w-5" />
+                        Start Class
                       </Button>
                     </div>
                   </div>
@@ -276,10 +263,12 @@ export const TeacherJoinClass = () => {
         </div>
       )}
 
+      {/* Upcoming Classes */}
       {upcomingClasses.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-lg font-semibold flex items-center gap-2">
-             <Calendar className="h-5 w-5" /> Upcoming Today
+            <Calendar className="h-5 w-5" />
+            Upcoming Today
           </h2>
           <div className="grid gap-4">
             {upcomingClasses.map((cls) => (
@@ -294,7 +283,7 @@ export const TeacherJoinClass = () => {
                         {formatTime(cls.start_time)} - {formatTime(cls.end_time)}
                       </p>
                     </div>
-                    <Badge variant="secondary">Scheduled</Badge>
+                    <Badge variant="secondary">Upcoming</Badge>
                   </div>
                 </CardContent>
               </Card>
@@ -303,38 +292,114 @@ export const TeacherJoinClass = () => {
         </div>
       )}
 
-      {selectedClassForAttendance && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-            <Card className="w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
-              <CardHeader className="flex flex-row items-center justify-between shrink-0">
-                <CardTitle className="flex items-center gap-2">
-                  <UserCheck className="h-5 w-5" /> Attendance
-                </CardTitle>
-                <Button variant="ghost" onClick={() => setSelectedClassForAttendance(null)}>Close</Button>
-              </CardHeader>
-              <CardContent className="overflow-y-auto">
-                {isLoadingAttendance ? (
-                  <Skeleton className="h-32 w-full" />
-                ) : attendance && attendance.length > 0 ? (
-                  <Table>
-                    <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Role</TableHead><TableHead>Joined</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
-                    <TableBody>
-                      {attendance.map((record) => (
-                        <TableRow key={record.id}>
-                          <TableCell className="font-medium">{record.user_name}</TableCell>
-                          <TableCell><Badge variant="outline">{record.user_role}</Badge></TableCell>
-                          <TableCell>{format(new Date(record.joined_at), 'h:mm a')}</TableCell>
-                          <TableCell>{record.left_at ? <span className="text-red-400">Left at {format(new Date(record.left_at), 'h:mm a')}</span> : <Badge className="bg-green-600">Active</Badge>}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <p className="text-center text-muted-foreground py-8">No attendance records found.</p>
-                )}
-              </CardContent>
-            </Card>
+      {/* Completed Classes */}
+      {completedClasses.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold text-muted-foreground">Completed</h2>
+          <div className="grid gap-4">
+            {completedClasses.map((cls) => (
+              <Card key={cls.id} className="opacity-60">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold">{cls.subject}</h3>
+                      <p className="text-muted-foreground text-sm">{cls.batch}</p>
+                      <p className="text-sm mt-2 flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        {formatTime(cls.start_time)} - {formatTime(cls.end_time)}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline"
+                        onClick={() => setSelectedClassForAttendance(cls)}
+                      >
+                        <UserCheck className="mr-2 h-4 w-4" />
+                        View Attendance
+                      </Button>
+                      <Badge variant="outline">Completed</Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
+      )}
+
+      {/* No Classes Today */}
+      {todaysClasses.length === 0 && (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold">No Classes Today</h3>
+            <p className="text-muted-foreground text-center mt-2">
+              You don't have any scheduled classes for today.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Attendance Modal */}
+      {selectedClassForAttendance && (
+        <Card className="mt-6">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5" />
+              Attendance - {selectedClassForAttendance.subject} ({selectedClassForAttendance.batch})
+            </CardTitle>
+            <Button variant="ghost" onClick={() => setSelectedClassForAttendance(null)}>
+              Close
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {isLoadingAttendance ? (
+              <Skeleton className="h-32 w-full" />
+            ) : attendance && attendance.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Joined At</TableHead>
+                    <TableHead>Left At</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {attendance.map((record) => (
+                    <TableRow key={record.id}>
+                      <TableCell className="font-medium">{record.user_name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{record.user_role}</Badge>
+                      </TableCell>
+                      <TableCell>{format(new Date(record.joined_at), 'h:mm a')}</TableCell>
+                      <TableCell>
+                        {record.left_at ? format(new Date(record.left_at), 'h:mm a') : 
+                          <Badge className="bg-green-500">In Class</Badge>}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-center text-muted-foreground py-8">No students have joined yet.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Jitsi Meeting Overlay */}
+      {activeMeeting && (
+        <JitsiMeeting
+          roomName={activeMeeting.roomName}
+          displayName={user?.user_metadata?.full_name || user?.user_metadata?.name || profile?.name || 'Teacher'}
+          subject={activeMeeting.subject}
+          batch={activeMeeting.batch}
+          scheduleId={activeMeeting.scheduleId}
+          onClose={() => setActiveMeeting(null)}
+          userRole="teacher"
+          userEmail={user?.email}
+        />
       )}
     </div>
   );
