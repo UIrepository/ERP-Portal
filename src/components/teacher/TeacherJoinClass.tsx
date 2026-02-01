@@ -1,220 +1,271 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { ExternalLink, Video, ShieldAlert, Wifi, Power } from "lucide-react";
+import { Video, Clock, Calendar, Users, Copy, ExternalLink, ShieldCheck } from 'lucide-react';
+import { format, isToday, parse, isBefore, isAfter } from 'date-fns';
+import { toast } from 'sonner';
+import { generateJitsiRoomName, subjectsMatch } from '@/lib/jitsiUtils';
+import { useYoutubeStream } from '@/hooks/useYoutubeStream'; // Assuming this hook exists in your project
 
-// Use public Jitsi or your self-hosted instance
-const JITSI_BASE_URL = "https://meet.jit.si";
+interface Schedule {
+  id: string;
+  subject: string;
+  batch: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  date: string | null;
+}
+
+interface Teacher {
+  id: string;
+  assigned_batches: string[];
+  assigned_subjects: string[];
+}
 
 export const TeacherJoinClass = () => {
-    const { profile, user } = useAuth();
-    const [selectedBatch, setSelectedBatch] = useState<string>("");
-    const [selectedSubject, setSelectedSubject] = useState<string>("");
-    const [activeClassLink, setActiveClassLink] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
+  const { profile, user } = useAuth();
+  const { startStream, isStartingStream } = useYoutubeStream();
+  
+  // State for the "Go Live" Modal
+  const [selectedClass, setSelectedClass] = useState<Schedule | null>(null);
+  const [streamKey, setStreamKey] = useState<string | null>(null);
+  const [meetingUrl, setMeetingUrl] = useState<string | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-    // Fetch Teacher's Assigned Batches/Subjects from DB
-    const { data: assignments } = useQuery({
-        queryKey: ['teacherAssignments', user?.id],
-        queryFn: async () => {
-            const { data } = await supabase
-                .from('teachers')
-                .select('assigned_batches, assigned_subjects')
-                .eq('user_id', user?.id)
-                .single();
-            return data;
-        },
-        enabled: !!user?.id
+  // 1. Fetch Teacher Assignments
+  const { data: teacher, isLoading: isLoadingTeacher } = useQuery<Teacher | null>({
+    queryKey: ['teacherAssignments', profile?.user_id],
+    queryFn: async () => {
+      if (!profile?.user_id) return null;
+      const { data } = await supabase
+        .from('teachers')
+        .select('id, assigned_batches, assigned_subjects')
+        .eq('user_id', profile.user_id)
+        .single();
+      return data;
+    },
+    enabled: !!profile?.user_id
+  });
+
+  // 2. Fetch Schedules
+  const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
+    queryKey: ['allSchedulesTeacher'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('schedules')
+        .select('id, subject, batch, day_of_week, start_time, end_time, date');
+      return data || [];
+    }
+  });
+
+  // 3. Filter Schedules (Original Logic)
+  const todaysClasses = useMemo(() => {
+    if (!schedules || !teacher) return [];
+    
+    const today = new Date();
+    const todayDayOfWeek = today.getDay();
+    const assignedBatches = teacher.assigned_batches || [];
+    const assignedSubjects = teacher.assigned_subjects || [];
+    
+    return schedules.filter(schedule => {
+      const isAssignedBatch = assignedBatches.includes(schedule.batch);
+      if (!isAssignedBatch) return false;
+      const isAssignedSubject = assignedSubjects.some(assigned => 
+        subjectsMatch(assigned, schedule.subject)
+      );
+      if (!isAssignedSubject) return false;
+      
+      if (schedule.date) return isToday(new Date(schedule.date));
+      return schedule.day_of_week === todayDayOfWeek;
+    }).sort((a, b) => a.start_time.localeCompare(b.start_time));
+  }, [schedules, teacher]);
+
+  const { liveClasses, upcomingClasses, completedClasses } = useMemo(() => {
+    const now = new Date();
+    const live: Schedule[] = [];
+    const upcoming: Schedule[] = [];
+    const completed: Schedule[] = [];
+    todaysClasses.forEach(cls => {
+      const startTime = parse(cls.start_time, 'HH:mm:ss', now);
+      const endTime = parse(cls.end_time, 'HH:mm:ss', now);
+      if (isBefore(now, startTime)) upcoming.push(cls);
+      else if (isAfter(now, endTime)) completed.push(cls);
+      else live.push(cls);
+    });
+    return { liveClasses: live, upcomingClasses: upcoming, completedClasses: completed };
+  }, [todaysClasses]);
+
+  const formatTime = (time: string) => format(parse(time, 'HH:mm:ss', new Date()), 'h:mm a');
+
+  // --- START CLASS HANDLER ---
+  const handleStartClass = async (cls: Schedule) => {
+    setSelectedClass(cls);
+    
+    // 1. Generate Room Name & URL
+    // We use a consistent room name so students land in the same place
+    const roomName = generateJitsiRoomName(cls.batch, cls.subject);
+    const url = `https://meet.jit.si/${roomName}`; 
+    setMeetingUrl(url);
+
+    // 2. Mark Class as "Active" in DB (Gatekeeper for Students)
+    // This allows students to see the "Join" button on their dashboard
+    await supabase.from('active_classes').upsert({
+         batch: cls.batch,
+         subject: cls.subject,
+         room_url: url,
+         teacher_id: user?.id,
+         is_active: true,
+         started_at: new Date().toISOString()
+    }, { onConflict: 'batch,subject' });
+
+    // 3. Log Attendance
+    await supabase.from('class_attendance').insert({
+        user_id: user?.id,
+        user_name: profile?.name || "Teacher",
+        user_role: 'teacher',
+        batch: cls.batch,
+        subject: cls.subject,
+        schedule_id: cls.id,
+        joined_at: new Date().toISOString(),
+        status: 'present'
     });
 
-    const handleStartClass = async () => {
-        if (!selectedBatch || !selectedSubject) {
-            toast.error("Please select Batch and Subject");
-            return;
+    // 4. Fetch/Generate Stream Key
+    try {
+        const details = await startStream(cls.batch, cls.subject); // Assuming this hook returns the key
+        if (details?.streamKey) {
+            setStreamKey(details.streamKey);
+        } else {
+            setStreamKey("Could not fetch key. Check API quota.");
         }
-
-        setIsLoading(true);
-
-        // 🔒 SECURITY STEP 1: Generate a Random, Un-guessable UUID
-        // Native browser crypto - no external package needed
-        const uniqueSecret = crypto.randomUUID().slice(0, 12);
-        
-        // Clean subject name for URL (remove spaces/special chars)
-        const cleanSubject = selectedSubject.replace(/[^a-zA-Z0-9]/g, '');
-        const roomName = `UnknownIITians-${cleanSubject}-${uniqueSecret}`;
-        const meetingUrl = `${JITSI_BASE_URL}/${roomName}`;
-
-        try {
-            // 🔒 SECURITY STEP 2: Save to DB (Gatekeeper)
-            const { error } = await supabase.from('active_classes').upsert({
-                 batch: selectedBatch,
-                 subject: selectedSubject,
-                 room_url: meetingUrl,
-                 teacher_id: user?.id,
-                 is_active: true,
-                 started_at: new Date().toISOString()
-            }, { onConflict: 'batch,subject' }); // Ensure unique active class per batch-subject
-
-            if (error) throw error;
-
-            // 3. Mark Teacher Attendance
-            await supabase.from('class_attendance').insert({
-                user_id: user?.id,
-                user_name: profile?.name || "Teacher",
-                user_role: 'teacher',
-                batch: selectedBatch,
-                subject: selectedSubject,
-                joined_at: new Date().toISOString(),
-                // We leave schedule_id null for ad-hoc/dynamic classes, or you can pass it if selected
-            });
-
-            // 4. Open Class
-            window.open(meetingUrl, '_blank');
-            setActiveClassLink(meetingUrl);
-            toast.success("Secure Class Launched!");
-            
-            // Security Tip
-            setTimeout(() => {
-                toast.info("Security Tip: Enable 'Lobby Mode' in Jitsi settings to manually approve students.", { duration: 5000 });
-            }, 1000);
-
-        } catch (err) {
-            console.error(err);
-            toast.error("Failed to start class. Please try again.");
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleEndClass = async () => {
-        if (!confirm("Are you sure you want to end the class? This will invalidate the link for all students.")) return;
-
-        try {
-            // 🔒 SECURITY STEP 3: Delete Link from DB
-            // This immediately prevents new joins. Existing Jitsi participants stay until they leave.
-            const { error } = await supabase
-                .from('active_classes')
-                .delete()
-                .match({ batch: selectedBatch, subject: selectedSubject });
-
-            if (error) throw error;
-
-            setActiveClassLink(null);
-            toast.info("Class Ended. The link is now invalid.");
-        } catch (err) {
-            toast.error("Error ending class.");
-            console.error(err);
-        }
-    };
-
-    // --- VIEW: CLASS IS LIVE ---
-    if (activeClassLink) {
-        return (
-            <div className="flex items-center justify-center p-6 animate-in fade-in duration-500">
-                <Card className="w-full max-w-2xl bg-gray-900 border-gray-800 text-white shadow-2xl">
-                    <CardHeader className="text-center border-b border-gray-800 pb-8">
-                        <div className="flex justify-center mb-6">
-                            <div className="relative">
-                                <div className="absolute inset-0 bg-green-500 blur-xl opacity-20 animate-pulse rounded-full"></div>
-                                <div className="relative h-20 w-20 bg-gray-800 border-2 border-green-500/50 rounded-full flex items-center justify-center">
-                                    <Wifi className="h-8 w-8 text-green-500 animate-pulse" />
-                                </div>
-                            </div>
-                        </div>
-                        <CardTitle className="text-3xl font-bold text-white mb-2">
-                            Class is Live
-                        </CardTitle>
-                        <p className="text-gray-400">{selectedSubject} • {selectedBatch}</p>
-                        
-                        <div className="flex items-center justify-center gap-2 text-amber-400 bg-amber-950/30 border border-amber-900/50 p-3 rounded-lg text-sm mt-6 max-w-md mx-auto">
-                            <ShieldAlert className="w-4 h-4 shrink-0" />
-                            <span>Link is secure. Only enrolled students can join via dashboard.</span>
-                        </div>
-                    </CardHeader>
-
-                    <CardContent className="space-y-6 pt-8 px-8 pb-8">
-                        <Button 
-                            variant="outline" 
-                            onClick={() => window.open(activeClassLink, '_blank')}
-                            className="w-full h-12 text-lg border-blue-500/50 text-blue-400 hover:bg-blue-950/30"
-                        >
-                            <ExternalLink className="w-5 h-5 mr-2" /> Re-open Meeting Tab
-                        </Button>
-
-                        <div className="h-px bg-gray-800 my-4" />
-
-                        <Button 
-                            onClick={handleEndClass} 
-                            variant="destructive" 
-                            className="w-full h-14 text-lg font-bold bg-red-600 hover:bg-red-700 shadow-lg shadow-red-900/20"
-                        >
-                            <Power className="w-5 h-5 mr-2" />
-                            End Class & Expire Link
-                        </Button>
-                    </CardContent>
-                </Card>
-            </div>
-        );
+    } catch (e) {
+        console.error(e);
+        setStreamKey("Manual Key Required");
     }
 
-    // --- VIEW: START CLASS ---
-    return (
-        <div className="p-6">
-            <Card className="max-w-xl mx-auto border-gray-200 dark:border-gray-800 shadow-xl">
-                <CardHeader>
-                    <CardTitle className="text-2xl flex items-center gap-2">
-                        <Video className="w-6 h-6 text-blue-600" />
-                        Launch Secure Class
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="space-y-2">
-                        <Label>Select Batch</Label>
-                        <Select onValueChange={setSelectedBatch}>
-                            <SelectTrigger className="h-12">
-                                <SelectValue placeholder="Select Batch" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {assignments?.assigned_batches?.map((b: string) => (
-                                    <SelectItem key={b} value={b}>{b}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
+    // 5. Open Modal
+    setIsDialogOpen(true);
+  };
 
-                    <div className="space-y-2">
-                        <Label>Select Subject</Label>
-                        <Select onValueChange={setSelectedSubject}>
-                            <SelectTrigger className="h-12">
-                                <SelectValue placeholder="Select Subject" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {assignments?.assigned_subjects?.map((s: string) => (
-                                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
+  const handleJoinMeeting = () => {
+    if (meetingUrl) {
+        window.open(meetingUrl, '_blank');
+        toast.success("Opening Meeting...");
+    }
+  };
 
-                    <Button 
-                        onClick={handleStartClass} 
-                        disabled={isLoading || !selectedBatch || !selectedSubject}
-                        className="w-full h-14 text-lg font-bold bg-blue-600 hover:bg-blue-700"
-                    >
-                        {isLoading ? "Generating Secure Link..." : "Start Class Now"}
-                    </Button>
-                    
-                    <p className="text-xs text-center text-muted-foreground">
-                        This will generate a one-time secure link visible only to students in the selected batch.
-                    </p>
-                </CardContent>
+  if (isLoadingTeacher || isLoadingSchedules) {
+    return <div className="p-6"><Skeleton className="h-32 w-full" /></div>;
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Teacher Dashboard</h1>
+        <p className="text-muted-foreground">Today's Schedule • {format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+      </div>
+
+      {/* Live Classes Section */}
+      {liveClasses.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold flex items-center gap-2 text-green-500">
+            <Video className="h-5 w-5" /> Live Now
+          </h2>
+          {liveClasses.map((cls) => (
+            <Card key={cls.id} className="border-green-500/50 bg-green-500/5">
+              <CardContent className="p-6 flex justify-between items-center">
+                <div>
+                  <h3 className="text-xl font-bold">{cls.subject}</h3>
+                  <p className="text-sm text-muted-foreground">{cls.batch}</p>
+                  <p className="text-xs mt-1">{formatTime(cls.start_time)} - {formatTime(cls.end_time)}</p>
+                </div>
+                <Button onClick={() => handleStartClass(cls)} className="bg-green-600 hover:bg-green-700">
+                   Start Class
+                </Button>
+              </CardContent>
             </Card>
+          ))}
         </div>
-    );
+      )}
+
+      {/* Upcoming Classes Section */}
+      {upcomingClasses.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Calendar className="h-5 w-5" /> Upcoming
+          </h2>
+          {upcomingClasses.map((cls) => (
+            <Card key={cls.id}>
+              <CardContent className="p-6 flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-semibold">{cls.subject}</h3>
+                  <p className="text-sm text-muted-foreground">{cls.batch}</p>
+                  <p className="text-xs mt-1">{formatTime(cls.start_time)} - {formatTime(cls.end_time)}</p>
+                </div>
+                <Badge variant="outline">Scheduled</Badge>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* --- STREAM KEY & JOIN MODAL --- */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-gray-900 text-white border-gray-800">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-green-500" />
+                Class Ready to Launch
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+                You are the host. Join first to become the Moderator.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+                <Label className="text-xs uppercase text-gray-500 font-bold">YouTube Stream Key</Label>
+                <div className="flex items-center gap-2">
+                    <Input 
+                        value={streamKey || "Generating..."} 
+                        readOnly 
+                        className="bg-black/50 border-gray-700 font-mono text-sm text-yellow-400"
+                    />
+                    <Button 
+                        size="icon" 
+                        variant="outline" 
+                        onClick={() => { navigator.clipboard.writeText(streamKey || ""); toast.success("Copied!"); }}
+                        className="shrink-0 border-gray-700 hover:bg-gray-800"
+                    >
+                        <Copy className="h-4 w-4" />
+                    </Button>
+                </div>
+                <p className="text-[10px] text-gray-500">
+                    Paste this key into Jitsi ("Start Live Stream") to broadcast to YouTube.
+                </p>
+            </div>
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button 
+                onClick={handleJoinMeeting} 
+                className="w-full bg-blue-600 hover:bg-blue-700 h-11 text-base"
+            >
+                <ExternalLink className="mr-2 h-4 w-4" />
+                Open Jitsi Meeting
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 };
