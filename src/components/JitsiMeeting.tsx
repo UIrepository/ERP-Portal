@@ -35,8 +35,7 @@ const injectNewScript = (): Promise<void> => {
   return new Promise((resolve, reject) => {
     console.log('[Jitsi] Injecting player library...');
     const script = document.createElement('script');
-    // UPDATED: Changed from meet.jit.si to meet.guifi.net
-    script.src = 'https://meet.guifi.net/external_api.js';
+    script.src = 'https://meet.jit.si/external_api.js';
     script.async = true;
     
     const timeoutId = setTimeout(() => {
@@ -166,8 +165,7 @@ export const JitsiMeeting = ({
 
   const openInNewTab = useCallback(() => {
     const sanitizedRoomName = getSanitizedRoomName();
-    // UPDATED: Changed from meet.jit.si to meet.guifi.net
-    window.open(`https://meet.guifi.net/${sanitizedRoomName}`, '_blank');
+    window.open(`https://meet.jit.si/${sanitizedRoomName}`, '_blank');
     toast.info('Meeting opened in new tab');
   }, [getSanitizedRoomName]);
 
@@ -237,6 +235,8 @@ export const JitsiMeeting = ({
             
             toast.success("Command sent. Waiting for YouTube...");
 
+            // FIXED: Removed auto-copy to clipboard in timeout (prevents NotAllowedError)
+            // Just show the notification where to find it.
             setTimeout(() => {
                 toast.info("If streaming didn't start automatically:", {
                     description: "Click the '...' button in the bottom bar -> 'Start Live Stream', and paste the key.",
@@ -291,8 +291,7 @@ export const JitsiMeeting = ({
       if (isLoadingRef.current) setLoadingMessage('Still connecting to room...');
     }, CONNECTION_TIMEOUT_MS);
 
-    // UPDATED: Changed from meet.jit.si to meet.guifi.net
-    const domain = 'meet.guifi.net';
+    const domain = 'meet.jit.si';
     const sanitizedRoomName = getSanitizedRoomName();
     const currentProps = propsRef.current;
     
@@ -326,9 +325,11 @@ export const JitsiMeeting = ({
         liveStreamingEnabled: true,
         
         // --- STABILITY FIXES FOR 5-MIN TIMEOUT (UPDATED) ---
+        // We REMOVE 'relay' policy to allow all connection types (Stable)
         p2p: { 
             enabled: false, 
             useStunTurn: true
+            // Removed: iceTransportPolicy: 'relay' (This was causing the drop!)
         },
         disable1On1Mode: true, // Force JVB
         
