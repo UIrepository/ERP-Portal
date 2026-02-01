@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useYoutubeStream } from '@/hooks/useYoutubeStream';
 
-// ✅ COMMUNITY SERVER (Unlimited Time, Embeddable)
+// ✅ COMMUNITY SERVER
 const DOMAIN = 'meet.guifi.net'; 
 
 interface JitsiMeetingProps {
@@ -38,10 +38,9 @@ export const JitsiMeeting = ({
   const [isLoading, setIsLoading] = useState(true);
   const { startStream, isStreaming, isStartingStream } = useYoutubeStream();
   
-  // 🔐 ROLE CHECK
   const isHost = userRole === 'teacher' || userRole === 'admin';
 
-  // --- 1. TOOLBAR CONFIGURATION (The "Moderator Control" Fix) ---
+  // TOOLBAR CONFIG
   const TEACHER_TOOLBAR = [
       'microphone', 'camera', 'desktop', 'chat', 'raisehand', 
       'participants-pane', 'tileview', 'fullscreen', 'videoquality', 
@@ -49,14 +48,12 @@ export const JitsiMeeting = ({
       'livestreaming', 'recording', 'mute-everyone', 'security', 'stats', 'select-background'
   ];
 
-  // Students get a restricted toolbar (No Kick, No Mute Others, No Security options)
   const STUDENT_TOOLBAR = [
       'microphone', 'camera', 'desktop', 'chat', 'raisehand', 
       'participants-pane', 'tileview', 'fullscreen', 'videoquality', 
       'filmstrip', 'hangup', 'select-background' 
   ];
 
-  // --- 2. LOAD JITSI SCRIPT ---
   useEffect(() => {
     const loadScript = async () => {
       if (window.JitsiMeetExternalAPI) {
@@ -71,13 +68,9 @@ export const JitsiMeeting = ({
     };
     loadScript();
     
-    // Cleanup on unmount
-    return () => {
-        if (apiRef.current) apiRef.current.dispose();
-    };
+    return () => { if (apiRef.current) apiRef.current.dispose(); };
   }, []);
 
-  // --- 3. INITIALIZE MEETING ---
   const initializeJitsi = () => {
     if (!jitsiContainerRef.current) return;
 
@@ -90,12 +83,10 @@ export const JitsiMeeting = ({
       configOverwrite: {
         startWithAudioMuted: true,
         disableThirdPartyRequests: true,
-        prejoinPageEnabled: false, // Instant Entry
-        
-        // 🔒 SECURITY: PREVENT STUDENTS FROM ACTING AS MODERATORS
-        disableRemoteMute: !isHost, // Only Host can mute others
+        prejoinPageEnabled: false, 
+        disableRemoteMute: !isHost, 
         remoteVideoMenu: {
-            disableKick: !isHost,   // Only Host can kick
+            disableKick: !isHost,   
             disableGrantModerator: true,
             disablePrivateChat: false,
         },
@@ -107,7 +98,7 @@ export const JitsiMeeting = ({
         SHOW_WATERMARK_FOR_GUESTS: false,
         DEFAULT_BACKGROUND: '#111827',
         TOOLBAR_ALWAYS_VISIBLE: true,
-        hideLobbyButton: !isHost, // Hide Lobby control from students
+        hideLobbyButton: !isHost,
         NATIVE_APP_NAME: 'Unknown IITians',
         MOBILE_APP_PROMO: false
       }
@@ -120,7 +111,6 @@ export const JitsiMeeting = ({
         setIsLoading(false);
         logAttendance();
         
-        // 🔒 TEACHER AUTO-ENABLES LOBBY
         if (isHost) {
             setTimeout(() => {
                 apiRef.current.executeCommand('toggleLobby', true);
@@ -132,7 +122,6 @@ export const JitsiMeeting = ({
     });
   };
 
-  // --- 4. STREAMING LOGIC ---
   const handleGoLive = async () => {
     if (!isHost) return;
     const details = await startStream(batch, subject);
@@ -145,14 +134,13 @@ export const JitsiMeeting = ({
                 youtubeStreamKey: details.streamKey,
                 rtmpBroadcastID: details.broadcastId
             });
-            toast.success("Connecting to YouTube... Please wait.");
+            toast.success("Connecting to YouTube...");
         } catch (e) {
             toast.error("Failed to start stream command.");
         }
     }
   };
 
-  // --- 5. ATTENDANCE LOGIC ---
   const logAttendance = async () => {
     try {
         const { data: { user } } = await supabase.auth.getUser();
@@ -177,7 +165,6 @@ export const JitsiMeeting = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
-      {/* HEADER */}
       <div className="bg-gray-900 border-b border-gray-800 p-3 flex justify-between items-center shrink-0">
         <div className="flex items-center gap-4">
             <div>
@@ -185,7 +172,6 @@ export const JitsiMeeting = ({
               <span className="text-xs text-gray-400 bg-gray-800 px-2 py-0.5 rounded">{batch}</span>
             </div>
             
-            {/* GO LIVE BUTTON (Teacher Only) */}
             {isHost && (
                 <Button 
                     size="sm"
@@ -204,7 +190,6 @@ export const JitsiMeeting = ({
         </Button>
       </div>
 
-      {/* MEETING CONTAINER */}
       <div className="flex-1 relative bg-gray-900">
          {isLoading && (
              <div className="absolute inset-0 flex items-center justify-center text-white z-10">
