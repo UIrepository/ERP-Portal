@@ -19,6 +19,8 @@ const ClassSession = () => {
   const [verifying, setVerifying] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [redirecting, setRedirecting] = useState(false);
+  
+  // Ref to ensure we don't mark attendance twice in strict mode
   const attendanceMarked = useRef(false);
 
   useEffect(() => {
@@ -36,9 +38,11 @@ const ClassSession = () => {
         let subject = '';
         let role = 'student';
 
-        // --- 1. VERIFICATION LOGIC ---
+        // ---------------------------------------------------------
+        // 1. VERIFICATION LOGIC (Secure UUID Check)
+        // ---------------------------------------------------------
         
-        // TEACHER CHECK
+        // --- TEACHER FLOW ---
         if (enrollmentId === 'teacher-access') {
            if (!scheduleId) { setError("Invalid schedule reference."); setVerifying(false); return; }
 
@@ -47,31 +51,35 @@ const ClassSession = () => {
              
            if (schedError || !schedule) { setError("Schedule not found."); setVerifying(false); return; }
 
+           // Verify Teacher Status
            const { data: teacher, error: teacherError } = await supabase
              .from('teachers').select('assigned_batches, assigned_subjects')
              .eq('user_id', user.id).single();
 
-           if (teacherError || !teacher) { setError("Access Denied: Not a teacher."); setVerifying(false); return; }
+           if (teacherError || !teacher) { setError("Access Denied: You are not registered as a teacher."); setVerifying(false); return; }
 
+           // Verify Assignment
            const hasBatch = teacher.assigned_batches?.includes(schedule.batch);
            const hasSubject = teacher.assigned_subjects?.some(s => subjectsMatch(s, schedule.subject));
 
-           if (!hasBatch || !hasSubject) { setError("Access Denied: Not assigned to this class."); setVerifying(false); return; }
+           if (!hasBatch || !hasSubject) { setError(`Access Denied: You are not assigned to ${schedule.subject}.`); setVerifying(false); return; }
 
            batch = schedule.batch;
            subject = schedule.subject;
            role = 'teacher';
         } 
-        // STUDENT CHECK
+        // --- STUDENT FLOW ---
         else {
             if (!enrollmentId) { setError("Invalid link."); setVerifying(false); return; }
 
+            // Fetch Enrollment by the UNIQUE UUID in the URL
             const { data: enrollment, error: fetchError } = await supabase
               .from('user_enrollments').select('user_id, batch_name, subject_name')
               .eq('id', enrollmentId).single();
 
             if (fetchError || !enrollment) { setError("Enrollment verification failed."); setVerifying(false); return; }
 
+            // CRITICAL SECURITY: Does this Enrollment UUID belong to the logged-in user?
             if (enrollment.user_id !== user.id) {
               setError("Access Denied. This secure link belongs to another user.");
               setVerifying(false);
@@ -83,11 +91,14 @@ const ClassSession = () => {
             role = 'student';
         }
 
-        // --- 2. MARK ATTENDANCE ---
+        // ---------------------------------------------------------
+        // 2. MARK ATTENDANCE (Before Redirect)
+        // ---------------------------------------------------------
         if (!attendanceMarked.current) {
             const today = format(new Date(), 'yyyy-MM-dd');
             const safeScheduleId = scheduleId && scheduleId.trim() !== '' ? scheduleId : null;
             
+            // We only mark "Joined At" because we cannot track "Left At" once they leave our domain
             await supabase.from('class_attendance').upsert({
                 user_id: user.id,
                 user_name: profile.name || user.email,
@@ -102,21 +113,24 @@ const ClassSession = () => {
             attendanceMarked.current = true;
         }
 
-        // --- 3. CONSTRUCT JITSI URL & REDIRECT ---
+        // ---------------------------------------------------------
+        // 3. CONSTRUCT URL & REDIRECT
+        // ---------------------------------------------------------
         setRedirecting(true);
         setVerifying(false);
 
         const roomName = generateJitsiRoomName(batch, subject);
         const displayName = profile.name || user.email || 'Participant';
         
-        // Encode URI components safely
-        const encodedRoom = encodeURIComponent(roomName);
+        // Encode for URL safety
         const encodedName = encodeURIComponent(displayName);
 
-        // Jitsi URL with config params to skip prejoin page and set name
+        // This URL opens the OFFICIAL Jitsi Meet (No 5-min timer)
+        // #userInfo.displayName sets their name automatically
+        // config.prejoinPageEnabled=false skips the "Join Meeting" waiting screen
         const jitsiUrl = `https://meet.jit.si/${roomName}#userInfo.displayName="${encodedName}"&config.prejoinPageEnabled=false`;
 
-        // Redirect
+        // FORCE REDIRECT
         window.location.href = jitsiUrl;
 
       } catch (err) {
@@ -129,8 +143,9 @@ const ClassSession = () => {
     verifyAndJoin();
   }, [enrollmentId, scheduleId, user, profile, authLoading]);
 
-  // --- RENDER STATES ---
-
+  // ---------------------------------------------------------
+  // 4. LOADING STATE (Visible while redirecting)
+  // ---------------------------------------------------------
   if (authLoading || verifying || redirecting) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white">
@@ -139,12 +154,15 @@ const ClassSession = () => {
             {redirecting ? "Joining Class..." : "Verifying Secure Access..."}
         </h2>
         <p className="text-gray-400">
-            {redirecting ? "Redirecting to Jitsi Meet" : "Please wait while we validate your credentials."}
+            {redirecting ? "Redirecting to Jitsi Meet..." : "Please wait while we validate your credentials."}
         </p>
       </div>
     );
   }
 
+  // ---------------------------------------------------------
+  // 5. ERROR STATE (Visible if UUID is invalid/stolen)
+  // ---------------------------------------------------------
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white p-4 text-center">
