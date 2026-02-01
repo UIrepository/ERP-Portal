@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import ClassSession from "./pages/ClassSession";
 import { ScreenRecordingProtection } from "@/components/ScreenRecordingProtection";
 
 const queryClient = new QueryClient();
@@ -20,6 +21,11 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
+              
+              {/* Secure Class Session Route */}
+              {/* This route verifies the enrollmentId matches the logged-in user before allowing access */}
+              <Route path="/class-session/:enrollmentId" element={<ClassSession />} />
+              
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
