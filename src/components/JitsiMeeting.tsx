@@ -123,7 +123,6 @@ export const JitsiMeeting = ({
   const [showFallbackPrompt, setShowFallbackPrompt] = useState(false);
   const [lastStreamKey, setLastStreamKey] = useState<string | null>(null);
 
-  // Use the new Custom Hook for YouTube logic
   const { startStream, isStreaming, isStartingStream } = useYoutubeStream();
 
   // Auth & Logic Refs
@@ -146,12 +145,8 @@ export const JitsiMeeting = ({
     }
   }, [displayName, userEmail, subject, batch, scheduleId, onClose, resolvedRole, profile, userRole]);
 
-  useEffect(() => {
-    const originalUrl = window.location.href;
-    const meetingPath = `/class/${batch.replace(/\s+/g, '-').toLowerCase()}/${subject.replace(/\s+/g, '-').toLowerCase()}`;
-    window.history.pushState({ path: meetingPath }, '', meetingPath);
-    return () => { window.history.pushState({ path: originalUrl }, '', originalUrl); };
-  }, [batch, subject]);
+  // REMOVED: URL Masking/Rewriting block to ensure UUID stays in URL
+  // const originalUrl = window.location.href ...
 
   const setLoadingState = useCallback((loading: boolean) => {
     isLoadingRef.current = loading;
@@ -160,10 +155,14 @@ export const JitsiMeeting = ({
   }, []);
 
   const getSanitizedRoomName = useCallback(() => {
+    // This room name is SHARED among all users so they land in the same meeting
+    // irrespective of their unique URL.
     return generateJitsiRoomName(batch, subject);
   }, [batch, subject]);
 
   const openInNewTab = useCallback(() => {
+    // This fallback will still open the generic shared room if clicked
+    // but the primary secure entry is via the parent page
     const sanitizedRoomName = getSanitizedRoomName();
     window.open(`https://meet.jit.si/${sanitizedRoomName}`, '_blank');
     toast.info('Meeting opened in new tab');
@@ -211,17 +210,13 @@ export const JitsiMeeting = ({
     } catch (error) { console.error('[Attendance] Error updating on leave:', error); }
   }, []);
 
-  // --- STREAMING LOGIC WRAPPER ---
   const handleGoLive = async () => {
     const currentProps = propsRef.current;
-
     if (!isHost) {
         toast.error("Only teachers can start the live stream.");
         return;
     }
-
     const streamDetails = await startStream(currentProps.batch, currentProps.subject);
-
     if (streamDetails && apiRef.current) {
          setLastStreamKey(streamDetails.streamKey);
          try {
@@ -232,11 +227,7 @@ export const JitsiMeeting = ({
                 youtubeStreamKey: streamDetails.streamKey, 
                 rtmpBroadcastID: streamDetails.broadcastId
             });
-            
             toast.success("Command sent. Waiting for YouTube...");
-
-            // FIXED: Removed auto-copy to clipboard in timeout (prevents NotAllowedError)
-            // Just show the notification where to find it.
             setTimeout(() => {
                 toast.info("If streaming didn't start automatically:", {
                     description: "Click the '...' button in the bottom bar -> 'Start Live Stream', and paste the key.",
@@ -250,7 +241,6 @@ export const JitsiMeeting = ({
                     }
                 });
             }, 6000);
-
         } catch (e) {
             console.error("Jitsi Command Error:", e);
             toast.error("Failed to send command to Jitsi player.");
@@ -258,7 +248,6 @@ export const JitsiMeeting = ({
     }
   };
 
-  // --- Core Player Logic: Embeds Jitsi ---
   const initializeJitsi = useCallback(async () => {
     if (isInitializingRef.current || apiRef.current) return;
     isInitializingRef.current = true;
@@ -295,7 +284,6 @@ export const JitsiMeeting = ({
     const sanitizedRoomName = getSanitizedRoomName();
     const currentProps = propsRef.current;
     
-    // --- PERMISSION & ROLE CONFIGURATION ---
     const TEACHER_TOOLBAR = [
         'microphone', 'camera', 'desktop', 'chat', 'raisehand', 
         'participants-pane', 'tileview', 'fullscreen', 'videoquality', 
@@ -321,23 +309,18 @@ export const JitsiMeeting = ({
         startWithVideoMuted: false,
         disableDeepLinking: true,
         disableInviteFunctions: true,
-        
         liveStreamingEnabled: true,
         
-        // --- STABILITY FIXES FOR 5-MIN TIMEOUT (UPDATED) ---
-        // We REMOVE 'relay' policy to allow all connection types (Stable)
+        // --- BYPASS 5-MIN TIMER CONFIGURATION ---
         p2p: { 
-            enabled: false, 
-            useStunTurn: true
-            // Removed: iceTransportPolicy: 'relay' (This was causing the drop!)
+            enabled: false, // Force JVB connection
+            useStunTurn: true 
         },
-        disable1On1Mode: true, // Force JVB
+        disable1On1Mode: true, // Always use the bridge
         
-        // Connection & Stream Stability
         enableLayerSuspension: true,
-        disableSuspendVideo: true, // Keep video alive when tab is backgrounded
+        disableSuspendVideo: true,
         
-        // Prevent idle detection
         enableNoisyMicDetection: false,
         enableNoAudioDetection: false,
         
@@ -453,7 +436,6 @@ export const JitsiMeeting = ({
               <p className="text-gray-400 text-xs">{batch}</p>
             </div>
             
-            {/* GO LIVE BUTTON - Only for Host */}
             {hasJoined && !isLoading && isHost && (
                 <Button 
                     variant={isStreaming ? "default" : "outline"} 
@@ -484,9 +466,7 @@ export const JitsiMeeting = ({
         </div>
       </div>
 
-      {/* Main Video */}
       <div className="flex-1 relative w-full bg-black">
-        {/* Start Screen */}
         {!hasJoined && !isLoading && !connectionError && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-30">
             <div className="text-center max-w-md px-4 animate-in fade-in zoom-in duration-300">
@@ -504,7 +484,6 @@ export const JitsiMeeting = ({
           </div>
         )}
 
-        {/* Loading */}
         {isLoading && !connectionError && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-30 pointer-events-none">
             <div className="text-center max-w-md px-4 pointer-events-auto">
@@ -530,7 +509,6 @@ export const JitsiMeeting = ({
           </div>
         )}
 
-        {/* Error */}
         {connectionError && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-30">
             <div className="text-center max-w-md px-4">
