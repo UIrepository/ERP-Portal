@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { generateJitsiRoomName, subjectsMatch } from '@/lib/jitsiUtils';
-import { Loader2, ShieldAlert } from 'lucide-react';
+import { Loader2, ShieldAlert, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 const ClassSession = () => {
   const { enrollmentId } = useParams();
@@ -17,14 +18,11 @@ const ClassSession = () => {
   
   const [verifying, setVerifying] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sessionData, setSessionData] = useState<{
-    batch: string;
-    subject: string;
-    role: 'student' | 'teacher';
-  } | null>(null);
+  const [redirecting, setRedirecting] = useState(false);
+  const attendanceMarked = useRef(false);
 
   useEffect(() => {
-    const verifyAccess = async () => {
+    const verifyAndJoin = async () => {
       if (authLoading) return;
       
       if (!user || !profile) {
@@ -34,90 +32,92 @@ const ClassSession = () => {
       }
 
       try {
-        // --- TEACHER FLOW ---
+        let batch = '';
+        let subject = '';
+        let role = 'student';
+
+        // --- 1. VERIFICATION LOGIC ---
+        
+        // TEACHER CHECK
         if (enrollmentId === 'teacher-access') {
-           if (!scheduleId) {
-             setError("Invalid schedule reference.");
-             setVerifying(false);
-             return;
-           }
+           if (!scheduleId) { setError("Invalid schedule reference."); setVerifying(false); return; }
 
            const { data: schedule, error: schedError } = await supabase
-             .from('schedules')
-             .select('subject, batch')
-             .eq('id', scheduleId)
-             .single();
+             .from('schedules').select('subject, batch').eq('id', scheduleId).single();
              
-           if (schedError || !schedule) {
-             setError("Schedule not found.");
-             setVerifying(false);
-             return;
-           }
+           if (schedError || !schedule) { setError("Schedule not found."); setVerifying(false); return; }
 
            const { data: teacher, error: teacherError } = await supabase
-             .from('teachers')
-             .select('assigned_batches, assigned_subjects')
-             .eq('user_id', user.id)
-             .single();
+             .from('teachers').select('assigned_batches, assigned_subjects')
+             .eq('user_id', user.id).single();
 
-           if (teacherError || !teacher) {
-             setError("Access Denied: You are not registered as a teacher.");
-             setVerifying(false);
-             return;
-           }
+           if (teacherError || !teacher) { setError("Access Denied: Not a teacher."); setVerifying(false); return; }
 
-           // Check Assignments
            const hasBatch = teacher.assigned_batches?.includes(schedule.batch);
            const hasSubject = teacher.assigned_subjects?.some(s => subjectsMatch(s, schedule.subject));
 
-           if (!hasBatch || !hasSubject) {
-             setError(`Access Denied: You are not assigned to ${schedule.subject} (${schedule.batch}).`);
-             setVerifying(false);
-             return;
-           }
+           if (!hasBatch || !hasSubject) { setError("Access Denied: Not assigned to this class."); setVerifying(false); return; }
 
-           setSessionData({
-             batch: schedule.batch,
-             subject: schedule.subject,
-             role: 'teacher'
-           });
-           setVerifying(false);
-           return;
+           batch = schedule.batch;
+           subject = schedule.subject;
+           role = 'teacher';
+        } 
+        // STUDENT CHECK
+        else {
+            if (!enrollmentId) { setError("Invalid link."); setVerifying(false); return; }
+
+            const { data: enrollment, error: fetchError } = await supabase
+              .from('user_enrollments').select('user_id, batch_name, subject_name')
+              .eq('id', enrollmentId).single();
+
+            if (fetchError || !enrollment) { setError("Enrollment verification failed."); setVerifying(false); return; }
+
+            if (enrollment.user_id !== user.id) {
+              setError("Access Denied. This secure link belongs to another user.");
+              setVerifying(false);
+              return;
+            }
+
+            batch = enrollment.batch_name;
+            subject = enrollment.subject_name;
+            role = 'student';
         }
 
-        // --- STUDENT FLOW ---
-        if (!enrollmentId) {
-            setError("Invalid link.");
-            setVerifying(false);
-            return;
+        // --- 2. MARK ATTENDANCE ---
+        if (!attendanceMarked.current) {
+            const today = format(new Date(), 'yyyy-MM-dd');
+            const safeScheduleId = scheduleId && scheduleId.trim() !== '' ? scheduleId : null;
+            
+            await supabase.from('class_attendance').upsert({
+                user_id: user.id,
+                user_name: profile.name || user.email,
+                user_role: role,
+                schedule_id: safeScheduleId,
+                batch: batch,
+                subject: subject,
+                class_date: today,
+                joined_at: new Date().toISOString()
+            }, { onConflict: 'user_id,schedule_id,class_date' });
+            
+            attendanceMarked.current = true;
         }
 
-        // Verify Enrollment Ownership and UUID
-        const { data: enrollment, error: fetchError } = await supabase
-          .from('user_enrollments')
-          .select('user_id, batch_name, subject_name')
-          .eq('id', enrollmentId)
-          .single();
-
-        if (fetchError || !enrollment) {
-          setError("Enrollment verification failed.");
-          setVerifying(false);
-          return;
-        }
-
-        // CRITICAL: Ensure the link matches the current user
-        if (enrollment.user_id !== user.id) {
-          setError("Access Denied. This meeting link is unique to another user.");
-          setVerifying(false);
-          return;
-        }
-
-        setSessionData({
-          batch: enrollment.batch_name,
-          subject: enrollment.subject_name,
-          role: 'student'
-        });
+        // --- 3. CONSTRUCT JITSI URL & REDIRECT ---
+        setRedirecting(true);
         setVerifying(false);
+
+        const roomName = generateJitsiRoomName(batch, subject);
+        const displayName = profile.name || user.email || 'Participant';
+        
+        // Encode URI components safely
+        const encodedRoom = encodeURIComponent(roomName);
+        const encodedName = encodeURIComponent(displayName);
+
+        // Jitsi URL with config params to skip prejoin page and set name
+        const jitsiUrl = `https://meet.jit.si/${roomName}#userInfo.displayName="${encodedName}"&config.prejoinPageEnabled=false`;
+
+        // Redirect
+        window.location.href = jitsiUrl;
 
       } catch (err) {
         console.error("Verification error:", err);
@@ -126,22 +126,21 @@ const ClassSession = () => {
       }
     };
 
-    verifyAccess();
+    verifyAndJoin();
   }, [enrollmentId, scheduleId, user, profile, authLoading]);
 
-  const handleClose = () => {
-    if (window.opener) {
-        window.close();
-    } else {
-        navigate('/');
-    }
-  };
+  // --- RENDER STATES ---
 
-  if (authLoading || verifying) {
+  if (authLoading || verifying || redirecting) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-950 text-white">
         <Loader2 className="h-12 w-12 animate-spin text-blue-500 mb-4" />
-        <p className="text-lg">Verifying secure access...</p>
+        <h2 className="text-xl font-semibold mb-2">
+            {redirecting ? "Joining Class..." : "Verifying Secure Access..."}
+        </h2>
+        <p className="text-gray-400">
+            {redirecting ? "Redirecting to Jitsi Meet" : "Please wait while we validate your credentials."}
+        </p>
       </div>
     );
   }
@@ -158,21 +157,6 @@ const ClassSession = () => {
           Return to Dashboard
         </Button>
       </div>
-    );
-  }
-
-  if (sessionData) {
-    return (
-      <JitsiMeeting
-        roomName={generateJitsiRoomName(sessionData.batch, sessionData.subject)}
-        displayName={profile?.name || user?.email || (sessionData.role === 'teacher' ? 'Teacher' : 'Student')}
-        subject={sessionData.subject}
-        batch={sessionData.batch}
-        scheduleId={scheduleId}
-        onClose={handleClose}
-        userRole={sessionData.role}
-        userEmail={user?.email}
-      />
     );
   }
 
