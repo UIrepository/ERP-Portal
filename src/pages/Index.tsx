@@ -20,6 +20,7 @@ const Index = () => {
       case 'admin': return 'enrollment-analytics';
       case 'manager': return 'manager-overview';
       case 'teacher': return 'teacher-schedule';
+      case 'student': return 'dashboard';
       default: return 'dashboard';
     }
   };
