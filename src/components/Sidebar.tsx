@@ -102,12 +102,10 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     return () => { supabase.removeChannel(channel); };
   }, [profile?.user_id, queryClient, resolvedRole]);
 
-  // --- 1. STUDENT TABS (Simplified) ---
+  // --- 1. STUDENT TABS (Simplified - Live class now inside subject blocks) ---
   const studentTabs = [
     { id: 'dashboard', label: 'My Learning', icon: LayoutDashboard },
-    { id: 'join-class', label: 'Join Live Class', icon: Video },
-    { id: 'current-class', label: 'Ongoing Class', icon: Clock },
-    { id: 'dpp', label: 'Practice (DPP)', icon: Target },
+    { id: 'schedule', label: 'Schedule', icon: Calendar },
     { id: 'feedback', label: 'Submit Feedback', icon: MessageSquare },
     { id: 'exams', label: 'Exams', icon: BookOpen },
     { id: 'contact-admin', label: 'Contact Admin', icon: Phone }, 

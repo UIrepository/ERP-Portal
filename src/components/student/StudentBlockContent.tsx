@@ -1,5 +1,4 @@
-import { ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { StudentSubjectHeader } from './StudentSubjectHeader';
 import { StudentSchedule } from './StudentSchedule';
 import { StudentRecordings } from './StudentRecordings';
 import { StudentNotes } from './StudentNotes';
@@ -7,6 +6,7 @@ import { StudentUIKiPadhai } from './StudentUIKiPadhai';
 import { StudentAnnouncements } from './StudentAnnouncements';
 import { StudentCommunity } from './StudentCommunity';
 import { StudentConnect } from './StudentConnect';
+import { StudentLiveClass } from './StudentLiveClass';
 
 interface StudentBlockContentProps {
   blockId: string;
@@ -16,8 +16,8 @@ interface StudentBlockContentProps {
 }
 
 const blockLabels: Record<string, string> = {
+  'live-class': 'Live Class',
   recordings: 'Lectures',
-  schedule: 'Schedule',
   notes: 'Notes',
   'ui-ki-padhai': 'UI Ki Padhai',
   announcements: 'Announcements',
@@ -33,8 +33,8 @@ export const StudentBlockContent = ({
 }: StudentBlockContentProps) => {
   const renderContent = () => {
     switch (blockId) {
-      case 'schedule':
-        return <StudentSchedule />;
+      case 'live-class':
+        return <StudentLiveClass batch={batch} subject={subject} />;
       case 'recordings':
         return <StudentRecordings batch={batch} subject={subject} />;
       case 'notes':
@@ -58,26 +58,14 @@ export const StudentBlockContent = ({
 
   return (
     <div className="min-h-full bg-slate-50">
-      {/* Header with breadcrumb */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <Button
-            variant="ghost"
-            onClick={onBack}
-            className="text-slate-300 hover:text-white hover:bg-slate-700/50 -ml-2"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to {subject}
-          </Button>
-          <div className="mt-2 flex items-center gap-2 text-sm text-slate-400">
-            <span>{batch}</span>
-            <span>→</span>
-            <span>{subject}</span>
-            <span>→</span>
-            <span className="text-white font-medium">{blockLabels[blockId] || blockId}</span>
-          </div>
-        </div>
-      </div>
+      {/* White sticky header with breadcrumb */}
+      <StudentSubjectHeader
+        batch={batch}
+        subject={subject}
+        block={blockId}
+        blockLabel={blockLabels[blockId] || blockId}
+        onBack={onBack}
+      />
 
       {/* Content */}
       <div className="flex-1">
