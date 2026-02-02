@@ -76,7 +76,7 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
 
   const now = new Date();
 
-  // Filter only Ongoing classes (Live Now)
+  // Filter only Ongoing classes
   const ongoingClasses = schedules?.filter(schedule => {
     const [startHour, startMin] = schedule.start_time.split(':').map(Number);
     const [endHour, endMin] = schedule.end_time.split(':').map(Number);
@@ -87,7 +87,7 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
     const endTime = new Date(today);
     endTime.setHours(endHour, endMin, 0, 0);
     
-    // Add 15 min buffer before and after to consider it "Live"
+    // Add 15 min buffer before and after
     const bufferStart = addMinutes(startTime, -15);
     const bufferEnd = addMinutes(endTime, 15);
     
@@ -115,11 +115,11 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
     );
   }
 
-  // Clean empty state (No grey box)
+  // Clean empty state (No grey box, pure text on bg)
   if (ongoingClasses.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <Video className="h-12 w-12 text-slate-200 mb-3" />
+        <Video className="h-12 w-12 text-slate-300 mb-3" />
         <h3 className="text-lg font-semibold text-slate-700">No Live Class</h3>
         <p className="text-slate-500 max-w-xs mx-auto">
           There are no classes currently running.
@@ -135,7 +135,7 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
           key={classItem.id}
           className="relative overflow-hidden rounded-2xl bg-white border border-emerald-100 p-6 shadow-sm transition-all hover:shadow-md hover:border-emerald-200"
         >
-          {/* Live Pulse Indicator - Updated for White Background */}
+          {/* Live Pulse Indicator */}
           <div className="absolute top-4 right-4 flex items-center gap-2">
             <span className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
@@ -147,7 +147,6 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
           </div>
 
           <div className="flex items-center gap-5">
-            {/* Icon Box - Green on Light Background */}
             <div className="w-16 h-16 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0 border border-emerald-100">
               <Video className="h-8 w-8 text-emerald-600" />
             </div>
