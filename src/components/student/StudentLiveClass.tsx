@@ -109,7 +109,7 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
 
   if (isLoading) {
     return (
-      <div className="w-full space-y-4">
+      <div className="w-full">
         <Skeleton className="h-32 w-full rounded-2xl" />
       </div>
     );
@@ -117,13 +117,11 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
 
   if (ongoingClasses.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center mb-4">
-          <Video className="h-8 w-8 text-slate-300" />
-        </div>
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <Video className="h-12 w-12 text-slate-200 mb-3" />
         <h3 className="text-lg font-semibold text-slate-700">No Live Class</h3>
-        <p className="text-slate-500 mt-1 max-w-xs">
-          There are no classes currently running for {subject || 'this batch'}.
+        <p className="text-slate-500 max-w-xs mx-auto">
+          There are no classes currently running.
         </p>
       </div>
     );
