@@ -93,8 +93,8 @@ export const StudentSubjectBlocks = ({
 }: StudentSubjectBlocksProps) => {
   return (
     <div className="min-h-full bg-slate-50">
-      {/* Header with breadcrumb */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white">
+      {/* Header with SELECTED BATCH styling */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white rounded-b-2xl shadow-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <Button
             variant="ghost"
@@ -105,8 +105,10 @@ export const StudentSubjectBlocks = ({
             Back to Subjects
           </Button>
           <div>
-            <p className="text-slate-400 text-sm font-medium mb-1">{batch}</p>
-            <h1 className="text-3xl font-bold">{subject}</h1>
+            <p className="text-cyan-400/80 text-xs font-semibold uppercase tracking-wider mb-1.5">
+              Selected Batch
+            </p>
+            <h1 className="text-2xl sm:text-3xl font-bold">{batch} - {subject}</h1>
           </div>
         </div>
       </div>

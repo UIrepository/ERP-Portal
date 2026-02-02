@@ -1,11 +1,10 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Crown, ExternalLink, Search, ArrowLeft } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
@@ -22,9 +21,9 @@ interface UIKiPadhaiContent {
   subject: string;
 }
 
-interface UserEnrollment {
-    batch_name: string;
-    subject_name: string;
+interface StudentUIKiPadhaiProps {
+  batch?: string;
+  subject?: string;
 }
 
 const PremiumContentSkeleton = () => (
@@ -94,12 +93,14 @@ const PremiumContentViewer = ({ content, onBack, onAccess, allContent, onContent
                                 {otherContent.map(item => (
                                     <div key={item.id} className="p-3 bg-white rounded-lg hover:shadow-xl hover:scale-105 transition-all duration-200 cursor-pointer" onClick={() => onContentSelect(item)}>
                                         <p className="font-semibold text-gray-900">{item.title}</p>
-                                        <div className="flex items-center gap-2 mt-2">
-                                            <Badge variant="outline">{item.subject}</Badge>
-                                            <Badge variant="secondary">{item.batch}</Badge>
-                                        </div>
+                                        {item.category && (
+                                            <Badge variant="outline" className="mt-2">{item.category}</Badge>
+                                        )}
                                     </div>
                                 ))}
+                                {otherContent.length === 0 && (
+                                    <p className="text-sm text-muted-foreground text-center py-4">No other content available</p>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -109,88 +110,29 @@ const PremiumContentViewer = ({ content, onBack, onAccess, allContent, onContent
     );
 };
 
-export const StudentUIKiPadhai = () => {
+export const StudentUIKiPadhai = ({ batch, subject }: StudentUIKiPadhaiProps) => {
   const { profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
-  const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
   const [selectedContent, setSelectedContent] = useState<UIKiPadhaiContent | null>(null);
 
-  const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
-    queryKey: ['userEnrollments', profile?.user_id],
-    queryFn: async () => {
-        if (!profile?.user_id) return [];
-        const { data, error } = await supabase.from('user_enrollments').select('batch_name, subject_name').eq('user_id', profile.user_id);
-        if (error) {
-            console.error("Error fetching user enrollments:", error);
-            return [];
-        }
-        return data || [];
-    },
-    enabled: !!profile?.user_id
-  });
-
-  const displayedBatches = useMemo(() => {
-    if (!userEnrollments) return [];
-    return Array.from(new Set(userEnrollments.map(e => e.batch_name))).sort();
-  }, [userEnrollments]);
-
-  const displayedSubjects = useMemo(() => {
-    if (!userEnrollments || selectedBatchFilter === 'all') return [];
-    return Array.from(new Set(userEnrollments.filter(e => e.batch_name === selectedBatchFilter).map(e => e.subject_name))).sort();
-  }, [userEnrollments, selectedBatchFilter]);
-
-  useEffect(() => {
-    if (selectedBatchFilter === 'all') {
-        setSelectedSubjectFilter('all');
-    }
-  }, [selectedBatchFilter]);
-
-  const { data: premiumContent, isLoading: isLoadingPremiumContent } = useQuery<UIKiPadhaiContent[]>({
-    queryKey: ['student-ui-ki-padhai', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
+  // Direct query when batch/subject props are provided (context-aware mode)
+  const { data: premiumContent, isLoading } = useQuery<UIKiPadhaiContent[]>({
+    queryKey: ['student-ui-ki-padhai', batch, subject],
     queryFn: async (): Promise<UIKiPadhaiContent[]> => {
-        if (!userEnrollments || userEnrollments.length === 0) return [];
+        if (!batch || !subject) return [];
         
         const { data, error } = await supabase
             .from('ui_ki_padhai_content')
             .select('id, title, description, category, link, is_active, created_at, batch, subject')
             .eq('is_active', true)
+            .eq('batch', batch)
+            .eq('subject', subject)
             .order('created_at', { ascending: false });
 
-        if (error) {
-            console.error("Error fetching 'UI Ki Padhai' content:", error);
-            throw error;
-        }
-
-        if (!data) return [];
-
-        const filteredContent = data.filter(content => {
-            if (typeof content.batch !== 'string' || typeof content.subject !== 'string') {
-              console.warn('Skipping content due to missing or invalid batch/subject:', content);
-              return false;
-            }
-
-            const isEnrolled = userEnrollments.some(enrollment =>
-                enrollment.batch_name === content.batch &&
-                enrollment.subject_name === content.subject
-            );
-
-            if (!isEnrolled) return false;
-
-            if (selectedBatchFilter !== 'all' && content.batch !== selectedBatchFilter) {
-                return false;
-            }
-
-            if (selectedSubjectFilter !== 'all' && content.subject !== selectedSubjectFilter) {
-                return false;
-            }
-
-            return true;
-        });
-
-        return filteredContent as UIKiPadhaiContent[];
+        if (error) throw error;
+        return (data || []) as UIKiPadhaiContent[];
     },
-    enabled: !!userEnrollments && userEnrollments.length > 0
+    enabled: !!batch && !!subject
   });
 
   const filteredContent = useMemo(() => {
@@ -204,8 +146,6 @@ export const StudentUIKiPadhai = () => {
   const handleAccessContent = (content: UIKiPadhaiContent) => {
     window.open(content.link, '_blank');
   };
-  
-  const isLoading = isLoadingEnrollments || isLoadingPremiumContent;
 
   if (selectedContent) {
     return <PremiumContentViewer content={selectedContent} onBack={() => setSelectedContent(null)} onAccess={handleAccessContent} allContent={premiumContent || []} onContentSelect={setSelectedContent} />;
@@ -228,13 +168,14 @@ export const StudentUIKiPadhai = () => {
                     UI Ki Padhai
                 </h1>
                 <p className="text-xl md:text-2xl text-yellow-100 drop-shadow-sm font-semibold">
-                    Exclusive Premium Content & Advanced Courses
+                    Exclusive Premium Content for {subject}
                 </p>
             </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="relative flex-1 col-span-full md:col-span-1">
+        {/* Search Section - No filter dropdowns */}
+        <div className="mb-8">
+          <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search content..."
@@ -243,32 +184,6 @@ export const StudentUIKiPadhai = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
-            <SelectTrigger className="w-full h-10">
-              <SelectValue placeholder="Filter by batch" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Batches</SelectItem>
-              {displayedBatches.map((batch) => (
-                <SelectItem key={batch} value={batch}>{batch}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={selectedSubjectFilter}
-            onValueChange={setSelectedSubjectFilter}
-            disabled={selectedBatchFilter === 'all'}
-          >
-            <SelectTrigger className="w-full h-10">
-              <SelectValue placeholder="Filter by subject" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Subjects</SelectItem>
-              {displayedSubjects?.map((subject) => (
-                <SelectItem key={subject} value={subject}>{subject}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
 
         <div className="space-y-4">
@@ -289,8 +204,6 @@ export const StudentUIKiPadhai = () => {
                                 </div>
                             </div>
                             <div className="flex flex-wrap gap-2 mt-3 pl-12">
-                                <Badge variant="outline">{content.subject}</Badge>
-                                <Badge variant="secondary">{content.batch}</Badge>
                                 {content.category && (
                                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{content.category}</Badge>
                                 )}
@@ -313,7 +226,7 @@ export const StudentUIKiPadhai = () => {
             <div className="text-center py-20 bg-white rounded-lg border-dashed border-2 shadow-sm">
               <Crown className="h-16 w-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-gray-700">No Premium Content Available</h3>
-              <p className="text-muted-foreground mt-2">Please check back later for exclusive courses and materials.</p>
+              <p className="text-muted-foreground mt-2">No exclusive content is available for this subject yet.</p>
             </div>
           )}
         </div>

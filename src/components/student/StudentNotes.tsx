@@ -6,7 +6,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileText, Download, Search, ArrowLeft } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CardHeader, CardTitle } from '../ui/card';
@@ -23,9 +22,9 @@ interface NotesContent {
   created_at: string;
 }
 
-interface UserEnrollment {
-    batch_name: string;
-    subject_name: string;
+interface StudentNotesProps {
+  batch?: string;
+  subject?: string;
 }
 
 const NotesSkeleton = () => (
@@ -49,7 +48,7 @@ const NotesSkeleton = () => (
 );
 
 const NoteViewer = ({ note, onBack, onDownload, allNotes, onNoteSelect }: { note: NotesContent, onBack: () => void, onDownload: (note: NotesContent) => void, allNotes: NotesContent[], onNoteSelect: (note: NotesContent) => void }) => {
-    const otherNotes = allNotes.filter(n => n.id !== note.id && n.batch === note.batch && n.subject === note.subject);
+    const otherNotes = allNotes.filter(n => n.id !== note.id);
   
     return (
       <div className="p-4 md:p-6 space-y-6 bg-slate-100 min-h-full">
@@ -98,6 +97,9 @@ const NoteViewer = ({ note, onBack, onDownload, allNotes, onNoteSelect }: { note
                                     <p className="text-xs text-muted-foreground">{otherNote.filename}</p>
                                 </div>
                             ))}
+                            {otherNotes.length === 0 && (
+                                <p className="text-sm text-muted-foreground text-center py-4">No other notes available</p>
+                            )}
                         </div>
                     </CardContent>
                 </Card>
@@ -108,107 +110,34 @@ const NoteViewer = ({ note, onBack, onDownload, allNotes, onNoteSelect }: { note
   };
 
 
-export const StudentNotes = () => {
+export const StudentNotes = ({ batch, subject }: StudentNotesProps) => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
-  const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
   const [selectedNote, setSelectedNote] = useState<NotesContent | null>(null);
 
-  const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
-    queryKey: ['userEnrollments', profile?.user_id],
-    queryFn: async () => {
-        if (!profile?.user_id) return [];
-        const { data, error } = await supabase
-            .from('user_enrollments')
-            .select('batch_name, subject_name')
-            .eq('user_id', profile.user_id);
-        if (error) {
-            console.error("Error fetching user enrollments:", error);
-            return [];
-        }
-        return data || [];
-    },
-    enabled: !!profile?.user_id
-  });
-
-  // Derived state for filter options, implementing cascading logic
-  const displayedBatches = useMemo(() => {
-    if (!userEnrollments) return [];
-    if (selectedSubjectFilter === 'all') {
-      return Array.from(new Set(userEnrollments.map(e => e.batch_name))).sort();
-    } else {
-      return Array.from(new Set(
-        userEnrollments
-          .filter(e => e.subject_name === selectedSubjectFilter)
-          .map(e => e.batch_name)
-      )).sort();
-    }
-  }, [userEnrollments, selectedSubjectFilter]);
-
-  const displayedSubjects = useMemo(() => {
-    if (!userEnrollments) return [];
-    if (selectedBatchFilter !== 'all') {
-      return Array.from(new Set(
-        userEnrollments
-          .filter(e => e.batch_name === selectedBatchFilter)
-          .map(e => e.subject_name)
-      )).sort();
-    }
-    return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
-  }, [userEnrollments, selectedBatchFilter]);
-
-  // FIX: Moved filter reset logic into useEffect hooks
-  useEffect(() => {
-    if (selectedBatchFilter !== 'all' && !displayedBatches.includes(selectedBatchFilter)) {
-        setSelectedBatchFilter('all');
-    }
-  }, [selectedBatchFilter, displayedBatches]);
-
-  useEffect(() => {
-      if (selectedSubjectFilter !== 'all' && !displayedSubjects.includes(selectedSubjectFilter)) {
-          setSelectedSubjectFilter('all');
-      }
-  }, [selectedSubjectFilter, displayedSubjects]);
-
-
-  const { data: notes, isLoading: isLoadingNotesContent } = useQuery<NotesContent[]>({
-    queryKey: ['student-notes', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
+  // Direct query when batch/subject props are provided (context-aware mode)
+  const { data: notes, isLoading } = useQuery<NotesContent[]>({
+    queryKey: ['student-notes', batch, subject],
     queryFn: async (): Promise<NotesContent[]> => {
-        if (!userEnrollments || userEnrollments.length === 0) return [];
-
-        let query = supabase.from('notes').select('*');
-
-        const combinationFilters = userEnrollments
-            .filter(enrollment =>
-                (selectedBatchFilter === 'all' || enrollment.batch_name === selectedBatchFilter) &&
-                (selectedSubjectFilter === 'all' || enrollment.subject_name === selectedSubjectFilter)
-            )
-            .map(enrollment => `and(batch.eq.${enrollment.batch_name},subject.eq.${enrollment.subject_name})`);
-
-        if (combinationFilters.length > 0) {
-            query = query.or(combinationFilters.join(','));
-        } else {
-            return [];
-        }
+        if (!batch || !subject) return [];
         
-        query = query.order('created_at', { ascending: false });
-
-        const { data, error } = await query;
-      
-        if (error) {
-            console.error("Error fetching filtered Notes content:", error);
-            throw error;
-        }
+        const { data, error } = await supabase
+            .from('notes')
+            .select('*')
+            .eq('batch', batch)
+            .eq('subject', subject)
+            .order('created_at', { ascending: false });
+        
+        if (error) throw error;
         return (data || []) as NotesContent[];
     },
-    enabled: !!userEnrollments && userEnrollments.length > 0
+    enabled: !!batch && !!subject
   });
 
   // Set up real-time subscriptions for notes data
   useEffect(() => {
-    if (!profile?.user_id) return;
+    if (!profile?.user_id || !batch || !subject) return;
 
     const notesChannel = supabase
       .channel('notes-realtime-updates')
@@ -221,20 +150,7 @@ export const StudentNotes = () => {
         },
         () => {
           console.log('Real-time update: notes changed');
-          queryClient.invalidateQueries({ queryKey: ['student-notes'] });
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_enrollments',
-          filter: `user_id=eq.${profile.user_id}`
-        },
-        () => {
-          console.log('Real-time update: user_enrollments changed');
-          queryClient.invalidateQueries({ queryKey: ['userEnrollments'] });
+          queryClient.invalidateQueries({ queryKey: ['student-notes', batch, subject] });
         }
       )
       .subscribe();
@@ -242,32 +158,33 @@ export const StudentNotes = () => {
     return () => {
       supabase.removeChannel(notesChannel);
     };
-  }, [profile?.user_id, queryClient]);
+  }, [profile?.user_id, batch, subject, queryClient]);
 
   // Client-side filtering only for search term
-  const filteredNotes = notes?.filter(note => {
-    const matchesSearch = !searchTerm || 
-      note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      note.filename.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    return matchesSearch;
-  });
+  const filteredNotes = useMemo(() => {
+    if (!notes) return [];
+    return notes.filter(note => {
+      const matchesSearch = !searchTerm || 
+        note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        note.filename.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesSearch;
+    });
+  }, [notes, searchTerm]);
 
   const logActivity = async (activityType: string, description: string, metadata?: any) => {
     if (!profile?.user_id) return;
     
-    const availableBatchesForLog = Array.from(new Set(userEnrollments?.map(e => e.batch_name) || []));
     await supabase.from('student_activities').insert({
       user_id: profile.user_id,
       activity_type: activityType,
       description,
       metadata,
-      batch: availableBatchesForLog.length > 0 ? availableBatchesForLog[0] : null,
-      subject: metadata.subject,
+      batch: batch || null,
+      subject: subject || null,
     });
   };
 
-  const handleDownload = async (note: any) => {
+  const handleDownload = async (note: NotesContent) => {
     await logActivity('note_download', `Downloaded ${note.title}`, {
       subject: note.subject,
       noteId: note.id,
@@ -301,8 +218,6 @@ export const StudentNotes = () => {
     }, 1000);
   };
 
-  const isLoading = isLoadingEnrollments || isLoadingNotesContent;
-
   if (selectedNote) {
     return <NoteViewer note={selectedNote} onBack={() => setSelectedNote(null)} onDownload={handleDownload} allNotes={notes || []} onNoteSelect={setSelectedNote} />;
   }
@@ -310,22 +225,17 @@ export const StudentNotes = () => {
   return (
     <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
       {/* Header Section */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 flex items-center">
-            <FileText className="mr-3 h-8 w-8 text-primary" />
-            Notes & Resources
-          </h1>
-          <p className="text-gray-500 mt-1">Download your class notes and materials here.</p>
-        </div>
-        <div className="flex gap-2">
-          {displayedBatches.map(b => <Badge key={b} variant="outline">{b}</Badge>)}
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold text-gray-800 flex items-center">
+          <FileText className="mr-3 h-8 w-8 text-primary" />
+          Notes & Resources
+        </h1>
+        <p className="text-gray-500 mt-1">Download your class notes and materials for {subject}</p>
       </div>
 
-      {/* Filter and Search Section */}
+      {/* Search Section - No filter dropdowns */}
       <div className="flex gap-4">
-        <div className="relative flex-1">
+        <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search notes by title or filename..."
@@ -334,32 +244,6 @@ export const StudentNotes = () => {
             className="pl-10 h-10"
           />
         </div>
-        <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
-          <SelectTrigger className="w-48 h-10">
-            <SelectValue placeholder="Filter by batch" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Batches</SelectItem>
-            {displayedBatches.map((batch) => (
-              <SelectItem key={batch} value={batch}>{batch}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={selectedSubjectFilter}
-          onValueChange={setSelectedSubjectFilter}
-          disabled={selectedBatchFilter === 'all'}
-        >
-          <SelectTrigger className="w-48 h-10">
-            <SelectValue placeholder="Filter by subject" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Subjects</SelectItem>
-            {displayedSubjects.map((subject) => (
-              <SelectItem key={subject} value={subject}>{subject}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Notes Grid */}
@@ -382,8 +266,6 @@ export const StudentNotes = () => {
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2 mt-4">
-                      <Badge variant="outline">{note.subject}</Badge>
-                      <Badge variant="secondary">{note.batch}</Badge>
                       {note.tags?.map((tag, index) => (
                         <Badge key={index} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{tag}</Badge>
                       ))}
@@ -398,10 +280,12 @@ export const StudentNotes = () => {
             ))}
           </div>
         ) : (
-          <div className="text-center py-20 bg-white rounded-lg border-dashed border-2">
-            <FileText className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-700">No Notes Found</h3>
-            <p className="text-muted-foreground mt-2">Check back later or adjust your filters.</p>
+          <div className="text-center py-20 bg-white rounded-lg border-dashed border-2 shadow-sm border-slate-300">
+            <div className="inline-block bg-slate-100 rounded-full p-4">
+              <FileText className="h-12 w-12 text-slate-400" />
+            </div>
+            <h3 className="mt-6 text-xl font-semibold text-slate-700">No Notes Found</h3>
+            <p className="text-muted-foreground mt-2">No notes are available for this subject yet.</p>
           </div>
         )}
       </div>
