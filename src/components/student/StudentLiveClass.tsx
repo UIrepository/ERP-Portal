@@ -132,38 +132,46 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
       {ongoingClasses.map((classItem) => (
         <div
           key={classItem.id}
-          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 p-6 text-white shadow-lg transition-transform hover:scale-[1.01]"
+          className="relative overflow-hidden rounded-2xl bg-white border border-slate-100 p-6 shadow-sm transition-all hover:shadow-md"
         >
           {/* Live Pulse Indicator */}
           <div className="absolute top-4 right-4 flex items-center gap-2">
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
-            <span className="text-xs font-bold uppercase tracking-wider bg-white/20 px-2 py-1 rounded-full">Live Now</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full border border-emerald-100">
+              Live Now
+            </span>
           </div>
 
           <div className="flex items-center gap-5">
-            <div className="w-16 h-16 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0 backdrop-blur-sm">
-              <Video className="h-8 w-8 text-white" />
+            <div className="w-16 h-16 rounded-xl bg-slate-50 flex items-center justify-center flex-shrink-0 border border-slate-100">
+              <Video className="h-8 w-8 text-slate-600" />
             </div>
+            
             <div className="flex-1 min-w-0">
-              <h3 className="text-xl font-bold mb-1 leading-tight">{classItem.subject}</h3>
-              <p className="text-emerald-100 text-sm font-medium mb-3">
+              <h3 className="text-xl font-bold mb-1 leading-tight text-slate-900">
+                {classItem.subject}
+              </h3>
+              <p className="text-slate-500 text-sm font-medium mb-3">
                 {formatTime(classItem.start_time)} - {formatTime(classItem.end_time)}
               </p>
+              
               <div className="flex items-center gap-3">
                 <Button
                   onClick={() => handleJoinClass(classItem.meeting_link_url)}
                   disabled={!classItem.meeting_link_url}
-                  className="bg-white text-emerald-700 hover:bg-emerald-50 font-bold border-0 shadow-sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm"
                   size="sm"
                 >
                   <ExternalLink className="h-4 w-4 mr-2" />
                   Join Class
                 </Button>
                 {!classItem.meeting_link_url && (
-                  <span className="text-emerald-100 text-xs italic">Waiting for link...</span>
+                  <span className="text-amber-600 text-xs italic font-medium bg-amber-50 px-2 py-1 rounded-md">
+                    Waiting for link...
+                  </span>
                 )}
               </div>
             </div>
