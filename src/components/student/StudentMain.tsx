@@ -9,7 +9,7 @@ import { StudentBlockContent } from './StudentBlockContent';
 import { StudentAnnouncements } from './StudentAnnouncements';
 import { StudentCommunity } from './StudentCommunity';
 import { StudentConnect } from './StudentConnect';
-import { StudentSchedule } from './StudentSchedule';
+import { StudentLiveClass } from './StudentLiveClass';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Share2, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -272,8 +272,8 @@ export const StudentMain = () => {
         );
       case 'live':
         return (
-          <div className="bg-white rounded-[16px] p-[20px] shadow-sm">
-             <StudentSchedule />
+          <div className="bg-white rounded-[16px] p-[35px] shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)]">
+             <StudentLiveClass batch={navigation.batch} />
           </div>
         );
       case 'announcements':
