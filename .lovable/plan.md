@@ -1,172 +1,226 @@
 
-# Plan: Professional UI/UX with Context-Aware Content Filtering
+
+# Plan: Dynamic URL Navigation & UI Restructure for Student Interface
 
 ## Overview
-This plan enhances the student interface to display content specific to the selected batch and subject, removing redundant filters from content views (except Schedule and Community). The floating header will be updated to match the reference design, showing the combined "Batch Name - Subject Name" format.
+
+This plan restructures the student interface with the following key changes:
+
+1. **Floating header** appears only on the initial batch/subject selection page, positioned below the navigation bar
+2. **White sticky header** replaces the dark header when navigating into a subject, featuring a back arrow on the left
+3. **Dynamic URL routing** reflects the current navigation state (batch, subject, block)
+4. **Join Live Class block** added inside each subject view (combining ongoing/upcoming class functionality)
+5. **Sidebar cleanup** - removes "Join Live Class", "Ongoing Class", and "Practice DPP" while keeping Schedule
+
+---
+
+## Architecture Overview
+
+```text
+URL Structure:
+/                                    -> Dashboard (batch selection + subjects)
+/?batch=JEE2025                      -> Dashboard with batch pre-selected
+/?batch=JEE2025&subject=Physics      -> Subject blocks view
+/?batch=JEE2025&subject=Physics&block=recordings -> Block content view
+/?batch=JEE2025&subject=Physics&block=live-class -> Live class block
+```
 
 ---
 
 ## Technical Implementation
 
-### 1. Update Floating Header Component
+### 1. Add URL Query Parameter Syncing
+
+**File: `src/components/student/StudentMain.tsx`**
+
+- Import `useSearchParams` from `react-router-dom`
+- Sync navigation state with URL query parameters
+- On mount, parse URL params to restore navigation state
+- On navigation changes, update URL params using `setSearchParams`
+
+Changes:
+- Add `useSearchParams` hook
+- Create `useEffect` to read initial state from URL
+- Update all navigation handlers to also update URL params
+- Handle browser back/forward navigation
+
+### 2. Update Header Architecture
 
 **File: `src/components/student/StudentBatchHeader.tsx`**
 
-Modify the header to:
-- Display "SELECTED BATCH" label with the format "Batch Name - Subject Name" when subject is selected
-- Show just batch name when at batch/subject selection level
-- Add a subtle menu dots icon on the right (matching reference image)
-- Improve the rounded corner styling to match the reference
+Keep as the dark floating header for the initial view (batch selection page only).
 
-**Changes:**
-- Add optional `subject` prop to component
-- Update display logic to show combined format when subject is present
-- Add `MoreVertical` icon on the right side
+**New File: `src/components/student/StudentSubjectHeader.tsx`**
 
----
+Create a new white sticky header for subject/block views:
+- White background with subtle border/shadow
+- Back arrow on the left side (after sidebar area)
+- Breadcrumb showing: Batch > Subject > Block
+- Clean, minimal design
 
-### 2. Update StudentBlockContent to Pass Context
-
-**File: `src/components/student/StudentBlockContent.tsx`**
-
-Modify to pass `batch` and `subject` props to child content components:
-- `StudentRecordings` receives `batch` and `subject`
-- `StudentNotes` receives `batch` and `subject`
-- `StudentUIKiPadhai` receives `batch` and `subject`
-- `StudentAnnouncements` receives `batch` and `subject`
-- `StudentSchedule` and `StudentCommunity` keep their existing behavior (with filters)
-
----
-
-### 3. Refactor StudentRecordings Component
-
-**File: `src/components/student/StudentRecordings.tsx`**
-
-Major changes:
-- Add `batch` and `subject` props (optional for backward compatibility)
-- When props are provided, filter data directly by those values
-- Remove the batch/subject filter dropdowns from UI
-- Keep only the search input for finding recordings by topic
-- Update query to filter by exact batch and subject combination
-- Remove all filter-related state and cascading logic
-
----
-
-### 4. Refactor StudentNotes Component
-
-**File: `src/components/student/StudentNotes.tsx`**
-
-Major changes:
-- Add `batch` and `subject` props
-- When props are provided, query only that specific batch/subject combination
-- Remove batch/subject filter dropdowns from UI
-- Keep only search input for filtering notes by title/filename
-- Simplify the component significantly
-
----
-
-### 5. Refactor StudentUIKiPadhai Component
-
-**File: `src/components/student/StudentUIKiPadhai.tsx`**
-
-Major changes:
-- Add `batch` and `subject` props
-- When props are provided, filter content to that specific combination
-- Remove batch/subject filter dropdowns from UI
-- Keep search input for content discovery
-- Maintain the premium content styling
-
----
-
-### 6. Refactor StudentAnnouncements Component
-
-**File: `src/components/student/StudentAnnouncements.tsx`**
-
-Major changes:
-- Add `batch` and `subject` props
-- Filter announcements to show only those targeted at the specific batch/subject
-- Include global announcements (where target_batch or target_subject is null)
-- No filters needed in this view - just show relevant announcements
-
----
-
-### 7. Keep Filters in Schedule and Community
-
-**Files: `StudentSchedule.tsx` and `StudentCommunity.tsx`**
-
-These components will retain their filter functionality as requested:
-- **Schedule**: Keep batch filter since students may want to see schedules across batches
-- **Community**: Keep the group selection (batch/subject combination) as it's core to the chat functionality
-
----
-
-### 8. Update StudentSubjectBlocks Header
+### 3. Add Live Class Block to Subject View
 
 **File: `src/components/student/StudentSubjectBlocks.tsx`**
 
-Update header to show "SELECTED BATCH" format matching the main header design for consistency.
+Add a new "Live Class" block to the blocks array:
+- ID: `live-class`
+- Label: "Join Live Class"
+- Description: "Ongoing & upcoming classes"
+- Icon: Video with live indicator
+- Gradient: Green/Emerald for live emphasis
+
+**New File: `src/components/student/StudentLiveClass.tsx`**
+
+Create a combined live class component:
+- Shows ongoing classes (LIVE NOW) for the selected batch/subject
+- Shows upcoming classes for today
+- Join button opens meeting link
+- Filtered by the current batch and subject context
+- Merges functionality from `StudentJoinClass` and `StudentCurrentClass`
+
+### 4. Update Block Content Router
+
+**File: `src/components/student/StudentBlockContent.tsx`**
+
+- Add case for `live-class` block
+- Import and render `StudentLiveClass` component
+- Pass batch and subject props
+
+### 5. Update Subject Blocks View Header
+
+**File: `src/components/student/StudentSubjectBlocks.tsx`**
+
+Replace the dark gradient header with the new white sticky header:
+- Back arrow at the start
+- Breadcrumb navigation
+- Remove the dark gradient styling
+
+### 6. Update Block Content View Header
+
+**File: `src/components/student/StudentBlockContent.tsx`**
+
+Replace the dark gradient header with the new white sticky header:
+- Consistent with subject blocks view
+- Back navigation to subject blocks
+- Full breadcrumb: Batch > Subject > Block
+
+### 7. Simplify Sidebar for Students
+
+**File: `src/components/Sidebar.tsx`**
+
+Update `studentTabs` array:
+- KEEP: "My Learning" (dashboard)
+- KEEP: "Schedule" (moved here from subject blocks)
+- REMOVE: "Join Live Class"
+- REMOVE: "Ongoing Class"
+- REMOVE: "Practice (DPP)"
+- KEEP: "Submit Feedback"
+- KEEP: "Exams"
+- KEEP: "Contact Admin"
+
+New student tabs:
+```typescript
+const studentTabs = [
+  { id: 'dashboard', label: 'My Learning', icon: LayoutDashboard },
+  { id: 'schedule', label: 'Schedule', icon: Calendar },
+  { id: 'feedback', label: 'Submit Feedback', icon: MessageSquare },
+  { id: 'exams', label: 'Exams', icon: BookOpen },
+  { id: 'contact-admin', label: 'Contact Admin', icon: Phone },
+];
+```
+
+### 8. Update StudentDashboard Tab Handling
+
+**File: `src/components/StudentDashboard.tsx`**
+
+- Remove cases for `join-class`, `current-class`, and `dpp`
+- Keep the `schedule` case for the sidebar schedule access
+- Ensure `schedule` tab renders `StudentSchedule` component
 
 ---
 
-## UI/UX Improvements
+## Visual Design Specifications
 
-### Header Styling (Matching Reference)
-- Dark gradient background: `from-slate-900 via-slate-800 to-slate-900`
-- More rounded corners on the header container
-- "SELECTED BATCH" label in muted cyan/slate color
-- Large bold white text for "Batch Name - Subject Name"
-- Dropdown chevron next to text when switchable
-- Subtle menu icon (three dots) on the right
-- Subtle dot pattern overlay for texture (optional)
+### White Sticky Header (for subject/block views)
 
-### Content Areas
-- Clean, filter-free layouts for Recordings, Notes, UI Ki Padhai, Announcements
-- Professional skeleton loaders
-- Consistent empty state designs
-- Proper spacing and typography hierarchy
+```
++--------------------------------------------------+
+| [<- Back]  Batch > Subject > Block               |
++--------------------------------------------------+
+```
+
+- Background: `bg-white`
+- Border bottom: `border-b border-slate-200`
+- Shadow: `shadow-sm`
+- Padding: Consistent with content area
+- Back arrow: Slate gray, hover effect
+- Breadcrumb: Small text, arrows between items
+
+### Live Class Block Card
+
+- Prominent green/emerald gradient background
+- Live pulse indicator when class is ongoing
+- "Join Now" button with external link icon
+- Shows class time and subject
 
 ---
 
-## Data Flow Diagram
+## URL State Management Logic
 
-```text
-StudentMain (manages navigation state)
-    |
-    +-- navigation.batch (selected batch)
-    +-- navigation.subject (selected subject)
-    +-- navigation.block (selected content block)
-    |
-    v
-StudentBlockContent (receives batch, subject, blockId)
-    |
-    +-- StudentRecordings (batch, subject) --> Direct filter, no UI filters
-    +-- StudentNotes (batch, subject) --> Direct filter, no UI filters
-    +-- StudentUIKiPadhai (batch, subject) --> Direct filter, no UI filters
-    +-- StudentAnnouncements (batch, subject) --> Direct filter, no UI filters
-    +-- StudentSchedule () --> Keeps internal filters
-    +-- StudentCommunity () --> Keeps group selection
+```typescript
+// Reading from URL on mount
+useEffect(() => {
+  const batch = searchParams.get('batch');
+  const subject = searchParams.get('subject');
+  const block = searchParams.get('block');
+  
+  if (batch) {
+    setNavigation({
+      level: block ? 'block' : (subject ? 'subject' : 'batch'),
+      batch,
+      subject: subject || null,
+      block: block || null,
+    });
+  }
+}, []);
+
+// Writing to URL on navigation change
+const updateUrl = (nav: NavigationState) => {
+  const params = new URLSearchParams();
+  if (nav.batch) params.set('batch', nav.batch);
+  if (nav.subject) params.set('subject', nav.subject);
+  if (nav.block) params.set('block', nav.block);
+  setSearchParams(params, { replace: true });
+};
 ```
 
 ---
+
+## Files to Create
+
+| File | Purpose |
+|------|---------|
+| `src/components/student/StudentSubjectHeader.tsx` | White sticky header with back navigation |
+| `src/components/student/StudentLiveClass.tsx` | Combined live/upcoming class view |
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `StudentBatchHeader.tsx` | Add subject prop, update display format, add menu icon |
-| `StudentBlockContent.tsx` | Pass batch/subject to child components |
-| `StudentRecordings.tsx` | Add props, remove filter UI, direct query by batch/subject |
-| `StudentNotes.tsx` | Add props, remove filter UI, direct query by batch/subject |
-| `StudentUIKiPadhai.tsx` | Add props, remove filter UI, filter by batch/subject |
-| `StudentAnnouncements.tsx` | Add props, filter announcements by batch/subject |
-| `StudentSubjectBlocks.tsx` | Update header style for consistency |
+| `src/components/student/StudentMain.tsx` | Add URL sync with useSearchParams |
+| `src/components/student/StudentSubjectBlocks.tsx` | Use white header, add live-class block |
+| `src/components/student/StudentBlockContent.tsx` | Use white header, add live-class case |
+| `src/components/Sidebar.tsx` | Remove join-class, current-class, dpp from student tabs |
+| `src/components/StudentDashboard.tsx` | Remove unused tab cases |
 
 ---
 
 ## Expected Outcome
 
-- **Professional Header**: Shows "Batch Name - Subject Name" like the reference image
-- **Context-Aware Content**: All content blocks show only materials for the selected batch and subject
-- **No Redundant Filters**: Recordings, Notes, UI Ki Padhai, and Announcements have clean UIs without filter dropdowns
-- **Preserved Functionality**: Schedule and Community keep their filter capabilities as requested
-- **Consistent Experience**: Unified design language across all student-facing components
+1. **Initial Dashboard**: Shows floating dark header with batch name, subject cards below
+2. **Subject View**: White sticky header with back arrow, block grid including "Live Class"
+3. **Block View**: White sticky header with breadcrumb, block content
+4. **URLs Update**: Every navigation action updates the URL for shareable links and browser history
+5. **Sidebar Simplified**: Only essential items remain (My Learning, Schedule, Feedback, Exams, Contact)
+6. **Live Class Integrated**: Join ongoing/upcoming classes from within subject context
+
