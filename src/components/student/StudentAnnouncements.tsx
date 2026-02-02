@@ -1,9 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Megaphone, UserCircle, Calendar, Info } from 'lucide-react';
+import { Megaphone, UserCircle, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -13,25 +12,23 @@ interface Announcement {
   message: string;
   created_at: string;
   created_by_name: string;
-  target_batch: string;
-  target_subject: string;
+  target_batch: string | null;
+  target_subject: string | null;
 }
 
-interface UserEnrollment {
-    batch_name: string;
-    subject_name: string;
+interface StudentAnnouncementsProps {
+  batch?: string;
+  subject?: string;
 }
 
 const AnnouncementSkeleton = () => (
     <div className="space-y-12 relative">
         {[...Array(3)].map((_, i) => (
             <div key={i} className="pl-12 relative">
-                {/* Skeleton for timeline line and dot */}
                 <div className="absolute left-3 top-2 h-full w-0.5 bg-slate-200"></div>
                 <div className="absolute left-0 top-1">
                     <Skeleton className="w-6 h-6 rounded-full" />
                 </div>
-                {/* Skeleton for card content */}
                 <Card className="bg-white rounded-xl shadow-lg">
                     <CardHeader className="p-5 border-b bg-slate-50">
                         <Skeleton className="h-6 w-3/4 rounded-md" />
@@ -49,32 +46,22 @@ const AnnouncementSkeleton = () => (
 );
 
 
-export const StudentAnnouncements = () => {
-    const { profile } = useAuth();
-
-    const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
-        queryKey: ['userEnrollmentsForAnnouncements', profile?.user_id],
-        queryFn: async () => {
-            if (!profile?.user_id) return [];
-            const { data, error } = await supabase
-                .from('user_enrollments')
-                .select('batch_name, subject_name')
-                .eq('user_id', profile.user_id);
-            if (error) {
-                console.error("Error fetching user enrollments:", error);
-                return [];
-            }
-            return data || [];
-        },
-        enabled: !!profile?.user_id && profile.role === 'student',
-    });
-
-    const { data: announcements, isLoading: isLoadingAnnouncements } = useQuery({
-        queryKey: ['student-announcements', profile?.user_id],
+export const StudentAnnouncements = ({ batch, subject }: StudentAnnouncementsProps) => {
+    // Direct query when batch/subject props are provided (context-aware mode)
+    const { data: announcements, isLoading } = useQuery({
+        queryKey: ['student-announcements', batch, subject],
         queryFn: async (): Promise<Announcement[]> => {
+            if (!batch || !subject) return [];
+            
+            // Get announcements that are:
+            // 1. Targeted to this specific batch AND subject
+            // 2. Targeted to this batch only (no subject filter)
+            // 3. Targeted to this subject only (no batch filter)
+            // 4. Global announcements (no batch and no subject filter)
             const { data, error } = await supabase
                 .from('notifications')
                 .select('id, title, message, created_at, created_by_name, target_batch, target_subject')
+                .or(`and(target_batch.eq.${batch},target_subject.eq.${subject}),and(target_batch.eq.${batch},target_subject.is.null),and(target_batch.is.null,target_subject.eq.${subject}),and(target_batch.is.null,target_subject.is.null)`)
                 .order('created_at', { ascending: false });
             
             if (error) {
@@ -83,10 +70,8 @@ export const StudentAnnouncements = () => {
             }
             return (data || []) as Announcement[];
         },
-        enabled: !!profile?.user_id && profile.role === 'student' && !!userEnrollments && userEnrollments.length > 0,
+        enabled: !!batch && !!subject,
     });
-
-    const isLoading = isLoadingEnrollments || isLoadingAnnouncements;
 
     return (
         <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
@@ -95,20 +80,12 @@ export const StudentAnnouncements = () => {
                     <Megaphone className="mr-3 h-8 w-8 text-primary" />
                     Notice Board
                 </h1>
-                <p className="text-gray-500 mt-1">All important updates from the team, right here in one place.</p>
+                <p className="text-gray-500 mt-1">Important updates for {subject}</p>
             </div>
 
             <div>
                 {isLoading ? (
                     <AnnouncementSkeleton />
-                ) : (profile?.role === 'student' && (!userEnrollments || userEnrollments.length === 0)) ? (
-                    <div className="text-center py-20 bg-white rounded-lg border-dashed border-2 shadow-sm border-slate-300">
-                        <div className="inline-block bg-slate-100 rounded-full p-4">
-                            <Info className="h-12 w-12 text-slate-400" />
-                        </div>
-                        <h3 className="mt-6 text-xl font-semibold text-slate-700">No Enrollments Found</h3>
-                        <p className="text-muted-foreground mt-2">You are not currently enrolled in any batch. Announcements will appear here once you are enrolled.</p>
-                    </div>
                 ) : announcements && announcements.length > 0 ? (
                     <div className="relative space-y-12">
                         <div className="absolute left-3 top-2 h-full w-0.5 bg-slate-200" />
@@ -154,7 +131,7 @@ export const StudentAnnouncements = () => {
                             <Megaphone className="h-12 w-12 text-slate-400" />
                         </div>
                         <h3 className="mt-6 text-xl font-semibold text-slate-700">No New Announcements</h3>
-                        <p className="text-muted-foreground mt-2">Check back later for important updates from the administration.</p>
+                        <p className="text-muted-foreground mt-2">Check back later for important updates.</p>
                     </div>
                 )}
             </div>

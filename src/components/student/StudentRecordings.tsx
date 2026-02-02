@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Video, Play, Search, ArrowLeft, PlayCircle, MessageSquare, Send, CornerDownRight } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,9 +26,9 @@ interface RecordingContent {
     created_at: string;
 }
 
-interface UserEnrollment {
-    batch_name: string;
-    subject_name: string;
+interface StudentRecordingsProps {
+    batch?: string;
+    subject?: string;
 }
 
 interface Profile {
@@ -95,7 +94,7 @@ const WatermarkedPlayer = ({ recording }: { recording: RecordingContent }) => {
     );
 };
 
-// Doubts Section Component - REDESIGNED
+// Doubts Section Component
 const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
     const { user } = useAuth();
     const queryClient = useQueryClient();
@@ -147,8 +146,8 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
                 recording_id: recording.id, 
                 user_id: user.id, 
                 question_text,
-                batch: recording.batch, // Added batch
-                subject: recording.subject // Added subject
+                batch: recording.batch,
+                subject: recording.subject
             });
             if (error) throw error;
         },
@@ -296,272 +295,160 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
 
 
 // Main Component
-export const StudentRecordings = () => {
+export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) => {
     const { profile } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
-    const [selectedSubjectFilter, setSelectedSubjectFilter] = useState('all');
-    const [selectedBatchFilter, setSelectedBatchFilter] = useState('all');
     const [selectedRecording, setSelectedRecording] = useState<RecordingContent | null>(null);
     const isMobile = useIsMobile();
 
-    const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
-        queryKey: ['userEnrollments', profile?.user_id],
-        queryFn: async () => {
-            if (!profile?.user_id) return [];
-            const { data, error } = await supabase.from('user_enrollments').select('batch_name, subject_name').eq('user_id', profile.user_id);
-            if (error) {
-                console.error("Error fetching user enrollments:", error);
-                return [];
-            }
-            return data || [];
-        },
-        enabled: !!profile?.user_id
-    });
-
-    const displayedBatches = useMemo(() => {
-        if (!userEnrollments) return [];
-        if (selectedSubjectFilter === 'all') return Array.from(new Set(userEnrollments.map(e => e.batch_name))).sort();
-        return Array.from(new Set(userEnrollments.filter(e => e.subject_name === selectedSubjectFilter).map(e => e.batch_name))).sort();
-    }, [userEnrollments, selectedSubjectFilter]);
-
-    const displayedSubjects = useMemo(() => {
-        if (!userEnrollments) return [];
-        if (selectedBatchFilter !== 'all') return Array.from(new Set(userEnrollments.filter(e => e.batch_name === selectedBatchFilter).map(e => e.subject_name))).sort();
-        return Array.from(new Set(userEnrollments.map(e => e.subject_name))).sort();
-    }, [userEnrollments, selectedBatchFilter]);
-
-    useEffect(() => {
-        if (selectedBatchFilter !== 'all' && !displayedBatches.includes(selectedBatchFilter)) setSelectedBatchFilter('all');
-    }, [selectedBatchFilter, displayedBatches]);
-
-    useEffect(() => {
-        if (selectedSubjectFilter !== 'all' && !displayedSubjects.includes(selectedSubjectFilter)) setSelectedSubjectFilter('all');
-    }, [selectedSubjectFilter, displayedSubjects]);
-
-    const { data: recordings, isLoading: isLoadingRecordingsContent } = useQuery<RecordingContent[]>({
-        queryKey: ['student-recordings', userEnrollments, selectedBatchFilter, selectedSubjectFilter],
+    // Direct query when batch/subject props are provided (context-aware mode)
+    const { data: recordings, isLoading } = useQuery<RecordingContent[]>({
+        queryKey: ['student-recordings', batch, subject],
         queryFn: async (): Promise<RecordingContent[]> => {
-            if (!userEnrollments || userEnrollments.length === 0) return [];
-            let query = supabase.from('recordings').select('*');
-            const combinationFilters = userEnrollments
-                .filter(e => (selectedBatchFilter === 'all' || e.batch_name === selectedBatchFilter) && (selectedSubjectFilter === 'all' || e.subject_name === selectedSubjectFilter))
-                .map(e => `and(batch.eq.${e.batch_name},subject.eq.${e.subject_name})`);
-            if (combinationFilters.length > 0) query = query.or(combinationFilters.join(','));
-            else return [];
-            const { data, error } = await query.order('date', { ascending: false });
+            if (!batch || !subject) return [];
+            
+            const { data, error } = await supabase
+                .from('recordings')
+                .select('*')
+                .eq('batch', batch)
+                .eq('subject', subject)
+                .order('date', { ascending: false });
+            
             if (error) throw error;
             return (data || []) as RecordingContent[];
         },
-        enabled: !!userEnrollments && userEnrollments.length > 0
+        enabled: !!batch && !!subject
     });
 
     const filteredRecordings = useMemo(() => recordings?.filter(rec =>
-        rec.topic.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        rec.subject.toLowerCase().includes(searchTerm.toLowerCase())
-    ), [recordings, searchTerm]);
+        rec.topic.toLowerCase().includes(searchTerm.toLowerCase())
+    ) || [], [recordings, searchTerm]);
 
-    const isLoading = isLoadingEnrollments || isLoadingRecordingsContent;
+    const logActivity = async (activityType: string, description: string, metadata?: any) => {
+        if (!profile?.user_id) return;
+        await supabase.from('student_activities').insert({
+            user_id: profile.user_id, activity_type: activityType, description, metadata,
+            batch: batch || null,
+            subject: subject || null,
+        });
+    };
+
+    const handleSelectRecording = async (recording: RecordingContent) => {
+        setSelectedRecording(recording);
+        await logActivity('recording_view', `Viewed recording: ${recording.topic}`, {
+            recordingId: recording.id, topic: recording.topic
+        });
+    };
 
     if (selectedRecording) {
-        const upNextRecordings = recordings?.filter(rec => rec.id !== selectedRecording.id && rec.batch === selectedRecording.batch && rec.subject === selectedRecording.subject).slice(0, 10) || [];
         return (
             <div className="p-4 md:p-6 space-y-6 bg-slate-100 min-h-full">
                 <Button variant="outline" onClick={() => setSelectedRecording(null)} className="mb-4">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Recordings
+                    <ArrowLeft className="h-4 w-4 mr-2" /> Back to Lectures
                 </Button>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-2">
-                        <Card className="bg-black rounded-2xl overflow-hidden shadow-2xl">
+                        <Card className="bg-white rounded-2xl overflow-hidden shadow-2xl">
+                            <CardHeader className="p-6 border-b">
+                                <CardTitle>{selectedRecording.topic}</CardTitle>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    {format(new Date(selectedRecording.date), 'MMMM d, yyyy')}
+                                </p>
+                            </CardHeader>
                             <CardContent className="p-0">
                                 <WatermarkedPlayer recording={selectedRecording} />
                             </CardContent>
                         </Card>
-                        <div className="mt-6">
-                            <h1 className="text-2xl font-bold text-slate-800">{selectedRecording.topic}</h1>
-                            <div className="flex items-center gap-4 text-slate-500 mt-2">
-                                <span>{format(new Date(selectedRecording.date), 'PPP')}</span>
-                                <Badge variant="secondary">{selectedRecording.batch}</Badge>
-                                <Badge variant="outline">{selectedRecording.subject}</Badge>
-                            </div>
-                        </div>
                         <DoubtsSection recording={selectedRecording} />
                     </div>
-                    <div className="space-y-4">
-                        <h2 className="text-xl font-semibold text-slate-700">Up Next</h2>
-                        {upNextRecordings.map(rec => (
-                            <Card key={rec.id} className="p-3 cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setSelectedRecording(rec)}>
-                                <div className="flex gap-4 items-center">
-                                    <div className="w-24 h-16 bg-slate-200 rounded-md flex-shrink-0 relative">
-                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                            <Play className="h-6 w-6 text-white" />
+                    <div className="lg:col-span-1">
+                        <Card className="bg-white rounded-2xl shadow-lg sticky top-4">
+                            <CardHeader><CardTitle>Other Lectures</CardTitle></CardHeader>
+                            <CardContent>
+                                <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+                                    {filteredRecordings.filter(r => r.id !== selectedRecording.id).map(rec => (
+                                        <div key={rec.id} className="p-4 border rounded-lg hover:shadow-md hover:border-primary/50 transition-all duration-200 cursor-pointer" onClick={() => handleSelectRecording(rec)}>
+                                            <div className="flex items-center gap-3">
+                                                <div className="bg-primary/10 p-2 rounded-full flex-shrink-0">
+                                                    <PlayCircle className="h-5 w-5 text-primary" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <p className="font-semibold text-primary line-clamp-1">{rec.topic}</p>
+                                                    <p className="text-xs text-muted-foreground">{format(new Date(rec.date), 'MMM d, yyyy')}</p>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold text-sm line-clamp-2">{rec.topic}</p>
-                                        <p className="text-xs text-slate-500">{rec.subject}</p>
-                                    </div>
+                                    ))}
                                 </div>
-                            </Card>
-                        ))}
+                            </CardContent>
+                        </Card>
                     </div>
                 </div>
             </div>
-        )
-    }
-
-    if (isMobile) {
-        return (
-            <div className="min-h-screen bg-gray-50 text-gray-800">
-                <main className="p-4">
-                    <div className="mb-6">
-                        <h2 className="text-lg font-semibold text-gray-900">Welcome back!</h2>
-                        <p className="text-gray-500 text-sm">Review past lectures and catch up on missed classes.</p>
-                    </div>
-                    <div className="relative mb-4">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
-                        <Input className="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Search recordings..." type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                    </div>
-                    <div className="flex gap-4 mb-6">
-                        <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
-                            <SelectTrigger className="w-full">
-                                <SelectValue placeholder="All Batches" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Batches</SelectItem>
-                                {displayedBatches.map((batch) => (
-                                    <SelectItem key={batch} value={batch}>{batch}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <Select value={selectedSubjectFilter} onValueChange={setSelectedSubjectFilter}>
-                            <SelectTrigger className="w-full">
-                                <SelectValue placeholder="All Subjects" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Subjects</SelectItem>
-                                {displayedSubjects.map((subject) => (
-                                    <SelectItem key={subject} value={subject}>{subject}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="space-y-4">
-                        {isLoading ? <RecordingSkeleton /> : (
-                            filteredRecordings && filteredRecordings.length > 0 ? (
-                                filteredRecordings.map((recording) => (
-                                    <div key={recording.id} onClick={() => setSelectedRecording(recording)} className="bg-white rounded-xl shadow-sm overflow-hidden cursor-pointer">
-                                        <div className="relative">
-                                            <div className="w-full h-40 bg-gray-800 flex items-center justify-center">
-                                                <button className="w-14 h-14 bg-white bg-opacity-30 rounded-full flex items-center justify-center backdrop-blur-sm">
-                                                    <Play className="text-white h-8 w-8 fill-white" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div className="p-4">
-                                            <h3 className="font-semibold text-gray-900 text-lg">{recording.topic}</h3>
-                                            <p className="text-sm text-gray-500 mb-3">{format(new Date(recording.date), 'PPP')}</p>
-                                            <div className="flex items-center space-x-2">
-                                                <span className="inline-block bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">{recording.subject}</span>
-                                                <span className="inline-block bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">{recording.batch}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="text-center py-20">
-                                    <Video className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                                    <h3 className="text-xl font-semibold text-gray-700">No Recordings Found</h3>
-                                    <p className="text-muted-foreground mt-2">Check back later or adjust your filters.</p>
-                                </div>
-                            )
-                        )}
-                    </div>
-                </main>
-            </div>
-        )
+        );
     }
 
     return (
-        <main className="flex-1 flex flex-col bg-slate-50">
-            <header className="flex items-center justify-between p-6 border-b border-gray-200 bg-white">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center">
-                        <Video className="h-6 w-6 mr-3 text-indigo-600" />
-                        Class Recordings
-                    </h1>
-                    <p className="text-gray-500 mt-1">Review past lectures and catch up on missed classes.</p>
+        <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
+            {/* Header Section */}
+            <div>
+                <h1 className="text-3xl font-bold text-gray-800 flex items-center">
+                    <PlayCircle className="mr-3 h-8 w-8 text-primary" />
+                    Lectures
+                </h1>
+                <p className="text-gray-500 mt-1">Watch recorded classes for {subject}</p>
+            </div>
+
+            {/* Search Section - No filter dropdowns */}
+            <div className="flex gap-4">
+                <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Search by topic..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 h-10"
+                    />
                 </div>
-                <div className="flex items-center space-x-4">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                        <Input
-                            className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            placeholder="Search recordings..."
-                            type="text"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
-                    <div>
-                        <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
-                            <SelectTrigger className="w-[180px]">
-                                <SelectValue placeholder="All Batches" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Batches</SelectItem>
-                                {displayedBatches.map((batch) => (
-                                    <SelectItem key={batch} value={batch}>{batch}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div>
-                        <Select value={selectedSubjectFilter} onValueChange={setSelectedSubjectFilter}>
-                            <SelectTrigger className="w-[180px]">
-                                <SelectValue placeholder="All Subjects" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Subjects</SelectItem>
-                                {displayedSubjects.map((subject) => (
-                                    <SelectItem key={subject} value={subject}>{subject}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
-            </header>
-            <div className="flex-1 p-8 overflow-y-auto">
-                {isLoading ? <RecordingSkeleton /> : (
-                    filteredRecordings && filteredRecordings.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                            {filteredRecordings.map((recording) => (
-                                <div key={recording.id} onClick={() => setSelectedRecording(recording)} className="bg-white rounded-xl shadow-lg overflow-hidden transform hover:-translate-y-1 transition-transform duration-300 cursor-pointer">
-                                    <div className="relative">
-                                        <div className="bg-gray-800 h-48 flex items-center justify-center">
-                                            <PlayCircle className="text-white text-6xl opacity-80" />
-                                        </div>
-                                    </div>
-                                    <div className="p-5">
-                                        <h3 className="text-lg font-semibold text-gray-900 mb-1 truncate">{recording.topic}</h3>
-                                        <p className="text-sm text-gray-500 mb-4">{format(new Date(recording.date), 'PPP')}</p>
-                                        <div className="flex items-center space-x-2">
-                                            <span className="bg-indigo-100 text-indigo-800 text-xs font-medium px-2.5 py-0.5 rounded-full">{recording.subject}</span>
-                                            <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">{recording.batch}</span>
-                                        </div>
+            </div>
+
+            {/* Recordings Grid */}
+            <div>
+                {isLoading ? (
+                    <RecordingSkeleton />
+                ) : filteredRecordings.length > 0 ? (
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        {filteredRecordings.map((recording) => (
+                            <Card
+                                key={recording.id}
+                                className="bg-white rounded-xl shadow-lg overflow-hidden cursor-pointer hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group"
+                                onClick={() => handleSelectRecording(recording)}
+                            >
+                                <div className="relative h-44 bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center">
+                                    <PlayCircle className="h-16 w-16 text-white/30 group-hover:text-white/60 group-hover:scale-110 transition-all duration-300" />
+                                    <div className="absolute top-3 right-3">
+                                        <Badge variant="secondary" className="bg-white/90 text-slate-700 font-semibold text-xs">
+                                            {format(new Date(recording.date), 'MMM d')}
+                                        </Badge>
                                     </div>
                                 </div>
-                            ))}
+                                <CardContent className="p-5">
+                                    <h3 className="font-semibold text-gray-800 group-hover:text-primary transition-colors line-clamp-2">{recording.topic}</h3>
+                                    <p className="text-sm text-muted-foreground mt-2">{format(new Date(recording.date), 'EEEE, MMMM d, yyyy')}</p>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center py-20 bg-white rounded-lg border-dashed border-2 shadow-sm border-slate-300">
+                        <div className="inline-block bg-slate-100 rounded-full p-4">
+                            <PlayCircle className="h-12 w-12 text-slate-400" />
                         </div>
-                    ) : (
-                        <div className="text-center py-20">
-                            <Video className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                            <h3 className="text-xl font-semibold text-gray-700">No Recordings Found</h3>
-                            <p className="text-muted-foreground mt-2">Check back later or adjust your filters.</p>
-                        </div>
-                    )
+                        <h3 className="mt-6 text-xl font-semibold text-slate-700">No Lectures Found</h3>
+                        <p className="text-muted-foreground mt-2">No recorded lectures are available for this subject yet.</p>
+                    </div>
                 )}
             </div>
-        </main>
+        </div>
     );
 };

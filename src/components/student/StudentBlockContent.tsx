@@ -36,13 +36,13 @@ export const StudentBlockContent = ({
       case 'schedule':
         return <StudentSchedule />;
       case 'recordings':
-        return <StudentRecordings />;
+        return <StudentRecordings batch={batch} subject={subject} />;
       case 'notes':
-        return <StudentNotes />;
+        return <StudentNotes batch={batch} subject={subject} />;
       case 'ui-ki-padhai':
-        return <StudentUIKiPadhai />;
+        return <StudentUIKiPadhai batch={batch} subject={subject} />;
       case 'announcements':
-        return <StudentAnnouncements />;
+        return <StudentAnnouncements batch={batch} subject={subject} />;
       case 'community':
         return <StudentCommunity />;
       case 'connect':
