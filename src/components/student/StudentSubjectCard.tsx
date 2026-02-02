@@ -1,4 +1,4 @@
-import { ArrowRight, BookOpen } from 'lucide-react';
+import { ArrowRight, BookOpen, Microscope, Calculator, FlaskConical, Beaker, TestTube2, FileText, LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface StudentSubjectCardProps {
@@ -7,77 +7,61 @@ interface StudentSubjectCardProps {
   index: number;
 }
 
-const subjectColors = [
-  'from-blue-500 to-blue-600',
-  'from-emerald-500 to-emerald-600',
-  'from-violet-500 to-violet-600',
-  'from-orange-500 to-orange-600',
-  'from-rose-500 to-rose-600',
-  'from-cyan-500 to-cyan-600',
-  'from-fuchsia-500 to-fuchsia-600',
-  'from-amber-500 to-amber-600',
-];
-
-const subjectBgColors = [
-  'bg-blue-50 hover:bg-blue-100',
-  'bg-emerald-50 hover:bg-emerald-100',
-  'bg-violet-50 hover:bg-violet-100',
-  'bg-orange-50 hover:bg-orange-100',
-  'bg-rose-50 hover:bg-rose-100',
-  'bg-cyan-50 hover:bg-cyan-100',
-  'bg-fuchsia-50 hover:bg-fuchsia-100',
-  'bg-amber-50 hover:bg-amber-100',
-];
-
-const subjectIconColors = [
-  'text-blue-600',
-  'text-emerald-600',
-  'text-violet-600',
-  'text-orange-600',
-  'text-rose-600',
-  'text-cyan-600',
-  'text-fuchsia-600',
-  'text-amber-600',
-];
+// Map subject names to specific icons and colors to match the design
+const getSubjectConfig = (subjectName: string): { icon: LucideIcon; colorClass: string } => {
+  const lowerName = subjectName.toLowerCase();
+  
+  if (lowerName.includes('physics')) {
+    return { icon: Microscope, colorClass: 'text-sky-600' }; // .ic-phys
+  }
+  if (lowerName.includes('math')) {
+    return { icon: Calculator, colorClass: 'text-emerald-600' }; // .ic-math
+  }
+  if (lowerName.includes('physical') && lowerName.includes('chem')) {
+    return { icon: FlaskConical, colorClass: 'text-teal-600' }; // .ic-chem
+  }
+  if (lowerName.includes('organic') && lowerName.includes('chem')) {
+    return { icon: Beaker, colorClass: 'text-teal-600' };
+  }
+  if (lowerName.includes('inorganic') && lowerName.includes('chem')) {
+    return { icon: TestTube2, colorClass: 'text-teal-600' };
+  }
+  if (lowerName.includes('chem')) {
+    return { icon: FlaskConical, colorClass: 'text-teal-600' };
+  }
+  
+  // Default fallback
+  return { icon: BookOpen, colorClass: 'text-amber-600' }; // .ic-note default
+};
 
 export const StudentSubjectCard = ({ subject, onClick, index }: StudentSubjectCardProps) => {
-  const colorIndex = index % subjectColors.length;
+  const { icon: Icon, colorClass } = getSubjectConfig(subject);
   
   return (
     <button
       onClick={onClick}
       className={cn(
-        "group w-full p-6 rounded-2xl text-left transition-all duration-300",
-        "border border-slate-200 hover:border-transparent",
-        "hover:shadow-xl hover:-translate-y-1",
-        subjectBgColors[colorIndex]
+        "group flex items-center p-[22px]",
+        "bg-white border border-[#f1f5f9] rounded-[14px]",
+        "transition-all duration-250 ease-in-out",
+        "hover:translate-y-[-3px] hover:border-[#0d9488] hover:shadow-[0_10px_15px_-3px_rgba(0,0,0,0.05)]",
+        "w-full text-left"
       )}
     >
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-4">
-          <div className={cn(
-            "w-14 h-14 rounded-xl flex items-center justify-center bg-gradient-to-br shadow-lg",
-            subjectColors[colorIndex]
-          )}>
-            <BookOpen className="h-7 w-7 text-white" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-lg text-slate-800 group-hover:text-slate-900">
-              {subject}
-            </h3>
-            <p className="text-sm text-slate-500 mt-1">
-              Tap to view content
-            </p>
-          </div>
-        </div>
-        <div className={cn(
-          "w-10 h-10 rounded-full flex items-center justify-center transition-all",
-          "bg-white shadow-sm group-hover:shadow-md",
-          subjectIconColors[colorIndex]
-        )}>
-          <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5" />
-        </div>
+      <div className="w-[55px] h-[55px] flex items-center justify-center mr-[18px] rounded-[12px] bg-[#f8fafc] shrink-0">
+        <Icon className={cn("h-8 w-8", colorClass)} strokeWidth={1.5} />
       </div>
+      
+      <div className="flex-1 min-w-0">
+        <h3 className="text-[15px] font-semibold text-[#1e293b] mb-[3px] truncate group-hover:text-[#0d9488] transition-colors">
+          {subject}
+        </h3>
+        <span className="text-[13px] text-[#64748b]">
+          View Content
+        </span>
+      </div>
+      
+      <ArrowRight className="h-5 w-5 text-[#e2e8f0] group-hover:text-[#0d9488] transition-colors" />
     </button>
   );
 };
