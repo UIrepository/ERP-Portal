@@ -3,14 +3,23 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { StudentBatchHeader } from './StudentBatchHeader';
-import { StudentBatchSwitcher } from './StudentBatchSwitcher';
 import { StudentSubjectCard } from './StudentSubjectCard';
 import { StudentSubjectBlocks } from './StudentSubjectBlocks';
 import { StudentBlockContent } from './StudentBlockContent';
-import { StudentQuickActions } from './StudentQuickActions';
+import { StudentAnnouncements } from './StudentAnnouncements';
+import { StudentCommunity } from './StudentCommunity';
+import { StudentConnect } from './StudentConnect';
+import { StudentSchedule } from './StudentSchedule';
 import { Skeleton } from '@/components/ui/skeleton';
-import { BookOpen } from 'lucide-react';
+import { Share2, ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface UserEnrollment {
   batch_name: string;
@@ -18,6 +27,7 @@ interface UserEnrollment {
 }
 
 type NavigationLevel = 'batch' | 'subject' | 'block';
+type TabType = 'classes' | 'live' | 'announcements' | 'community' | 'connect';
 
 interface NavigationState {
   level: NavigationLevel;
@@ -30,7 +40,7 @@ export const StudentMain = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [isBatchSwitcherOpen, setIsBatchSwitcherOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>('classes');
   const [isInitialized, setIsInitialized] = useState(false);
   
   const [navigation, setNavigation] = useState<NavigationState>({
@@ -145,7 +155,7 @@ export const StudentMain = () => {
     };
   }, [profile?.user_id, queryClient]);
 
-  // Navigation handlers with URL sync
+  // Navigation handlers
   const handleSelectBatch = (batch: string) => {
     const newNav: NavigationState = {
       level: 'batch',
@@ -155,6 +165,7 @@ export const StudentMain = () => {
     };
     setNavigation(newNav);
     updateUrl(newNav);
+    setActiveTab('classes'); // Reset to classes tab on batch change
   };
 
   const handleSelectSubject = (subject: string) => {
@@ -223,60 +234,146 @@ export const StudentMain = () => {
     );
   }
 
-  // Render main batch/subjects view
+  // --- Main Batch Level View (New Design) ---
+  
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'classes':
+        return (
+          <main className="bg-white rounded-[16px] p-[35px] shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)]">
+            <div className="mb-[30px]">
+              <h2 className="text-[22px] font-bold text-[#1e293b] mb-1">Subjects</h2>
+              <p className="text-[14px] text-[#64748b]">Select your subjects & start learning</p>
+            </div>
+
+            {isLoadingEnrollments ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-[20px]">
+                {[...Array(4)].map((_, i) => (
+                  <Skeleton key={i} className="h-24 rounded-[14px]" />
+                ))}
+              </div>
+            ) : subjectsForBatch.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-[20px]">
+                {subjectsForBatch.map((subject, index) => (
+                  <StudentSubjectCard
+                    key={subject}
+                    subject={subject}
+                    index={index}
+                    onClick={() => handleSelectSubject(subject)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-20">
+                <p className="text-[#64748b]">No subjects found for this batch.</p>
+              </div>
+            )}
+          </main>
+        );
+      case 'live':
+        return (
+          <div className="bg-white rounded-[16px] p-[20px] shadow-sm">
+             <StudentSchedule />
+          </div>
+        );
+      case 'announcements':
+        return (
+          <div className="bg-white rounded-[16px] p-[20px] shadow-sm">
+            <StudentAnnouncements />
+          </div>
+        );
+      case 'community':
+        return (
+          <div className="bg-white rounded-[16px] p-[20px] shadow-sm">
+            <StudentCommunity />
+          </div>
+        );
+      case 'connect':
+        return (
+           <div className="bg-white rounded-[16px] p-[20px] shadow-sm">
+            <StudentConnect />
+           </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div className="min-h-full bg-slate-50">
-      <StudentBatchHeader
-        selectedBatch={navigation.batch}
-        batchCount={availableBatches.length}
-        onOpenBatchSwitcher={() => setIsBatchSwitcherOpen(true)}
-      />
-
-      <StudentBatchSwitcher
-        isOpen={isBatchSwitcherOpen}
-        onClose={() => setIsBatchSwitcherOpen(false)}
-        batches={availableBatches}
-        selectedBatch={navigation.batch}
-        onSelectBatch={handleSelectBatch}
-      />
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Quick Actions */}
-        <StudentQuickActions batch={navigation.batch} subjects={subjectsForBatch} />
-
-        {/* Subjects Section */}
-        <div className="mt-10">
-          <h2 className="text-xl font-semibold text-slate-800 mb-4">
-            Your Subjects
-          </h2>
-
-          {isLoadingEnrollments ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[...Array(3)].map((_, i) => (
-                <Skeleton key={i} className="h-28 rounded-2xl" />
-              ))}
+    <div className="w-full max-w-[1100px] mx-auto p-6 flex flex-col items-center min-h-screen bg-[#f1f5f9]">
+      {/* Header Section */}
+      <header className="w-full bg-white rounded-[16px] overflow-hidden shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)] mb-[25px]">
+        {/* Top Banner with Gradient */}
+        <div className="relative bg-gradient-to-br from-[#0f172a] to-[#1e293b] px-[35px] py-[45px] text-white">
+          {/* Subtle geometric pattern overlay */}
+          <div 
+            className="absolute top-0 right-0 w-[300px] h-full bg-[rgba(13,148,136,0.15)] z-0"
+            style={{ clipPath: 'polygon(100% 0, 0% 100%, 100% 100%)' }}
+          />
+          
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h1 className="text-[28px] font-bold tracking-tight">
+                {navigation.batch || "No Batch Selected"}
+              </h1>
+              {availableBatches.length > 1 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="text-slate-300 hover:text-white hover:bg-white/10">
+                      <ChevronDown className="h-5 w-5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    {availableBatches.map((b) => (
+                      <DropdownMenuItem key={b} onClick={() => handleSelectBatch(b)}>
+                        {b}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
-          ) : subjectsForBatch.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {subjectsForBatch.map((subject, index) => (
-                <StudentSubjectCard
-                  key={subject}
-                  subject={subject}
-                  index={index}
-                  onClick={() => handleSelectSubject(subject)}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border-2 border-dashed border-slate-200">
-              <BookOpen className="h-16 w-16 text-slate-300 mb-4" />
-              <h3 className="text-xl font-semibold text-slate-700">No Subjects Found</h3>
-              <p className="text-slate-500 mt-2 text-center max-w-sm">
-                You don't have any subjects enrolled in this batch yet. Please contact admin for assistance.
-              </p>
-            </div>
-          )}
+          </div>
         </div>
+
+        {/* Navigation Tabs */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-[35px] border-b border-[#e2e8f0]">
+          <nav className="flex gap-[30px] overflow-x-auto w-full sm:w-auto no-scrollbar">
+            {[
+              { id: 'classes', label: 'All Classes' },
+              { id: 'live', label: 'Join Live Class' },
+              { id: 'announcements', label: 'Announcements' },
+              { id: 'community', label: 'Community' },
+              { id: 'connect', label: 'Support Connect' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as TabType)}
+                className={cn(
+                  "py-[20px] text-[14px] font-medium transition-colors relative whitespace-nowrap",
+                  activeTab === tab.id 
+                    ? "text-[#0d9488]" 
+                    : "text-[#64748b] hover:text-[#1e293b]"
+                )}
+              >
+                {tab.label}
+                {activeTab === tab.id && (
+                  <div className="absolute bottom-0 left-0 w-full h-[3px] bg-[#0d9488] rounded-t-[10px]" />
+                )}
+              </button>
+            ))}
+          </nav>
+
+          <button className="hidden sm:flex items-center gap-2 px-[18px] py-[9px] my-4 sm:my-0 border border-[#e2e8f0] rounded-[10px] bg-white text-[14px] font-medium text-[#1e293b] hover:bg-[#f8fafc] transition-colors">
+            <Share2 className="h-4 w-4" />
+            Share Batch
+          </button>
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <div className="w-full">
+        {renderTabContent()}
       </div>
     </div>
   );
