@@ -172,7 +172,8 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const tabs = getTabs();
 
   return (
-    <div className="w-full bg-white border-r border-slate-200 h-full flex flex-col overflow-y-auto">
+    <div className="w-full bg-white border-r border-slate-200 h-full flex flex-col">
+      {/* Header - Fixed */}
       <div className="p-4 border-b border-slate-200 shrink-0">
         <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-16 w-auto mx-auto mb-4 md:hidden" />
         <h2 className="font-semibold text-slate-800 text-lg">
@@ -194,72 +195,73 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
         )}
       </div>
       
-      <div className="flex flex-col flex-grow">
-          <nav className="overflow-y-auto p-4 space-y-1">
-              {tabs.map((tab) => {
-                const isContactAdminTab = tab.id === 'contact-admin';
+      {/* Navigation - Scrollable on mobile, non-scrollable on desktop */}
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto md:overflow-y-visible">
+          {tabs.map((tab) => {
+            const isContactAdminTab = tab.id === 'contact-admin';
 
-                if (isContactAdminTab) {
-                    return (
-                        <AlertDialog key={tab.id}>
-                            <AlertDialogTrigger asChild>
-                                <Button
-                                    variant={activeTab === tab.id ? 'default' : 'ghost'}
-                                    className={`w-full justify-start ${
-                                        activeTab === tab.id 
-                                            ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
-                                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                                    }`}
-                                >
-                                    <tab.icon className="mr-3 h-4 w-4" />
-                                    {tab.label}
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>Contact Admin on WhatsApp</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        Are you sure you want to proceed and open a new WhatsApp chat with the Admin?
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={handleContactAdmin}>
-                                        Proceed to WhatsApp
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                    );
-                }
-
+            if (isContactAdminTab) {
                 return (
-                    <Button
-                        key={tab.id}
-                        variant={activeTab === tab.id ? 'default' : 'ghost'}
-                        className={`w-full justify-start ${
-                        activeTab === tab.id 
-                            ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
-                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                        }`}
-                        onClick={() => onTabChange(tab.id)}
-                    >
-                        <tab.icon className="mr-3 h-4 w-4" />
-                        {tab.label}
-                    </Button>
+                    <AlertDialog key={tab.id}>
+                        <AlertDialogTrigger asChild>
+                            <Button
+                                variant={activeTab === tab.id ? 'default' : 'ghost'}
+                                className={`w-full justify-start ${
+                                    activeTab === tab.id 
+                                        ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                                }`}
+                            >
+                                <tab.icon className="mr-3 h-4 w-4" />
+                                {tab.label}
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Contact Admin on WhatsApp</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Are you sure you want to proceed and open a new WhatsApp chat with the Admin?
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleContactAdmin}>
+                                    Proceed to WhatsApp
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 );
-              })}
-          </nav>
-          <div className="p-4 border-t border-slate-200 mt-auto">
-            <Button
-              variant="destructive"
-              className="w-full justify-center"
-              onClick={signOut}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout
-            </Button>
-          </div>
+            }
+
+            return (
+                <Button
+                    key={tab.id}
+                    variant={activeTab === tab.id ? 'default' : 'ghost'}
+                    className={`w-full justify-start ${
+                    activeTab === tab.id 
+                        ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                    onClick={() => onTabChange(tab.id)}
+                >
+                    <tab.icon className="mr-3 h-4 w-4" />
+                    {tab.label}
+                </Button>
+            );
+          })}
+      </nav>
+      
+      {/* Logout Button - Fixed at bottom */}
+      <div className="p-4 border-t border-slate-200 shrink-0 mt-auto">
+        <Button
+          variant="destructive"
+          className="w-full justify-center"
+          onClick={signOut}
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
+        </Button>
       </div>
     </div>
   );
