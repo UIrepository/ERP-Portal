@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -28,7 +29,9 @@ interface NavigationState {
 export const StudentMain = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isBatchSwitcherOpen, setIsBatchSwitcherOpen] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   
   const [navigation, setNavigation] = useState<NavigationState>({
     level: 'batch',
@@ -57,15 +60,55 @@ export const StudentMain = () => {
     return Array.from(new Set(userEnrollments?.map((e) => e.batch_name) || [])).sort();
   }, [userEnrollments]);
 
-  // Set initial batch when data loads
+  // Update URL when navigation changes
+  const updateUrl = useCallback((nav: NavigationState) => {
+    const params = new URLSearchParams();
+    if (nav.batch) params.set('batch', nav.batch);
+    if (nav.subject) params.set('subject', nav.subject);
+    if (nav.block) params.set('block', nav.block);
+    setSearchParams(params, { replace: true });
+  }, [setSearchParams]);
+
+  // Read URL params on mount and when enrollments load
   useEffect(() => {
-    if (availableBatches.length > 0 && !navigation.batch) {
-      setNavigation((prev) => ({
-        ...prev,
-        batch: availableBatches[0],
-      }));
+    if (!userEnrollments || userEnrollments.length === 0 || isInitialized) return;
+    
+    const batchParam = searchParams.get('batch');
+    const subjectParam = searchParams.get('subject');
+    const blockParam = searchParams.get('block');
+    
+    // Validate batch exists in enrollments
+    const validBatch = batchParam && availableBatches.includes(batchParam) 
+      ? batchParam 
+      : availableBatches[0] || null;
+    
+    // Validate subject exists for the batch
+    const subjectsForBatch = userEnrollments
+      .filter(e => e.batch_name === validBatch)
+      .map(e => e.subject_name);
+    const validSubject = subjectParam && subjectsForBatch.includes(subjectParam) 
+      ? subjectParam 
+      : null;
+    
+    // Determine level
+    let level: NavigationLevel = 'batch';
+    if (blockParam && validSubject) {
+      level = 'block';
+    } else if (validSubject) {
+      level = 'subject';
     }
-  }, [availableBatches, navigation.batch]);
+    
+    const newNav: NavigationState = {
+      level,
+      batch: validBatch,
+      subject: validSubject,
+      block: blockParam || null,
+    };
+    
+    setNavigation(newNav);
+    updateUrl(newNav);
+    setIsInitialized(true);
+  }, [userEnrollments, availableBatches, searchParams, isInitialized, updateUrl]);
 
   // Derive subjects for selected batch
   const subjectsForBatch = useMemo(() => {
@@ -102,48 +145,58 @@ export const StudentMain = () => {
     };
   }, [profile?.user_id, queryClient]);
 
-  // Navigation handlers
+  // Navigation handlers with URL sync
   const handleSelectBatch = (batch: string) => {
-    setNavigation({
+    const newNav: NavigationState = {
       level: 'batch',
       batch,
       subject: null,
       block: null,
-    });
+    };
+    setNavigation(newNav);
+    updateUrl(newNav);
   };
 
   const handleSelectSubject = (subject: string) => {
-    setNavigation((prev) => ({
-      ...prev,
+    const newNav: NavigationState = {
+      ...navigation,
       level: 'subject',
       subject,
       block: null,
-    }));
+    };
+    setNavigation(newNav);
+    updateUrl(newNav);
   };
 
   const handleSelectBlock = (block: string) => {
-    setNavigation((prev) => ({
-      ...prev,
+    const newNav: NavigationState = {
+      ...navigation,
       level: 'block',
       block,
-    }));
+    };
+    setNavigation(newNav);
+    updateUrl(newNav);
   };
 
   const handleBackToSubjects = () => {
-    setNavigation((prev) => ({
-      ...prev,
+    const newNav: NavigationState = {
+      ...navigation,
       level: 'batch',
       subject: null,
       block: null,
-    }));
+    };
+    setNavigation(newNav);
+    updateUrl(newNav);
   };
 
   const handleBackToBlocks = () => {
-    setNavigation((prev) => ({
-      ...prev,
+    const newNav: NavigationState = {
+      ...navigation,
       level: 'subject',
       block: null,
-    }));
+    };
+    setNavigation(newNav);
+    updateUrl(newNav);
   };
 
   // Render block content view

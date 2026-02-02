@@ -1,11 +1,8 @@
 import { useAuth } from '@/hooks/useAuth';
 import { StudentMain } from './student/StudentMain';
-import { StudentJoinClass } from './student/StudentJoinClass';
-import { StudentCurrentClass } from './student/StudentCurrentClass';
-import { StudentDPP } from './student/StudentDPP';
 import { StudentFeedback } from './student/StudentFeedback';
 import { StudentExams } from './student/StudentExams';
-import { StudentExtraClasses } from './student/StudentExtraClasses';
+import { StudentSchedule } from './student/StudentSchedule';
 
 interface StudentDashboardProps {
   activeTab: string;
@@ -28,18 +25,12 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
   
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'join-class':
-        return <StudentJoinClass />;
-      case 'current-class':
-        return <StudentCurrentClass onTabChange={onTabChange} />;
-      case 'dpp':
-        return <StudentDPP />;
+      case 'schedule':
+        return <StudentSchedule />;
       case 'feedback':
         return <StudentFeedback />;
       case 'exams':
         return <StudentExams />;
-      case 'extra-classes':
-        return <StudentExtraClasses />;
       case 'dashboard':
       default:
         return <StudentMain />;

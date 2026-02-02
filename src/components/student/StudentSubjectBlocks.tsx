@@ -6,10 +6,10 @@ import {
   Megaphone, 
   Users, 
   UserCog,
-  ArrowLeft,
-  PlayCircle
+  PlayCircle,
+  Radio
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { StudentSubjectHeader } from './StudentSubjectHeader';
 import { cn } from '@/lib/utils';
 
 interface StudentSubjectBlocksProps {
@@ -21,6 +21,16 @@ interface StudentSubjectBlocksProps {
 
 const blocks = [
   {
+    id: 'live-class',
+    label: 'Join Live Class',
+    description: 'Ongoing & upcoming classes',
+    icon: Radio,
+    gradient: 'from-emerald-500 to-emerald-600',
+    bgColor: 'bg-emerald-50 hover:bg-emerald-100',
+    iconColor: 'text-emerald-600',
+    isLive: true,
+  },
+  {
     id: 'recordings',
     label: 'Lectures',
     description: 'Watch recorded classes',
@@ -28,15 +38,6 @@ const blocks = [
     gradient: 'from-blue-500 to-blue-600',
     bgColor: 'bg-blue-50 hover:bg-blue-100',
     iconColor: 'text-blue-600',
-  },
-  {
-    id: 'schedule',
-    label: 'Schedule',
-    description: 'View class timetable',
-    icon: Calendar,
-    gradient: 'from-emerald-500 to-emerald-600',
-    bgColor: 'bg-emerald-50 hover:bg-emerald-100',
-    iconColor: 'text-emerald-600',
   },
   {
     id: 'notes',
@@ -93,25 +94,12 @@ export const StudentSubjectBlocks = ({
 }: StudentSubjectBlocksProps) => {
   return (
     <div className="min-h-full bg-slate-50">
-      {/* Header with SELECTED BATCH styling */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white rounded-b-2xl shadow-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <Button
-            variant="ghost"
-            onClick={onBack}
-            className="text-slate-300 hover:text-white hover:bg-slate-700/50 mb-3 -ml-2"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Subjects
-          </Button>
-          <div>
-            <p className="text-cyan-400/80 text-xs font-semibold uppercase tracking-wider mb-1.5">
-              Selected Batch
-            </p>
-            <h1 className="text-2xl sm:text-3xl font-bold">{batch} - {subject}</h1>
-          </div>
-        </div>
-      </div>
+      {/* White sticky header */}
+      <StudentSubjectHeader
+        batch={batch}
+        subject={subject}
+        onBack={onBack}
+      />
 
       {/* Blocks grid */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -121,12 +109,22 @@ export const StudentSubjectBlocks = ({
               key={block.id}
               onClick={() => onBlockSelect(block.id)}
               className={cn(
-                "group p-6 rounded-2xl text-left transition-all duration-300",
+                "group p-6 rounded-2xl text-left transition-all duration-300 relative",
                 "border border-slate-200 hover:border-transparent",
                 "hover:shadow-xl hover:-translate-y-1",
                 block.bgColor
               )}
             >
+              {/* Live indicator for live-class block */}
+              {'isLive' in block && block.isLive && (
+                <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-xs font-semibold text-emerald-600 uppercase">Live</span>
+                </div>
+              )}
               <div className="flex items-start gap-4">
                 <div className={cn(
                   "w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br shadow-lg flex-shrink-0",
