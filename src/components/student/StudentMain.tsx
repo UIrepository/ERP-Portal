@@ -299,15 +299,16 @@ export const StudentMain = () => {
   };
 
   return (
-    <div className="w-full max-w-[1000px] mx-auto px-4 py-5 flex flex-col items-center min-h-screen bg-[#f1f5f9]">
-      {/* FLOAT HEADER: Standalone Card */}
-      <header className="w-full bg-white rounded-[14px] overflow-hidden shadow-[0_2px_8px_-2px_rgba(0,0,0,0.08)] border border-slate-100 mb-5 z-10">
+    <div className="w-full max-w-[1000px] mx-auto px-4 py-5 flex flex-col items-center min-h-screen">
+      {/* FLOAT HEADER */}
+      <header className="w-full bg-white rounded-2xl overflow-hidden shadow-lg mb-5">
         
-        {/* Top Banner with Purple Gradient - matching reference */}
-        <div className="relative bg-gradient-to-r from-[#7c3aed] via-[#8b5cf6] to-[#a78bfa] px-6 py-8 text-white overflow-hidden">
-          {/* Decorative shapes */}
-          <div className="absolute top-0 right-0 w-[180px] h-full bg-white/10 z-0" style={{ clipPath: 'polygon(100% 0, 30% 100%, 100% 100%)' }} />
-          <div className="absolute top-4 right-20 w-16 h-16 rounded-full bg-white/10" />
+        {/* Top Banner - Dark Gradient */}
+        <div className="relative bg-gradient-to-br from-slate-900 to-slate-800 px-6 py-8 text-white overflow-hidden">
+          <div 
+            className="absolute top-0 right-0 w-[200px] h-full bg-teal-500/10 z-0"
+            style={{ clipPath: 'polygon(100% 0, 0% 100%, 100% 100%)' }}
+          />
           
           <div className="relative z-10 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -317,7 +318,7 @@ export const StudentMain = () => {
               {availableBatches.length > 1 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="text-white/80 hover:text-white hover:bg-white/10 h-7 w-7">
+                    <Button variant="ghost" size="icon" className="text-white/70 hover:text-white hover:bg-white/10 h-7 w-7">
                       <ChevronDown className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -334,8 +335,8 @@ export const StudentMain = () => {
           </div>
         </div>
 
-        {/* Navigation Tabs - zoomed out */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-6 border-b border-[#e2e8f0]">
+        {/* Navigation Tabs */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-6">
           <nav className="flex gap-5 overflow-x-auto w-full sm:w-auto no-scrollbar">
             {[
               { id: 'classes', label: 'All Classes' },
@@ -350,27 +351,27 @@ export const StudentMain = () => {
                 className={cn(
                   "py-3 text-[13px] font-medium transition-colors relative whitespace-nowrap",
                   activeTab === tab.id 
-                    ? "text-[#7c3aed]" 
-                    : "text-[#64748b] hover:text-[#1e293b]"
+                    ? "text-teal-600" 
+                    : "text-slate-500 hover:text-slate-800"
                 )}
               >
                 {tab.label}
                 {activeTab === tab.id && (
-                  <div className="absolute bottom-0 left-0 w-full h-[2px] bg-[#7c3aed] rounded-t-[10px]" />
+                  <div className="absolute bottom-0 left-0 w-full h-[2px] bg-teal-600 rounded-t" />
                 )}
               </button>
             ))}
           </nav>
 
-          <button className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 my-3 sm:my-0 border border-[#e2e8f0] rounded-lg bg-white text-[12px] font-medium text-[#1e293b] hover:bg-[#f8fafc] transition-colors">
+          <button className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 my-3 sm:my-0 rounded-lg bg-slate-50 text-[12px] font-medium text-slate-700 hover:bg-slate-100 transition-colors">
             <Share2 className="h-3.5 w-3.5" />
             Share Batch
           </button>
         </div>
       </header>
 
-      {/* MAIN CONTENT - wrapped in white card */}
-      <div className="w-full bg-white rounded-[14px] border border-slate-100 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.08)] p-6">
+      {/* MAIN CONTENT - White, no border */}
+      <div className="w-full bg-white rounded-2xl shadow-lg p-6">
         {renderTabContent()}
       </div>
     </div>

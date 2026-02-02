@@ -45,9 +45,9 @@ export const StudentSubjectCard = ({ subject, onClick, index }: StudentSubjectCa
       onClick={onClick}
       className={cn(
         "group flex items-center p-3",
-        "bg-white border border-slate-100 rounded-lg",
+        "bg-white rounded-lg",
         "transition-all duration-200",
-        "hover:border-violet-300 hover:shadow-sm",
+        "hover:bg-slate-50",
         "w-full text-left"
       )}
     >
