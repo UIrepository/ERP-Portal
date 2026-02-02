@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      active_classes: {
+        Row: {
+          batch: string
+          is_active: boolean | null
+          room_url: string
+          started_at: string | null
+          subject: string
+          teacher_id: string | null
+        }
+        Insert: {
+          batch: string
+          is_active?: boolean | null
+          room_url: string
+          started_at?: string | null
+          subject: string
+          teacher_id?: string | null
+        }
+        Update: {
+          batch?: string
+          is_active?: boolean | null
+          room_url?: string
+          started_at?: string | null
+          subject?: string
+          teacher_id?: string | null
+        }
+        Relationships: []
+      }
       activity_logs: {
         Row: {
           action: string

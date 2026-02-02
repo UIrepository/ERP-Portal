@@ -32,7 +32,7 @@ const ClassSession = () => {
         }
 
         // 2. Double Check: Is the class actually active? (Prevents backdoor entry)
-        const { data: activeClass } = await supabase.from('active_classes')
+        const { data: activeClass } = await (supabase.from('active_classes') as any)
            .select('room_url')
            .eq('batch', enrollment.batch_name)
            .eq('subject', enrollment.subject_name)
@@ -60,7 +60,7 @@ const ClassSession = () => {
 
         // 4. REDIRECT to the Public Jitsi URL (Bypasses 5-min timer)
         // Set name automatically
-        const finalUrl = `${activeClass.room_url}#userInfo.displayName="${encodeURIComponent(profile.name || 'Student')}"`;
+        const finalUrl = `${(activeClass as any).room_url}#userInfo.displayName="${encodeURIComponent(profile.name || 'Student')}"`;
         window.location.href = finalUrl;
 
       } catch (err: any) {

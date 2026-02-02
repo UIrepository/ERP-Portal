@@ -91,10 +91,6 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     return Array.from(new Set(userEnrollments?.map(e => e.batch_name) || [])).sort();
   }, [userEnrollments]);
 
-  const availableSubjects = useMemo(() => {
-    return Array.from(new Set(userEnrollments?.map(e => e.subject_name) || [])).sort();
-  }, [userEnrollments]);
-
   useEffect(() => {
     if (!profile?.user_id || resolvedRole !== 'student') return;
     const channel = supabase
@@ -106,20 +102,13 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
     return () => { supabase.removeChannel(channel); };
   }, [profile?.user_id, queryClient, resolvedRole]);
 
-  // --- 1. STUDENT TABS ---
+  // --- 1. STUDENT TABS (Simplified) ---
   const studentTabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'announcements', label: 'Announcements', icon: Megaphone },
-    { id: 'community', label: 'Community', icon: Users },
-    { id: 'schedule', label: 'Class Schedule', icon: Calendar },
-    { id: 'join-class', label: 'Join Class', icon: Video },
+    { id: 'dashboard', label: 'My Learning', icon: LayoutDashboard },
+    { id: 'join-class', label: 'Join Live Class', icon: Video },
     { id: 'current-class', label: 'Ongoing Class', icon: Clock },
-    { id: 'connect', label: 'Mentors & Connect', icon: UserCog },
-    { id: 'recordings', label: 'Recordings', icon: Video },
-    { id: 'notes', label: 'Notes', icon: FileText },
-    { id: 'dpp', label: 'DPP Section', icon: Target },
-    { id: 'ui-ki-padhai', label: 'UI Ki Padhai', icon: Crown },
-    { id: 'feedback', label: 'Feedback', icon: MessageSquare },
+    { id: 'dpp', label: 'Practice (DPP)', icon: Target },
+    { id: 'feedback', label: 'Submit Feedback', icon: MessageSquare },
     { id: 'exams', label: 'Exams', icon: BookOpen },
     { id: 'contact-admin', label: 'Contact Admin', icon: Phone }, 
   ];
@@ -184,57 +173,33 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
 
   const tabs = getTabs();
 
-  // Helper for array formatting if needed
-  const formatArrayString = (arr: string | string[] | null | undefined) => {
-    if (!arr) return '';
-    if (Array.isArray(arr)) {
-      return arr.map(item =>
-        typeof item === 'string' ? item.replace(/[\\"]/g, '') : item
-      ).join(', ');
-    }
-    try {
-      const parsed = JSON.parse(arr);
-      if (Array.isArray(parsed)) {
-        return parsed.map(item =>
-          typeof item === 'string' ? item.replace(/[\\"]/g, '') : item
-        ).join(', ');
-      }
-    } catch (e) {}
-    return String(arr).replace(/[\\"\\[\\]]/g, '');
-  };
-
   return (
-    <div className="w-full bg-white border-r border-gray-200 h-full flex flex-col overflow-y-auto">
-      <div className="p-4 border-b border-gray-200 shrink-0">
+    <div className="w-full bg-white border-r border-slate-200 h-full flex flex-col overflow-y-auto">
+      <div className="p-4 border-b border-slate-200 shrink-0">
         <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-16 w-auto mx-auto mb-4 md:hidden" />
-        <h2 className="font-semibold text-gray-800 text-lg">
+        <h2 className="font-semibold text-slate-800 text-lg">
           {getPortalName()}
         </h2>
-        <p className="text-sm text-gray-500 mt-1">{profile?.name}</p>
+        <p className="text-sm text-slate-500 mt-1">{profile?.name}</p>
         
         {resolvedRole === 'student' && availableBatches.length > 0 && (
-          <p className="text-xs text-gray-500 mt-1">Batch: {availableBatches.join(', ')}</p>
-        )}
-        {resolvedRole === 'student' && availableSubjects.length > 0 && (
-          <p className="text-xs text-gray-500 mt-1">Subjects: {availableSubjects.join(', ')}</p>
+          <p className="text-xs text-slate-500 mt-1">Batch: {availableBatches.join(', ')}</p>
         )}
         {resolvedRole === 'student' && isLoadingEnrollments && (
-             <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                <span className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-gray-400"></span>
+             <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                <span className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-slate-400"></span>
                 Loading enrollments...
              </p>
         )}
-        {resolvedRole === 'student' && !isLoadingEnrollments && availableBatches.length === 0 && availableSubjects.length === 0 && (
-             <p className="text-xs text-gray-500 mt-1">No enrollments found.</p>
+        {resolvedRole === 'student' && !isLoadingEnrollments && availableBatches.length === 0 && (
+             <p className="text-xs text-slate-500 mt-1">No enrollments found.</p>
         )}
       </div>
       
       <div className="flex flex-col flex-grow">
-          <nav className="overflow-y-auto p-4 space-y-2">
+          <nav className="overflow-y-auto p-4 space-y-1">
               {tabs.map((tab) => {
                 const isContactAdminTab = tab.id === 'contact-admin';
-                const isCommunityTab = tab.id === 'community' || tab.id === 'community-admin' || tab.id === 'teacher-community';
-                const hasNewGroupMessage = isCommunityTab && tab.id !== activeTab; 
 
                 if (isContactAdminTab) {
                     return (
@@ -244,8 +209,8 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
                                     variant={activeTab === tab.id ? 'default' : 'ghost'}
                                     className={`w-full justify-start ${
                                         activeTab === tab.id 
-                                            ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                                            ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                                     }`}
                                 >
                                     <tab.icon className="mr-3 h-4 w-4" />
@@ -271,30 +236,23 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
                 }
 
                 return (
-                    <div key={tab.id} className="relative">
-                        <Button
-                            variant={activeTab === tab.id ? 'default' : 'ghost'}
-                            className={`w-full justify-start ${
-                            activeTab === tab.id 
-                                ? 'bg-blue-600 text-white hover:bg-blue-700' 
-                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                            }`}
-                            onClick={() => onTabChange(tab.id)}
-                        >
-                            <tab.icon className="mr-3 h-4 w-4" />
-                            {tab.label}
-                        </Button>
-                        {hasNewGroupMessage && (
-                            <span 
-                                className="absolute top-1 right-2 h-3 w-3 rounded-full bg-red-500 border-2 border-white animate-pulse" 
-                                title="New group messages received"
-                            />
-                        )}
-                    </div>
-                )
+                    <Button
+                        key={tab.id}
+                        variant={activeTab === tab.id ? 'default' : 'ghost'}
+                        className={`w-full justify-start ${
+                        activeTab === tab.id 
+                            ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                        }`}
+                        onClick={() => onTabChange(tab.id)}
+                    >
+                        <tab.icon className="mr-3 h-4 w-4" />
+                        {tab.label}
+                    </Button>
+                );
               })}
           </nav>
-          <div className="p-4 border-t border-gray-200 mt-auto">
+          <div className="p-4 border-t border-slate-200 mt-auto">
             <Button
               variant="destructive"
               className="w-full justify-center"
