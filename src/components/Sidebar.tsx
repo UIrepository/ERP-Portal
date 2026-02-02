@@ -172,8 +172,8 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const tabs = getTabs();
 
   return (
-    <div className="w-full bg-white border-r border-slate-200 h-full flex flex-col">
-      {/* Header - Fixed */}
+    <div className="w-full bg-white border-r border-slate-200 h-full flex flex-col relative">
+      {/* Header - Fixed at top */}
       <div className="p-4 border-b border-slate-200 shrink-0">
         <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-16 w-auto mx-auto mb-4 md:hidden" />
         <h2 className="font-semibold text-slate-800 text-lg">
@@ -195,8 +195,8 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
         )}
       </div>
       
-      {/* Navigation - Scrollable on mobile, non-scrollable on desktop */}
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto md:overflow-y-visible">
+      {/* Navigation - Takes available space, with padding at bottom for logout */}
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto pb-20">
           {tabs.map((tab) => {
             const isContactAdminTab = tab.id === 'contact-admin';
 
@@ -252,8 +252,8 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
           })}
       </nav>
       
-      {/* Logout Button - Fixed at bottom */}
-      <div className="p-4 border-t border-slate-200 shrink-0 mt-auto">
+      {/* Logout Button - Absolutely fixed at bottom of sidebar */}
+      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-200 bg-white">
         <Button
           variant="destructive"
           className="w-full justify-center"
