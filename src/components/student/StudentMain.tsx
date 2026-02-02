@@ -240,7 +240,7 @@ export const StudentMain = () => {
     switch (activeTab) {
       case 'classes':
         return (
-          <main className="bg-white rounded-[16px] p-[35px] shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)]">
+          <main className="bg-white rounded-[16px] p-[35px] border border-slate-100 shadow-sm">
             <div className="mb-[30px]">
               <h2 className="text-[22px] font-bold text-[#1e293b] mb-1">Subjects</h2>
               <p className="text-[14px] text-[#64748b]">Select your subjects & start learning</p>
@@ -272,25 +272,26 @@ export const StudentMain = () => {
         );
       case 'live':
         return (
-          <div className="bg-white rounded-[16px] p-[35px] shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)]">
+          // Box wrapper removed to eliminate "grey box holding nothing" look
+          <div className="w-full">
              <StudentLiveClass batch={navigation.batch} />
           </div>
         );
       case 'announcements':
         return (
-          <div className="bg-white rounded-[16px] p-[20px] shadow-sm">
+          <div className="bg-white rounded-[16px] p-[20px] border border-slate-100 shadow-sm">
             <StudentAnnouncements />
           </div>
         );
       case 'community':
         return (
-          <div className="bg-white rounded-[16px] p-[20px] shadow-sm">
+          <div className="bg-white rounded-[16px] p-[20px] border border-slate-100 shadow-sm">
             <StudentCommunity />
           </div>
         );
       case 'connect':
         return (
-           <div className="bg-white rounded-[16px] p-[20px] shadow-sm">
+           <div className="bg-white rounded-[16px] p-[20px] border border-slate-100 shadow-sm">
             <StudentConnect />
            </div>
         );
@@ -300,9 +301,10 @@ export const StudentMain = () => {
   };
 
   return (
-    <div className="w-full max-w-[1100px] mx-auto p-6 flex flex-col items-center min-h-screen bg-[#f1f5f9]">
+    // Changed bg-[#f1f5f9] to bg-white
+    <div className="w-full max-w-[1100px] mx-auto p-6 flex flex-col items-center min-h-screen bg-white">
       {/* Header Section */}
-      <header className="w-full bg-white rounded-[16px] overflow-hidden shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)] mb-[25px]">
+      <header className="w-full bg-white rounded-[16px] overflow-hidden shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)] border border-slate-100 mb-[25px]">
         {/* Top Banner with Gradient */}
         <div className="relative bg-gradient-to-br from-[#0f172a] to-[#1e293b] px-[35px] py-[45px] text-white">
           {/* Subtle geometric pattern overlay */}
@@ -376,5 +378,3 @@ export const StudentMain = () => {
         {renderTabContent()}
       </div>
     </div>
-  );
-};
