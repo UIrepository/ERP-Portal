@@ -165,7 +165,7 @@ export const StudentMain = () => {
     };
     setNavigation(newNav);
     updateUrl(newNav);
-    setActiveTab('classes'); // Reset to classes tab on batch change
+    setActiveTab('classes');
   };
 
   const handleSelectSubject = (subject: string) => {
@@ -234,14 +234,13 @@ export const StudentMain = () => {
     );
   }
 
-  // --- Main Batch Level View (New Design) ---
-  
+  // --- Main Batch Level View ---
   const renderTabContent = () => {
     switch (activeTab) {
       case 'classes':
         return (
-          // REMOVED white section wrapper. Content sits directly on background.
-          <div className="w-full">
+          // FULL WIDTH - No extra container card
+          <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="mb-[25px]">
               <h2 className="text-[22px] font-bold text-[#1e293b] mb-1">Subjects</h2>
               <p className="text-[14px] text-[#64748b]">Select your subjects & start learning</p>
@@ -265,7 +264,7 @@ export const StudentMain = () => {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-20">
+              <div className="text-center py-20 bg-white rounded-[16px] border border-slate-100 shadow-sm">
                 <p className="text-[#64748b]">No subjects found for this batch.</p>
               </div>
             )}
@@ -273,26 +272,25 @@ export const StudentMain = () => {
         );
       case 'live':
         return (
-          // No section wrapper for Live Class
-          <div className="w-full">
+          <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
              <StudentLiveClass batch={navigation.batch} />
           </div>
         );
       case 'announcements':
         return (
-          <div className="w-full">
+          <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
             {navigation.batch && <StudentAnnouncements batch={navigation.batch} />}
           </div>
         );
       case 'community':
         return (
-          <div className="w-full">
+          <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
             {navigation.batch && <StudentCommunity batch={navigation.batch} />}
           </div>
         );
       case 'connect':
         return (
-           <div className="w-full">
+           <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
             {navigation.batch && <StudentConnect batch={navigation.batch} />}
            </div>
         );
@@ -302,13 +300,12 @@ export const StudentMain = () => {
   };
 
   return (
-    // Background set to #f1f5f9 (Light Gray-Blue) to match design variable --bg-body
     <div className="w-full max-w-[1100px] mx-auto p-6 flex flex-col items-center min-h-screen bg-[#f1f5f9]">
-      {/* Header Section - Kept as a standalone white card */}
-      <header className="w-full bg-white rounded-[16px] overflow-hidden shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)] mb-[25px]">
+      {/* FLOAT HEADER: Standalone Card */}
+      <header className="w-full bg-white rounded-[16px] overflow-hidden shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)] border border-slate-100 mb-[30px] z-10">
+        
         {/* Top Banner with Gradient */}
         <div className="relative bg-gradient-to-br from-[#0f172a] to-[#1e293b] px-[35px] py-[45px] text-white">
-          {/* Subtle geometric pattern overlay */}
           <div 
             className="absolute top-0 right-0 w-[300px] h-full bg-[rgba(13,148,136,0.15)] z-0"
             style={{ clipPath: 'polygon(100% 0, 0% 100%, 100% 100%)' }}
@@ -374,7 +371,7 @@ export const StudentMain = () => {
         </div>
       </header>
 
-      {/* Main Content Area */}
+      {/* MAIN CONTENT: Subject Blocks / Live Class (Full Width, No Extra Wrapper) */}
       <div className="w-full">
         {renderTabContent()}
       </div>
