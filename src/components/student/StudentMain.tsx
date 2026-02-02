@@ -272,7 +272,6 @@ export const StudentMain = () => {
         );
       case 'live':
         return (
-          // Box wrapper removed to eliminate "grey box holding nothing" look
           <div className="w-full">
              <StudentLiveClass batch={navigation.batch} />
           </div>
@@ -280,19 +279,22 @@ export const StudentMain = () => {
       case 'announcements':
         return (
           <div className="bg-white rounded-[16px] p-[20px] border border-slate-100 shadow-sm">
-            <StudentAnnouncements />
+            {/* Added batch prop here */}
+            {navigation.batch && <StudentAnnouncements batch={navigation.batch} />}
           </div>
         );
       case 'community':
         return (
           <div className="bg-white rounded-[16px] p-[20px] border border-slate-100 shadow-sm">
-            <StudentCommunity />
+            {/* Added batch prop here */}
+            {navigation.batch && <StudentCommunity batch={navigation.batch} />}
           </div>
         );
       case 'connect':
         return (
            <div className="bg-white rounded-[16px] p-[20px] border border-slate-100 shadow-sm">
-            <StudentConnect />
+            {/* Added batch prop here - Connect usually needs batch context */}
+            {navigation.batch && <StudentConnect batch={navigation.batch} />}
            </div>
         );
       default:
@@ -301,7 +303,6 @@ export const StudentMain = () => {
   };
 
   return (
-    // Changed bg-[#f1f5f9] to bg-white
     <div className="w-full max-w-[1100px] mx-auto p-6 flex flex-col items-center min-h-screen bg-white">
       {/* Header Section */}
       <header className="w-full bg-white rounded-[16px] overflow-hidden shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1)] border border-slate-100 mb-[25px]">
@@ -378,3 +379,5 @@ export const StudentMain = () => {
         {renderTabContent()}
       </div>
     </div>
+  );
+};
