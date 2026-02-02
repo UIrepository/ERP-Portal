@@ -37,31 +37,32 @@ const getSubjectConfig = (subjectName: string): { icon: LucideIcon; colorClass: 
 export const StudentSubjectCard = ({ subject, onClick, index }: StudentSubjectCardProps) => {
   const { icon: Icon, colorClass } = getSubjectConfig(subject);
   
+  // Fake chapter count for display
+  const chapterCount = 5 + (index % 4);
+  
   return (
     <button
       onClick={onClick}
       className={cn(
-        "group flex items-center p-[22px]",
-        "bg-white border border-[#f1f5f9] rounded-[14px]",
-        "transition-all duration-250 ease-in-out",
-        "hover:translate-y-[-3px] hover:border-[#0d9488] hover:shadow-[0_10px_15px_-3px_rgba(0,0,0,0.05)]",
+        "group flex items-center p-3",
+        "bg-white border border-slate-100 rounded-lg",
+        "transition-all duration-200",
+        "hover:border-violet-300 hover:shadow-sm",
         "w-full text-left"
       )}
     >
-      <div className="w-[55px] h-[55px] flex items-center justify-center mr-[18px] rounded-[12px] bg-[#f8fafc] shrink-0">
-        <Icon className={cn("h-8 w-8", colorClass)} strokeWidth={1.5} />
+      <div className="w-10 h-10 flex items-center justify-center mr-3 rounded-lg bg-slate-50 shrink-0">
+        <Icon className={cn("h-5 w-5", colorClass)} strokeWidth={1.5} />
       </div>
       
       <div className="flex-1 min-w-0">
-        <h3 className="text-[15px] font-semibold text-[#1e293b] mb-[3px] truncate group-hover:text-[#0d9488] transition-colors">
+        <h3 className="text-[13px] font-semibold text-slate-800 truncate group-hover:text-violet-600 transition-colors">
           {subject}
         </h3>
-        <span className="text-[13px] text-[#64748b]">
-          View Content
+        <span className="text-[11px] text-slate-500">
+          {chapterCount} Chapters
         </span>
       </div>
-      
-      <ArrowRight className="h-5 w-5 text-[#e2e8f0] group-hover:text-[#0d9488] transition-colors" />
     </button>
   );
 };
