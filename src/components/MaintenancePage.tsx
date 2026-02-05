@@ -19,7 +19,7 @@ export const MaintenancePage = ({ message }: MaintenancePageProps) => {
             Under Maintenance
           </h1>
           <p className="text-muted-foreground text-sm leading-relaxed" style={{ fontFamily: 'Inter, sans-serif' }}>
-            {message || 'We are currently performing scheduled maintenance. Please check back soon.'}
+            {message || 'We are currently performing scheduled maintenance. Please check back on 7th Feb 2026.'}
           </p>
         </div>
 
