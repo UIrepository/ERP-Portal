@@ -410,14 +410,13 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
     }
 
     return (
-        <div className="p-4 space-y-6 bg-white min-h-full font-sans">
-            {/* Header Section */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="p-4 bg-white min-h-full font-sans">
+            {/* Header Section - Wrapped in a clean white section */}
+            <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 flex items-center tracking-tight">
-                        Lectures
+                        Class Lectures
                     </h1>
-                    <p className="text-sm text-slate-500 mt-0.5">Watch recorded classes for {subject}</p>
                 </div>
                 
                 {/* Search */}
@@ -463,9 +462,9 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                                         </div>
 
                                         {/* Graphic Elements (Right) */}
-                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 scale-90">
-                                            {/* Logo Circle */}
-                                            <div className="w-[100px] h-[100px] bg-[#111] rounded-full flex items-center justify-center border-[6px] border-[#f0fdfa] shadow-sm select-none overflow-hidden p-3">
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                                            {/* Logo Circle - Zoomed up from scale-90, slightly larger dims */}
+                                            <div className="w-[110px] h-[110px] bg-[#111] rounded-full flex items-center justify-center border-[6px] border-[#f0fdfa] shadow-sm select-none overflow-hidden p-3">
                                                 <img 
                                                     src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
                                                     alt="UI Logo" 
@@ -473,7 +472,7 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                                                 />
                                             </div>
                                             {/* Play Button Overlay */}
-                                            <div className="absolute bottom-0 right-0 w-[40px] h-[40px] bg-[#0d9488] rounded-full flex items-center justify-center text-white border-[3px] border-white shadow-sm z-20">
+                                            <div className="absolute bottom-0 right-0 w-[42px] h-[42px] bg-[#0d9488] rounded-full flex items-center justify-center text-white border-[3px] border-white shadow-sm z-20">
                                                 <Play fill="white" className="w-3.5 h-3.5 ml-0.5" />
                                             </div>
                                         </div>
@@ -504,7 +503,7 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                         <div className="inline-block bg-slate-50 rounded-full p-3 mb-3">
                             <PlayCircle className="h-8 w-8 text-slate-400" />
                         </div>
-                        <h3 className="text-base font-semibold text-slate-900">No Lectures Found</h3>
+                        <h3 className="text-base font-semibold text-slate-900">No Class Lectures Found</h3>
                         <p className="text-sm text-slate-500">No recorded lectures are available for this subject.</p>
                     </div>
                 )}
