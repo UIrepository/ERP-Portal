@@ -413,15 +413,6 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
 
     return (
         <div className="p-6 bg-white min-h-full font-sans">
-            <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => navigate(-1)} 
-                className="mb-4 pl-0 text-slate-500 hover:bg-transparent hover:text-slate-800"
-            >
-                <ChevronLeft className="h-5 w-5 mr-1" /> Back
-            </Button>
-
             {/* Unified White Section for Header + Content */}
             <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
                 
