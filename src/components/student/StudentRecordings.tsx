@@ -302,12 +302,11 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
 // Main Component
 export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) => {
     const { profile } = useAuth();
-    const navigate = useNavigate(); // Added for Back button
+    const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRecording, setSelectedRecording] = useState<RecordingContent | null>(null);
     const isMobile = useIsMobile();
 
-    // Direct query when batch/subject props are provided (context-aware mode)
     const { data: recordings, isLoading } = useQuery<RecordingContent[]>({
         queryKey: ['student-recordings', batch, subject],
         queryFn: async (): Promise<RecordingContent[]> => {
@@ -318,7 +317,7 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                 .select('*')
                 .eq('batch', batch)
                 .eq('subject', subject)
-                .order('date', { ascending: false }); // Newest first
+                .order('date', { ascending: false });
             
             if (error) throw error;
             return (data || []) as RecordingContent[];
@@ -346,11 +345,6 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
         });
     };
 
-    const getSubjectInitials = (subj: string) => {
-        if (!subj) return 'CS';
-        return subj.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-    };
-
     if (selectedRecording) {
         return (
             <div className="p-4 space-y-4 bg-white min-h-full font-sans">
@@ -374,20 +368,18 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                         <DoubtsSection recording={selectedRecording} />
                     </div>
                     
-                    {/* Sidebar Suggestions */}
                     <div className="lg:col-span-1">
                         <Card className="bg-white rounded-xl shadow-sm border border-slate-200 sticky top-4">
                             <CardHeader className="pb-2 pt-4 px-4"><CardTitle className="text-base text-slate-800">Other Lectures</CardTitle></CardHeader>
                             <CardContent className="px-4 pb-4">
                                 <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
-                                    {filteredRecordings.filter(r => r.id !== selectedRecording.id).map((rec, idx) => (
+                                    {filteredRecordings.filter(r => r.id !== selectedRecording.id).map((rec) => (
                                         <div 
                                             key={rec.id} 
-                                            className="group flex gap-3 p-2 hover:bg-slate-50 rounded-md cursor-pointer transition-colors border border-transparent hover:border-slate-100" 
+                                            className="group flex gap-3 p-2 hover:bg-slate-50 rounded-md cursor-pointer transition-all duration-300 border border-transparent hover:border-slate-100 hover:scale-[1.02] active:scale-[0.98]" 
                                             onClick={() => handleSelectRecording(rec)}
                                         >
                                             <div className="relative w-20 h-12 bg-slate-100 rounded overflow-hidden flex-shrink-0">
-                                                 {/* Mini Thumbnail */}
                                                 <div className="absolute inset-0 bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center">
                                                     <PlayCircle className="h-5 w-5 text-white/70" />
                                                 </div>
@@ -413,10 +405,8 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
 
     return (
         <div className="p-6 bg-white min-h-full font-sans">
-            {/* Unified White Section for Header + Content */}
             <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
                 
-                {/* Header Section */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                     <div className="flex items-center gap-3">
                         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
@@ -424,7 +414,6 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                         </h1>
                     </div>
                     
-                    {/* Search */}
                     <div className="relative w-full md:w-64">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                         <Input
@@ -436,7 +425,6 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                     </div>
                 </div>
 
-                {/* Recordings Grid - Zoomed Out Premium Cards */}
                 <div>
                     {isLoading ? (
                         <RecordingSkeleton />
@@ -454,22 +442,22 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                                             "shadow-[0_1px_3px_rgba(0,0,0,0.05)]",
                                             "border border-slate-200",
                                             "cursor-pointer",
-                                            "w-[280px] h-[280px] flex-shrink-0 flex flex-col"
+                                            "w-[280px] h-[280px] flex-shrink-0 flex flex-col",
+                                            // Zoom Effects Integrated
+                                            "transition-all duration-300 ease-in-out group",
+                                            "hover:scale-[1.02] hover:shadow-lg hover:border-teal-200",
+                                            "active:scale-[0.98]"
                                         )}
                                     >
-                                        {/* Visual Banner - Fixed Height */}
                                         <div className="h-[160px] w-full flex-shrink-0 bg-gradient-to-br from-white to-[#f0fdfa] rounded-lg relative flex items-center px-5 border border-[#ccfbf1] overflow-hidden">
                                             
-                                            {/* Banner Title - Lecture No */}
                                             <div className="z-10 relative flex-shrink-0">
                                                 <span className="text-[#0d9488] font-bold text-xl block tracking-tight whitespace-nowrap">
                                                     Lecture {lectureNo}
                                                 </span>
                                             </div>
 
-                                            {/* Graphic Elements (Right) - Fixed Position */}
                                             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex-shrink-0">
-                                                {/* Logo Circle - Fixed Size */}
                                                 <div className="w-[100px] h-[100px] flex-shrink-0 bg-[#111] rounded-full flex items-center justify-center border-4 border-[#f0fdfa] shadow-sm select-none overflow-hidden p-2">
                                                     <img 
                                                         src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
@@ -477,14 +465,12 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                                                         className="w-full h-full object-contain"
                                                     />
                                                 </div>
-                                                {/* Play Button Overlay - Fixed Size */}
-                                                <div className="absolute bottom-0 right-0 w-9 h-9 flex-shrink-0 bg-[#0d9488] rounded-full flex items-center justify-center text-white border-2 border-white shadow-sm z-20">
+                                                <div className="absolute bottom-0 right-0 w-9 h-9 flex-shrink-0 bg-[#0d9488] rounded-full flex items-center justify-center text-white border-2 border-white shadow-sm z-20 group-hover:bg-[#0f766e] transition-colors">
                                                     <Play fill="white" className="w-3 h-3 ml-0.5" />
                                                 </div>
                                             </div>
                                         </div>
 
-                                        {/* Info Footer - Fixed Height */}
                                         <div className="pt-3 px-1 pb-1 flex-1 flex flex-col justify-between min-h-0">
                                             <div className="flex justify-between items-center mb-2 text-slate-500 font-normal text-xs flex-shrink-0">
                                                 <span className="whitespace-nowrap">{format(new Date(recording.date), 'dd MMM, yyyy')}</span>
@@ -493,8 +479,7 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                                                     <span className="whitespace-nowrap">{format(new Date(recording.created_at), 'h:mm a')}</span>
                                                 </div>
                                             </div>
-                                            {/* Topic Title */}
-                                            <h2 className="text-base font-semibold text-slate-900 tracking-tight leading-snug line-clamp-2 flex-shrink-0">
+                                            <h2 className="text-base font-semibold text-slate-900 tracking-tight leading-snug line-clamp-2 flex-shrink-0 group-hover:text-teal-600 transition-colors">
                                                 {recording.topic}
                                             </h2>
                                         </div>
