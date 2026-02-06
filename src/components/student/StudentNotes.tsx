@@ -1,21 +1,16 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { 
   FileText, 
   Download, 
-  Search, 
   ArrowLeft, 
   FileSpreadsheet, 
   FileCode, 
-  File, 
-  Cloud,
-  ExternalLink
+  File
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -43,7 +38,7 @@ const getFileMetadata = (url: string, filename: string) => {
 
   if (lowerUrl.includes('docs.google.com/spreadsheets') || lowerName.endsWith('.csv') || lowerName.endsWith('.xlsx')) {
     return { 
-      icon: <FileSpreadsheet className="w-6 h-6" />, 
+      icon: <FileSpreadsheet className="w-4 h-4" />, 
       color: "text-green-600", 
       bg: "bg-green-50",
       type: "Spreadsheet",
@@ -52,7 +47,7 @@ const getFileMetadata = (url: string, filename: string) => {
   }
   if (lowerUrl.includes('docs.google.com/document') || lowerName.endsWith('.docx')) {
     return { 
-      icon: <FileText className="w-6 h-6" />, 
+      icon: <FileText className="w-4 h-4" />, 
       color: "text-blue-600", 
       bg: "bg-blue-50",
       type: "Document",
@@ -61,7 +56,7 @@ const getFileMetadata = (url: string, filename: string) => {
   }
   if (lowerUrl.includes('colab.research.google.com') || lowerName.endsWith('.ipynb')) {
     return { 
-      icon: <FileCode className="w-6 h-6" />, 
+      icon: <FileCode className="w-4 h-4" />, 
       color: "text-orange-600", 
       bg: "bg-orange-50",
       type: "Notebook",
@@ -70,7 +65,7 @@ const getFileMetadata = (url: string, filename: string) => {
   }
   if (lowerUrl.includes('drive.google.com') || lowerName.endsWith('.pdf')) {
     return { 
-      icon: <File className="w-6 h-6" />, 
+      icon: <File className="w-4 h-4" />, 
       color: "text-red-600", 
       bg: "bg-red-50",
       type: "PDF File",
@@ -80,7 +75,7 @@ const getFileMetadata = (url: string, filename: string) => {
   
   // Default
   return { 
-    icon: <File className="w-6 h-6" />, 
+    icon: <File className="w-4 h-4" />, 
     color: "text-violet-600", 
     bg: "bg-violet-50",
     type: "Resource",
@@ -89,19 +84,13 @@ const getFileMetadata = (url: string, filename: string) => {
 };
 
 const NotesSkeleton = () => (
-  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-    {[...Array(3)].map((_, i) => (
-      <div key={i} className="bg-white p-8 rounded-[20px] shadow-sm border border-slate-100 space-y-6 h-[200px]">
-        <Skeleton className="h-6 w-3/4 rounded-md" />
-        <div className="flex justify-between items-end mt-auto pt-4">
-           <div className="flex gap-3">
-             <Skeleton className="h-11 w-11 rounded-xl" />
-             <div className="space-y-2">
-               <Skeleton className="h-3 w-16" />
-               <Skeleton className="h-2 w-10" />
-             </div>
-           </div>
-           <Skeleton className="h-12 w-12 rounded-full" />
+  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    {[...Array(6)].map((_, i) => (
+      <div key={i} className="bg-white p-4 rounded-lg border border-slate-200 space-y-3">
+        <Skeleton className="h-5 w-3/4 rounded-md" />
+        <div className="flex items-center gap-2">
+           <Skeleton className="h-4 w-4 rounded" />
+           <Skeleton className="h-3 w-1/2" />
         </div>
       </div>
     ))}
@@ -115,15 +104,15 @@ const NoteViewer = ({ note, onBack, onDownload, allNotes, onNoteSelect }: { note
       <div className="p-4 md:p-6 space-y-6 bg-slate-50 min-h-full">
         <Button variant="ghost" onClick={onBack} className="mb-4 hover:bg-slate-200">
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Notes
+          Back to References
         </Button>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2">
-                <Card className="bg-white rounded-2xl overflow-hidden shadow-xl border-slate-100">
+                <Card className="bg-white rounded-xl overflow-hidden shadow-sm border-slate-200">
                     <CardHeader className="p-6 border-b bg-white">
                         <div className="flex justify-between items-center">
                             <CardTitle className="text-xl font-semibold text-slate-800">{note.title}</CardTitle>
-                            <Button onClick={() => onDownload(note)} className="bg-slate-900 hover:bg-slate-800">
+                            <Button onClick={() => onDownload(note)} variant="outline" size="sm">
                                 <Download className="h-4 w-4 mr-2" />
                                 Download
                             </Button>
@@ -131,7 +120,7 @@ const NoteViewer = ({ note, onBack, onDownload, allNotes, onNoteSelect }: { note
                     </CardHeader>
                     <Alert className="mx-6 mt-4 mb-2 p-3 bg-blue-50 border-blue-100 text-blue-800 text-sm [&>svg]:hidden">
                       <AlertDescription>
-                        For programming subjects, if content isn't viewing correctly, please use the <strong>Download</strong> button.
+                        If content isn't viewing correctly, please use the <strong>Download</strong> button.
                       </AlertDescription>
                     </Alert>
                     <CardContent className="p-0">
@@ -146,22 +135,22 @@ const NoteViewer = ({ note, onBack, onDownload, allNotes, onNoteSelect }: { note
                 </Card>
             </div>
             <div className="md:col-span-1">
-                <Card className="bg-white rounded-2xl shadow-lg border-slate-100">
+                <Card className="bg-white rounded-xl shadow-sm border-slate-200">
                     <CardHeader>
                         <CardTitle className="text-lg">Other Files</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                             {otherNotes.map(otherNote => {
                                 const meta = getFileMetadata(otherNote.file_url, otherNote.filename);
                                 return (
-                                <div key={otherNote.id} className="p-3 border border-slate-100 rounded-xl hover:bg-slate-50 transition-all duration-200 cursor-pointer flex items-center gap-3" onClick={() => onNoteSelect(otherNote)}>
-                                    <div className={`p-2 rounded-lg ${meta.bg} ${meta.color}`}>
+                                <div key={otherNote.id} className="p-3 border border-slate-100 rounded-lg hover:bg-slate-50 transition-all duration-200 cursor-pointer flex items-center gap-3" onClick={() => onNoteSelect(otherNote)}>
+                                    <div className={`p-1.5 rounded-md ${meta.bg} ${meta.color}`}>
                                         {meta.icon}
                                     </div>
                                     <div className="overflow-hidden">
                                         <p className="font-medium text-sm text-slate-700 truncate">{otherNote.title}</p>
-                                        <p className="text-[11px] text-slate-400 uppercase">{meta.ext}</p>
+                                        <p className="text-xs text-slate-400 truncate">{otherNote.filename}</p>
                                     </div>
                                 </div>
                             )})}
@@ -180,10 +169,8 @@ const NoteViewer = ({ note, onBack, onDownload, allNotes, onNoteSelect }: { note
 export const StudentNotes = ({ batch, subject }: StudentNotesProps) => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedNote, setSelectedNote] = useState<NotesContent | null>(null);
 
-  // Direct query when batch/subject props are provided (context-aware mode)
   const { data: notes, isLoading } = useQuery<NotesContent[]>({
     queryKey: ['student-notes', batch, subject],
     queryFn: async (): Promise<NotesContent[]> => {
@@ -202,7 +189,6 @@ export const StudentNotes = ({ batch, subject }: StudentNotesProps) => {
     enabled: !!batch && !!subject
   });
 
-  // Set up real-time subscriptions for notes data
   useEffect(() => {
     if (!profile?.user_id || !batch || !subject) return;
 
@@ -216,7 +202,6 @@ export const StudentNotes = ({ batch, subject }: StudentNotesProps) => {
           table: 'notes'
         },
         () => {
-          console.log('Real-time update: notes changed');
           queryClient.invalidateQueries({ queryKey: ['student-notes', batch, subject] });
         }
       )
@@ -226,17 +211,6 @@ export const StudentNotes = ({ batch, subject }: StudentNotesProps) => {
       supabase.removeChannel(notesChannel);
     };
   }, [profile?.user_id, batch, subject, queryClient]);
-
-  // Client-side filtering
-  const filteredNotes = useMemo(() => {
-    if (!notes) return [];
-    return notes.filter(note => {
-      const matchesSearch = !searchTerm || 
-        note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        note.filename.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesSearch;
-    });
-  }, [notes, searchTerm]);
 
   const logActivity = async (activityType: string, description: string, metadata?: any) => {
     if (!profile?.user_id) return;
@@ -252,7 +226,7 @@ export const StudentNotes = ({ batch, subject }: StudentNotesProps) => {
   };
 
   const handleDownload = async (e: React.MouseEvent, note: NotesContent) => {
-    e.stopPropagation(); // Prevent card click when clicking download
+    e.stopPropagation();
     
     await logActivity('note_download', `Downloaded ${note.title}`, {
       subject: note.subject,
@@ -292,84 +266,70 @@ export const StudentNotes = ({ batch, subject }: StudentNotesProps) => {
   }
 
   return (
-    <div className="p-6 space-y-8 bg-[#fcfcfd] min-h-full font-sans">
+    <div className="p-6 space-y-6 bg-[#fcfcfd] min-h-full font-sans">
       {/* Header Section */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 flex items-center tracking-tight">
-          <FileText className="mr-3 h-8 w-8 text-violet-600" />
-          Notes & Resources
+        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+          Reference Section
         </h1>
-        <p className="text-gray-500 mt-2 text-lg">Download your class notes and materials for {subject}</p>
-      </div>
-
-      {/* Search Section */}
-      <div className="flex gap-4">
-        <div className="relative flex-1 max-w-md group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-violet-600 transition-colors" />
-          <Input
-            placeholder="Search notes by title or filename..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 h-11 bg-white border-gray-200 focus:border-violet-600 focus:ring-violet-600/20 rounded-xl transition-all"
-          />
-        </div>
+        <p className="text-gray-500 mt-1 text-sm">Course materials and documents</p>
       </div>
 
       {/* Notes Grid */}
       <div>
         {isLoading ? (
           <NotesSkeleton />
-        ) : filteredNotes && filteredNotes.length > 0 ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {filteredNotes.map((note) => {
+        ) : notes && notes.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {notes.map((note) => {
               const meta = getFileMetadata(note.file_url, note.filename);
               
               return (
                 <div 
                   key={note.id} 
                   onClick={() => setSelectedNote(note)}
-                  className="bg-white p-8 rounded-[20px] shadow-[0_1px_2px_rgba(0,0,0,0.02),0_4px_12px_rgba(0,0,0,0.03),0_12px_24px_-4px_rgba(0,0,0,0.04)] border border-black/5 transition-all duration-400 cursor-pointer hover:-translate-y-1.5 hover:shadow-[0_4px_6px_rgba(0,0,0,0.02),0_20px_40px_-8px_rgba(0,0,0,0.08)] hover:border-violet-600/10 relative group h-full flex flex-col justify-between"
+                  className="
+                    group relative bg-white 
+                    border border-slate-200 
+                    rounded-lg 
+                    shadow-none 
+                    hover:bg-slate-50 transition-colors cursor-pointer 
+                    p-4 flex flex-col justify-between gap-4
+                  "
                 >
-                  <div>
-                    <h3 className="mb-6 text-xl font-semibold leading-relaxed text-gray-900 tracking-tight line-clamp-2">
+                  <div className="flex justify-between items-start gap-4">
+                    <h3 className="font-medium text-slate-900 line-clamp-2 text-base leading-snug">
                       {note.title}
                     </h3>
-                  </div>
-
-                  <div className="flex justify-between items-center mt-auto">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${meta.bg} ${meta.color}`}>
-                        {meta.icon}
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[13px] font-semibold text-gray-900">
-                          {meta.type}
-                        </span>
-                        <span className="text-[11px] text-gray-500 uppercase tracking-wider">
-                          {meta.ext}
-                        </span>
-                      </div>
-                    </div>
-
+                    
                     <button 
                       onClick={(e) => handleDownload(e, note)}
-                      className="w-12 h-12 rounded-full bg-gray-900 text-white flex items-center justify-center transition-all duration-300 border-none cursor-pointer shadow-lg hover:bg-violet-600 hover:scale-105 group-hover:shadow-violet-600/20"
-                      aria-label="Download Now"
+                      className="shrink-0 text-slate-400 hover:text-slate-900 transition-colors p-1"
+                      aria-label="Download"
                     >
-                      <Download className="w-5 h-5" />
+                      <Download className="w-4 h-4" />
                     </button>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 text-slate-500">
+                    <div className={`${meta.color} shrink-0`}>
+                      {meta.icon}
+                    </div>
+                    <span className="text-xs truncate font-normal text-slate-500 max-w-full">
+                      {note.filename}
+                    </span>
                   </div>
                 </div>
               );
             })}
           </div>
         ) : (
-          <div className="text-center py-24 bg-white rounded-[20px] border border-dashed border-slate-200">
-            <div className="inline-block bg-slate-50 rounded-2xl p-6 mb-4">
-              <FileText className="h-10 w-10 text-slate-400" />
+          <div className="text-center py-24 bg-white rounded-lg border border-dashed border-slate-200">
+            <div className="inline-block bg-slate-50 rounded-full p-4 mb-3">
+              <FileText className="h-8 w-8 text-slate-400" />
             </div>
-            <h3 className="text-xl font-semibold text-slate-900">No Notes Found</h3>
-            <p className="text-slate-500 mt-2">No notes are available for this subject yet.</p>
+            <h3 className="text-lg font-medium text-slate-900">No References Found</h3>
+            <p className="text-slate-500 text-sm mt-1">No materials have been uploaded yet.</p>
           </div>
         )}
       </div>
