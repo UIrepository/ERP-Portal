@@ -353,7 +353,7 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
 
     if (selectedRecording) {
         return (
-            <div className="p-4 space-y-4 bg-[#F8F8F8] min-h-full font-sans">
+            <div className="p-4 space-y-4 bg-white min-h-full font-sans">
                 <Button variant="outline" size="sm" onClick={() => setSelectedRecording(null)} className="mb-2 bg-white hover:bg-slate-50 text-slate-600 border-slate-200">
                     <ArrowLeft className="h-3.5 w-3.5 mr-2" /> Back to Lectures
                 </Button>
@@ -412,21 +412,22 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
     }
 
     return (
-        <div className="p-6 bg-[#F8F8F8] min-h-full font-sans">
+        <div className="p-6 bg-white min-h-full font-sans">
+            <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => navigate(-1)} 
+                className="mb-4 pl-0 text-slate-500 hover:bg-transparent hover:text-slate-800"
+            >
+                <ChevronLeft className="h-5 w-5 mr-1" /> Back
+            </Button>
+
             {/* Unified White Section for Header + Content */}
             <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
                 
                 {/* Header Section */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                     <div className="flex items-center gap-3">
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => navigate(-1)} 
-                            className="h-8 w-8 text-slate-500 hover:text-slate-800 -ml-2"
-                        >
-                            <ChevronLeft className="h-5 w-5" />
-                        </Button>
                         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
                             Class Lectures
                         </h1>
