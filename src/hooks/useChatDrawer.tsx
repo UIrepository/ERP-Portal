@@ -27,6 +27,7 @@ interface ChatDrawerContextValue {
   selectSupportRole: (role: 'admin' | 'manager') => void;
   setRecipient: (recipient: Recipient) => void;
   resetToRoleSelection: () => void;
+  toggleChatbot: () => void;
 }
 
 const defaultState: ChatDrawerState = {
@@ -88,6 +89,19 @@ export const ChatDrawerProvider = ({ children }: { children: ReactNode }) => {
     }));
   }, []);
 
+  const toggleChatbot = useCallback(() => {
+    setState(prev => {
+      if (prev.isOpen) {
+        return defaultState;
+      }
+      return {
+        ...defaultState,
+        isOpen: true,
+        mode: 'support',
+      };
+    });
+  }, []);
+
   return (
     <ChatDrawerContext.Provider
       value={{
@@ -98,6 +112,7 @@ export const ChatDrawerProvider = ({ children }: { children: ReactNode }) => {
         selectSupportRole,
         setRecipient,
         resetToRoleSelection,
+        toggleChatbot,
       }}
     >
       {children}
