@@ -3,12 +3,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useChatDrawer } from '@/hooks/useChatDrawer';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -20,10 +14,13 @@ import {
   Loader2, 
   ArrowLeft,
   User,
-  GraduationCap
+  GraduationCap,
+  MessageCircle,
+  X,
+  Bot
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface Message {
   id: string;
@@ -35,13 +32,39 @@ interface Message {
   subject_context?: string | null;
 }
 
-export const StudentChatDrawer = () => {
+export const StudentChatbot = () => {
   const { profile } = useAuth();
-  const { state, closeDrawer, selectSupportRole, setRecipient, resetToRoleSelection } = useChatDrawer();
+  const { 
+    state, 
+    closeDrawer, 
+    selectSupportRole, 
+    setRecipient, 
+    resetToRoleSelection,
+    toggleChatbot 
+  } = useChatDrawer();
   const [message, setMessage] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const [isLoadingRecipient, setIsLoadingRecipient] = useState(false);
+  const [managerUnavailable, setManagerUnavailable] = useState(false);
+
+  // Pre-fetch available staff
+  const { data: availableStaff } = useQuery({
+    queryKey: ['available-support-staff', profile?.user_id],
+    queryFn: async () => {
+      const [admins, managers] = await Promise.all([
+        supabase.from('admins').select('user_id').not('user_id', 'is', null),
+        supabase.from('managers').select('user_id, assigned_batches').not('user_id', 'is', null)
+      ]);
+      
+      return {
+        hasAdmin: (admins.data?.length || 0) > 0,
+        hasManager: (managers.data?.length || 0) > 0,
+        managers: managers.data || []
+      };
+    },
+    enabled: !!profile?.user_id && state.isOpen,
+  });
 
   // Fetch admin for support
   const fetchAdmin = async () => {
@@ -53,22 +76,19 @@ export const StudentChatDrawer = () => {
       .maybeSingle();
     
     if (error || !data) {
-      toast.error('No admin available at the moment');
       return null;
     }
     return data;
   };
 
-  // Fetch manager for support
+  // Fetch manager for support with better fallback
   const fetchManager = async (studentBatches: string[]) => {
     const { data, error } = await supabase
       .from('managers')
       .select('user_id, name, assigned_batches')
-      .not('user_id', 'is', null)
-      .limit(100);
+      .not('user_id', 'is', null);
     
     if (error || !data || data.length === 0) {
-      toast.error('No manager available at the moment');
       return null;
     }
 
@@ -77,7 +97,8 @@ export const StudentChatDrawer = () => {
       manager.assigned_batches?.some((b: string) => studentBatches.includes(b))
     );
 
-    return matchingManager || data[0]; // Fallback to first manager
+    // Return matching manager or first available
+    return matchingManager || data[0];
   };
 
   // Fetch teacher for subject connect
@@ -85,11 +106,9 @@ export const StudentChatDrawer = () => {
     const { data, error } = await supabase
       .from('teachers')
       .select('user_id, name, assigned_batches, assigned_subjects')
-      .not('user_id', 'is', null)
-      .limit(100);
+      .not('user_id', 'is', null);
     
     if (error || !data || data.length === 0) {
-      toast.error('No teacher available for this subject');
       return null;
     }
 
@@ -99,12 +118,7 @@ export const StudentChatDrawer = () => {
       teacher.assigned_subjects?.includes(subject)
     );
 
-    if (!matchingTeacher) {
-      toast.error('No teacher assigned to this subject and batch');
-      return null;
-    }
-
-    return matchingTeacher;
+    return matchingTeacher || null;
   };
 
   // Fetch student batches for manager lookup
@@ -123,6 +137,7 @@ export const StudentChatDrawer = () => {
 
   // Handle role selection for support mode
   const handleRoleSelect = async (role: 'admin' | 'manager') => {
+    setManagerUnavailable(false);
     selectSupportRole(role);
     setIsLoadingRecipient(true);
 
@@ -142,10 +157,12 @@ export const StudentChatDrawer = () => {
           displayName: 'Support Agent',
         });
       } else {
+        if (role === 'manager') {
+          setManagerUnavailable(true);
+        }
         resetToRoleSelection();
       }
     } catch {
-      toast.error('Failed to connect to support');
       resetToRoleSelection();
     } finally {
       setIsLoadingRecipient(false);
@@ -170,7 +187,7 @@ export const StudentChatDrawer = () => {
             });
           }
         } catch {
-          toast.error('Failed to connect to teacher');
+          // Silent fail - UI will handle
         } finally {
           setIsLoadingRecipient(false);
         }
@@ -228,9 +245,6 @@ export const StudentChatDrawer = () => {
       setMessage('');
       queryClient.invalidateQueries({ queryKey: ['chat-messages'] });
     },
-    onError: () => {
-      toast.error('Failed to send message');
-    },
   });
 
   // Auto-scroll to bottom
@@ -240,47 +254,124 @@ export const StudentChatDrawer = () => {
     }
   }, [messages]);
 
-  // Role Selection View (Support Mode)
-  const renderRoleSelection = () => (
-    <div className="flex flex-col gap-4 p-4">
-      <p className="text-sm text-muted-foreground text-center mb-2">
-        Who would you like to contact?
-      </p>
-      
-      <button
-        onClick={() => handleRoleSelect('admin')}
-        disabled={isLoadingRecipient}
-        className="flex items-center gap-4 p-4 rounded-lg border border-slate-200 hover:border-slate-900 transition-colors text-left group"
-      >
-        <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-          <Shield className="h-6 w-6 text-blue-600" />
-        </div>
-        <div>
-          <h3 className="font-semibold text-slate-900 group-hover:text-slate-800">Admin</h3>
-          <p className="text-sm text-slate-500">Technical Support</p>
-        </div>
-      </button>
+  // Reset manager unavailable state when drawer closes
+  useEffect(() => {
+    if (!state.isOpen) {
+      setManagerUnavailable(false);
+    }
+  }, [state.isOpen]);
 
-      <button
-        onClick={() => handleRoleSelect('manager')}
-        disabled={isLoadingRecipient}
-        className="flex items-center gap-4 p-4 rounded-lg border border-slate-200 hover:border-slate-900 transition-colors text-left group"
-      >
-        <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-          <Briefcase className="h-6 w-6 text-emerald-600" />
+  // Welcome View with options
+  const renderWelcomeView = () => (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
+        <div className="flex items-center gap-2">
+          <img src="/imagelogo.png" alt="Logo" className="h-6 w-auto" />
+          <span className="font-semibold text-sm text-slate-800">Unknown IITians</span>
         </div>
-        <div>
-          <h3 className="font-semibold text-slate-900 group-hover:text-slate-800">Manager</h3>
-          <p className="text-sm text-slate-500">Batch Issues</p>
-        </div>
-      </button>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={closeDrawer}>
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
 
-      {isLoadingRecipient && (
-        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mt-2">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Connecting to support...
+      {/* Bot greeting */}
+      <div className="flex-1 p-4 overflow-auto">
+        <div className="flex items-start gap-3 mb-6">
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+            <Bot className="h-5 w-5 text-primary" />
+          </div>
+          <div className="bg-slate-100 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%]">
+            <p className="text-sm text-slate-700">
+              Hi! 👋 I'm here to help. Who would you like to connect with?
+            </p>
+          </div>
         </div>
-      )}
+
+        {/* Manager unavailable fallback */}
+        {managerUnavailable && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+            <p className="text-sm text-amber-800">
+              No manager is currently assigned to your batch. Would you like to talk to an Admin instead?
+            </p>
+            <div className="flex gap-2 mt-3">
+              <Button size="sm" onClick={() => handleRoleSelect('admin')}>
+                Talk to Admin
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setManagerUnavailable(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Option blocks */}
+        <div className="space-y-3">
+          {/* Admin option */}
+          <button
+            onClick={() => handleRoleSelect('admin')}
+            disabled={isLoadingRecipient || !availableStaff?.hasAdmin}
+            className={cn(
+              "w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left group",
+              availableStaff?.hasAdmin 
+                ? "border-slate-200 hover:border-slate-400 hover:shadow-sm" 
+                : "border-slate-100 opacity-50 cursor-not-allowed"
+            )}
+          >
+            <div className="w-11 h-11 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+              <Shield className="h-5 w-5 text-blue-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-slate-900 text-[15px]">Talk to Admin</h3>
+              <p className="text-sm text-slate-500">Technical Support</p>
+            </div>
+          </button>
+
+          {/* Manager option */}
+          <button
+            onClick={() => handleRoleSelect('manager')}
+            disabled={isLoadingRecipient || !availableStaff?.hasManager}
+            className={cn(
+              "w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left group",
+              availableStaff?.hasManager 
+                ? "border-slate-200 hover:border-slate-400 hover:shadow-sm" 
+                : "border-slate-100 opacity-50 cursor-not-allowed"
+            )}
+          >
+            <div className="w-11 h-11 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+              <Briefcase className="h-5 w-5 text-emerald-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-slate-900 text-[15px]">Talk to Manager</h3>
+              <p className="text-sm text-slate-500">Batch Issues</p>
+            </div>
+          </button>
+
+          {/* Teacher option - only in subject-connect mode */}
+          {state.mode === 'subject-connect' && state.subjectContext && (
+            <button
+              onClick={() => {/* Already triggers auto-fetch */}}
+              disabled={isLoadingRecipient}
+              className="w-full flex items-center gap-4 p-4 rounded-xl border border-slate-200 hover:border-slate-400 hover:shadow-sm transition-all text-left group"
+            >
+              <div className="w-11 h-11 rounded-full bg-violet-100 flex items-center justify-center shrink-0">
+                <GraduationCap className="h-5 w-5 text-violet-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-slate-900 text-[15px]">Talk to Teacher</h3>
+                <p className="text-sm text-slate-500">{state.subjectContext.subject} Mentor</p>
+              </div>
+            </button>
+          )}
+        </div>
+
+        {isLoadingRecipient && (
+          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mt-6">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Connecting...
+          </div>
+        )}
+      </div>
     </div>
   );
 
@@ -288,17 +379,15 @@ export const StudentChatDrawer = () => {
   const renderChatView = () => (
     <div className="flex flex-col h-full">
       {/* Chat Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b shrink-0">
-        {state.mode === 'support' && (
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8"
-            onClick={resetToRoleSelection}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        )}
+      <div className="flex items-center gap-3 px-4 py-3 border-b shrink-0 bg-white">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-8 w-8"
+          onClick={resetToRoleSelection}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
         <Avatar className="h-9 w-9">
           <AvatarFallback className="bg-primary/10 text-primary">
             {state.mode === 'support' ? (
@@ -308,12 +397,15 @@ export const StudentChatDrawer = () => {
             )}
           </AvatarFallback>
         </Avatar>
-        <div>
+        <div className="flex-1">
           <h3 className="font-semibold text-sm">{state.selectedRecipient?.displayName}</h3>
           <p className="text-xs text-muted-foreground">
             {state.mode === 'support' ? 'Support Chat' : 'Subject Mentor'}
           </p>
         </div>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={closeDrawer}>
+          <X className="h-4 w-4" />
+        </Button>
       </div>
 
       {/* Messages Area */}
@@ -333,14 +425,18 @@ export const StudentChatDrawer = () => {
               return (
                 <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                   <div 
-                    className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                    className={cn(
+                      "max-w-[80%] rounded-2xl px-4 py-2",
                       isMe 
-                        ? 'bg-primary text-primary-foreground rounded-br-sm' 
-                        : 'bg-muted rounded-bl-sm'
-                    }`}
+                        ? "bg-primary text-primary-foreground rounded-br-sm" 
+                        : "bg-slate-100 rounded-bl-sm"
+                    )}
                   >
                     <p className="text-sm">{msg.content}</p>
-                    <p className={`text-[10px] mt-1 text-right ${isMe ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                    <p className={cn(
+                      "text-[10px] mt-1 text-right",
+                      isMe ? "text-primary-foreground/70" : "text-muted-foreground"
+                    )}>
                       {msg.created_at ? format(new Date(msg.created_at), 'h:mm a') : ''}
                     </p>
                   </div>
@@ -353,7 +449,7 @@ export const StudentChatDrawer = () => {
       </ScrollArea>
 
       {/* Message Input */}
-      <div className="p-4 border-t shrink-0">
+      <div className="p-3 border-t shrink-0 bg-white">
         <div className="flex gap-2">
           <Input 
             value={message}
@@ -376,11 +472,22 @@ export const StudentChatDrawer = () => {
 
   // Loading state for subject-connect
   const renderLoadingRecipient = () => (
-    <div className="flex flex-col items-center justify-center h-64 gap-3">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      <p className="text-sm text-muted-foreground">
-        Connecting to {state.subjectContext?.subject} Mentor...
-      </p>
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
+        <div className="flex items-center gap-2">
+          <img src="/imagelogo.png" alt="Logo" className="h-6 w-auto" />
+          <span className="font-semibold text-sm text-slate-800">Unknown IITians</span>
+        </div>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={closeDrawer}>
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+      <div className="flex-1 flex flex-col items-center justify-center gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">
+          Connecting to {state.subjectContext?.subject} Mentor...
+        </p>
+      </div>
     </div>
   );
 
@@ -394,31 +501,41 @@ export const StudentChatDrawer = () => {
       return renderChatView();
     }
 
-    if (state.mode === 'support') {
-      return renderRoleSelection();
-    }
-
-    return renderLoadingRecipient();
-  };
-
-  // Get sheet title
-  const getSheetTitle = () => {
-    if (state.mode === 'subject-connect' && state.subjectContext) {
-      return `${state.subjectContext.subject} Support`;
-    }
-    return 'Support Chat';
+    return renderWelcomeView();
   };
 
   return (
-    <Sheet open={state.isOpen} onOpenChange={(open) => !open && closeDrawer()}>
-      <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
-        <SheetHeader className="px-4 py-3 border-b shrink-0">
-          <SheetTitle className="text-left">{getSheetTitle()}</SheetTitle>
-        </SheetHeader>
-        <div className="flex-1 overflow-hidden">
+    <>
+      {/* Floating Action Button */}
+      <button
+        onClick={toggleChatbot}
+        className={cn(
+          "fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full shadow-lg transition-all duration-200",
+          "bg-slate-900 hover:bg-slate-800 hover:scale-105 hover:shadow-xl",
+          "flex items-center justify-center",
+          state.isOpen && "rotate-0"
+        )}
+      >
+        {state.isOpen ? (
+          <X className="h-6 w-6 text-white" />
+        ) : (
+          <MessageCircle className="h-6 w-6 text-white" />
+        )}
+      </button>
+
+      {/* Chatbot Window */}
+      {state.isOpen && (
+        <div 
+          className={cn(
+            "fixed bottom-24 right-6 z-50 w-[380px] h-[500px]",
+            "bg-white border border-slate-200 rounded-2xl shadow-2xl",
+            "flex flex-col overflow-hidden",
+            "animate-in fade-in slide-in-from-bottom-4 duration-200"
+          )}
+        >
           {renderContent()}
         </div>
-      </SheetContent>
-    </Sheet>
+      )}
+    </>
   );
 };
