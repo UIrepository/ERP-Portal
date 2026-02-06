@@ -39,7 +39,7 @@ const getFileMetadata = (url: string, filename: string) => {
 
   if (lowerUrl.includes('docs.google.com/spreadsheets') || lowerName.endsWith('.csv') || lowerName.endsWith('.xlsx')) {
     return { 
-      icon: <FileSpreadsheet className="w-4 h-4" />, 
+      icon: <FileSpreadsheet className="w-5 h-5" />, 
       color: "text-green-600", 
       bg: "bg-green-50",
       type: "Spreadsheet",
@@ -48,7 +48,7 @@ const getFileMetadata = (url: string, filename: string) => {
   }
   if (lowerUrl.includes('docs.google.com/document') || lowerName.endsWith('.docx')) {
     return { 
-      icon: <FileText className="w-4 h-4" />, 
+      icon: <FileText className="w-5 h-5" />, 
       color: "text-blue-600", 
       bg: "bg-blue-50",
       type: "Document",
@@ -57,7 +57,7 @@ const getFileMetadata = (url: string, filename: string) => {
   }
   if (lowerUrl.includes('colab.research.google.com') || lowerName.endsWith('.ipynb')) {
     return { 
-      icon: <FileCode className="w-4 h-4" />, 
+      icon: <FileCode className="w-5 h-5" />, 
       color: "text-orange-600", 
       bg: "bg-orange-50",
       type: "Notebook",
@@ -66,7 +66,7 @@ const getFileMetadata = (url: string, filename: string) => {
   }
   if (lowerUrl.includes('drive.google.com') || lowerName.endsWith('.pdf')) {
     return { 
-      icon: <File className="w-4 h-4" />, 
+      icon: <File className="w-5 h-5" />, 
       color: "text-red-600", 
       bg: "bg-red-50",
       type: "PDF File",
@@ -76,7 +76,7 @@ const getFileMetadata = (url: string, filename: string) => {
   
   // Default
   return { 
-    icon: <File className="w-4 h-4" />, 
+    icon: <File className="w-5 h-5" />, 
     color: "text-violet-600", 
     bg: "bg-violet-50",
     type: "Resource",
@@ -85,15 +85,20 @@ const getFileMetadata = (url: string, filename: string) => {
 };
 
 const NotesSkeleton = () => (
-  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
     {[...Array(6)].map((_, i) => (
-      <div key={i} className="bg-white p-4 rounded-lg border border-slate-200 space-y-3">
-        <Skeleton className="h-5 w-3/4 rounded-md" />
-        <div className="flex items-center gap-2">
-           <Skeleton className="h-4 w-4 rounded" />
-           <Skeleton className="h-3 w-1/2" />
+      <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 space-y-4 h-[180px] flex flex-col justify-between">
+        <Skeleton className="h-6 w-3/4 rounded-md" />
+        <div className="flex justify-between items-end">
+           <div className="flex gap-3 items-center">
+             <Skeleton className="h-10 w-10 rounded-lg" />
+             <div className="space-y-1.5">
+               <Skeleton className="h-3 w-20" />
+               <Skeleton className="h-2 w-12" />
+             </div>
+           </div>
+           <Skeleton className="h-10 w-10 rounded-full" />
         </div>
-        <Skeleton className="h-9 w-full rounded-md mt-2" />
       </div>
     ))}
   </div>
@@ -284,58 +289,54 @@ export const StudentNotes = ({ batch, subject }: StudentNotesProps) => {
             {isLoading ? (
               <NotesSkeleton />
             ) : notes && notes.length > 0 ? (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
                 {notes.map((note) => {
                   const meta = getFileMetadata(note.file_url, note.filename);
                   
                   return (
                     <div 
                       key={note.id} 
+                      onClick={() => setSelectedNote(note)}
                       className="
                         group relative bg-white 
                         border border-slate-200 
-                        rounded-lg 
-                        shadow-none 
-                        hover:bg-slate-50 transition-colors 
-                        p-4 flex flex-col gap-4
+                        rounded-2xl
+                        p-6 flex flex-col justify-between gap-6
+                        hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-slate-300 transition-all duration-300 cursor-pointer
                       "
                     >
-                      {/* Top Row: Title and Circular Download Button */}
-                      <div className="flex justify-between items-start gap-3">
-                        <h3 className="font-medium text-slate-900 line-clamp-2 text-base leading-snug pt-1">
+                      {/* Title Section (Semi Bold) */}
+                      <div>
+                        <h3 className="font-semibold text-slate-900 text-lg leading-snug line-clamp-2">
                           {note.title}
                         </h3>
-                        
-                        {/* Circular Download Button (Premium Style) */}
+                      </div>
+
+                      {/* Footer Section: Icon/Name Left, Download Right */}
+                      <div className="flex items-center justify-between gap-4 pt-2 mt-auto">
+                        {/* Left: File Info */}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`shrink-0 w-11 h-11 rounded-xl flex items-center justify-center ${meta.bg} ${meta.color}`}>
+                            {meta.icon}
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-medium text-slate-700 truncate block">
+                               {note.filename}
+                            </span>
+                            <span className="text-[11px] text-slate-400 font-medium uppercase tracking-wider">
+                               {meta.ext}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Right: Circular Download Button (Bottom Corner) */}
                         <button 
                           onClick={(e) => handleDownload(e, note)}
-                          className="shrink-0 w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center transition-transform hover:scale-105 hover:bg-slate-700 shadow-sm"
+                          className="shrink-0 w-11 h-11 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-md hover:bg-violet-600 hover:scale-110 hover:shadow-xl transition-all duration-300"
                           aria-label="Download"
                         >
-                          <Download className="w-4 h-4" />
+                          <Download className="w-5 h-5" />
                         </button>
-                      </div>
-
-                      {/* File Info Row */}
-                      <div className="flex items-center gap-2.5 text-slate-500">
-                        <div className={`${meta.color} shrink-0`}>
-                          {meta.icon}
-                        </div>
-                        <span className="text-xs truncate font-normal text-slate-500 max-w-full">
-                          {note.filename}
-                        </span>
-                      </div>
-
-                      {/* View Note Button */}
-                      <div className="mt-auto pt-2">
-                        <Button 
-                          className="w-full bg-slate-100 text-slate-900 hover:bg-slate-200 border border-slate-200 shadow-sm"
-                          size="sm"
-                          onClick={() => setSelectedNote(note)}
-                        >
-                          <Eye className="w-3.5 h-3.5 mr-2" />
-                          View Note
-                        </Button>
                       </div>
                     </div>
                   );
