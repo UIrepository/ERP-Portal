@@ -5,9 +5,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Crown, ExternalLink, Search, ArrowLeft } from 'lucide-react';
+import { Crown, ExternalLink, ArrowLeft, Play, FileText } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Input } from '@/components/ui/input';
 
 interface UIKiPadhaiContent {
   id: string;
@@ -27,20 +26,25 @@ interface StudentUIKiPadhaiProps {
 }
 
 const PremiumContentSkeleton = () => (
-    <div className="space-y-4">
-        {[...Array(3)].map((_, i) => (
-            <Card key={i} className="p-4">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <Skeleton className="h-10 w-10 rounded-full" />
-                        <div className="space-y-2">
-                            <Skeleton className="h-4 w-48" />
-                            <Skeleton className="h-4 w-32" />
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200 h-[280px] flex flex-col justify-between">
+                <div className="space-y-4">
+                    <Skeleton className="h-6 w-24 rounded-md" />
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-4 w-2/3" />
+                </div>
+                <div className="flex justify-between items-center pt-4 border-t border-slate-100">
+                    <div className="flex gap-3">
+                        <Skeleton className="h-10 w-10 rounded-xl" />
+                        <div className="space-y-1">
+                            <Skeleton className="h-3 w-16" />
+                            <Skeleton className="h-2 w-10" />
                         </div>
                     </div>
-                    <Skeleton className="h-10 w-28" />
+                    <Skeleton className="h-10 w-10 rounded-full" />
                 </div>
-            </Card>
+            </div>
         ))}
     </div>
 );
@@ -49,57 +53,66 @@ const PremiumContentViewer = ({ content, onBack, onAccess, allContent, onContent
     const otherContent = allContent.filter(c => c.id !== content.id);
 
     return (
-        <div className="p-4 md:p-6 space-y-6 bg-slate-200 min-h-full">
-            <Button variant="outline" onClick={onBack} className="mb-4 bg-white/80 backdrop-blur-sm">
+        <div className="p-4 md:p-6 space-y-6 bg-slate-50 min-h-full font-sans">
+            <Button variant="ghost" onClick={onBack} className="mb-4 hover:bg-slate-200">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Premium Content
             </Button>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2">
-                    <Card className="bg-black rounded-2xl overflow-hidden shadow-2xl">
-                         <CardHeader className="p-6 border-b border-yellow-500/30 bg-gray-900">
+                    <Card className="bg-black rounded-2xl overflow-hidden shadow-2xl border-0">
+                         <CardHeader className="p-6 border-b border-white/10 bg-neutral-900">
                             <div className="flex justify-between items-center">
                                 <CardTitle className="text-white flex items-center gap-3">
-                                    <Crown className="text-yellow-400" />
+                                    <Crown className="text-yellow-500 fill-yellow-500" />
                                     {content.title}
                                 </CardTitle>
-                                <Button onClick={() => onAccess(content)} className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold">
+                                <Button onClick={() => onAccess(content)} className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-full">
                                     <ExternalLink className="h-4 w-4 mr-2" />
-                                    Access Content
+                                    Open Link
                                 </Button>
                             </div>
                         </CardHeader>
                         <CardContent className="p-0">
-                            <div className="w-full h-[60vh] md:h-[75vh]">
+                            <div className="w-full h-[60vh] md:h-[75vh] bg-neutral-950 flex items-center justify-center">
                                 <iframe
                                     src={content.link}
                                     className="w-full h-full"
                                     title={content.title}
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowFullScreen
                                 />
                             </div>
                         </CardContent>
                     </Card>
                 </div>
                 <div className="lg:col-span-1">
-                     <Card className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg">
+                     <Card className="bg-white rounded-2xl shadow-sm border border-slate-200">
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-gray-800">
-                                <Crown className="text-yellow-500" />
+                            <CardTitle className="flex items-center gap-2 text-gray-900 text-lg">
                                 More Premium Content
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="space-y-3 max-h-[70vh] overflow-y-auto">
+                            <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
                                 {otherContent.map(item => (
-                                    <div key={item.id} className="p-3 bg-white rounded-lg hover:shadow-xl hover:scale-105 transition-all duration-200 cursor-pointer" onClick={() => onContentSelect(item)}>
-                                        <p className="font-semibold text-gray-900">{item.title}</p>
-                                        {item.category && (
-                                            <Badge variant="outline" className="mt-2">{item.category}</Badge>
-                                        )}
+                                    <div 
+                                        key={item.id} 
+                                        className="p-4 bg-white border border-slate-100 rounded-xl hover:border-indigo-500/30 hover:shadow-md transition-all duration-200 cursor-pointer group" 
+                                        onClick={() => onContentSelect(item)}
+                                    >
+                                        <div className="flex justify-between items-start mb-2">
+                                            <Badge variant="outline" className="bg-yellow-50 text-amber-600 border-yellow-100 text-[10px] uppercase tracking-wider font-bold">
+                                                Premium
+                                            </Badge>
+                                        </div>
+                                        <p className="font-medium text-slate-800 group-hover:text-indigo-600 transition-colors line-clamp-2">
+                                            {item.title}
+                                        </p>
                                     </div>
                                 ))}
                                 {otherContent.length === 0 && (
-                                    <p className="text-sm text-muted-foreground text-center py-4">No other content available</p>
+                                    <p className="text-sm text-slate-400 text-center py-8">No other content available</p>
                                 )}
                             </div>
                         </CardContent>
@@ -112,7 +125,6 @@ const PremiumContentViewer = ({ content, onBack, onAccess, allContent, onContent
 
 export const StudentUIKiPadhai = ({ batch, subject }: StudentUIKiPadhaiProps) => {
   const { profile } = useAuth();
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedContent, setSelectedContent] = useState<UIKiPadhaiContent | null>(null);
 
   // Direct query when batch/subject props are provided (context-aware mode)
@@ -135,14 +147,6 @@ export const StudentUIKiPadhai = ({ batch, subject }: StudentUIKiPadhaiProps) =>
     enabled: !!batch && !!subject
   });
 
-  const filteredContent = useMemo(() => {
-    if (!premiumContent) return [];
-    return premiumContent.filter(content => 
-        content.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (content.description && content.description.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-  }, [premiumContent, searchTerm]);
-
   const handleAccessContent = (content: UIKiPadhaiContent) => {
     window.open(content.link, '_blank');
   };
@@ -152,81 +156,85 @@ export const StudentUIKiPadhai = ({ batch, subject }: StudentUIKiPadhaiProps) =>
   }
 
   return (
-    <div className="p-6 bg-gradient-to-br from-yellow-50 to-orange-50 min-h-full flex flex-col items-center">
-      <div className="max-w-4xl mx-auto w-full">
+    <div className="p-6 md:p-8 bg-[#fafafa] min-h-full font-sans flex justify-center">
+      <div className="w-full max-w-[1200px]">
         
-        <div className="relative p-8 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-r from-yellow-500 to-orange-500 text-white mb-10 text-center animate-fade-in-up">
-            <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/10 rounded-full animate-pulse-slow"></div>
-            <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-white/10 rounded-full animate-pulse-slow animation-delay-500"></div>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-white/10 rounded-full animate-pulse-slow animation-delay-1000"></div>
-
-            <div className="relative z-10">
-                <div className="flex items-center justify-center mb-4">
-                    <Crown className="h-16 w-16 text-yellow-100 drop-shadow-md" />
-                </div>
-                <h1 className="text-4xl md:text-5xl font-bold mb-2 tracking-tight drop-shadow-lg">
+        {/* Section Header */}
+        <header className="flex flex-col md:flex-row justify-between items-end mb-8 px-1">
+            <div className="mb-4 md:mb-0">
+                <h1 className="text-2xl font-bold text-neutral-900 mb-2 tracking-tight">
                     UI Ki Padhai
                 </h1>
-                <p className="text-xl md:text-2xl text-yellow-100 drop-shadow-sm font-semibold">
-                    Exclusive Premium Content for {subject}
+                <p className="text-sm text-neutral-500">
+                    Exclusive high-quality resources and premium content.
                 </p>
             </div>
-        </div>
+        </header>
 
-        {/* Search Section - No filter dropdowns */}
-        <div className="mb-8">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search content..."
-              className="pl-10 h-10"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-4">
+        {/* Content Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {isLoading ? (
             <PremiumContentSkeleton />
-          ) : filteredContent && filteredContent.length > 0 ? (
-            filteredContent.map((content) => (
-                <Card key={content.id} className="bg-white hover:shadow-xl transition-shadow duration-300 group">
-                    <CardContent className="p-5 flex flex-col md:flex-row md:items-center md:justify-between">
-                        <div className="flex-grow mb-4 md:mb-0">
-                            <div className="flex items-center gap-3">
-                                <div className="bg-yellow-100 p-2 rounded-full flex-shrink-0">
-                                    <Crown className="h-6 w-6 text-yellow-500" />
-                                </div>
-                                <div>
-                                    <h3 className="font-semibold text-gray-800 group-hover:text-primary transition-colors">{content.title}</h3>
-                                    <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{content.description}</p>
-                                </div>
-                            </div>
-                            <div className="flex flex-wrap gap-2 mt-3 pl-12">
-                                {content.category && (
-                                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{content.category}</Badge>
-                                )}
-                            </div>
+          ) : premiumContent && premiumContent.length > 0 ? (
+            premiumContent.map((content) => (
+                <div 
+                    key={content.id} 
+                    onClick={() => setSelectedContent(content)}
+                    className="
+                        group relative bg-white 
+                        border border-gray-200 
+                        rounded-2xl 
+                        p-6 flex flex-col justify-between 
+                        transition-all duration-400 cubic-bezier(0.19, 1, 0.22, 1)
+                        hover:-translate-y-2 hover:border-indigo-500 hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.08)]
+                        cursor-pointer overflow-hidden h-full min-h-[260px]
+                    "
+                >
+                    {/* Top Content */}
+                    <div>
+                        {/* Premium Badge */}
+                        <div className="inline-flex items-center gap-1.5 bg-yellow-50 text-amber-600 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-md border border-yellow-100 mb-5 w-fit">
+                            <Crown className="w-3 h-3 fill-current" />
+                            Premium
                         </div>
-                        <div className="flex gap-2 justify-end">
-                            <Button 
-                                onClick={() => setSelectedContent(content)}
-                                variant="outline"
-                                className="font-semibold"
-                            >
-                                <ExternalLink className="h-4 w-4 mr-2" />
-                                View Content
-                            </Button>
+
+                        {/* Title */}
+                        <h2 className="text-lg font-semibold leading-snug text-neutral-900 mb-6 tracking-tight line-clamp-3">
+                            {content.title}
+                        </h2>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-between pt-5 border-t border-gray-50 mt-auto">
+                        
+                        {/* File Type Info (Left) */}
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-indigo-500 border border-slate-100 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                                <Play className="w-5 h-5 fill-current" />
+                            </div>
+                            <span className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
+                                Video Resource
+                            </span>
                         </div>
-                    </CardContent>
-                </Card>
+
+                        {/* Circular Action Button (Right) */}
+                        <button 
+                            className="w-11 h-11 rounded-full border-none bg-neutral-900 text-white flex items-center justify-center transition-all duration-300 shadow-md group-hover:bg-indigo-600 group-hover:scale-110 group-hover:rotate-[-10deg]"
+                            aria-label="View Content"
+                        >
+                            <ExternalLink className="w-5 h-5" />
+                        </button>
+
+                    </div>
+                </div>
             ))
           ) : (
-            <div className="text-center py-20 bg-white rounded-lg border-dashed border-2 shadow-sm">
-              <Crown className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-700">No Premium Content Available</h3>
-              <p className="text-muted-foreground mt-2">No exclusive content is available for this subject yet.</p>
+            <div className="col-span-full text-center py-24 bg-white rounded-2xl border border-dashed border-gray-200">
+              <div className="inline-block bg-slate-50 rounded-full p-5 mb-4">
+                <Crown className="h-10 w-10 text-slate-300" />
+              </div>
+              <h3 className="text-xl font-semibold text-neutral-900">No Premium Content</h3>
+              <p className="text-neutral-500 mt-2">Check back later for exclusive updates.</p>
             </div>
           )}
         </div>
