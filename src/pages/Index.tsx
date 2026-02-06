@@ -10,6 +10,8 @@ import { TeacherDashboard } from '@/components/teacher/TeacherDashboard';
 import { ManagerDashboard } from '@/components/manager/ManagerDashboard';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { MaintenancePage } from '@/components/MaintenancePage';
+import { ChatDrawerProvider } from '@/hooks/useChatDrawer';
+import { StudentChatDrawer } from '@/components/student/StudentChatDrawer';
 
 const Index = () => {
   const { user, loading, profile, resolvedRole } = useAuth();
@@ -63,6 +65,18 @@ const Index = () => {
         );
     }
   };
+
+  // Only wrap with ChatDrawerProvider for students
+  if (resolvedRole === 'student') {
+    return (
+      <ChatDrawerProvider>
+        <Layout activeTab={activeTab} onTabChange={setActiveTab}>
+          {renderDashboard()}
+        </Layout>
+        <StudentChatDrawer />
+      </ChatDrawerProvider>
+    );
+  }
 
   return (
     <Layout activeTab={activeTab} onTabChange={setActiveTab}>

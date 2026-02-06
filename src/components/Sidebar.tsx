@@ -26,6 +26,7 @@ import {
   Contact,
   Star,
   Wrench,
+  Headphones,
 } from 'lucide-react';
 
 import {
@@ -43,6 +44,7 @@ import {
 interface SidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
+  onSupportClick?: () => void;
 }
 
 interface UserEnrollment {
@@ -50,7 +52,7 @@ interface UserEnrollment {
     subject_name: string;
 }
 
-export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
+export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps) => {
   const { profile, signOut, resolvedRole } = useAuth();
   const queryClient = useQueryClient();
 
@@ -106,6 +108,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   const studentTabs = [
     { id: 'dashboard', label: 'My Learning', icon: LayoutDashboard },
     { id: 'schedule', label: 'Schedule', icon: Calendar },
+    { id: 'support', label: 'Support', icon: Headphones },
     { id: 'feedback', label: 'Submit Feedback', icon: MessageSquare },
     { id: 'exams', label: 'Exams', icon: BookOpen },
     { id: 'contact-admin', label: 'Contact Admin', icon: Phone }, 
@@ -199,6 +202,21 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto pb-20">
           {tabs.map((tab) => {
             const isContactAdminTab = tab.id === 'contact-admin';
+            const isSupportTab = tab.id === 'support';
+
+            if (isSupportTab && onSupportClick) {
+                return (
+                    <Button
+                        key={tab.id}
+                        variant="ghost"
+                        className="w-full justify-start text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                        onClick={onSupportClick}
+                    >
+                        <tab.icon className="mr-3 h-4 w-4" />
+                        {tab.label}
+                    </Button>
+                );
+            }
 
             if (isContactAdminTab) {
                 return (
