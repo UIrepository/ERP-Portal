@@ -28,14 +28,14 @@ interface StudentUIKiPadhaiProps {
 const PremiumContentSkeleton = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-white p-5 rounded-md border border-slate-200 h-[180px] flex flex-col justify-between">
-                <div className="space-y-3">
-                    <Skeleton className="h-4 w-16 rounded-sm" />
-                    <Skeleton className="h-5 w-full" />
-                    <Skeleton className="h-5 w-2/3" />
-                </div>
-                <div className="flex justify-end pt-3 border-t border-slate-50">
-                    <Skeleton className="h-9 w-9 rounded-full" />
+            <div key={i} className="bg-white p-5 rounded-lg border border-white shadow-sm h-[140px] flex flex-col justify-between">
+                <div className="flex justify-between gap-4">
+                    <div className="space-y-3 w-full">
+                         <Skeleton className="h-4 w-16 rounded-sm" />
+                         <Skeleton className="h-5 w-full" />
+                         <Skeleton className="h-5 w-2/3" />
+                    </div>
+                    <Skeleton className="h-9 w-9 rounded-full shrink-0" />
                 </div>
             </div>
         ))}
@@ -56,7 +56,7 @@ const PremiumContentViewer = ({ content, onBack, onAccess, allContent, onContent
                     <Card className="bg-black rounded-lg overflow-hidden shadow-sm border-0">
                          <CardHeader className="p-6 border-b border-white/10 bg-neutral-900">
                             <div className="flex justify-between items-center">
-                                <CardTitle className="text-white flex items-center gap-3">
+                                <CardTitle className="text-white flex items-center gap-3 font-normal">
                                     <Crown className="text-yellow-500 fill-yellow-500" />
                                     {content.title}
                                 </CardTitle>
@@ -82,7 +82,7 @@ const PremiumContentViewer = ({ content, onBack, onAccess, allContent, onContent
                 <div className="lg:col-span-1">
                      <Card className="bg-white rounded-lg shadow-sm border border-slate-200">
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-gray-900 text-lg">
+                            <CardTitle className="flex items-center gap-2 text-gray-900 text-lg font-normal">
                                 More Premium Content
                             </CardTitle>
                         </CardHeader>
@@ -91,7 +91,7 @@ const PremiumContentViewer = ({ content, onBack, onAccess, allContent, onContent
                                 {otherContent.map(item => (
                                     <div 
                                         key={item.id} 
-                                        className="p-4 bg-white border border-slate-100 rounded-md hover:border-black transition-colors duration-200 cursor-pointer group" 
+                                        className="p-4 bg-white border border-slate-100 rounded-md hover:bg-slate-50 transition-colors duration-200 cursor-pointer group" 
                                         onClick={() => onContentSelect(item)}
                                     >
                                         <div className="flex justify-between items-start mb-2">
@@ -99,7 +99,7 @@ const PremiumContentViewer = ({ content, onBack, onAccess, allContent, onContent
                                                 Premium
                                             </Badge>
                                         </div>
-                                        <p className="font-medium text-slate-800 group-hover:text-black transition-colors line-clamp-2">
+                                        <p className="font-normal text-slate-800 transition-colors line-clamp-2">
                                             {item.title}
                                         </p>
                                     </div>
@@ -176,33 +176,30 @@ export const StudentUIKiPadhai = ({ batch, subject }: StudentUIKiPadhaiProps) =>
                     onClick={() => setSelectedContent(content)}
                     className="
                         group relative bg-white 
-                        border border-slate-200 
-                        rounded-md 
-                        p-5 flex flex-col justify-between 
+                        border border-white 
+                        rounded-lg 
+                        p-5 
                         transition-colors duration-200
-                        hover:border-black /* Thin 1px black outline */
-                        cursor-pointer overflow-hidden h-full min-h-[180px]
+                        hover:bg-slate-50 
+                        cursor-pointer overflow-hidden
                     "
                 >
-                    {/* Top Content */}
-                    <div>
-                        {/* Premium Badge */}
-                        <div className="inline-flex items-center gap-1.5 bg-[#fffbeb] text-[#f59e0b] text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-sm border border-[#fef3c7] mb-4 w-fit">
+                    {/* Badge Row */}
+                    <div className="mb-3">
+                        <div className="inline-flex items-center gap-1.5 bg-[#fffbeb] text-[#f59e0b] text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-sm border border-[#fef3c7] w-fit">
                             <Crown className="w-3 h-3 fill-current" />
                             Premium
                         </div>
-
-                        {/* Title */}
-                        <h2 className="text-base font-semibold leading-snug text-gray-900 mb-4 tracking-tight line-clamp-3">
-                            {content.title}
-                        </h2>
                     </div>
 
-                    {/* Footer */}
-                    <div className="flex items-center justify-end pt-4 border-t border-slate-50 mt-auto">
-                        {/* Circular Action Button (Right) */}
+                    {/* Title and Action Button Row */}
+                    <div className="flex justify-between items-start gap-4">
+                        <h2 className="font-normal text-base text-gray-900 leading-snug tracking-normal line-clamp-3">
+                            {content.title}
+                        </h2>
+
                         <button 
-                            className="w-9 h-9 rounded-full border-none bg-gray-900 text-white flex items-center justify-center transition-all duration-300 group-hover:bg-black"
+                            className="shrink-0 w-9 h-9 rounded-full border-none bg-gray-900 text-white flex items-center justify-center transition-all duration-300 hover:bg-black hover:scale-105"
                             aria-label="View Content"
                         >
                             <ExternalLink className="w-4 h-4" />
