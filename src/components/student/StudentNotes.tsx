@@ -267,71 +267,74 @@ export const StudentNotes = ({ batch, subject }: StudentNotesProps) => {
 
   return (
     <div className="p-6 space-y-6 bg-[#fcfcfd] min-h-full font-sans">
-      {/* Header Section */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
-          Reference Section
-        </h1>
-        <p className="text-gray-500 mt-1 text-sm">Course materials and documents</p>
-      </div>
+      {/* Main Section Holding Container */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 md:p-8 shadow-sm max-w-7xl mx-auto">
+          {/* Header Section */}
+          <div className="mb-8 border-b border-slate-100 pb-6">
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+              Reference Section
+            </h1>
+            <p className="text-gray-500 mt-1 text-sm">Course materials and documents</p>
+          </div>
 
-      {/* Notes Grid */}
-      <div>
-        {isLoading ? (
-          <NotesSkeleton />
-        ) : notes && notes.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {notes.map((note) => {
-              const meta = getFileMetadata(note.file_url, note.filename);
-              
-              return (
-                <div 
-                  key={note.id} 
-                  onClick={() => setSelectedNote(note)}
-                  className="
-                    group relative bg-white 
-                    border border-slate-200 
-                    rounded-lg 
-                    shadow-none 
-                    hover:bg-slate-50 transition-colors cursor-pointer 
-                    p-4 flex flex-col justify-between gap-4
-                  "
-                >
-                  <div className="flex justify-between items-start gap-4">
-                    <h3 className="font-medium text-slate-900 line-clamp-2 text-base leading-snug">
-                      {note.title}
-                    </h3>
-                    
-                    <button 
-                      onClick={(e) => handleDownload(e, note)}
-                      className="shrink-0 text-slate-400 hover:text-slate-900 transition-colors p-1"
-                      aria-label="Download"
+          {/* Notes Grid */}
+          <div>
+            {isLoading ? (
+              <NotesSkeleton />
+            ) : notes && notes.length > 0 ? (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {notes.map((note) => {
+                  const meta = getFileMetadata(note.file_url, note.filename);
+                  
+                  return (
+                    <div 
+                      key={note.id} 
+                      onClick={() => setSelectedNote(note)}
+                      className="
+                        group relative bg-white 
+                        border border-slate-200 
+                        rounded-lg 
+                        shadow-none 
+                        hover:bg-slate-50 transition-colors cursor-pointer 
+                        p-4 flex flex-col justify-between gap-4
+                      "
                     >
-                      <Download className="w-4 h-4" />
-                    </button>
-                  </div>
+                      <div className="flex justify-between items-start gap-4">
+                        <h3 className="font-medium text-slate-900 line-clamp-2 text-base leading-snug">
+                          {note.title}
+                        </h3>
+                        
+                        <button 
+                          onClick={(e) => handleDownload(e, note)}
+                          className="shrink-0 text-slate-400 hover:text-slate-900 transition-colors p-1"
+                          aria-label="Download"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                      </div>
 
-                  <div className="flex items-center gap-2.5 text-slate-500">
-                    <div className={`${meta.color} shrink-0`}>
-                      {meta.icon}
+                      <div className="flex items-center gap-2.5 text-slate-500">
+                        <div className={`${meta.color} shrink-0`}>
+                          {meta.icon}
+                        </div>
+                        <span className="text-xs truncate font-normal text-slate-500 max-w-full">
+                          {note.filename}
+                        </span>
+                      </div>
                     </div>
-                    <span className="text-xs truncate font-normal text-slate-500 max-w-full">
-                      {note.filename}
-                    </span>
-                  </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-20">
+                <div className="inline-block bg-slate-50 rounded-full p-4 mb-3">
+                  <FileText className="h-8 w-8 text-slate-400" />
                 </div>
-              );
-            })}
+                <h3 className="text-lg font-medium text-slate-900">No References Found</h3>
+                <p className="text-slate-500 text-sm mt-1">No materials have been uploaded yet.</p>
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="text-center py-24 bg-white rounded-lg border border-dashed border-slate-200">
-            <div className="inline-block bg-slate-50 rounded-full p-4 mb-3">
-              <FileText className="h-8 w-8 text-slate-400" />
-            </div>
-            <h3 className="text-lg font-medium text-slate-900">No References Found</h3>
-            <p className="text-slate-500 text-sm mt-1">No materials have been uploaded yet.</p>
-          </div>
-        )}
       </div>
     </div>
   );
