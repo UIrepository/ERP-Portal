@@ -300,20 +300,23 @@ export const StudentNotes = ({ batch, subject }: StudentNotesProps) => {
                         p-4 flex flex-col gap-4
                       "
                     >
+                      {/* Top Row: Title and Circular Download Button */}
                       <div className="flex justify-between items-start gap-3">
-                        <h3 className="font-medium text-slate-900 line-clamp-2 text-base leading-snug">
+                        <h3 className="font-medium text-slate-900 line-clamp-2 text-base leading-snug pt-1">
                           {note.title}
                         </h3>
                         
+                        {/* Circular Download Button (Premium Style) */}
                         <button 
                           onClick={(e) => handleDownload(e, note)}
-                          className="shrink-0 text-slate-400 hover:text-slate-900 transition-colors p-1"
+                          className="shrink-0 w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center transition-transform hover:scale-105 hover:bg-slate-700 shadow-sm"
                           aria-label="Download"
                         >
                           <Download className="w-4 h-4" />
                         </button>
                       </div>
 
+                      {/* File Info Row */}
                       <div className="flex items-center gap-2.5 text-slate-500">
                         <div className={`${meta.color} shrink-0`}>
                           {meta.icon}
@@ -323,9 +326,10 @@ export const StudentNotes = ({ batch, subject }: StudentNotesProps) => {
                         </span>
                       </div>
 
+                      {/* View Note Button */}
                       <div className="mt-auto pt-2">
                         <Button 
-                          className="w-full bg-slate-900 text-white hover:bg-slate-800"
+                          className="w-full bg-slate-100 text-slate-900 hover:bg-slate-200 border border-slate-200 shadow-sm"
                           size="sm"
                           onClick={() => setSelectedNote(note)}
                         >
