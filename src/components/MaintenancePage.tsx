@@ -19,14 +19,14 @@ export const MaintenancePage = ({ message }: MaintenancePageProps) => {
             Under Maintenance
           </h1>
           <p className="text-muted-foreground text-sm leading-relaxed" style={{ fontFamily: 'Inter, sans-serif' }}>
-            {message || 'We are currently performing scheduled maintenance. Please check back on 7th Feb 2026.'}
+            {message || 'We are currently performing scheduled maintenance.'}
           </p>
         </div>
 
         <div className="pt-4">
           <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-            <span style={{ fontFamily: 'Inter, sans-serif' }}>Maintenance in progress</span>
+            <span style={{ fontFamily: 'Inter, sans-serif' }}>Maintenance in progress. Please check back on 7th Feb 2026.</span>
           </div>
         </div>
       </div>
