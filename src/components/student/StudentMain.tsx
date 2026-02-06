@@ -180,6 +180,12 @@ export const StudentMain = () => {
   };
 
   const handleSelectBlock = (block: string) => {
+    // Intercept Community Block Selection
+    if (block === 'community') {
+      window.open('/portal/student/community', '_blank');
+      return;
+    }
+
     const newNav: NavigationState = {
       ...navigation,
       level: 'block',
@@ -282,11 +288,9 @@ export const StudentMain = () => {
           </div>
         );
       case 'community':
-        return (
-          <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <StudentCommunity />
-          </div>
-        );
+        // This case is essentially unreachable if we intercept the click, 
+        // but kept as fallback just in case.
+        return null;
       case 'connect':
         return (
            <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -295,6 +299,14 @@ export const StudentMain = () => {
         );
       default:
         return null;
+    }
+  };
+
+  const handleTabClick = (tabId: string) => {
+    if (tabId === 'community') {
+      window.open('/portal/student/community', '_blank');
+    } else {
+      setActiveTab(tabId as TabType);
     }
   };
 
@@ -347,7 +359,7 @@ export const StudentMain = () => {
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as TabType)}
+                onClick={() => handleTabClick(tab.id)}
                 className={cn(
                   "py-3 text-[13px] font-medium transition-colors relative whitespace-nowrap",
                   activeTab === tab.id 
