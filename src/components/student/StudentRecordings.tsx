@@ -61,12 +61,12 @@ const BANNER_HEIGHT = 160;
 
 // Skeletons
 const RecordingSkeleton = () => (
-    <div className="flex flex-wrap gap-5">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         {[...Array(8)].map((_, i) => (
             <div 
                 key={i} 
                 className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 animate-pulse flex flex-col"
-                style={{ width: CARD_WIDTH, height: CARD_HEIGHT, flexShrink: 0 }}
+                style={{ minWidth: CARD_WIDTH, height: CARD_HEIGHT, flexShrink: 0, flexGrow: 0 }}
             >
                 <div className="bg-slate-100 rounded-lg w-full" style={{ height: BANNER_HEIGHT, flexShrink: 0 }} />
                 <div className="space-y-2 px-1 pt-3 flex-1">
@@ -450,7 +450,7 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                     {isLoading ? (
                         <RecordingSkeleton />
                     ) : filteredRecordings.length > 0 ? (
-                        <div className="flex flex-wrap gap-5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                             {filteredRecordings.map((recording, index) => {
                                 const lectureNo = filteredRecordings.length - index; 
                                 
@@ -466,10 +466,7 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                                             "flex flex-col"
                                         )}
                                         style={{
-                                            width: CARD_WIDTH,
                                             height: CARD_HEIGHT,
-                                            minWidth: CARD_WIDTH,
-                                            maxWidth: CARD_WIDTH,
                                             minHeight: CARD_HEIGHT,
                                             maxHeight: CARD_HEIGHT,
                                             flexShrink: 0,
