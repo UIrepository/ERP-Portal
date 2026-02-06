@@ -139,8 +139,8 @@ export const StudentSubjectBlocks = ({
         </button>
       </nav>
 
-      {/* Main Content Wrapper */}
-      <div className="max-w-[1000px] mx-auto mt-8 px-4 md:px-0">
+      {/* Main Content Wrapper - Increased Width to 1200px */}
+      <div className="max-w-[1200px] mx-auto mt-8 px-4 md:px-6">
         <div className="bg-white rounded-md border border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-8">
           
           <h2 className="text-[26px] font-bold text-[#1e293b] mb-8 tracking-tight">
