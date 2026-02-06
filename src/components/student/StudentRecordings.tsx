@@ -55,16 +55,16 @@ interface DoubtAnswer {
 
 // Skeletons
 const RecordingSkeleton = () => (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
-        {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-white rounded-lg shadow-sm border border-slate-200 p-3.5 h-[360px] animate-pulse">
-                <div className="h-[210px] bg-slate-200 rounded-md w-full mb-5" />
-                <div className="space-y-3 px-2">
+    <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {[...Array(8)].map((_, i) => (
+            <div key={i} className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 h-[300px] animate-pulse">
+                <div className="h-[160px] bg-slate-100 rounded-md w-full mb-4" />
+                <div className="space-y-2 px-1">
                     <div className="flex justify-between">
-                        <div className="h-4 bg-slate-200 rounded w-24" />
-                        <div className="h-4 bg-slate-200 rounded w-16" />
+                        <div className="h-3.5 bg-slate-100 rounded w-20" />
+                        <div className="h-3.5 bg-slate-100 rounded w-12" />
                     </div>
-                    <div className="h-6 bg-slate-200 rounded w-3/4" />
+                    <div className="h-5 bg-slate-100 rounded w-3/4" />
                 </div>
             </div>
         ))}
@@ -84,14 +84,14 @@ const WatermarkedPlayer = ({ recording }: { recording: RecordingContent }) => {
                 allowFullScreen
                 title={recording.topic}
             />
-            <div className="absolute top-2 left-2 bg-black/50 text-white/80 text-xs px-2 py-1 rounded-full pointer-events-none backdrop-blur-sm">
+            <div className="absolute top-2 left-2 bg-black/50 text-white/80 text-[10px] px-2 py-0.5 rounded-full pointer-events-none backdrop-blur-sm">
                 {profile?.email}
             </div>
             <div className="absolute bottom-2 right-2 pointer-events-none">
                 <img 
                     src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
                     alt="Logo" 
-                    className="h-10 w-auto opacity-60" 
+                    className="h-8 w-auto opacity-50" 
                 />
             </div>
         </div>
@@ -193,89 +193,90 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
     }, [supabase, recording.id, queryClient, doubtIds]);
 
     return (
-        <div className="mt-8 bg-white rounded-2xl shadow-lg border border-slate-100">
-            <div className="p-6 border-b border-slate-100">
-                <h2 className="text-xl font-bold text-slate-800 flex items-center">
-                    <MessageSquare className="mr-3 text-teal-600" /> Doubts & Discussions
+        <div className="mt-6 bg-white rounded-xl shadow-sm border border-slate-200">
+            <div className="p-4 border-b border-slate-100">
+                <h2 className="text-lg font-semibold text-slate-800 flex items-center">
+                    <MessageSquare className="mr-2 h-4 w-4 text-teal-600" /> Doubts & Discussions
                 </h2>
             </div>
-            <div className="p-6">
-                <div className="flex items-start space-x-4">
-                    <Avatar>
+            <div className="p-4">
+                <div className="flex items-start space-x-3">
+                    <Avatar className="h-8 w-8">
                         <AvatarFallback>{user?.email?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
                         <Textarea 
-                            placeholder="Ask a question about this recording..." 
+                            placeholder="Ask a question..." 
                             value={newDoubt} 
                             onChange={e => setNewDoubt(e.target.value)} 
-                            className="bg-slate-50 focus:bg-white border-slate-200"
+                            className="bg-slate-50 focus:bg-white border-slate-200 min-h-[80px] text-sm"
                         />
                         <Button 
                             onClick={() => addDoubtMutation.mutate(newDoubt)} 
                             disabled={!newDoubt.trim() || addDoubtMutation.isPending}
-                            className="mt-3 bg-teal-600 hover:bg-teal-700"
+                            size="sm"
+                            className="mt-2 bg-teal-600 hover:bg-teal-700 h-8"
                         >
-                            <Send className="mr-2 h-4 w-4" /> Ask Question
+                            <Send className="mr-2 h-3 w-3" /> Ask Question
                         </Button>
                     </div>
                 </div>
                 
-                <div className="mt-8 space-y-2">
+                <div className="mt-6 space-y-2">
                     {isLoadingDoubts ? <Skeleton className="h-20 w-full" /> : (
                         <Accordion type="single" collapsible className="w-full">
                             {doubts.map(doubt => (
                                 <AccordionItem key={doubt.id} value={doubt.id} className="border-b-0 mb-2">
-                                    <AccordionTrigger className="p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
+                                    <AccordionTrigger className="p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
                                         <div className="flex items-center gap-3 text-left w-full">
-                                            <Avatar className="h-9 w-9">
-                                                <AvatarFallback className="bg-teal-100 text-teal-800">{doubt.profiles?.name?.charAt(0) || '?'}</AvatarFallback>
+                                            <Avatar className="h-8 w-8">
+                                                <AvatarFallback className="bg-teal-100 text-teal-800 text-xs">{doubt.profiles?.name?.charAt(0) || '?'}</AvatarFallback>
                                             </Avatar>
-                                            <div className="flex-1">
-                                                <div className="font-semibold text-slate-800">{doubt.profiles?.name || 'A student'}</div>
-                                                <div className="font-normal text-sm text-slate-600 truncate">{doubt.question_text}</div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-medium text-sm text-slate-800">{doubt.profiles?.name || 'A student'}</div>
+                                                <div className="font-normal text-xs text-slate-600 truncate">{doubt.question_text}</div>
                                             </div>
-                                            <div className="text-xs text-slate-400 ml-4 flex-shrink-0">
+                                            <div className="text-[10px] text-slate-400 ml-2 flex-shrink-0">
                                                 {formatDistanceToNow(new Date(doubt.created_at), { addSuffix: true })}
                                             </div>
                                         </div>
                                     </AccordionTrigger>
-                                    <AccordionContent className="pt-4 pb-2 pl-16">
-                                        <div className="space-y-4">
+                                    <AccordionContent className="pt-3 pb-1 pl-12">
+                                        <div className="space-y-3">
                                             {(answersByDoubtId[doubt.id] || []).map(answer => (
-                                                <div key={answer.id} className="flex items-start space-x-3">
-                                                    <Avatar className="h-8 w-8">
-                                                        <AvatarFallback>{answer.profiles?.name?.charAt(0) || '?'}</AvatarFallback>
+                                                <div key={answer.id} className="flex items-start space-x-2.5">
+                                                    <Avatar className="h-6 w-6">
+                                                        <AvatarFallback className="text-[10px]">{answer.profiles?.name?.charAt(0) || '?'}</AvatarFallback>
                                                     </Avatar>
-                                                    <div className="flex-1 bg-slate-50 rounded-lg p-3">
-                                                        <div className="flex justify-between items-center">
-                                                            <p className="font-semibold text-sm text-slate-800">{answer.profiles?.name || 'A student'}</p>
-                                                            <p className="text-xs text-slate-500">{formatDistanceToNow(new Date(answer.created_at), { addSuffix: true })}</p>
+                                                    <div className="flex-1 bg-slate-50 rounded-lg p-2.5">
+                                                        <div className="flex justify-between items-center mb-1">
+                                                            <p className="font-medium text-xs text-slate-800">{answer.profiles?.name || 'A student'}</p>
+                                                            <p className="text-[10px] text-slate-500">{formatDistanceToNow(new Date(answer.created_at), { addSuffix: true })}</p>
                                                         </div>
-                                                        <p className="mt-1 text-sm text-slate-700">{answer.answer_text}</p>
+                                                        <p className="text-xs text-slate-700">{answer.answer_text}</p>
                                                     </div>
                                                 </div>
                                             ))}
                                         </div>
 
-                                        <div className="mt-4 flex items-start space-x-3">
-                                            <Avatar className="h-8 w-8">
-                                                 <AvatarFallback>{user?.email?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
+                                        <div className="mt-3 flex items-start space-x-2.5">
+                                            <Avatar className="h-6 w-6">
+                                                 <AvatarFallback className="text-[10px]">{user?.email?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
                                             </Avatar>
                                             <div className="flex-1">
                                                 <Textarea 
-                                                    placeholder="Write an answer..." 
+                                                    placeholder="Write a reply..." 
                                                     value={newAnswers[doubt.id] || ''} 
                                                     onChange={e => setNewAnswers(prev => ({...prev, [doubt.id]: e.target.value}))} 
-                                                    className="text-sm bg-white border-slate-200"
+                                                    className="text-xs bg-white border-slate-200 min-h-[60px]"
                                                 />
                                                 <Button 
                                                     size="sm" 
                                                     onClick={() => addAnswerMutation.mutate({ doubt_id: doubt.id, answer_text: newAnswers[doubt.id] })} 
                                                     disabled={!newAnswers[doubt.id]?.trim() || addAnswerMutation.isPending}
-                                                    className="mt-2 bg-teal-600 hover:bg-teal-700"
+                                                    className="mt-2 h-7 text-xs bg-teal-600 hover:bg-teal-700"
                                                 >
-                                                    <CornerDownRight className="mr-2 h-4 w-4" /> Reply
+                                                    <CornerDownRight className="mr-1.5 h-3 w-3" /> Reply
                                                 </Button>
                                             </div>
                                         </div>
@@ -285,10 +286,9 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
                         </Accordion>
                     )}
                     {doubts.length === 0 && !isLoadingDoubts && (
-                        <div className="text-center py-10 text-slate-500">
-                            <MessageSquare className="mx-auto h-12 w-12 text-slate-300" />
-                            <p className="mt-4">No questions have been asked for this recording yet.</p>
-                            <p>Be the first to start a discussion!</p>
+                        <div className="text-center py-8 text-slate-500">
+                            <MessageSquare className="mx-auto h-8 w-8 text-slate-300 mb-2" />
+                            <p className="text-sm">No discussions yet.</p>
                         </div>
                     )}
                 </div>
@@ -351,18 +351,18 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
 
     if (selectedRecording) {
         return (
-            <div className="p-4 md:p-6 space-y-6 bg-[#f1f5f9] min-h-full">
-                <Button variant="outline" onClick={() => setSelectedRecording(null)} className="mb-4 bg-white hover:bg-slate-50">
-                    <ArrowLeft className="h-4 w-4 mr-2" /> Back to Lectures
+            <div className="p-4 space-y-4 bg-white min-h-full font-sans">
+                <Button variant="outline" size="sm" onClick={() => setSelectedRecording(null)} className="mb-2 bg-white hover:bg-slate-50 text-slate-600 border-slate-200">
+                    <ArrowLeft className="h-3.5 w-3.5 mr-2" /> Back to Lectures
                 </Button>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                     <div className="lg:col-span-2">
-                        <Card className="bg-white rounded-2xl overflow-hidden shadow-xl border-none">
-                            <CardHeader className="p-6 border-b border-slate-100">
-                                <CardTitle className="text-slate-800">{selectedRecording.topic}</CardTitle>
-                                <p className="text-sm text-slate-500 mt-1 flex items-center gap-2">
-                                    <Clock className="h-4 w-4" />
-                                    {format(new Date(selectedRecording.date), 'MMMM d, yyyy')}
+                        <Card className="bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200">
+                            <CardHeader className="p-4 border-b border-slate-100">
+                                <CardTitle className="text-base font-semibold text-slate-800">{selectedRecording.topic}</CardTitle>
+                                <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5 font-normal">
+                                    <Clock className="h-3.5 w-3.5" />
+                                    {format(new Date(selectedRecording.date), 'MMMM d, yyyy • h:mm a')}
                                 </p>
                             </CardHeader>
                             <CardContent className="p-0">
@@ -374,27 +374,27 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                     
                     {/* Sidebar Suggestions */}
                     <div className="lg:col-span-1">
-                        <Card className="bg-white rounded-2xl shadow-lg sticky top-4 border-none">
-                            <CardHeader className="pb-3"><CardTitle className="text-lg text-slate-800">Other Lectures</CardTitle></CardHeader>
-                            <CardContent>
-                                <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+                        <Card className="bg-white rounded-xl shadow-sm border border-slate-200 sticky top-4">
+                            <CardHeader className="pb-2 pt-4 px-4"><CardTitle className="text-base text-slate-800">Other Lectures</CardTitle></CardHeader>
+                            <CardContent className="px-4 pb-4">
+                                <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
                                     {filteredRecordings.filter(r => r.id !== selectedRecording.id).map((rec, idx) => (
                                         <div 
                                             key={rec.id} 
-                                            className="group flex gap-3 p-2 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors" 
+                                            className="group flex gap-3 p-2 hover:bg-slate-50 rounded-md cursor-pointer transition-colors border border-transparent hover:border-slate-100" 
                                             onClick={() => handleSelectRecording(rec)}
                                         >
-                                            <div className="relative w-24 h-14 bg-slate-200 rounded-md overflow-hidden flex-shrink-0">
+                                            <div className="relative w-20 h-12 bg-slate-100 rounded overflow-hidden flex-shrink-0">
                                                  {/* Mini Thumbnail */}
                                                 <div className="absolute inset-0 bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center">
-                                                    <PlayCircle className="h-6 w-6 text-white/70" />
+                                                    <PlayCircle className="h-5 w-5 text-white/70" />
                                                 </div>
                                             </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="font-medium text-sm text-slate-800 line-clamp-2 group-hover:text-teal-600 transition-colors">
+                                            <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                                <p className="font-medium text-xs text-slate-800 line-clamp-2 group-hover:text-teal-600 transition-colors">
                                                     {rec.topic}
                                                 </p>
-                                                <p className="text-xs text-slate-400 mt-1">
+                                                <p className="text-[10px] text-slate-400 mt-0.5 font-normal">
                                                     {format(new Date(rec.date), 'MMM d')}
                                                 </p>
                                             </div>
@@ -410,36 +410,38 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
     }
 
     return (
-        <div className="p-6 space-y-8 bg-[#f1f5f9] min-h-full font-sans">
+        // Changed background to bg-white
+        <div className="p-4 space-y-6 bg-white min-h-full font-sans">
             {/* Header Section */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900 flex items-center tracking-tight">
+                    {/* Zoomed out: Smaller Text */}
+                    <h1 className="text-2xl font-bold text-slate-900 flex items-center tracking-tight">
                         Lectures
                     </h1>
-                    <p className="text-slate-500 mt-1">Watch recorded classes for {subject}</p>
+                    <p className="text-sm text-slate-500 mt-0.5">Watch recorded classes for {subject}</p>
                 </div>
                 
                 {/* Search */}
-                <div className="relative w-full md:w-72">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <div className="relative w-full md:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                     <Input
                         placeholder="Search topics..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 h-10 bg-white border-slate-200 focus:border-teal-500 focus:ring-teal-500"
+                        className="pl-9 h-9 text-sm bg-white border-slate-200 focus:border-teal-500 focus:ring-teal-500"
                     />
                 </div>
             </div>
 
-            {/* Recordings Grid - Premium Cards */}
+            {/* Recordings Grid - Zoomed Out Premium Cards */}
             <div>
                 {isLoading ? (
                     <RecordingSkeleton />
                 ) : filteredRecordings.length > 0 ? (
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
+                    // Zoomed out grid: smaller gaps
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         {filteredRecordings.map((recording, index) => {
-                            // Calculate lecture number based on total count and index (assuming filtered desc)
                             const lectureNo = filteredRecordings.length - index; 
                             
                             return (
@@ -447,27 +449,28 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                                     key={recording.id}
                                     onClick={() => handleSelectRecording(recording)}
                                     className={cn(
-                                        "w-full bg-white rounded-lg p-3.5",
-                                        "shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)]",
+                                        "w-full bg-white rounded-[4px] p-3", // Reduced padding
+                                        "shadow-[0_1px_3px_rgba(0,0,0,0.05)]", // Static shadow
                                         "border border-slate-200",
-                                        "cursor-pointer transition-all duration-300",
-                                        "hover:shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1)] hover:-translate-y-1"
+                                        "cursor-pointer",
+                                        // No hover effects
                                     )}
                                 >
-                                    {/* Visual Banner */}
-                                    <div className="h-[210px] w-full bg-gradient-to-br from-white to-[#f0fdfa] rounded-md relative flex items-center px-8 border border-[#ccfbf1] overflow-hidden group">
+                                    {/* Visual Banner - Zoomed Out Height [160px] */}
+                                    <div className="h-[160px] w-full bg-gradient-to-br from-white to-[#f0fdfa] rounded-[4px] relative flex items-center px-6 border border-[#ccfbf1] overflow-hidden">
                                         
-                                        {/* Banner Text - Lecture No ONLY (Duration Removed) */}
+                                        {/* Banner Text - Lecture No */}
                                         <div className="z-10 relative">
-                                            <span className="text-[#0d9488] font-bold text-3xl block mb-0.5 tracking-tight">
+                                            {/* Zoomed out font size */}
+                                            <span className="text-[#0d9488] font-bold text-2xl block tracking-tight">
                                                 Lecture {lectureNo}
                                             </span>
                                         </div>
 
                                         {/* Graphic Elements (Right) */}
-                                        <div className="absolute right-5 top-1/2 -translate-y-1/2">
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 scale-90">
                                             {/* Logo Circle */}
-                                            <div className="w-[140px] h-[140px] bg-[#111] rounded-full flex items-center justify-center border-[10px] border-[#f0fdfa] shadow-sm select-none overflow-hidden p-4">
+                                            <div className="w-[100px] h-[100px] bg-[#111] rounded-full flex items-center justify-center border-[6px] border-[#f0fdfa] shadow-sm select-none overflow-hidden p-3">
                                                 <img 
                                                     src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
                                                     alt="UI Logo" 
@@ -475,22 +478,25 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                                                 />
                                             </div>
                                             {/* Play Button Overlay */}
-                                            <div className="absolute bottom-1 right-1 w-[54px] h-[54px] bg-[#0d9488] rounded-full flex items-center justify-center text-white border-4 border-white shadow-[0_4px_12px_rgba(13,148,136,0.3)] z-20 group-hover:scale-110 transition-transform duration-300">
-                                                <Play fill="white" className="w-5 h-5 ml-1" />
+                                            <div className="absolute bottom-0 right-0 w-[40px] h-[40px] bg-[#0d9488] rounded-full flex items-center justify-center text-white border-[3px] border-white shadow-sm z-20">
+                                                <Play fill="white" className="w-3.5 h-3.5 ml-0.5" />
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Info Footer */}
-                                    <div className="pt-5 px-2.5 pb-2.5">
-                                        <div className="flex justify-between items-center mb-3.5 text-slate-500 font-medium text-[15px]">
+                                    <div className="pt-3 px-1 pb-1">
+                                        <div className="flex justify-between items-center mb-2 text-slate-500 font-normal text-xs">
+                                            {/* Date - Non-bold */}
                                             <span>{format(new Date(recording.date), 'dd MMMM, yyyy')}</span>
-                                            <div className="flex items-center gap-2">
-                                                <Clock className="w-[18px] opacity-80" />
+                                            <div className="flex items-center gap-1.5">
+                                                <Clock className="w-3.5 h-3.5 opacity-70" />
+                                                {/* Time - Non-bold */}
                                                 <span>{format(new Date(recording.date), 'h:mm a')}</span>
                                             </div>
                                         </div>
-                                        <h2 className="text-[21px] font-bold text-slate-900 tracking-tight leading-snug line-clamp-2">
+                                        {/* Topic Title - Semi-bold, smaller size */}
+                                        <h2 className="text-lg font-semibold text-slate-900 tracking-tight leading-snug line-clamp-2">
                                             {recording.topic}
                                         </h2>
                                     </div>
@@ -499,12 +505,12 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                         })}
                     </div>
                 ) : (
-                    <div className="text-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
-                        <div className="inline-block bg-slate-50 rounded-full p-4 mb-4">
-                            <PlayCircle className="h-10 w-10 text-slate-400" />
+                    <div className="text-center py-16 bg-white rounded-lg border border-dashed border-slate-300">
+                        <div className="inline-block bg-slate-50 rounded-full p-3 mb-3">
+                            <PlayCircle className="h-8 w-8 text-slate-400" />
                         </div>
-                        <h3 className="text-lg font-semibold text-slate-900">No Lectures Found</h3>
-                        <p className="text-slate-500">No recorded lectures are available for this subject.</p>
+                        <h3 className="text-base font-semibold text-slate-900">No Lectures Found</h3>
+                        <p className="text-sm text-slate-500">No recorded lectures are available for this subject.</p>
                     </div>
                 )}
             </div>
