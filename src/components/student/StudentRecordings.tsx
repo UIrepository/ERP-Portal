@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Video, Play, Search, ArrowLeft, PlayCircle, MessageSquare, Send, CornerDownRight, Clock } from 'lucide-react';
+import { Video, Play, Search, ArrowLeft, PlayCircle, MessageSquare, Send, CornerDownRight, Clock, ChevronLeft } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -15,6 +15,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 // Interfaces
 interface RecordingContent {
@@ -301,6 +302,7 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
 // Main Component
 export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) => {
     const { profile } = useAuth();
+    const navigate = useNavigate(); // Added for Back button
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRecording, setSelectedRecording] = useState<RecordingContent | null>(null);
     const isMobile = useIsMobile();
@@ -351,7 +353,7 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
 
     if (selectedRecording) {
         return (
-            <div className="p-4 space-y-4 bg-white min-h-full font-sans">
+            <div className="p-4 space-y-4 bg-[#F8F8F8] min-h-full font-sans">
                 <Button variant="outline" size="sm" onClick={() => setSelectedRecording(null)} className="mb-2 bg-white hover:bg-slate-50 text-slate-600 border-slate-200">
                     <ArrowLeft className="h-3.5 w-3.5 mr-2" /> Back to Lectures
                 </Button>
@@ -410,103 +412,115 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
     }
 
     return (
-        <div className="p-4 bg-white min-h-full font-sans">
-            {/* Header Section - Wrapped in a clean white section */}
-            <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900 flex items-center tracking-tight">
-                        Class Lectures
-                    </h1>
-                </div>
+        <div className="p-6 bg-[#F8F8F8] min-h-full font-sans">
+            {/* Unified White Section for Header + Content */}
+            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
                 
-                {/* Search */}
-                <div className="relative w-full md:w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                    <Input
-                        placeholder="Search topics..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-9 h-9 text-sm bg-white border-slate-200 focus:border-teal-500 focus:ring-teal-500"
-                    />
+                {/* Header Section */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                    <div className="flex items-center gap-3">
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => navigate(-1)} 
+                            className="h-8 w-8 text-slate-500 hover:text-slate-800 -ml-2"
+                        >
+                            <ChevronLeft className="h-5 w-5" />
+                        </Button>
+                        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                            Class Lectures
+                        </h1>
+                    </div>
+                    
+                    {/* Search */}
+                    <div className="relative w-full md:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                        <Input
+                            placeholder="Search topics..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-9 h-9 text-sm bg-white border-slate-200 focus:border-teal-500 focus:ring-teal-500"
+                        />
+                    </div>
                 </div>
-            </div>
 
-            {/* Recordings Grid - Zoomed Out Premium Cards */}
-            <div>
-                {isLoading ? (
-                    <RecordingSkeleton />
-                ) : filteredRecordings.length > 0 ? (
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                        {filteredRecordings.map((recording, index) => {
-                            const lectureNo = filteredRecordings.length - index; 
-                            
-                            return (
-                                <div 
-                                    key={recording.id}
-                                    onClick={() => handleSelectRecording(recording)}
-                                    className={cn(
-                                        "w-full bg-white rounded-[4px] p-3",
-                                        "shadow-[0_1px_3px_rgba(0,0,0,0.05)]",
-                                        "border border-slate-200",
-                                        "cursor-pointer",
-                                    )}
-                                >
-                                    {/* Visual Banner - Zoomed Out Height [160px] */}
-                                    <div className="h-[160px] w-full bg-gradient-to-br from-white to-[#f0fdfa] rounded-[4px] relative flex items-center px-6 border border-[#ccfbf1] overflow-hidden">
-                                        
-                                        {/* Banner Title - Lecture No */}
-                                        <div className="z-10 relative">
-                                            <span className="text-[#0d9488] font-bold text-2xl block tracking-tight">
-                                                Lecture {lectureNo}
-                                            </span>
+                {/* Recordings Grid - Zoomed Out Premium Cards */}
+                <div>
+                    {isLoading ? (
+                        <RecordingSkeleton />
+                    ) : filteredRecordings.length > 0 ? (
+                        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                            {filteredRecordings.map((recording, index) => {
+                                const lectureNo = filteredRecordings.length - index; 
+                                
+                                return (
+                                    <div 
+                                        key={recording.id}
+                                        onClick={() => handleSelectRecording(recording)}
+                                        className={cn(
+                                            "w-full bg-white rounded-[4px] p-3",
+                                            "shadow-[0_1px_3px_rgba(0,0,0,0.05)]",
+                                            "border border-slate-200",
+                                            "cursor-pointer",
+                                        )}
+                                    >
+                                        {/* Visual Banner - Zoomed Out Height [160px] */}
+                                        <div className="h-[160px] w-full bg-gradient-to-br from-white to-[#f0fdfa] rounded-[4px] relative flex items-center px-6 border border-[#ccfbf1] overflow-hidden">
+                                            
+                                            {/* Banner Title - Lecture No */}
+                                            <div className="z-10 relative">
+                                                <span className="text-[#0d9488] font-bold text-2xl block tracking-tight">
+                                                    Lecture {lectureNo}
+                                                </span>
+                                            </div>
+
+                                            {/* Graphic Elements (Right) */}
+                                            <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                                                {/* Logo Circle - Zoomed & Larger */}
+                                                <div className="w-[120px] h-[120px] bg-[#111] rounded-full flex items-center justify-center border-[6px] border-[#f0fdfa] shadow-sm select-none overflow-hidden p-3">
+                                                    <img 
+                                                        src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
+                                                        alt="UI Logo" 
+                                                        className="w-full h-full object-contain"
+                                                    />
+                                                </div>
+                                                {/* Play Button Overlay */}
+                                                <div className="absolute bottom-0 right-0 w-[42px] h-[42px] bg-[#0d9488] rounded-full flex items-center justify-center text-white border-[3px] border-white shadow-sm z-20">
+                                                    <Play fill="white" className="w-3.5 h-3.5 ml-0.5" />
+                                                </div>
+                                            </div>
                                         </div>
 
-                                        {/* Graphic Elements (Right) */}
-                                        <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                                            {/* Logo Circle - Zoomed up from scale-90, slightly larger dims */}
-                                            <div className="w-[110px] h-[110px] bg-[#111] rounded-full flex items-center justify-center border-[6px] border-[#f0fdfa] shadow-sm select-none overflow-hidden p-3">
-                                                <img 
-                                                    src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
-                                                    alt="UI Logo" 
-                                                    className="w-full h-full object-contain"
-                                                />
+                                        {/* Info Footer */}
+                                        <div className="pt-3 px-1 pb-1">
+                                            <div className="flex justify-between items-center mb-2 text-slate-500 font-normal text-xs">
+                                                {/* Date - Non-bold */}
+                                                <span>{format(new Date(recording.date), 'dd MMMM, yyyy')}</span>
+                                                <div className="flex items-center gap-1.5">
+                                                    <Clock className="w-3.5 h-3.5 opacity-70" />
+                                                    {/* Time - Created At (Non-bold) */}
+                                                    <span>{format(new Date(recording.created_at), 'h:mm a')}</span>
+                                                </div>
                                             </div>
-                                            {/* Play Button Overlay */}
-                                            <div className="absolute bottom-0 right-0 w-[42px] h-[42px] bg-[#0d9488] rounded-full flex items-center justify-center text-white border-[3px] border-white shadow-sm z-20">
-                                                <Play fill="white" className="w-3.5 h-3.5 ml-0.5" />
-                                            </div>
+                                            {/* Topic Title - Semi-bold */}
+                                            <h2 className="text-lg font-semibold text-slate-900 tracking-tight leading-snug line-clamp-2">
+                                                {recording.topic}
+                                            </h2>
                                         </div>
                                     </div>
-
-                                    {/* Info Footer */}
-                                    <div className="pt-3 px-1 pb-1">
-                                        <div className="flex justify-between items-center mb-2 text-slate-500 font-normal text-xs">
-                                            {/* Date - Non-bold */}
-                                            <span>{format(new Date(recording.date), 'dd MMMM, yyyy')}</span>
-                                            <div className="flex items-center gap-1.5">
-                                                <Clock className="w-3.5 h-3.5 opacity-70" />
-                                                {/* Time - Created At (Non-bold) */}
-                                                <span>{format(new Date(recording.created_at), 'h:mm a')}</span>
-                                            </div>
-                                        </div>
-                                        {/* Topic Title - Semi-bold */}
-                                        <h2 className="text-lg font-semibold text-slate-900 tracking-tight leading-snug line-clamp-2">
-                                            {recording.topic}
-                                        </h2>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                ) : (
-                    <div className="text-center py-16 bg-white rounded-lg border border-dashed border-slate-300">
-                        <div className="inline-block bg-slate-50 rounded-full p-3 mb-3">
-                            <PlayCircle className="h-8 w-8 text-slate-400" />
+                                );
+                            })}
                         </div>
-                        <h3 className="text-base font-semibold text-slate-900">No Class Lectures Found</h3>
-                        <p className="text-sm text-slate-500">No recorded lectures are available for this subject.</p>
-                    </div>
-                )}
+                    ) : (
+                        <div className="text-center py-16 bg-white rounded-lg border border-dashed border-slate-300">
+                            <div className="inline-block bg-slate-50 rounded-full p-3 mb-3">
+                                <PlayCircle className="h-8 w-8 text-slate-400" />
+                            </div>
+                            <h3 className="text-base font-semibold text-slate-900">No Class Lectures Found</h3>
+                            <p className="text-sm text-slate-500">No recorded lectures are available for this subject.</p>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
