@@ -1,227 +1,267 @@
 
-
-# Student Messaging Refactor Plan
+# Floating Chatbot Widget Refactor Plan
 
 ## Overview
 
-This plan introduces a professional, unified **Right-Side Chat Drawer (Sheet)** for all 1:1 direct messaging in the student portal. The system will have two distinct entry points - "Support" from the sidebar and "Subject Connect" from within subject cards - but both will use the same underlying drawer component with different configurations.
+This plan replaces the right-side sheet drawer with a **floating chatbot widget** (similar to Intercom/Drift) that appears in the bottom-right corner of the screen. It also fixes the manager availability issue by improving the fallback logic.
 
 ---
 
 ## Architecture Summary
 
 ```text
-+---------------------+       +------------------------+
-|     STUDENT UI      |       |   UNIFIED CHAT DRAWER  |
-+---------------------+       +------------------------+
-        |                              |
-        |-- Sidebar "Support" -------->| Role Selection View
-        |                              |   - Admin Card
-        |                              |   - Manager Card
-        |                              |        |
-        |                              |        v
-        |                              |   Chat View (Anonymous)
-        |                              |
-        |-- Subject Card "Connect" --->| Direct Chat View
-        |                              |   (Context: "Physics Mentor")
-        +------------------------------+
++---------------------------+
+|      STUDENT PORTAL       |
+|                           |
+|                           |
+|                           |
+|                   +-------+
+|                   | FAB   | <-- Floating Action Button (bottom-right)
++-------------------+-------+
+
+When clicked:
+
++---------------------------+
+|      STUDENT PORTAL       |
+|            +--------------+
+|            |  CHATBOT     |
+|            |  WINDOW      |
+|            |              |
+|            | [Welcome Msg]|
+|            | [Options]    |
+|            | [Chat Area]  |
++------------+--------------+
 ```
 
 ---
 
-## Detailed Implementation Plan
+## Problem 1: Manager "Not Available" Error
 
-### Phase 1: Database Schema Updates
+### Root Cause
+The `managers` table has records but with `user_id: null`. The code correctly filters these out, but when no manager has a valid `user_id`, the error message appears.
 
-**Add a `message_context` column to the `direct_messages` table** to categorize conversations for staff filtering.
-
-**SQL Migration:**
-```sql
--- Add context column to distinguish message types
-ALTER TABLE public.direct_messages 
-ADD COLUMN IF NOT EXISTS context TEXT DEFAULT 'general';
-
--- Add index for faster filtering
-CREATE INDEX IF NOT EXISTS idx_direct_messages_context 
-ON public.direct_messages(context);
-
--- Add subject context for teacher chats
-ALTER TABLE public.direct_messages 
-ADD COLUMN IF NOT EXISTS subject_context TEXT DEFAULT NULL;
-```
-
-The `context` field will have values like:
-- `support_admin` - Technical support tickets
-- `support_manager` - Batch issue tickets  
-- `subject_doubt` - Subject-specific teacher chats
-- `general` - Legacy/default
+### Solution
+1. **Improve error messaging**: Instead of a generic toast, show a helpful inline message in the chatbot
+2. **Add fallback to admin**: If no manager is available, offer to connect to admin instead
+3. **Better data validation**: Display available options only when staff members exist with valid `user_id`
 
 ---
 
-### Phase 2: Create Unified Chat Drawer Component
+## Problem 2: Convert Sheet to Floating Chatbot Widget
 
-**New File: `src/components/student/StudentChatDrawer.tsx`**
+### Current Implementation
+- Uses `Sheet` component sliding in from the right
+- Triggered from sidebar "Support" tab or subject "Connect" block
+- Role selection cards inside sheet
 
-This single component will handle both workflows with different initial states:
+### New Implementation
+A floating chatbot widget with these characteristics:
 
-**Props Interface:**
-```typescript
-interface StudentChatDrawerProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  // Mode determines initial view
-  mode: 'support' | 'subject-connect';
-  // For subject-connect mode only
-  subjectContext?: {
-    batch: string;
-    subject: string;
-  };
-}
-```
+**Floating Action Button (FAB):**
+- Fixed position: bottom-right corner (`fixed bottom-6 right-6`)
+- Circular button with chat/headphone icon
+- Pulse animation when there are unread messages (future)
+- Click to toggle chatbot window open/close
+
+**Chatbot Window:**
+- Positioned above FAB (`bottom-20 right-6`)
+- Fixed dimensions: `w-[380px] h-[500px]`
+- Rounded corners with shadow
+- Three views:
+  1. **Welcome View** - Initial greeting with option buttons
+  2. **Chat View** - Message history and input
+  3. **Loading View** - Connecting animation
+
+---
+
+## Detailed Implementation
+
+### Phase 1: Create Floating Chatbot Component
+
+**New File: `src/components/student/StudentChatbot.tsx`**
 
 **Component Structure:**
-1. **Role Selection View** (for `support` mode)
-   - Two clean rectangular cards:
-     - "Admin" card - icon: `Shield`, subtitle: "Technical Support"
-     - "Manager" card - icon: `Briefcase`, subtitle: "Batch Issues"
-   - On click: Fetch appropriate staff member and transition to Chat View
+```typescript
+interface ChatbotState {
+  isOpen: boolean;
+  view: 'welcome' | 'chat' | 'loading';
+  chatMode?: 'support-admin' | 'support-manager' | 'subject-doubt';
+  recipient?: { id: string; name: string; displayName: string };
+  subjectContext?: { batch: string; subject: string };
+}
+```
 
-2. **Chat View** (for both modes)
-   - Context-aware header:
-     - Support mode: "Support Agent" (anonymous)
-     - Subject mode: "{Subject} Mentor" (e.g., "Physics Mentor")
-   - Full message history from `direct_messages` table
-   - Real-time polling (3-second interval)
-   - Message input with send button
+**Welcome View Features:**
+- Bot avatar with greeting message bubble: "Hi! I'm here to help. Who would you like to connect with?"
+- Three rectangular option blocks:
+  1. **"Talk to Admin"** - For technical support issues
+  2. **"Talk to Manager"** - For batch-related issues  
+  3. **"Talk to Teacher"** - Only shown when triggered from subject context
+- Each block has icon, title, and subtitle
+- Hover effect with border color change
 
-**Key Features:**
-- Uses the existing `Sheet` component from `@/components/ui/sheet`
-- Slides in from the right side
-- Fixed height with internal scrolling for messages
-- Preserves conversation history across sessions
+**Chat View Features:**
+- Header with recipient avatar and display name
+- Back button to return to welcome view
+- Scrollable message area
+- Message input with send button
+- Messages styled as bubbles (right-aligned for user, left for recipient)
 
----
+### Phase 2: Update State Management Hook
 
-### Phase 3: Support Workflow (Sidebar Trigger)
+**Modify: `src/hooks/useChatDrawer.tsx`**
+
+Rename to `useChatbot.tsx` (or keep same name for compatibility) and update:
+- Change `isOpen` to manage chatbot visibility
+- Add `view` state for internal navigation
+- Keep `mode` and `subjectContext` for different entry points
+- Add `toggleChatbot()` function for FAB click
+
+### Phase 3: Fix Manager Lookup with Better Fallback
+
+**Updated Logic in `StudentChatbot.tsx`:**
+
+```typescript
+const fetchManager = async (studentBatches: string[]) => {
+  const { data, error } = await supabase
+    .from('managers')
+    .select('user_id, name, assigned_batches')
+    .not('user_id', 'is', null);  // Only get managers with linked users
+  
+  if (error || !data || data.length === 0) {
+    // No managers with user_id exist - return null but don't show error
+    // The UI will handle showing alternative options
+    return null;
+  }
+
+  // Find manager whose assigned_batches overlaps with student batches
+  const matchingManager = data.find(manager => 
+    manager.assigned_batches?.some((b: string) => studentBatches.includes(b))
+  );
+
+  // If no batch-specific manager, try any available manager
+  return matchingManager || data[0];
+};
+```
+
+**UI Fallback:**
+When manager is not available, the chatbot shows:
+```
+"No manager is currently assigned to your batch. 
+Would you like to talk to an Admin instead?"
+[Talk to Admin] [Cancel]
+```
+
+### Phase 4: Pre-fetch Available Staff
+
+Before showing options, check what's actually available:
+
+```typescript
+const { data: availableStaff } = useQuery({
+  queryKey: ['available-support-staff', profile?.user_id],
+  queryFn: async () => {
+    const [admins, managers] = await Promise.all([
+      supabase.from('admins').select('user_id').not('user_id', 'is', null),
+      supabase.from('managers').select('user_id, assigned_batches').not('user_id', 'is', null)
+    ]);
+    
+    return {
+      hasAdmin: (admins.data?.length || 0) > 0,
+      hasManager: (managers.data?.length || 0) > 0,
+      managers: managers.data || []
+    };
+  }
+});
+```
+
+Only show options that are actually available (disable or hide unavailable options).
+
+### Phase 5: Update Trigger Points
+
+**1. Sidebar "Support" Tab:**
+Instead of opening a drawer, it toggles the floating chatbot with `welcome` view.
 
 **Modify: `src/components/Sidebar.tsx`**
+- Change `onSupportClick` behavior to toggle chatbot instead of opening drawer
+- The chatbot opens in "support" mode showing Admin/Manager options
 
-Add a new "Support" tab to the student tabs array:
-```typescript
-const studentTabs = [
-  { id: 'dashboard', label: 'My Learning', icon: LayoutDashboard },
-  { id: 'schedule', label: 'Schedule', icon: Calendar },
-  { id: 'support', label: 'Support', icon: Headphones }, // NEW
-  { id: 'feedback', label: 'Submit Feedback', icon: MessageSquare },
-  { id: 'exams', label: 'Exams', icon: BookOpen },
-  { id: 'contact-admin', label: 'Contact Admin', icon: Phone },
-];
-```
-
-**Behavior:**
-- Clicking "Support" opens the Chat Drawer in `support` mode
-- The drawer shows the Role Selection View first
-- Student picks Admin or Manager
-- System fetches the first available staff member assigned to the student's batch
-- Transition to Chat View with "Support Agent" header (anonymous)
-
-**Staff Lookup Logic:**
-```typescript
-// For Admin support
-const { data: admin } = await supabase
-  .from('admins')
-  .select('user_id, name')
-  .limit(1)
-  .single();
-
-// For Manager support
-const { data: manager } = await supabase
-  .from('managers')
-  .select('user_id, name, assigned_batches')
-  .overlaps('assigned_batches', studentBatches)
-  .limit(1)
-  .single();
-```
-
----
-
-### Phase 4: Subject Connect Workflow (Subject Card Trigger)
+**2. Subject "Connect" Block:**
+Opens chatbot directly in loading state, fetches teacher, then shows chat.
 
 **Modify: `src/components/student/StudentSubjectBlocks.tsx`**
+- Change `openSubjectConnect` to open chatbot with subject context
+- Welcome message shows: "Connecting you to your {Subject} mentor..."
+- After teacher is fetched, transitions to chat view
 
-The existing "Connect" block (id: `connect`) will be enhanced:
-- Instead of navigating to `StudentBlockContent`, it opens the Chat Drawer in `subject-connect` mode
-- Automatically fetches the teacher assigned to both the batch AND subject
+### Phase 6: Integration
 
-**Teacher Lookup Logic:**
-```typescript
-const { data: teacher } = await supabase
-  .from('teachers')
-  .select('user_id, name')
-  .contains('assigned_batches', [batch])
-  .contains('assigned_subjects', [subject])
-  .limit(1)
-  .single();
-```
-
-**Behavior:**
-- Student clicks "Connect" block within a subject (e.g., Physics)
-- Drawer opens directly to Chat View (bypasses role selection)
-- Header shows "{Subject} Mentor" (e.g., "Physics Mentor")
-- Full chat history with that specific teacher is loaded
-- Messages are tagged with `context: 'subject_doubt'` and `subject_context: 'Physics'`
+**Modify: `src/pages/Index.tsx`**
+- Replace `<StudentChatDrawer />` with `<StudentChatbot />`
+- Keep `ChatDrawerProvider` (renamed internally but API compatible)
 
 ---
 
-### Phase 5: Enhanced Staff Inbox
+## UI Specifications
 
-**Modify: `src/components/shared/StaffInbox.tsx`**
+### Floating Action Button (FAB)
+- Size: `56px` (w-14 h-14)
+- Position: `fixed bottom-6 right-6 z-50`
+- Background: Primary color (slate-900)
+- Icon: `MessageCircle` or `Headphones`
+- Hover: Scale up slightly, shadow increase
+- Open state: Icon changes to `X` (close)
 
-Add category filtering and context badges to help staff manage their inboxes:
+### Chatbot Window
+- Size: `w-[380px] h-[500px]` (fixed)
+- Position: `fixed bottom-24 right-6 z-50`
+- Background: White
+- Border: `border border-slate-200`
+- Shadow: `shadow-2xl`
+- Border radius: `rounded-2xl`
+- Animation: Fade + slide up on open
 
-**New Features:**
-1. **Tab-based filtering** at the top:
-   - "All" - Shows all conversations
-   - "Support Tickets" - Filters `context IN ('support_admin', 'support_manager')`
-   - "Subject Doubts" - Filters `context = 'subject_doubt'`
-
-2. **Context Badges** on each contact card:
-   - Support tickets: Red badge with "Support"
-   - Subject doubts: Blue badge with the subject name (e.g., "Physics")
-
-3. **Enhanced Contact Query:**
-```typescript
-// Modified query to include message context
-const { data: messages } = await supabase
-  .from('direct_messages')
-  .select('*, context, subject_context')
-  .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
-  .order('created_at', { ascending: false });
+### Welcome View Layout
+```
++-----------------------------------+
+|  [X]                    Unknown IITians |
++-----------------------------------+
+|                                   |
+|    [Bot Avatar]                   |
+|                                   |
+|    "Hi! 👋 I'm here to help.      |
+|     Who would you like to         |
+|     connect with?"                |
+|                                   |
++-----------------------------------+
+|  +-----------------------------+  |
+|  | [Icon]  Talk to Admin       |  |
+|  |         Technical Support   |  |
+|  +-----------------------------+  |
+|                                   |
+|  +-----------------------------+  |
+|  | [Icon]  Talk to Manager     |  |
+|  |         Batch Issues        |  |
+|  +-----------------------------+  |
+|                                   |
++-----------------------------------+
 ```
 
----
-
-### Phase 6: State Management
-
-**New File: `src/hooks/useChatDrawer.tsx`**
-
-A simple context/hook to manage the drawer state across components:
-
-```typescript
-interface ChatDrawerState {
-  isOpen: boolean;
-  mode: 'support' | 'subject-connect';
-  subjectContext?: { batch: string; subject: string };
-  selectedRecipient?: { id: string; name: string; displayName: string };
-}
-
-// Provides: openSupportDrawer(), openSubjectConnect(batch, subject), closeDrawer()
+### Chat View Layout
 ```
-
-This hook will be used by:
-- `Sidebar.tsx` - to open support drawer
-- `StudentSubjectBlocks.tsx` - to open subject connect drawer
-- `StudentMain.tsx` - to render the drawer component
++-----------------------------------+
+|  [<]  Support Agent       [?]     |
++-----------------------------------+
+|                                   |
+|  [Bot msg bubble]                 |
+|                                   |
+|              [User msg bubble]    |
+|                                   |
+|  [Bot msg bubble]                 |
+|                                   |
++-----------------------------------+
+|  [Input field...        ] [Send]  |
++-----------------------------------+
+```
 
 ---
 
@@ -229,60 +269,31 @@ This hook will be used by:
 
 | File | Action | Description |
 |------|--------|-------------|
-| `src/components/student/StudentChatDrawer.tsx` | **Create** | New unified chat drawer component |
-| `src/hooks/useChatDrawer.tsx` | **Create** | State management hook for drawer |
-| `src/components/Sidebar.tsx` | **Modify** | Add "Support" tab, integrate drawer trigger |
-| `src/components/student/StudentSubjectBlocks.tsx` | **Modify** | Wire "Connect" block to drawer |
-| `src/components/student/StudentMain.tsx` | **Modify** | Add ChatDrawerProvider and render drawer |
-| `src/components/shared/StaffInbox.tsx` | **Modify** | Add filtering tabs and context badges |
-| Database Migration | **Create** | Add `context` and `subject_context` columns |
+| `src/components/student/StudentChatbot.tsx` | **Create** | New floating chatbot widget component |
+| `src/components/student/StudentChatDrawer.tsx` | **Delete** | Remove old sheet-based drawer |
+| `src/hooks/useChatDrawer.tsx` | **Modify** | Update for chatbot state management |
+| `src/components/Sidebar.tsx` | **Modify** | Update support click behavior |
+| `src/components/student/StudentSubjectBlocks.tsx` | **Modify** | Update connect trigger |
+| `src/pages/Index.tsx` | **Modify** | Replace drawer with chatbot component |
 
 ---
 
-## Critical Constraints
+## Technical Notes
 
-1. **DO NOT TOUCH `StudentCommunity.tsx`** - The existing community feature remains completely unchanged
-2. **Preserve existing `direct_messages` data** - The migration adds columns with defaults, no data loss
-3. **Keep `StudentConnect.tsx` functional** - It will continue to work for the "Support Connect" tab but will be enhanced with the drawer
+### Why Floating Widget Over Sheet?
+1. **Always accessible**: FAB is always visible, users don't need to navigate to sidebar
+2. **Context preservation**: Chat stays open while browsing other content
+3. **Modern UX pattern**: Familiar from Intercom, Drift, etc.
+4. **Better mobile experience**: Doesn't take full screen width
 
----
-
-## Technical Details
-
-### Message Context Values
-- `support_admin` - Message to admin via support workflow
-- `support_manager` - Message to manager via support workflow
-- `subject_doubt` - Message to teacher via subject connect
-- `general` - Default/legacy messages
-
-### Anonymous Display Logic
+### Manager Fallback Logic
 ```typescript
-// In Chat View header
-const displayName = mode === 'support' 
-  ? 'Support Agent' 
-  : `${subjectContext.subject} Mentor`;
+// Priority order for manager lookup:
+// 1. Manager with matching batch AND valid user_id
+// 2. Any manager with valid user_id
+// 3. Offer admin as fallback
+// 4. Show "support unavailable" with contact info
 ```
 
-### Real-time Sync
-Messages will use the existing 3-second polling pattern already in `StudentDirectMessage.tsx`, which works reliably without complex WebSocket setup.
-
----
-
-## UI/UX Specifications
-
-**Drawer Dimensions:**
-- Width: `sm:max-w-md` (448px) on desktop
-- Height: Full viewport height
-- Side: Right
-
-**Role Selection Cards:**
-- Height: ~100px each
-- Border: 1px slate-200, hover: black
-- Icon: 40x40px in a colored circle
-- Layout: Icon left, text right
-
-**Chat View:**
-- Header: 56px fixed with avatar and name
-- Messages: Scrollable area with `flex-1`
-- Input: 64px fixed at bottom
-
+### Message Persistence
+All messages continue to be stored in `direct_messages` table with proper `context` and `subject_context` values for staff inbox filtering.
