@@ -26,16 +26,16 @@ interface StudentUIKiPadhaiProps {
 }
 
 const PremiumContentSkeleton = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-white p-6 rounded-lg border border-slate-200 h-[240px] flex flex-col justify-between">
-                <div className="space-y-4">
-                    <Skeleton className="h-5 w-20 rounded-md" />
-                    <Skeleton className="h-6 w-full" />
-                    <Skeleton className="h-6 w-2/3" />
+            <div key={i} className="bg-white p-5 rounded-md border border-slate-200 h-[180px] flex flex-col justify-between">
+                <div className="space-y-3">
+                    <Skeleton className="h-4 w-16 rounded-sm" />
+                    <Skeleton className="h-5 w-full" />
+                    <Skeleton className="h-5 w-2/3" />
                 </div>
-                <div className="flex justify-end pt-4 border-t border-slate-50">
-                    <Skeleton className="h-10 w-10 rounded-full" />
+                <div className="flex justify-end pt-3 border-t border-slate-50">
+                    <Skeleton className="h-9 w-9 rounded-full" />
                 </div>
             </div>
         ))}
@@ -53,7 +53,7 @@ const PremiumContentViewer = ({ content, onBack, onAccess, allContent, onContent
             </Button>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2">
-                    <Card className="bg-black rounded-xl overflow-hidden shadow-sm border-0">
+                    <Card className="bg-black rounded-lg overflow-hidden shadow-sm border-0">
                          <CardHeader className="p-6 border-b border-white/10 bg-neutral-900">
                             <div className="flex justify-between items-center">
                                 <CardTitle className="text-white flex items-center gap-3">
@@ -80,7 +80,7 @@ const PremiumContentViewer = ({ content, onBack, onAccess, allContent, onContent
                     </Card>
                 </div>
                 <div className="lg:col-span-1">
-                     <Card className="bg-white rounded-xl shadow-sm border border-slate-200">
+                     <Card className="bg-white rounded-lg shadow-sm border border-slate-200">
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-gray-900 text-lg">
                                 More Premium Content
@@ -91,11 +91,11 @@ const PremiumContentViewer = ({ content, onBack, onAccess, allContent, onContent
                                 {otherContent.map(item => (
                                     <div 
                                         key={item.id} 
-                                        className="p-4 bg-white border border-slate-100 rounded-lg hover:border-black transition-colors duration-200 cursor-pointer group" 
+                                        className="p-4 bg-white border border-slate-100 rounded-md hover:border-black transition-colors duration-200 cursor-pointer group" 
                                         onClick={() => onContentSelect(item)}
                                     >
                                         <div className="flex justify-between items-start mb-2">
-                                            <Badge variant="outline" className="bg-yellow-50 text-amber-600 border-yellow-100 text-[10px] uppercase tracking-wider font-bold">
+                                            <Badge variant="outline" className="bg-yellow-50 text-amber-600 border-yellow-100 text-[10px] uppercase tracking-wider font-bold rounded-sm">
                                                 Premium
                                             </Badge>
                                         </div>
@@ -151,7 +151,7 @@ export const StudentUIKiPadhai = ({ batch, subject }: StudentUIKiPadhaiProps) =>
   return (
     <div className="p-6 md:p-8 bg-[#fcfcfd] min-h-full font-sans">
       {/* Main Section Holding Container */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 md:p-8 shadow-sm max-w-7xl mx-auto">
+      <div className="bg-white border border-slate-200 rounded-lg p-6 md:p-8 shadow-sm max-w-7xl mx-auto">
         
         {/* Section Header */}
         <header className="flex flex-col md:flex-row justify-between items-end mb-8 border-b border-slate-100 pb-6">
@@ -166,7 +166,7 @@ export const StudentUIKiPadhai = ({ batch, subject }: StudentUIKiPadhaiProps) =>
         </header>
 
         {/* Content Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {isLoading ? (
             <PremiumContentSkeleton />
           ) : premiumContent && premiumContent.length > 0 ? (
@@ -177,32 +177,32 @@ export const StudentUIKiPadhai = ({ batch, subject }: StudentUIKiPadhaiProps) =>
                     className="
                         group relative bg-white 
                         border border-slate-200 
-                        rounded-lg 
-                        p-6 flex flex-col justify-between 
+                        rounded-md 
+                        p-5 flex flex-col justify-between 
                         transition-colors duration-200
-                        hover:border-black /* Black outline on hover */
-                        cursor-pointer overflow-hidden h-full min-h-[220px]
+                        hover:border-black /* Thin 1px black outline */
+                        cursor-pointer overflow-hidden h-full min-h-[180px]
                     "
                 >
                     {/* Top Content */}
                     <div>
                         {/* Premium Badge */}
-                        <div className="inline-flex items-center gap-1.5 bg-[#fffbeb] text-[#f59e0b] text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-md border border-[#fef3c7] mb-5 w-fit">
+                        <div className="inline-flex items-center gap-1.5 bg-[#fffbeb] text-[#f59e0b] text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-sm border border-[#fef3c7] mb-4 w-fit">
                             <Crown className="w-3 h-3 fill-current" />
                             Premium
                         </div>
 
                         {/* Title */}
-                        <h2 className="text-lg font-semibold leading-snug text-gray-900 mb-6 tracking-tight line-clamp-3">
+                        <h2 className="text-base font-semibold leading-snug text-gray-900 mb-4 tracking-tight line-clamp-3">
                             {content.title}
                         </h2>
                     </div>
 
                     {/* Footer */}
-                    <div className="flex items-center justify-end pt-5 border-t border-slate-50 mt-auto">
+                    <div className="flex items-center justify-end pt-4 border-t border-slate-50 mt-auto">
                         {/* Circular Action Button (Right) */}
                         <button 
-                            className="w-10 h-10 rounded-full border-none bg-gray-900 text-white flex items-center justify-center transition-all duration-300 group-hover:bg-black"
+                            className="w-9 h-9 rounded-full border-none bg-gray-900 text-white flex items-center justify-center transition-all duration-300 group-hover:bg-black"
                             aria-label="View Content"
                         >
                             <ExternalLink className="w-4 h-4" />
