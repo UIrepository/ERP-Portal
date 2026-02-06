@@ -362,7 +362,7 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                                 <CardTitle className="text-base font-semibold text-slate-800">{selectedRecording.topic}</CardTitle>
                                 <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5 font-normal">
                                     <Clock className="h-3.5 w-3.5" />
-                                    {format(new Date(selectedRecording.date), 'MMMM d, yyyy • h:mm a')}
+                                    {format(new Date(selectedRecording.date), 'MMMM d, yyyy')} • {format(new Date(selectedRecording.created_at), 'h:mm a')}
                                 </p>
                             </CardHeader>
                             <CardContent className="p-0">
@@ -410,12 +410,10 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
     }
 
     return (
-        // Changed background to bg-white
         <div className="p-4 space-y-6 bg-white min-h-full font-sans">
             {/* Header Section */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    {/* Zoomed out: Smaller Text */}
                     <h1 className="text-2xl font-bold text-slate-900 flex items-center tracking-tight">
                         Lectures
                     </h1>
@@ -439,7 +437,6 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                 {isLoading ? (
                     <RecordingSkeleton />
                 ) : filteredRecordings.length > 0 ? (
-                    // Zoomed out grid: smaller gaps
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         {filteredRecordings.map((recording, index) => {
                             const lectureNo = filteredRecordings.length - index; 
@@ -449,19 +446,17 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                                     key={recording.id}
                                     onClick={() => handleSelectRecording(recording)}
                                     className={cn(
-                                        "w-full bg-white rounded-[4px] p-3", // Reduced padding
-                                        "shadow-[0_1px_3px_rgba(0,0,0,0.05)]", // Static shadow
+                                        "w-full bg-white rounded-[4px] p-3",
+                                        "shadow-[0_1px_3px_rgba(0,0,0,0.05)]",
                                         "border border-slate-200",
                                         "cursor-pointer",
-                                        // No hover effects
                                     )}
                                 >
                                     {/* Visual Banner - Zoomed Out Height [160px] */}
                                     <div className="h-[160px] w-full bg-gradient-to-br from-white to-[#f0fdfa] rounded-[4px] relative flex items-center px-6 border border-[#ccfbf1] overflow-hidden">
                                         
-                                        {/* Banner Text - Lecture No */}
+                                        {/* Banner Title - Lecture No */}
                                         <div className="z-10 relative">
-                                            {/* Zoomed out font size */}
                                             <span className="text-[#0d9488] font-bold text-2xl block tracking-tight">
                                                 Lecture {lectureNo}
                                             </span>
@@ -491,11 +486,11 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                                             <span>{format(new Date(recording.date), 'dd MMMM, yyyy')}</span>
                                             <div className="flex items-center gap-1.5">
                                                 <Clock className="w-3.5 h-3.5 opacity-70" />
-                                                {/* Time - Non-bold */}
-                                                <span>{format(new Date(recording.date), 'h:mm a')}</span>
+                                                {/* Time - Created At (Non-bold) */}
+                                                <span>{format(new Date(recording.created_at), 'h:mm a')}</span>
                                             </div>
                                         </div>
-                                        {/* Topic Title - Semi-bold, smaller size */}
+                                        {/* Topic Title - Semi-bold */}
                                         <h2 className="text-lg font-semibold text-slate-900 tracking-tight leading-snug line-clamp-2">
                                             {recording.topic}
                                         </h2>
