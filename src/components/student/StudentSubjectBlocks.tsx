@@ -7,10 +7,12 @@ import {
   Users, 
   UserCog,
   PlayCircle,
-  Radio
+  Radio,
+  ChevronLeft,
+  Award
 } from 'lucide-react';
-import { StudentSubjectHeader } from './StudentSubjectHeader';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 interface StudentSubjectBlocksProps {
   batch: string;
@@ -23,66 +25,45 @@ const blocks = [
   {
     id: 'live-class',
     label: 'Join Live Class',
-    description: 'Ongoing & upcoming classes',
+    stats: ['Ongoing', 'Upcoming'],
     icon: Radio,
-    gradient: 'from-emerald-500 to-emerald-600',
-    bgColor: 'bg-emerald-50 hover:bg-emerald-100',
-    iconColor: 'text-emerald-600',
     isLive: true,
   },
   {
     id: 'recordings',
     label: 'Lectures',
-    description: 'Watch recorded classes',
+    stats: ['All Videos', 'Recorded'],
     icon: PlayCircle,
-    gradient: 'from-blue-500 to-blue-600',
-    bgColor: 'bg-blue-50 hover:bg-blue-100',
-    iconColor: 'text-blue-600',
   },
   {
     id: 'notes',
-    label: 'Notes',
-    description: 'Download study materials',
+    label: 'Notes & PDFs',
+    stats: ['Study Material', 'Assignments'],
     icon: FileText,
-    gradient: 'from-violet-500 to-violet-600',
-    bgColor: 'bg-violet-50 hover:bg-violet-100',
-    iconColor: 'text-violet-600',
   },
   {
     id: 'ui-ki-padhai',
     label: 'UI Ki Padhai',
-    description: 'Premium content',
+    stats: ['Premium Content', 'Exclusive'],
     icon: Crown,
-    gradient: 'from-amber-500 to-amber-600',
-    bgColor: 'bg-amber-50 hover:bg-amber-100',
-    iconColor: 'text-amber-600',
   },
   {
     id: 'announcements',
     label: 'Announcements',
-    description: 'Important updates',
+    stats: ['Updates', 'News'],
     icon: Megaphone,
-    gradient: 'from-rose-500 to-rose-600',
-    bgColor: 'bg-rose-50 hover:bg-rose-100',
-    iconColor: 'text-rose-600',
   },
   {
     id: 'community',
     label: 'Community',
-    description: 'Discuss with peers',
+    stats: ['Discussions', 'Doubts'],
     icon: Users,
-    gradient: 'from-cyan-500 to-cyan-600',
-    bgColor: 'bg-cyan-50 hover:bg-cyan-100',
-    iconColor: 'text-cyan-600',
   },
   {
     id: 'connect',
     label: 'Connect',
-    description: 'Chat with teachers & mentors',
+    stats: ['Chat with Teachers', 'Support'],
     icon: UserCog,
-    gradient: 'from-fuchsia-500 to-fuchsia-600',
-    bgColor: 'bg-fuchsia-50 hover:bg-fuchsia-100',
-    iconColor: 'text-fuchsia-600',
   },
 ];
 
@@ -93,56 +74,72 @@ export const StudentSubjectBlocks = ({
   onBlockSelect,
 }: StudentSubjectBlocksProps) => {
   return (
-    <div className="min-h-full bg-slate-50">
-      {/* White sticky header */}
-      <StudentSubjectHeader
-        batch={batch}
-        subject={subject}
-        onBack={onBack}
-      />
+    <div className="min-h-screen bg-[#f4f4f5] font-sans pb-10">
+      
+      {/* Top Navbar */}
+      <nav className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-10">
+        <button 
+          onClick={onBack}
+          className="flex items-center gap-2 text-[#1e293b] font-medium text-[15px] hover:opacity-80 transition-opacity"
+        >
+          <ChevronLeft className="h-5 w-5" />
+          Back
+        </button>
 
-      {/* Blocks grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {blocks.map((block) => (
-            <button
-              key={block.id}
-              onClick={() => onBlockSelect(block.id)}
-              className={cn(
-                "group p-6 rounded-2xl text-left transition-all duration-300 relative",
-                "border border-slate-200 hover:border-transparent",
-                "hover:shadow-xl hover:-translate-y-1",
-                block.bgColor
-              )}
-            >
-              {/* Live indicator for live-class block */}
-              {'isLive' in block && block.isLive && (
-                <div className="absolute top-3 right-3 flex items-center gap-1.5">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                  </span>
-                  <span className="text-xs font-semibold text-emerald-600 uppercase">Live</span>
+        <div className="bg-[#f1f5f9] px-3.5 py-1.5 rounded flex items-center gap-2 border border-slate-200 text-[#475569] text-sm font-semibold">
+          <Award className="h-4 w-4" />
+          XP 0
+        </div>
+      </nav>
+
+      {/* Main Content Wrapper */}
+      <div className="max-w-[1000px] mx-auto mt-10 px-4 md:px-0">
+        <div className="bg-white rounded-md border border-slate-200 shadow-sm p-6 md:p-10">
+          
+          <h2 className="text-[26px] font-bold text-[#1e293b] mb-8 tracking-tight">
+            {subject}
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {blocks.map((block) => (
+              <button
+                key={block.id}
+                onClick={() => onBlockSelect(block.id)}
+                className={cn(
+                  "group relative w-full text-left",
+                  "bg-[#efede7] hover:bg-[#e5e2d9]", // Mud Light background + darker hover
+                  "p-6 rounded-[4px]", // Very low rounded corners
+                  "transition-all duration-200 ease-in-out",
+                  "flex flex-col justify-center",
+                  "transform hover:-translate-y-[2px]" // Subtle lift
+                )}
+              >
+                {/* Live Indicator */}
+                {'isLive' in block && block.isLive && (
+                  <div className="absolute top-4 right-4">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                    </span>
+                  </div>
+                )}
+
+                <h3 className="text-[17px] font-semibold text-[#27272a] mb-2 group-hover:text-black">
+                  {block.label}
+                </h3>
+                
+                <div className="flex items-center text-[13px] text-[#71717a] font-normal">
+                  {block.stats.map((stat, index) => (
+                    <span key={index} className="flex items-center">
+                      {index > 0 && <span className="mx-3 text-[#d4d4d8]">|</span>}
+                      {stat}
+                    </span>
+                  ))}
                 </div>
-              )}
-              <div className="flex items-start gap-4">
-                <div className={cn(
-                  "w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br shadow-lg flex-shrink-0",
-                  block.gradient
-                )}>
-                  <block.icon className="h-6 w-6 text-white" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-lg text-slate-800 group-hover:text-slate-900">
-                    {block.label}
-                  </h3>
-                  <p className="text-sm text-slate-500 mt-1 truncate">
-                    {block.description}
-                  </p>
-                </div>
-              </div>
-            </button>
-          ))}
+              </button>
+            ))}
+          </div>
+
         </div>
       </div>
     </div>
