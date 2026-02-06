@@ -71,7 +71,6 @@ export const StudentSubjectBlocks = ({
       id: 'live-class',
       label: 'Join Live Class',
       stats: ['Ongoing Classes', 'Upcoming Schedule'],
-      icon: Radio,
       isLive: true,
     },
     {
@@ -81,7 +80,6 @@ export const StudentSubjectBlocks = ({
         isLoading ? 'Loading...' : `${stats?.videos} Videos`, 
         isLoading ? '...' : `${stats?.exercises} Exercises`
       ], 
-      icon: PlayCircle,
     },
     {
       id: 'notes',
@@ -90,7 +88,6 @@ export const StudentSubjectBlocks = ({
         isLoading ? 'Loading...' : `${stats?.notes} Notes`, 
         'Assignments'
       ],
-      icon: FileText,
     },
     {
       id: 'ui-ki-padhai',
@@ -99,25 +96,21 @@ export const StudentSubjectBlocks = ({
         isLoading ? 'Loading...' : `${stats?.premium} Premium Content`, 
         'Exclusive Series'
       ],
-      icon: Crown,
     },
     {
       id: 'announcements',
       label: 'Announcements',
       stats: ['Latest Updates', 'Batch News'],
-      icon: Megaphone,
     },
     {
       id: 'community',
       label: 'Community',
       stats: ['Discussions', 'Peer Support'],
-      icon: Users,
     },
     {
       id: 'connect',
       label: 'Connect',
       stats: ['Chat with Teachers', 'Mentorship'],
-      icon: UserCog,
     },
   ];
 
@@ -150,57 +143,44 @@ export const StudentSubjectBlocks = ({
                 onClick={() => onBlockSelect(block.id)}
                 className={cn(
                   "group relative w-full text-left",
-                  // Premium Background: Slate 50 -> White on Hover
-                  "bg-[#F8FAFC] hover:bg-white", 
-                  // Border & Shadow
-                  "border border-slate-100 hover:border-slate-200",
-                  "shadow-sm hover:shadow-md",
-                  // Layout & Transition
-                  "p-5 rounded-xl",
-                  "transition-all duration-300 ease-out",
-                  "flex items-stretch gap-5",
-                  "transform hover:-translate-y-[2px]"
+                  // Background White (replaced mud), preserved Rounding [4px]
+                  "bg-white rounded-[4px]", 
+                  // Border added for visibility on white background
+                  "border border-slate-200 hover:border-blue-300",
+                  "p-6", 
+                  "transition-all duration-200 ease-in-out",
+                  "flex items-stretch gap-4", // Stretch to allow bar to fill height
+                  "transform hover:-translate-y-[2px] hover:shadow-sm"
                 )}
               >
-                {/* 1. Left Accent Bar (Not connected to sides) */}
-                <div className={cn(
-                    "w-1.5 rounded-full shrink-0 transition-colors duration-300",
-                    "bg-slate-200 group-hover:bg-[#0F172A]" // Subtle Gray -> Dark Slate Accent
-                )} />
+                {/* Blue Bar - Floating on the left */}
+                <div className="w-1 bg-[#3b82f6] rounded-full shrink-0" />
 
-                {/* 2. Content */}
-                <div className="flex-1 flex flex-col justify-center py-0.5">
-                    <div className="flex items-start justify-between">
-                        <h3 className="text-[17px] font-semibold text-[#1e293b] mb-1.5 group-hover:text-[#0F172A] tracking-tight">
-                        {block.label}
-                        </h3>
-                        
-                        {/* Subtle Icon on Top Right */}
-                        <block.icon className="h-5 w-5 text-slate-300 group-hover:text-[#5d87a8] transition-colors duration-300" strokeWidth={1.5} />
-                    </div>
-
+                {/* Content */}
+                <div className="flex-1 flex flex-col justify-center">
+                    <h3 className="text-[17px] font-semibold text-[#1e293b] mb-2 group-hover:text-blue-700">
+                      {block.label}
+                    </h3>
+                    
                     {/* Stats Row */}
-                    <div className="flex items-center text-[13px] text-[#64748b] font-medium">
-                        {block.stats.map((stat, index) => (
-                            <span key={index} className="flex items-center">
-                            {index > 0 && <span className="mx-2 text-slate-300 text-[8px]">•</span>}
-                            {stat}
-                            </span>
-                        ))}
+                    <div className="flex items-center text-[13px] text-[#71717a] font-normal">
+                      {block.stats.map((stat, index) => (
+                        <span key={index} className="flex items-center">
+                          {index > 0 && <span className="mx-3 text-[#d4d4d8]">|</span>}
+                          {stat}
+                        </span>
+                      ))}
                     </div>
                 </div>
 
                 {/* Live Indicator */}
                 {'isLive' in block && block.isLive && (
                   <div className="absolute top-4 right-4">
-                     {/* Hidden if icon is present to prevent overlap, or adjust position */}
+                     <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                    </span>
                   </div>
-                )}
-                {'isLive' in block && block.isLive && (
-                    <div className="absolute -top-1 -right-1 h-3 w-3">
-                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                         <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border-2 border-white"></span>
-                    </div>
                 )}
               </button>
             ))}
