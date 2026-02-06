@@ -302,7 +302,7 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
 // Main Component
 export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) => {
     const { profile } = useAuth();
-    const navigate = useNavigate();
+    const navigate = useNavigate(); // Added for Back button
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRecording, setSelectedRecording] = useState<RecordingContent | null>(null);
     const isMobile = useIsMobile();
@@ -346,6 +346,11 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
         });
     };
 
+    const getSubjectInitials = (subj: string) => {
+        if (!subj) return 'CS';
+        return subj.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    };
+
     if (selectedRecording) {
         return (
             <div className="p-4 space-y-4 bg-white min-h-full font-sans">
@@ -378,13 +383,7 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                                     {filteredRecordings.filter(r => r.id !== selectedRecording.id).map((rec, idx) => (
                                         <div 
                                             key={rec.id} 
-                                            className={cn(
-                                                "group flex gap-3 p-2 rounded-md cursor-pointer border border-transparent hover:border-slate-100",
-                                                // Animation for Sidebar items (Optional but consistent)
-                                                "transition-all duration-300 ease-in-out",
-                                                "hover:bg-slate-50 hover:scale-[1.02]",
-                                                "active:scale-[0.98]"
-                                            )}
+                                            className="group flex gap-3 p-2 hover:bg-slate-50 rounded-md cursor-pointer transition-colors border border-transparent hover:border-slate-100" 
                                             onClick={() => handleSelectRecording(rec)}
                                         >
                                             <div className="relative w-20 h-12 bg-slate-100 rounded overflow-hidden flex-shrink-0">
@@ -455,13 +454,7 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                                             "shadow-[0_1px_3px_rgba(0,0,0,0.05)]",
                                             "border border-slate-200",
                                             "cursor-pointer",
-                                            "w-[280px] h-[280px] flex-shrink-0 flex flex-col",
-                                            // --- ANIMATIONS ADDED HERE ---
-                                            // Keeps the card design intact, but adds the zoom behavior
-                                            "transition-all duration-300 ease-in-out",
-                                            "hover:scale-[1.02] hover:shadow-lg hover:border-teal-200",
-                                            "active:scale-[0.98]",
-                                            "group" // For child interactions
+                                            "w-[280px] h-[280px] flex-shrink-0 flex flex-col"
                                         )}
                                     >
                                         {/* Visual Banner - Fixed Height */}
@@ -485,7 +478,7 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                                                     />
                                                 </div>
                                                 {/* Play Button Overlay - Fixed Size */}
-                                                <div className="absolute bottom-0 right-0 w-9 h-9 flex-shrink-0 bg-[#0d9488] rounded-full flex items-center justify-center text-white border-2 border-white shadow-sm z-20 group-hover:bg-[#0f766e] transition-colors">
+                                                <div className="absolute bottom-0 right-0 w-9 h-9 flex-shrink-0 bg-[#0d9488] rounded-full flex items-center justify-center text-white border-2 border-white shadow-sm z-20">
                                                     <Play fill="white" className="w-3 h-3 ml-0.5" />
                                                 </div>
                                             </div>
@@ -501,7 +494,7 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                                                 </div>
                                             </div>
                                             {/* Topic Title */}
-                                            <h2 className="text-base font-semibold text-slate-900 tracking-tight leading-snug line-clamp-2 flex-shrink-0 group-hover:text-teal-600 transition-colors">
+                                            <h2 className="text-base font-semibold text-slate-900 tracking-tight leading-snug line-clamp-2 flex-shrink-0">
                                                 {recording.topic}
                                             </h2>
                                         </div>
