@@ -1,226 +1,288 @@
 
 
-# Plan: Dynamic URL Navigation & UI Restructure for Student Interface
+# Student Messaging Refactor Plan
 
 ## Overview
 
-This plan restructures the student interface with the following key changes:
-
-1. **Floating header** appears only on the initial batch/subject selection page, positioned below the navigation bar
-2. **White sticky header** replaces the dark header when navigating into a subject, featuring a back arrow on the left
-3. **Dynamic URL routing** reflects the current navigation state (batch, subject, block)
-4. **Join Live Class block** added inside each subject view (combining ongoing/upcoming class functionality)
-5. **Sidebar cleanup** - removes "Join Live Class", "Ongoing Class", and "Practice DPP" while keeping Schedule
+This plan introduces a professional, unified **Right-Side Chat Drawer (Sheet)** for all 1:1 direct messaging in the student portal. The system will have two distinct entry points - "Support" from the sidebar and "Subject Connect" from within subject cards - but both will use the same underlying drawer component with different configurations.
 
 ---
 
-## Architecture Overview
+## Architecture Summary
 
 ```text
-URL Structure:
-/                                    -> Dashboard (batch selection + subjects)
-/?batch=JEE2025                      -> Dashboard with batch pre-selected
-/?batch=JEE2025&subject=Physics      -> Subject blocks view
-/?batch=JEE2025&subject=Physics&block=recordings -> Block content view
-/?batch=JEE2025&subject=Physics&block=live-class -> Live class block
++---------------------+       +------------------------+
+|     STUDENT UI      |       |   UNIFIED CHAT DRAWER  |
++---------------------+       +------------------------+
+        |                              |
+        |-- Sidebar "Support" -------->| Role Selection View
+        |                              |   - Admin Card
+        |                              |   - Manager Card
+        |                              |        |
+        |                              |        v
+        |                              |   Chat View (Anonymous)
+        |                              |
+        |-- Subject Card "Connect" --->| Direct Chat View
+        |                              |   (Context: "Physics Mentor")
+        +------------------------------+
 ```
 
 ---
 
-## Technical Implementation
+## Detailed Implementation Plan
 
-### 1. Add URL Query Parameter Syncing
+### Phase 1: Database Schema Updates
 
-**File: `src/components/student/StudentMain.tsx`**
+**Add a `message_context` column to the `direct_messages` table** to categorize conversations for staff filtering.
 
-- Import `useSearchParams` from `react-router-dom`
-- Sync navigation state with URL query parameters
-- On mount, parse URL params to restore navigation state
-- On navigation changes, update URL params using `setSearchParams`
+**SQL Migration:**
+```sql
+-- Add context column to distinguish message types
+ALTER TABLE public.direct_messages 
+ADD COLUMN IF NOT EXISTS context TEXT DEFAULT 'general';
 
-Changes:
-- Add `useSearchParams` hook
-- Create `useEffect` to read initial state from URL
-- Update all navigation handlers to also update URL params
-- Handle browser back/forward navigation
+-- Add index for faster filtering
+CREATE INDEX IF NOT EXISTS idx_direct_messages_context 
+ON public.direct_messages(context);
 
-### 2. Update Header Architecture
+-- Add subject context for teacher chats
+ALTER TABLE public.direct_messages 
+ADD COLUMN IF NOT EXISTS subject_context TEXT DEFAULT NULL;
+```
 
-**File: `src/components/student/StudentBatchHeader.tsx`**
+The `context` field will have values like:
+- `support_admin` - Technical support tickets
+- `support_manager` - Batch issue tickets  
+- `subject_doubt` - Subject-specific teacher chats
+- `general` - Legacy/default
 
-Keep as the dark floating header for the initial view (batch selection page only).
+---
 
-**New File: `src/components/student/StudentSubjectHeader.tsx`**
+### Phase 2: Create Unified Chat Drawer Component
 
-Create a new white sticky header for subject/block views:
-- White background with subtle border/shadow
-- Back arrow on the left side (after sidebar area)
-- Breadcrumb showing: Batch > Subject > Block
-- Clean, minimal design
+**New File: `src/components/student/StudentChatDrawer.tsx`**
 
-### 3. Add Live Class Block to Subject View
+This single component will handle both workflows with different initial states:
 
-**File: `src/components/student/StudentSubjectBlocks.tsx`**
+**Props Interface:**
+```typescript
+interface StudentChatDrawerProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  // Mode determines initial view
+  mode: 'support' | 'subject-connect';
+  // For subject-connect mode only
+  subjectContext?: {
+    batch: string;
+    subject: string;
+  };
+}
+```
 
-Add a new "Live Class" block to the blocks array:
-- ID: `live-class`
-- Label: "Join Live Class"
-- Description: "Ongoing & upcoming classes"
-- Icon: Video with live indicator
-- Gradient: Green/Emerald for live emphasis
+**Component Structure:**
+1. **Role Selection View** (for `support` mode)
+   - Two clean rectangular cards:
+     - "Admin" card - icon: `Shield`, subtitle: "Technical Support"
+     - "Manager" card - icon: `Briefcase`, subtitle: "Batch Issues"
+   - On click: Fetch appropriate staff member and transition to Chat View
 
-**New File: `src/components/student/StudentLiveClass.tsx`**
+2. **Chat View** (for both modes)
+   - Context-aware header:
+     - Support mode: "Support Agent" (anonymous)
+     - Subject mode: "{Subject} Mentor" (e.g., "Physics Mentor")
+   - Full message history from `direct_messages` table
+   - Real-time polling (3-second interval)
+   - Message input with send button
 
-Create a combined live class component:
-- Shows ongoing classes (LIVE NOW) for the selected batch/subject
-- Shows upcoming classes for today
-- Join button opens meeting link
-- Filtered by the current batch and subject context
-- Merges functionality from `StudentJoinClass` and `StudentCurrentClass`
+**Key Features:**
+- Uses the existing `Sheet` component from `@/components/ui/sheet`
+- Slides in from the right side
+- Fixed height with internal scrolling for messages
+- Preserves conversation history across sessions
 
-### 4. Update Block Content Router
+---
 
-**File: `src/components/student/StudentBlockContent.tsx`**
+### Phase 3: Support Workflow (Sidebar Trigger)
 
-- Add case for `live-class` block
-- Import and render `StudentLiveClass` component
-- Pass batch and subject props
+**Modify: `src/components/Sidebar.tsx`**
 
-### 5. Update Subject Blocks View Header
-
-**File: `src/components/student/StudentSubjectBlocks.tsx`**
-
-Replace the dark gradient header with the new white sticky header:
-- Back arrow at the start
-- Breadcrumb navigation
-- Remove the dark gradient styling
-
-### 6. Update Block Content View Header
-
-**File: `src/components/student/StudentBlockContent.tsx`**
-
-Replace the dark gradient header with the new white sticky header:
-- Consistent with subject blocks view
-- Back navigation to subject blocks
-- Full breadcrumb: Batch > Subject > Block
-
-### 7. Simplify Sidebar for Students
-
-**File: `src/components/Sidebar.tsx`**
-
-Update `studentTabs` array:
-- KEEP: "My Learning" (dashboard)
-- KEEP: "Schedule" (moved here from subject blocks)
-- REMOVE: "Join Live Class"
-- REMOVE: "Ongoing Class"
-- REMOVE: "Practice (DPP)"
-- KEEP: "Submit Feedback"
-- KEEP: "Exams"
-- KEEP: "Contact Admin"
-
-New student tabs:
+Add a new "Support" tab to the student tabs array:
 ```typescript
 const studentTabs = [
   { id: 'dashboard', label: 'My Learning', icon: LayoutDashboard },
   { id: 'schedule', label: 'Schedule', icon: Calendar },
+  { id: 'support', label: 'Support', icon: Headphones }, // NEW
   { id: 'feedback', label: 'Submit Feedback', icon: MessageSquare },
   { id: 'exams', label: 'Exams', icon: BookOpen },
   { id: 'contact-admin', label: 'Contact Admin', icon: Phone },
 ];
 ```
 
-### 8. Update StudentDashboard Tab Handling
+**Behavior:**
+- Clicking "Support" opens the Chat Drawer in `support` mode
+- The drawer shows the Role Selection View first
+- Student picks Admin or Manager
+- System fetches the first available staff member assigned to the student's batch
+- Transition to Chat View with "Support Agent" header (anonymous)
 
-**File: `src/components/StudentDashboard.tsx`**
+**Staff Lookup Logic:**
+```typescript
+// For Admin support
+const { data: admin } = await supabase
+  .from('admins')
+  .select('user_id, name')
+  .limit(1)
+  .single();
 
-- Remove cases for `join-class`, `current-class`, and `dpp`
-- Keep the `schedule` case for the sidebar schedule access
-- Ensure `schedule` tab renders `StudentSchedule` component
+// For Manager support
+const { data: manager } = await supabase
+  .from('managers')
+  .select('user_id, name, assigned_batches')
+  .overlaps('assigned_batches', studentBatches)
+  .limit(1)
+  .single();
+```
 
 ---
 
-## Visual Design Specifications
+### Phase 4: Subject Connect Workflow (Subject Card Trigger)
 
-### White Sticky Header (for subject/block views)
+**Modify: `src/components/student/StudentSubjectBlocks.tsx`**
 
+The existing "Connect" block (id: `connect`) will be enhanced:
+- Instead of navigating to `StudentBlockContent`, it opens the Chat Drawer in `subject-connect` mode
+- Automatically fetches the teacher assigned to both the batch AND subject
+
+**Teacher Lookup Logic:**
+```typescript
+const { data: teacher } = await supabase
+  .from('teachers')
+  .select('user_id, name')
+  .contains('assigned_batches', [batch])
+  .contains('assigned_subjects', [subject])
+  .limit(1)
+  .single();
 ```
-+--------------------------------------------------+
-| [<- Back]  Batch > Subject > Block               |
-+--------------------------------------------------+
-```
 
-- Background: `bg-white`
-- Border bottom: `border-b border-slate-200`
-- Shadow: `shadow-sm`
-- Padding: Consistent with content area
-- Back arrow: Slate gray, hover effect
-- Breadcrumb: Small text, arrows between items
-
-### Live Class Block Card
-
-- Prominent green/emerald gradient background
-- Live pulse indicator when class is ongoing
-- "Join Now" button with external link icon
-- Shows class time and subject
+**Behavior:**
+- Student clicks "Connect" block within a subject (e.g., Physics)
+- Drawer opens directly to Chat View (bypasses role selection)
+- Header shows "{Subject} Mentor" (e.g., "Physics Mentor")
+- Full chat history with that specific teacher is loaded
+- Messages are tagged with `context: 'subject_doubt'` and `subject_context: 'Physics'`
 
 ---
 
-## URL State Management Logic
+### Phase 5: Enhanced Staff Inbox
+
+**Modify: `src/components/shared/StaffInbox.tsx`**
+
+Add category filtering and context badges to help staff manage their inboxes:
+
+**New Features:**
+1. **Tab-based filtering** at the top:
+   - "All" - Shows all conversations
+   - "Support Tickets" - Filters `context IN ('support_admin', 'support_manager')`
+   - "Subject Doubts" - Filters `context = 'subject_doubt'`
+
+2. **Context Badges** on each contact card:
+   - Support tickets: Red badge with "Support"
+   - Subject doubts: Blue badge with the subject name (e.g., "Physics")
+
+3. **Enhanced Contact Query:**
+```typescript
+// Modified query to include message context
+const { data: messages } = await supabase
+  .from('direct_messages')
+  .select('*, context, subject_context')
+  .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+  .order('created_at', { ascending: false });
+```
+
+---
+
+### Phase 6: State Management
+
+**New File: `src/hooks/useChatDrawer.tsx`**
+
+A simple context/hook to manage the drawer state across components:
 
 ```typescript
-// Reading from URL on mount
-useEffect(() => {
-  const batch = searchParams.get('batch');
-  const subject = searchParams.get('subject');
-  const block = searchParams.get('block');
-  
-  if (batch) {
-    setNavigation({
-      level: block ? 'block' : (subject ? 'subject' : 'batch'),
-      batch,
-      subject: subject || null,
-      block: block || null,
-    });
-  }
-}, []);
+interface ChatDrawerState {
+  isOpen: boolean;
+  mode: 'support' | 'subject-connect';
+  subjectContext?: { batch: string; subject: string };
+  selectedRecipient?: { id: string; name: string; displayName: string };
+}
 
-// Writing to URL on navigation change
-const updateUrl = (nav: NavigationState) => {
-  const params = new URLSearchParams();
-  if (nav.batch) params.set('batch', nav.batch);
-  if (nav.subject) params.set('subject', nav.subject);
-  if (nav.block) params.set('block', nav.block);
-  setSearchParams(params, { replace: true });
-};
+// Provides: openSupportDrawer(), openSubjectConnect(batch, subject), closeDrawer()
 ```
 
----
-
-## Files to Create
-
-| File | Purpose |
-|------|---------|
-| `src/components/student/StudentSubjectHeader.tsx` | White sticky header with back navigation |
-| `src/components/student/StudentLiveClass.tsx` | Combined live/upcoming class view |
-
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/components/student/StudentMain.tsx` | Add URL sync with useSearchParams |
-| `src/components/student/StudentSubjectBlocks.tsx` | Use white header, add live-class block |
-| `src/components/student/StudentBlockContent.tsx` | Use white header, add live-class case |
-| `src/components/Sidebar.tsx` | Remove join-class, current-class, dpp from student tabs |
-| `src/components/StudentDashboard.tsx` | Remove unused tab cases |
+This hook will be used by:
+- `Sidebar.tsx` - to open support drawer
+- `StudentSubjectBlocks.tsx` - to open subject connect drawer
+- `StudentMain.tsx` - to render the drawer component
 
 ---
 
-## Expected Outcome
+## File Changes Summary
 
-1. **Initial Dashboard**: Shows floating dark header with batch name, subject cards below
-2. **Subject View**: White sticky header with back arrow, block grid including "Live Class"
-3. **Block View**: White sticky header with breadcrumb, block content
-4. **URLs Update**: Every navigation action updates the URL for shareable links and browser history
-5. **Sidebar Simplified**: Only essential items remain (My Learning, Schedule, Feedback, Exams, Contact)
-6. **Live Class Integrated**: Join ongoing/upcoming classes from within subject context
+| File | Action | Description |
+|------|--------|-------------|
+| `src/components/student/StudentChatDrawer.tsx` | **Create** | New unified chat drawer component |
+| `src/hooks/useChatDrawer.tsx` | **Create** | State management hook for drawer |
+| `src/components/Sidebar.tsx` | **Modify** | Add "Support" tab, integrate drawer trigger |
+| `src/components/student/StudentSubjectBlocks.tsx` | **Modify** | Wire "Connect" block to drawer |
+| `src/components/student/StudentMain.tsx` | **Modify** | Add ChatDrawerProvider and render drawer |
+| `src/components/shared/StaffInbox.tsx` | **Modify** | Add filtering tabs and context badges |
+| Database Migration | **Create** | Add `context` and `subject_context` columns |
+
+---
+
+## Critical Constraints
+
+1. **DO NOT TOUCH `StudentCommunity.tsx`** - The existing community feature remains completely unchanged
+2. **Preserve existing `direct_messages` data** - The migration adds columns with defaults, no data loss
+3. **Keep `StudentConnect.tsx` functional** - It will continue to work for the "Support Connect" tab but will be enhanced with the drawer
+
+---
+
+## Technical Details
+
+### Message Context Values
+- `support_admin` - Message to admin via support workflow
+- `support_manager` - Message to manager via support workflow
+- `subject_doubt` - Message to teacher via subject connect
+- `general` - Default/legacy messages
+
+### Anonymous Display Logic
+```typescript
+// In Chat View header
+const displayName = mode === 'support' 
+  ? 'Support Agent' 
+  : `${subjectContext.subject} Mentor`;
+```
+
+### Real-time Sync
+Messages will use the existing 3-second polling pattern already in `StudentDirectMessage.tsx`, which works reliably without complex WebSocket setup.
+
+---
+
+## UI/UX Specifications
+
+**Drawer Dimensions:**
+- Width: `sm:max-w-md` (448px) on desktop
+- Height: Full viewport height
+- Side: Right
+
+**Role Selection Cards:**
+- Height: ~100px each
+- Border: 1px slate-200, hover: black
+- Icon: 40x40px in a colored circle
+- Layout: Icon left, text right
+
+**Chat View:**
+- Header: 56px fixed with avatar and name
+- Messages: Scrollable area with `flex-1`
+- Input: 64px fixed at bottom
 
