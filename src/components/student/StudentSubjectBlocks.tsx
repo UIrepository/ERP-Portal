@@ -127,7 +127,7 @@ export const StudentSubjectBlocks = ({
 
   return (
     // Updated background color to #F8F8F8
-    <div className="min-h-screen bg-[#F8F8F8] font-sans pb-10">
+    <div className="min-h-screen bg-[#F5F5F5] font-sans pb-10">
       
       {/* Top Navbar */}
       <nav className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-10">
