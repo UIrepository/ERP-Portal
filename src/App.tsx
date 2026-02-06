@@ -9,6 +9,9 @@ import NotFound from "./pages/NotFound";
 import ClassSession from "./pages/ClassSession";
 import { ScreenRecordingProtection } from "@/components/ScreenRecordingProtection";
 
+// Import Student Community Component
+import { StudentCommunity } from "@/components/student/StudentCommunity";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -23,8 +26,10 @@ const App = () => (
               <Route path="/" element={<Index />} />
               
               {/* SECURE CLASS SESSION ROUTE */}
-              {/* This route verifies the unique link and redirects to Jitsi in a new tab */}
               <Route path="/class-session/:enrollmentId" element={<ClassSession />} />
+              
+              {/* STUDENT COMMUNITY ROUTE (Opens in new tab) */}
+              <Route path="/portal/student/community" element={<StudentCommunity />} />
               
               {/* Fallback Route */}
               <Route path="*" element={<NotFound />} />
