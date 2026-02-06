@@ -10,7 +10,8 @@ import {
   ArrowLeft, 
   FileSpreadsheet, 
   FileCode, 
-  File
+  File,
+  Eye
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -92,6 +93,7 @@ const NotesSkeleton = () => (
            <Skeleton className="h-4 w-4 rounded" />
            <Skeleton className="h-3 w-1/2" />
         </div>
+        <Skeleton className="h-9 w-full rounded-md mt-2" />
       </div>
     ))}
   </div>
@@ -289,17 +291,16 @@ export const StudentNotes = ({ batch, subject }: StudentNotesProps) => {
                   return (
                     <div 
                       key={note.id} 
-                      onClick={() => setSelectedNote(note)}
                       className="
                         group relative bg-white 
                         border border-slate-200 
                         rounded-lg 
                         shadow-none 
-                        hover:bg-slate-50 transition-colors cursor-pointer 
-                        p-4 flex flex-col justify-between gap-4
+                        hover:bg-slate-50 transition-colors 
+                        p-4 flex flex-col gap-4
                       "
                     >
-                      <div className="flex justify-between items-start gap-4">
+                      <div className="flex justify-between items-start gap-3">
                         <h3 className="font-medium text-slate-900 line-clamp-2 text-base leading-snug">
                           {note.title}
                         </h3>
@@ -320,6 +321,17 @@ export const StudentNotes = ({ batch, subject }: StudentNotesProps) => {
                         <span className="text-xs truncate font-normal text-slate-500 max-w-full">
                           {note.filename}
                         </span>
+                      </div>
+
+                      <div className="mt-auto pt-2">
+                        <Button 
+                          className="w-full bg-slate-900 text-white hover:bg-slate-800"
+                          size="sm"
+                          onClick={() => setSelectedNote(note)}
+                        >
+                          <Eye className="w-3.5 h-3.5 mr-2" />
+                          View Note
+                        </Button>
                       </div>
                     </div>
                   );
