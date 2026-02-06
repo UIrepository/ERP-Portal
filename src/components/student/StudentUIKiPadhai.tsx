@@ -28,7 +28,7 @@ interface StudentUIKiPadhaiProps {
 const PremiumContentSkeleton = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-white p-5 rounded-lg border border-white shadow-sm h-[140px] flex flex-col justify-between">
+            <div key={i} className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm h-[140px] flex flex-col justify-between">
                 <div className="flex justify-between gap-4">
                     <div className="space-y-3 w-full">
                          <Skeleton className="h-4 w-16 rounded-sm" />
@@ -91,7 +91,7 @@ const PremiumContentViewer = ({ content, onBack, onAccess, allContent, onContent
                                 {otherContent.map(item => (
                                     <div 
                                         key={item.id} 
-                                        className="p-4 bg-white border border-slate-100 rounded-md hover:bg-slate-50 transition-colors duration-200 cursor-pointer group" 
+                                        className="p-4 bg-white border border-slate-200 rounded-md hover:border-black transition-colors duration-200 cursor-pointer group" 
                                         onClick={() => onContentSelect(item)}
                                     >
                                         <div className="flex justify-between items-start mb-2">
@@ -176,11 +176,11 @@ export const StudentUIKiPadhai = ({ batch, subject }: StudentUIKiPadhaiProps) =>
                     onClick={() => setSelectedContent(content)}
                     className="
                         group relative bg-white 
-                        border border-white 
+                        border border-slate-200 
                         rounded-lg 
                         p-5 
                         transition-colors duration-200
-                        hover:bg-slate-50 
+                        hover:border-black /* Grey default, Black on hover */
                         cursor-pointer overflow-hidden
                     "
                 >
