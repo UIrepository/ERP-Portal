@@ -20,38 +20,25 @@ interface StudentSubjectBlocksProps {
   onBlockSelect: (blockId: string) => void;
 }
 
-// Updated blocks with specific content counts ("stats")
+// Blocks updated to match your specific needs with relevant stats
 const blocks = [
   {
     id: 'live-class',
     label: 'Join Live Class',
-    // Live classes usually don't have "notes" counts in the same way, but keeping consistent format
     stats: ['Ongoing Classes', 'Upcoming Schedule'],
     icon: Radio,
     isLive: true,
   },
   {
     id: 'recordings',
-    label: 'All Contents', // Changed to match "All Contents" from your example
-    stats: ['120 Videos', '45 Exercises', '89 Notes'],
+    label: 'Lectures',
+    stats: ['120 Videos', '45 Exercises'], // Stats relevant to Lectures
     icon: PlayCircle,
   },
   {
-    id: 'mind-maps',
-    label: 'Mind Maps || Only PDF',
-    stats: ['0 Videos', '0 Exercises', '27 Notes'],
-    icon: FileText,
-  },
-  {
-    id: 'short-notes',
-    label: 'Short Notes || Only PDF',
-    stats: ['0 Videos', '0 Exercises', '35 Notes'],
-    icon: FileText,
-  },
-  {
-    id: 'pyq',
-    label: 'PYQ Practice Sheet || Only PDF',
-    stats: ['0 Videos', '0 Exercises', '58 Notes'],
+    id: 'notes',
+    label: 'Notes & PDFs',
+    stats: ['89 Notes', 'Assignments'], // Stats relevant to Notes
     icon: FileText,
   },
   {
@@ -89,7 +76,7 @@ export const StudentSubjectBlocks = ({
   return (
     <div className="min-h-screen bg-[#f4f4f5] font-sans pb-10">
       
-      {/* Top Navbar - Clean, no XP badge */}
+      {/* Top Navbar */}
       <nav className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-10">
         <button 
           onClick={onBack}
