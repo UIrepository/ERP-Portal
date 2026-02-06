@@ -6,8 +6,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Video, Play, Search, ArrowLeft, PlayCircle, MessageSquare, Send, CornerDownRight, Clock, ChevronLeft } from 'lucide-react';
+import { 
+    Video, 
+    Play, 
+    Search, 
+    ArrowLeft, 
+    PlayCircle, 
+    MessageSquare, 
+    Send, 
+    CornerDownRight, 
+    Clock, 
+    ChevronLeft,
+    Calendar,
+    FileText
+} from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -17,7 +29,7 @@ import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 
-// Interfaces
+// --- Interfaces ---
 interface RecordingContent {
     id: string;
     date: string;
@@ -54,29 +66,12 @@ interface DoubtAnswer {
     profiles: Profile | null;
 }
 
-// Skeletons
-const RecordingSkeleton = () => (
-    <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {[...Array(8)].map((_, i) => (
-            <div key={i} className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 w-[280px] h-[280px] animate-pulse flex flex-col">
-                <div className="h-[160px] bg-slate-100 rounded-lg w-full flex-shrink-0" />
-                <div className="space-y-2 px-1 pt-3 flex-1">
-                    <div className="flex justify-between">
-                        <div className="h-3 bg-slate-100 rounded w-20" />
-                        <div className="h-3 bg-slate-100 rounded w-12" />
-                    </div>
-                    <div className="h-4 bg-slate-100 rounded w-3/4" />
-                </div>
-            </div>
-        ))}
-    </div>
-);
+// --- Sub-Components ---
 
-// Player Component
 const WatermarkedPlayer = ({ recording }: { recording: RecordingContent }) => {
     const { profile } = useAuth();
     return (
-        <div className="relative aspect-video" onContextMenu={(e) => e.preventDefault()}>
+        <div className="relative aspect-video bg-black rounded-md overflow-hidden" onContextMenu={(e) => e.preventDefault()}>
             <iframe
                 src={recording.embed_link}
                 className="absolute top-0 left-0 w-full h-full"
@@ -99,7 +94,6 @@ const WatermarkedPlayer = ({ recording }: { recording: RecordingContent }) => {
     );
 };
 
-// Doubts Section Component
 const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
     const { user } = useAuth();
     const queryClient = useQueryClient();
@@ -299,7 +293,8 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
 };
 
 
-// Main Component
+// --- Main Component ---
+
 export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) => {
     const { profile } = useAuth();
     const navigate = useNavigate();
@@ -307,6 +302,7 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
     const [selectedRecording, setSelectedRecording] = useState<RecordingContent | null>(null);
     const isMobile = useIsMobile();
 
+    // Context-aware query
     const { data: recordings, isLoading } = useQuery<RecordingContent[]>({
         queryKey: ['student-recordings', batch, subject],
         queryFn: async (): Promise<RecordingContent[]> => {
@@ -317,7 +313,7 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                 .select('*')
                 .eq('batch', batch)
                 .eq('subject', subject)
-                .order('date', { ascending: false });
+                .order('date', { ascending: false }); // Newest first
             
             if (error) throw error;
             return (data || []) as RecordingContent[];
@@ -345,157 +341,201 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
         });
     };
 
+    // --- View: Single Recording Player ---
     if (selectedRecording) {
         return (
-            <div className="p-4 space-y-4 bg-white min-h-full font-sans">
-                <Button variant="outline" size="sm" onClick={() => setSelectedRecording(null)} className="mb-2 bg-white hover:bg-slate-50 text-slate-600 border-slate-200">
-                    <ArrowLeft className="h-3.5 w-3.5 mr-2" /> Back to Lectures
-                </Button>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                    <div className="lg:col-span-2">
-                        <Card className="bg-white rounded-xl overflow-hidden shadow-sm border border-slate-200">
-                            <CardHeader className="p-4 border-b border-slate-100">
-                                <CardTitle className="text-base font-semibold text-slate-800">{selectedRecording.topic}</CardTitle>
-                                <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5 font-normal">
-                                    <Clock className="h-3.5 w-3.5" />
-                                    {format(new Date(selectedRecording.date), 'MMMM d, yyyy')} • {format(new Date(selectedRecording.created_at), 'h:mm a')}
-                                </p>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                <WatermarkedPlayer recording={selectedRecording} />
-                            </CardContent>
-                        </Card>
-                        <DoubtsSection recording={selectedRecording} />
-                    </div>
-                    
-                    <div className="lg:col-span-1">
-                        <Card className="bg-white rounded-xl shadow-sm border border-slate-200 sticky top-4">
-                            <CardHeader className="pb-2 pt-4 px-4"><CardTitle className="text-base text-slate-800">Other Lectures</CardTitle></CardHeader>
-                            <CardContent className="px-4 pb-4">
-                                <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
-                                    {filteredRecordings.filter(r => r.id !== selectedRecording.id).map((rec) => (
-                                        <div 
-                                            key={rec.id} 
-                                            className="group flex gap-3 p-2 hover:bg-slate-50 rounded-md cursor-pointer transition-all duration-300 border border-transparent hover:border-slate-100 hover:scale-[1.02] active:scale-[0.98]" 
-                                            onClick={() => handleSelectRecording(rec)}
-                                        >
-                                            <div className="relative w-20 h-12 bg-slate-100 rounded overflow-hidden flex-shrink-0">
-                                                <div className="absolute inset-0 bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center">
-                                                    <PlayCircle className="h-5 w-5 text-white/70" />
-                                                </div>
-                                            </div>
-                                            <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                                <p className="font-medium text-xs text-slate-800 line-clamp-2 group-hover:text-teal-600 transition-colors">
-                                                    {rec.topic}
-                                                </p>
-                                                <p className="text-[10px] text-slate-400 mt-0.5 font-normal">
-                                                    {format(new Date(rec.date), 'MMM d')}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    ))}
+            <div className="min-h-screen bg-[#F8F8F8] font-sans pb-10">
+                <nav className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-10">
+                    <button 
+                        onClick={() => setSelectedRecording(null)}
+                        className="flex items-center gap-2 text-[#1e293b] font-medium text-[15px] hover:opacity-80 transition-opacity"
+                    >
+                        <ChevronLeft className="h-5 w-5" />
+                        Back to Lectures
+                    </button>
+                </nav>
+
+                <div className="max-w-[1200px] mx-auto mt-8 px-4 md:px-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                        <div className="lg:col-span-2">
+                            {/* Video Player Card */}
+                            <div className="bg-white rounded-md border border-slate-200 shadow-sm overflow-hidden mb-6">
+                                <div className="p-6 border-b border-slate-100">
+                                    <h2 className="text-[22px] font-bold text-[#1e293b] leading-tight">
+                                        {selectedRecording.topic}
+                                    </h2>
+                                    <p className="text-[13px] text-slate-500 mt-2 flex items-center gap-2">
+                                        <Calendar className="h-3.5 w-3.5" />
+                                        {format(new Date(selectedRecording.date), 'MMMM d, yyyy')}
+                                        <span className="text-slate-300">|</span>
+                                        <Clock className="h-3.5 w-3.5" />
+                                        {format(new Date(selectedRecording.created_at), 'h:mm a')}
+                                    </p>
                                 </div>
-                            </CardContent>
-                        </Card>
+                                <div className="p-0">
+                                    <WatermarkedPlayer recording={selectedRecording} />
+                                </div>
+                            </div>
+
+                            {/* Doubts Section */}
+                            <DoubtsSection recording={selectedRecording} />
+                        </div>
+                        
+                        {/* Sidebar: Other Lectures */}
+                        <div className="lg:col-span-1">
+                            <div className="bg-white rounded-md border border-slate-200 shadow-sm sticky top-24">
+                                <div className="p-6 border-b border-slate-100">
+                                    <h3 className="text-[16px] font-semibold text-[#1e293b]">Other Lectures</h3>
+                                </div>
+                                <div className="p-4">
+                                    <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                                        {filteredRecordings.filter(r => r.id !== selectedRecording.id).map((rec) => (
+                                            <button 
+                                                key={rec.id} 
+                                                className={cn(
+                                                    "w-full text-left group flex gap-3 p-3 rounded-[4px] cursor-pointer",
+                                                    "border border-transparent hover:border-slate-100 hover:bg-slate-50",
+                                                    "transition-all duration-200 hover:scale-[1.01]"
+                                                )}
+                                                onClick={() => handleSelectRecording(rec)}
+                                            >
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-semibold text-[13px] text-[#1e293b] line-clamp-2 group-hover:text-teal-600 transition-colors">
+                                                        {rec.topic}
+                                                    </p>
+                                                    <p className="text-[11px] text-slate-400 mt-1">
+                                                        {format(new Date(rec.date), 'MMM d')}
+                                                    </p>
+                                                </div>
+                                                <div className="flex items-center justify-center">
+                                                    <PlayCircle className="h-4 w-4 text-slate-300 group-hover:text-teal-500" />
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         );
     }
 
+    // --- View: Recordings Grid (Subject Blocks Style) ---
     return (
-        <div className="p-6 bg-white min-h-full font-sans">
-            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-                
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-                    <div className="flex items-center gap-3">
-                        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-                            Class Lectures
-                        </h1>
-                    </div>
-                    
-                    <div className="relative w-full md:w-64">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                        <Input
-                            placeholder="Search topics..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-9 h-9 text-sm bg-white border-slate-200 focus:border-teal-500 focus:ring-teal-500"
-                        />
-                    </div>
+        <div className="min-h-screen bg-[#F8F8F8] font-sans pb-10">
+            
+            {/* Top Navbar */}
+            <nav className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-10">
+                <div className="flex items-center gap-3">
+                    <button 
+                        onClick={() => navigate(-1)} // Or simpler onBack if passed as prop
+                        className="text-[#1e293b] hover:opacity-80 transition-opacity"
+                    >
+                         <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    <h1 className="text-[17px] font-bold text-[#1e293b]">Class Lectures</h1>
                 </div>
+                
+                {/* Search */}
+                <div className="relative w-full md:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                    <Input
+                        placeholder="Search lectures..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-9 h-9 text-sm bg-[#F8F8F8] border-transparent focus:bg-white focus:border-slate-200 focus:ring-0"
+                    />
+                </div>
+            </nav>
 
-                <div>
-                    {isLoading ? (
-                        <RecordingSkeleton />
-                    ) : filteredRecordings.length > 0 ? (
-                        <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                            {filteredRecordings.map((recording, index) => {
-                                const lectureNo = filteredRecordings.length - index; 
+            {/* Main Content Wrapper */}
+            <div className="max-w-[1200px] mx-auto mt-8 px-4 md:px-6">
+                <div className="bg-white rounded-md border border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-8">
+                    
+                    <h2 className="text-[26px] font-bold text-[#1e293b] mb-8 tracking-tight">
+                        {subject} Recordings
+                    </h2>
+
+                    {/* Grid Layout - Matches Subject Blocks */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        {isLoading ? (
+                            [...Array(4)].map((_, i) => (
+                                <Skeleton key={i} className="h-32 w-full rounded-[4px]" />
+                            ))
+                        ) : filteredRecordings.length > 0 ? (
+                            filteredRecordings.map((recording, index) => {
+                                const lectureNo = filteredRecordings.length - index;
                                 
                                 return (
-                                    <div 
+                                    <button
                                         key={recording.id}
                                         onClick={() => handleSelectRecording(recording)}
                                         className={cn(
-                                            "bg-white rounded-lg p-3",
-                                            "shadow-[0_1px_3px_rgba(0,0,0,0.05)]",
-                                            "border border-slate-200",
-                                            "cursor-pointer",
-                                            "w-[280px] h-[280px] flex-shrink-0 flex flex-col",
-                                            // Zoom Effects Integrated
-                                            "transition-all duration-300 ease-in-out group",
+                                            "group relative w-full text-left",
+                                            // Base Styles (White, Rounded, Border, Padding)
+                                            "bg-white rounded-[4px]", 
+                                            "border border-slate-200", 
+                                            "p-6", 
+                                            "flex items-stretch gap-5",
+                                            // ZOOM ANIMATION on the whole section
+                                            "transition-all duration-300 ease-in-out",
                                             "hover:scale-[1.02] hover:shadow-lg hover:border-teal-200",
                                             "active:scale-[0.98]"
                                         )}
                                     >
-                                        <div className="h-[160px] w-full flex-shrink-0 bg-gradient-to-br from-white to-[#f0fdfa] rounded-lg relative flex items-center px-5 border border-[#ccfbf1] overflow-hidden">
-                                            
-                                            <div className="z-10 relative flex-shrink-0">
-                                                <span className="text-[#0d9488] font-bold text-xl block tracking-tight whitespace-nowrap">
+                                        {/* Teal Bar (Fixed width, full height of flex container) */}
+                                        <div className="w-1 bg-teal-500 rounded-full shrink-0 group-hover:bg-teal-600 transition-colors" />
+
+                                        {/* Content Wrapper */}
+                                        <div className="flex-1 flex flex-col justify-center min-w-0">
+                                            {/* Header Row */}
+                                            <div className="flex justify-between items-center mb-2">
+                                                <span className="text-teal-600 font-bold text-[13px] uppercase tracking-wider">
                                                     Lecture {lectureNo}
                                                 </span>
+                                                <span className="text-[12px] text-slate-400 font-normal">
+                                                    {format(new Date(recording.date), 'dd MMM, yyyy')}
+                                                </span>
                                             </div>
-
-                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex-shrink-0">
-                                                <div className="w-[100px] h-[100px] flex-shrink-0 bg-[#111] rounded-full flex items-center justify-center border-4 border-[#f0fdfa] shadow-sm select-none overflow-hidden p-2">
-                                                    <img 
-                                                        src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
-                                                        alt="UI Logo" 
-                                                        className="w-full h-full object-contain"
-                                                    />
-                                                </div>
-                                                <div className="absolute bottom-0 right-0 w-9 h-9 flex-shrink-0 bg-[#0d9488] rounded-full flex items-center justify-center text-white border-2 border-white shadow-sm z-20 group-hover:bg-[#0f766e] transition-colors">
-                                                    <Play fill="white" className="w-3 h-3 ml-0.5" />
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="pt-3 px-1 pb-1 flex-1 flex flex-col justify-between min-h-0">
-                                            <div className="flex justify-between items-center mb-2 text-slate-500 font-normal text-xs flex-shrink-0">
-                                                <span className="whitespace-nowrap">{format(new Date(recording.date), 'dd MMM, yyyy')}</span>
-                                                <div className="flex items-center gap-1">
-                                                    <Clock className="w-3 h-3 opacity-70 flex-shrink-0" />
-                                                    <span className="whitespace-nowrap">{format(new Date(recording.created_at), 'h:mm a')}</span>
-                                                </div>
-                                            </div>
-                                            <h2 className="text-base font-semibold text-slate-900 tracking-tight leading-snug line-clamp-2 flex-shrink-0 group-hover:text-teal-600 transition-colors">
+                                            
+                                            {/* Title */}
+                                            <h3 className="text-[17px] font-semibold text-[#1e293b] mb-3 leading-snug line-clamp-2 group-hover:text-teal-600 transition-colors">
                                                 {recording.topic}
-                                            </h2>
+                                            </h3>
+                                            
+                                            {/* Stats/Footer Row */}
+                                            <div className="flex items-center text-[13px] text-[#71717a] font-normal">
+                                                <span className="flex items-center gap-1.5">
+                                                    <Clock className="h-3.5 w-3.5 opacity-70" />
+                                                    {format(new Date(recording.created_at), 'h:mm a')}
+                                                </span>
+                                                <span className="mx-3 text-[#d4d4d8]">|</span>
+                                                <span className="flex items-center gap-1.5 text-teal-600 font-medium">
+                                                    <PlayCircle className="h-3.5 w-3.5" />
+                                                    Watch Now
+                                                </span>
+                                            </div>
                                         </div>
-                                    </div>
+
+                                        {/* Optional: Right Side Icon for visual balance (hidden on very small screens) */}
+                                        <div className="hidden sm:flex items-center justify-center pl-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 transform translate-x-2 group-hover:translate-x-0">
+                                            <div className="bg-teal-50 p-2 rounded-full">
+                                                <Play className="h-5 w-5 text-teal-600 fill-teal-600" />
+                                            </div>
+                                        </div>
+                                    </button>
                                 );
-                            })}
-                        </div>
-                    ) : (
-                        <div className="text-center py-16 bg-white rounded-lg border border-dashed border-slate-300">
-                            <div className="inline-block bg-slate-50 rounded-full p-3 mb-3">
-                                <PlayCircle className="h-8 w-8 text-slate-400" />
+                            })
+                        ) : (
+                            <div className="col-span-full text-center py-16 text-slate-500">
+                                <Video className="mx-auto h-10 w-10 text-slate-200 mb-3" />
+                                <p className="text-sm">No lectures found.</p>
                             </div>
-                            <h3 className="text-base font-semibold text-slate-900">No Class Lectures Found</h3>
-                            <p className="text-sm text-slate-500">No recorded lectures are available for this subject.</p>
-                        </div>
-                    )}
+                        )}
+                    </div>
+
                 </div>
             </div>
         </div>
