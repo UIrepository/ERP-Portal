@@ -33,7 +33,6 @@ export const StudentSubjectBlocks = ({
   const { data: stats, isLoading } = useQuery({
     queryKey: ['subject-stats', batch, subject],
     queryFn: async () => {
-      // Run all count queries in parallel for performance
       const [recordings, notes, dpp, premium] = await Promise.all([
         supabase
           .from('recordings')
@@ -64,10 +63,9 @@ export const StudentSubjectBlocks = ({
         premium: premium.count || 0,
       };
     },
-    staleTime: 1000 * 60 * 5, // Cache stats for 5 minutes
+    staleTime: 1000 * 60 * 5, 
   });
 
-  // Define blocks with dynamic stats
   const blocks = [
     {
       id: 'live-class',
@@ -79,7 +77,6 @@ export const StudentSubjectBlocks = ({
     {
       id: 'recordings',
       label: 'Lectures',
-      // Dynamic video and exercise counts
       stats: [
         isLoading ? 'Loading...' : `${stats?.videos} Videos`, 
         isLoading ? '...' : `${stats?.exercises} Exercises`
@@ -89,7 +86,6 @@ export const StudentSubjectBlocks = ({
     {
       id: 'notes',
       label: 'Notes & PDFs',
-      // Dynamic notes count
       stats: [
         isLoading ? 'Loading...' : `${stats?.notes} Notes`, 
         'Assignments'
@@ -126,8 +122,7 @@ export const StudentSubjectBlocks = ({
   ];
 
   return (
-    // Updated background color to #F8F8F8
-    <div className="min-h-screen bg-[#F5F5F5] font-sans pb-10">
+    <div className="min-h-screen bg-[#F8F8F8] font-sans pb-10">
       
       {/* Top Navbar */}
       <nav className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-10">
@@ -140,7 +135,7 @@ export const StudentSubjectBlocks = ({
         </button>
       </nav>
 
-      {/* Main Content Wrapper - Increased Width to 1200px */}
+      {/* Main Content Wrapper */}
       <div className="max-w-[1200px] mx-auto mt-8 px-4 md:px-6">
         <div className="bg-white rounded-md border border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-8">
           
@@ -155,36 +150,58 @@ export const StudentSubjectBlocks = ({
                 onClick={() => onBlockSelect(block.id)}
                 className={cn(
                   "group relative w-full text-left",
-                  "bg-[#efede7] hover:bg-[#e5e2d9]", // Mud Light background + darker hover
-                  "p-6 rounded-[4px]", // Very low rounded corners
-                  "transition-all duration-200 ease-in-out",
-                  "flex flex-col justify-center",
-                  "transform hover:-translate-y-[2px]" // Subtle lift
+                  // Premium Background: Slate 50 -> White on Hover
+                  "bg-[#F8FAFC] hover:bg-white", 
+                  // Border & Shadow
+                  "border border-slate-100 hover:border-slate-200",
+                  "shadow-sm hover:shadow-md",
+                  // Layout & Transition
+                  "p-5 rounded-xl",
+                  "transition-all duration-300 ease-out",
+                  "flex items-stretch gap-5",
+                  "transform hover:-translate-y-[2px]"
                 )}
               >
+                {/* 1. Left Accent Bar (Not connected to sides) */}
+                <div className={cn(
+                    "w-1.5 rounded-full shrink-0 transition-colors duration-300",
+                    "bg-slate-200 group-hover:bg-[#0F172A]" // Subtle Gray -> Dark Slate Accent
+                )} />
+
+                {/* 2. Content */}
+                <div className="flex-1 flex flex-col justify-center py-0.5">
+                    <div className="flex items-start justify-between">
+                        <h3 className="text-[17px] font-semibold text-[#1e293b] mb-1.5 group-hover:text-[#0F172A] tracking-tight">
+                        {block.label}
+                        </h3>
+                        
+                        {/* Subtle Icon on Top Right */}
+                        <block.icon className="h-5 w-5 text-slate-300 group-hover:text-[#5d87a8] transition-colors duration-300" strokeWidth={1.5} />
+                    </div>
+
+                    {/* Stats Row */}
+                    <div className="flex items-center text-[13px] text-[#64748b] font-medium">
+                        {block.stats.map((stat, index) => (
+                            <span key={index} className="flex items-center">
+                            {index > 0 && <span className="mx-2 text-slate-300 text-[8px]">•</span>}
+                            {stat}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+
                 {/* Live Indicator */}
                 {'isLive' in block && block.isLive && (
                   <div className="absolute top-4 right-4">
-                    <span className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
-                    </span>
+                     {/* Hidden if icon is present to prevent overlap, or adjust position */}
                   </div>
                 )}
-
-                <h3 className="text-[17px] font-semibold text-[#27272a] mb-2 group-hover:text-black">
-                  {block.label}
-                </h3>
-                
-                {/* Dynamic Stats Row with Separators */}
-                <div className="flex items-center text-[13px] text-[#71717a] font-normal">
-                  {block.stats.map((stat, index) => (
-                    <span key={index} className="flex items-center">
-                      {index > 0 && <span className="mx-3 text-[#d4d4d8]">|</span>}
-                      {stat}
-                    </span>
-                  ))}
-                </div>
+                {'isLive' in block && block.isLive && (
+                    <div className="absolute -top-1 -right-1 h-3 w-3">
+                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                         <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border-2 border-white"></span>
+                    </div>
+                )}
               </button>
             ))}
           </div>
