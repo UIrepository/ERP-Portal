@@ -143,22 +143,21 @@ export const StudentSubjectBlocks = ({
                 onClick={() => onBlockSelect(block.id)}
                 className={cn(
                   "group relative w-full text-left",
-                  // Background White (replaced mud), preserved Rounding [4px]
+                  // White Background, Rounded Corners
                   "bg-white rounded-[4px]", 
-                  // Border added for visibility on white background
-                  "border border-slate-200 hover:border-blue-300",
+                  // Static Border (No hover change)
+                  "border border-slate-200", 
+                  // No hover effects (transform, shadow, etc. removed)
                   "p-6", 
-                  "transition-all duration-200 ease-in-out",
-                  "flex items-stretch gap-4", // Stretch to allow bar to fill height
-                  "transform hover:-translate-y-[2px] hover:shadow-sm"
+                  "flex items-stretch gap-4"
                 )}
               >
-                {/* Blue Bar - Floating on the left */}
+                {/* Blue Bar */}
                 <div className="w-1 bg-[#3b82f6] rounded-full shrink-0" />
 
                 {/* Content */}
                 <div className="flex-1 flex flex-col justify-center">
-                    <h3 className="text-[17px] font-semibold text-[#1e293b] mb-2 group-hover:text-blue-700">
+                    <h3 className="text-[17px] font-semibold text-[#1e293b] mb-2">
                       {block.label}
                     </h3>
                     
