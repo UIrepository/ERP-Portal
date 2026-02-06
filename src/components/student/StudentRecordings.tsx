@@ -56,16 +56,16 @@ interface DoubtAnswer {
 
 // Skeletons
 const RecordingSkeleton = () => (
-    <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {[...Array(8)].map((_, i) => (
-            <div key={i} className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 h-[300px] animate-pulse">
-                <div className="h-[160px] bg-slate-100 rounded-md w-full mb-4" />
-                <div className="space-y-2 px-1">
+            <div key={i} className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 w-[280px] h-[280px] animate-pulse flex flex-col">
+                <div className="h-[160px] bg-slate-100 rounded-lg w-full flex-shrink-0" />
+                <div className="space-y-2 px-1 pt-3 flex-1">
                     <div className="flex justify-between">
-                        <div className="h-3.5 bg-slate-100 rounded w-20" />
-                        <div className="h-3.5 bg-slate-100 rounded w-12" />
+                        <div className="h-3 bg-slate-100 rounded w-20" />
+                        <div className="h-3 bg-slate-100 rounded w-12" />
                     </div>
-                    <div className="h-5 bg-slate-100 rounded w-3/4" />
+                    <div className="h-4 bg-slate-100 rounded w-3/4" />
                 </div>
             </div>
         ))}
@@ -441,7 +441,7 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                     {isLoading ? (
                         <RecordingSkeleton />
                     ) : filteredRecordings.length > 0 ? (
-                        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                             {filteredRecordings.map((recording, index) => {
                                 const lectureNo = filteredRecordings.length - index; 
                                 
@@ -450,52 +450,51 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                                         key={recording.id}
                                         onClick={() => handleSelectRecording(recording)}
                                         className={cn(
-                                            "w-full bg-white rounded-[4px] p-3",
+                                            "bg-white rounded-lg p-3",
                                             "shadow-[0_1px_3px_rgba(0,0,0,0.05)]",
                                             "border border-slate-200",
                                             "cursor-pointer",
+                                            "w-[280px] h-[280px] flex-shrink-0 flex flex-col"
                                         )}
                                     >
-                                        {/* Visual Banner - Zoomed Out Height [160px] */}
-                                        <div className="h-[160px] w-full bg-gradient-to-br from-white to-[#f0fdfa] rounded-[4px] relative flex items-center px-6 border border-[#ccfbf1] overflow-hidden">
+                                        {/* Visual Banner - Fixed Height */}
+                                        <div className="h-[160px] w-full flex-shrink-0 bg-gradient-to-br from-white to-[#f0fdfa] rounded-lg relative flex items-center px-5 border border-[#ccfbf1] overflow-hidden">
                                             
                                             {/* Banner Title - Lecture No */}
-                                            <div className="z-10 relative">
-                                                <span className="text-[#0d9488] font-bold text-2xl block tracking-tight">
+                                            <div className="z-10 relative flex-shrink-0">
+                                                <span className="text-[#0d9488] font-bold text-xl block tracking-tight whitespace-nowrap">
                                                     Lecture {lectureNo}
                                                 </span>
                                             </div>
 
-                                            {/* Graphic Elements (Right) */}
-                                            <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                                                {/* Logo Circle - Zoomed & Larger */}
-                                                <div className="w-[120px] h-[120px] bg-[#111] rounded-full flex items-center justify-center border-[6px] border-[#f0fdfa] shadow-sm select-none overflow-hidden p-3">
+                                            {/* Graphic Elements (Right) - Fixed Position */}
+                                            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex-shrink-0">
+                                                {/* Logo Circle - Fixed Size */}
+                                                <div className="w-[100px] h-[100px] flex-shrink-0 bg-[#111] rounded-full flex items-center justify-center border-4 border-[#f0fdfa] shadow-sm select-none overflow-hidden p-2">
                                                     <img 
                                                         src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
                                                         alt="UI Logo" 
                                                         className="w-full h-full object-contain"
                                                     />
                                                 </div>
-                                                {/* Play Button Overlay */}
-                                                <div className="absolute bottom-0 right-0 w-[42px] h-[42px] bg-[#0d9488] rounded-full flex items-center justify-center text-white border-[3px] border-white shadow-sm z-20">
-                                                    <Play fill="white" className="w-3.5 h-3.5 ml-0.5" />
+                                                {/* Play Button Overlay - Fixed Size */}
+                                                <div className="absolute bottom-0 right-0 w-9 h-9 flex-shrink-0 bg-[#0d9488] rounded-full flex items-center justify-center text-white border-2 border-white shadow-sm z-20">
+                                                    <Play fill="white" className="w-3 h-3 ml-0.5" />
                                                 </div>
                                             </div>
                                         </div>
 
-                                        {/* Info Footer */}
-                                        <div className="pt-3 px-1 pb-1">
-                                            <div className="flex justify-between items-center mb-2 text-slate-500 font-normal text-xs">
-                                                {/* Date - Non-bold */}
-                                                <span>{format(new Date(recording.date), 'dd MMMM, yyyy')}</span>
-                                                <div className="flex items-center gap-1.5">
-                                                    <Clock className="w-3.5 h-3.5 opacity-70" />
-                                                    {/* Time - Created At (Non-bold) */}
-                                                    <span>{format(new Date(recording.created_at), 'h:mm a')}</span>
+                                        {/* Info Footer - Fixed Height */}
+                                        <div className="pt-3 px-1 pb-1 flex-1 flex flex-col justify-between min-h-0">
+                                            <div className="flex justify-between items-center mb-2 text-slate-500 font-normal text-xs flex-shrink-0">
+                                                <span className="whitespace-nowrap">{format(new Date(recording.date), 'dd MMM, yyyy')}</span>
+                                                <div className="flex items-center gap-1">
+                                                    <Clock className="w-3 h-3 opacity-70 flex-shrink-0" />
+                                                    <span className="whitespace-nowrap">{format(new Date(recording.created_at), 'h:mm a')}</span>
                                                 </div>
                                             </div>
-                                            {/* Topic Title - Semi-bold */}
-                                            <h2 className="text-lg font-semibold text-slate-900 tracking-tight leading-snug line-clamp-2">
+                                            {/* Topic Title */}
+                                            <h2 className="text-base font-semibold text-slate-900 tracking-tight leading-snug line-clamp-2 flex-shrink-0">
                                                 {recording.topic}
                                             </h2>
                                         </div>
