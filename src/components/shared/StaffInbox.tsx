@@ -8,9 +8,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Search, Send, User, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-// 1. Define flexible types that match your Supabase schema
-// We allow nulls because database fields might be returned as null
 interface Message {
   id: string;
   content: string;
@@ -18,6 +18,8 @@ interface Message {
   receiver_id: string;
   created_at: string | null;
   is_read: boolean | null;
+  context?: string | null;
+  subject_context?: string | null;
 }
 
 interface Contact {
@@ -26,22 +28,26 @@ interface Contact {
   lastMessage: string;
   lastMessageTime: string;
   unreadCount: number;
+  context?: string | null;
+  subject_context?: string | null;
 }
+
+type FilterType = 'all' | 'support' | 'doubts';
 
 export const StaffInbox = () => {
   const { profile } = useAuth();
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
+  const [filter, setFilter] = useState<FilterType>('all');
   const scrollRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
-  // 2. Fetch Contacts (People who have chatted with you)
+  // Fetch Contacts (People who have chatted with you)
   const { data: contacts, isLoading: loadingContacts } = useQuery({
     queryKey: ['inbox-contacts', profile?.user_id],
     queryFn: async () => {
       if (!profile?.user_id) return [];
 
-      // Fetch all messages where you are sender OR receiver
       const { data: messages, error } = await supabase
         .from('direct_messages')
         .select('*')
@@ -53,14 +59,12 @@ export const StaffInbox = () => {
         return [];
       }
 
-      // Group messages by the "other" person
       const contactMap = new Map<string, Contact>();
       
       for (const msg of messages) {
         const otherId = msg.sender_id === profile.user_id ? msg.receiver_id : msg.sender_id;
         
         if (!contactMap.has(otherId)) {
-          // Fetch name for this ID
           const { data: userProfile } = await supabase
             .from('profiles')
             .select('name')
@@ -71,13 +75,13 @@ export const StaffInbox = () => {
             user_id: otherId,
             name: userProfile?.name || 'Unknown User',
             lastMessage: msg.content || 'Attachment',
-            // Handle potentially null created_at
             lastMessageTime: msg.created_at || new Date().toISOString(),
-            unreadCount: 0
+            unreadCount: 0,
+            context: (msg as Message).context || 'general',
+            subject_context: (msg as Message).subject_context || null,
           });
         }
         
-        // Count unread messages (only if you are the receiver)
         if (msg.receiver_id === profile.user_id && msg.is_read === false) {
            const contact = contactMap.get(otherId)!;
            contact.unreadCount += 1;
@@ -87,10 +91,22 @@ export const StaffInbox = () => {
       return Array.from(contactMap.values());
     },
     enabled: !!profile?.user_id,
-    refetchInterval: 5000 // Poll every 5s for new chats
+    refetchInterval: 5000
   });
 
-  // 3. Fetch Messages for the selected contact
+  // Filter contacts based on selected filter
+  const filteredContacts = contacts?.filter(contact => {
+    if (filter === 'all') return true;
+    if (filter === 'support') {
+      return contact.context === 'support_admin' || contact.context === 'support_manager';
+    }
+    if (filter === 'doubts') {
+      return contact.context === 'subject_doubt';
+    }
+    return true;
+  });
+
+  // Fetch Messages for the selected contact
   const { data: messages, isLoading: loadingMessages } = useQuery({
     queryKey: ['dm-messages', profile?.user_id, selectedContactId],
     queryFn: async () => {
@@ -106,20 +122,17 @@ export const StaffInbox = () => {
       return data as Message[];
     },
     enabled: !!profile?.user_id && !!selectedContactId,
-    refetchInterval: 3000 // Poll active chat every 3s
+    refetchInterval: 3000
   });
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, selectedContactId]);
 
-  // Mark messages as read when you open the chat
   useEffect(() => {
     if (selectedContactId && profile?.user_id && messages?.length) {
-        // Only update if there are unread messages
         const unreadExists = messages.some(m => m.receiver_id === profile.user_id && !m.is_read);
         
         if (unreadExists) {
@@ -130,7 +143,6 @@ export const StaffInbox = () => {
           .eq('receiver_id', profile.user_id)
           .eq('is_read', false)
           .then(() => {
-              // Refresh contacts to clear the notification badge
               queryClient.invalidateQueries({ queryKey: ['inbox-contacts'] });
           });
         }
@@ -142,30 +154,64 @@ export const StaffInbox = () => {
     if (!newMessage.trim() || !selectedContactId || !profile?.user_id) return;
 
     const tempMsg = newMessage;
-    setNewMessage(''); // Clear input immediately
+    setNewMessage('');
+
+    // Get the context from the selected contact's conversation
+    const selectedContact = contacts?.find(c => c.user_id === selectedContactId);
 
     const { error } = await supabase.from('direct_messages').insert({
       sender_id: profile.user_id,
       receiver_id: selectedContactId,
       content: tempMsg,
-      is_read: false
+      is_read: false,
+      context: selectedContact?.context || 'general',
+      subject_context: selectedContact?.subject_context || null,
     });
 
     if (error) {
       console.error("Error sending message:", error);
-      setNewMessage(tempMsg); // Put text back if it failed
+      setNewMessage(tempMsg);
     } else {
       queryClient.invalidateQueries({ queryKey: ['dm-messages'] });
       queryClient.invalidateQueries({ queryKey: ['inbox-contacts'] });
     }
   };
 
+  // Get context badge for a contact
+  const getContextBadge = (contact: Contact) => {
+    if (contact.context === 'support_admin' || contact.context === 'support_manager') {
+      return (
+        <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4">
+          Support
+        </Badge>
+      );
+    }
+    if (contact.context === 'subject_doubt' && contact.subject_context) {
+      return (
+        <Badge variant="default" className="text-[9px] px-1.5 py-0 h-4 bg-blue-600">
+          {contact.subject_context}
+        </Badge>
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="flex h-[calc(100vh-100px)] border rounded-xl overflow-hidden bg-white shadow-sm">
       {/* LEFT SIDE: Contact List */}
-      <div className="w-1/3 border-r flex flex-col bg-gray-50/50 min-w-[250px]">
-        <div className="p-4 border-b bg-white">
-          <h2 className="text-lg font-semibold mb-3">Inbox</h2>
+      <div className="w-1/3 border-r flex flex-col bg-gray-50/50 min-w-[280px]">
+        <div className="p-4 border-b bg-white space-y-3">
+          <h2 className="text-lg font-semibold">Inbox</h2>
+          
+          {/* Filter Tabs */}
+          <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterType)} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 h-8">
+              <TabsTrigger value="all" className="text-xs">All</TabsTrigger>
+              <TabsTrigger value="support" className="text-xs">Support</TabsTrigger>
+              <TabsTrigger value="doubts" className="text-xs">Doubts</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
             <Input placeholder="Search messages..." className="pl-9 bg-gray-50" />
@@ -175,11 +221,13 @@ export const StaffInbox = () => {
         <ScrollArea className="flex-1">
           {loadingContacts ? (
              <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-gray-400"/></div>
-          ) : contacts?.length === 0 ? (
-             <p className="p-8 text-center text-gray-500 text-sm">No conversations yet.</p>
+          ) : filteredContacts?.length === 0 ? (
+             <p className="p-8 text-center text-gray-500 text-sm">
+               {filter === 'all' ? 'No conversations yet.' : `No ${filter} conversations.`}
+             </p>
           ) : (
             <div className="flex flex-col">
-              {contacts?.map((contact) => (
+              {filteredContacts?.map((contact) => (
                 <button
                   key={contact.user_id}
                   onClick={() => setSelectedContactId(contact.user_id)}
@@ -192,8 +240,11 @@ export const StaffInbox = () => {
                     <AvatarFallback><User className="h-4 w-4" /></AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-baseline mb-1">
-                      <span className="font-semibold text-sm truncate">{contact.name}</span>
+                    <div className="flex justify-between items-start mb-1 gap-2">
+                      <div className="flex flex-col gap-1 min-w-0">
+                        <span className="font-semibold text-sm truncate">{contact.name}</span>
+                        {getContextBadge(contact)}
+                      </div>
                       <span className="text-xs text-gray-400 shrink-0">
                         {contact.lastMessageTime ? format(new Date(contact.lastMessageTime), 'MMM d') : ''}
                       </span>
@@ -218,10 +269,15 @@ export const StaffInbox = () => {
           <>
             <div className="p-4 border-b flex items-center gap-3 shadow-sm bg-white z-10">
                <Avatar className="h-8 w-8">
-                  <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${contacts?.find(c => c.user_id === selectedContactId)?.name}`} />
-                  <AvatarFallback>U</AvatarFallback>
+                 <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${contacts?.find(c => c.user_id === selectedContactId)?.name}`} />
+                 <AvatarFallback>U</AvatarFallback>
                </Avatar>
-               <span className="font-semibold">{contacts?.find(c => c.user_id === selectedContactId)?.name}</span>
+               <div className="flex-1">
+                 <span className="font-semibold">{contacts?.find(c => c.user_id === selectedContactId)?.name}</span>
+                 <div className="mt-0.5">
+                   {contacts?.find(c => c.user_id === selectedContactId) && getContextBadge(contacts.find(c => c.user_id === selectedContactId)!)}
+                 </div>
+               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/30" ref={scrollRef}>

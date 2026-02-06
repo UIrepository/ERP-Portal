@@ -8,12 +8,14 @@ import {
   UserCog,
   PlayCircle,
   Radio,
-  ChevronLeft
+  ChevronLeft,
+  MessageCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useChatDrawer } from '@/hooks/useChatDrawer';
 
 interface StudentSubjectBlocksProps {
   batch: string;
@@ -28,6 +30,7 @@ export const StudentSubjectBlocks = ({
   onBack,
   onBlockSelect,
 }: StudentSubjectBlocksProps) => {
+  const { openSubjectConnect } = useChatDrawer();
 
   // Fetch real content counts from the database
   const { data: stats, isLoading } = useQuery({
@@ -140,7 +143,13 @@ export const StudentSubjectBlocks = ({
             {blocks.map((block) => (
               <button
                 key={block.id}
-                onClick={() => onBlockSelect(block.id)}
+                onClick={() => {
+                  if (block.id === 'connect') {
+                    openSubjectConnect(batch, subject);
+                  } else {
+                    onBlockSelect(block.id);
+                  }
+                }}
                 className={cn(
                   "group relative w-full text-left",
                   // White Background, Rounded Corners

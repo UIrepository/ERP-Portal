@@ -324,27 +324,33 @@ export type Database = {
       direct_messages: {
         Row: {
           content: string
+          context: string | null
           created_at: string | null
           id: string
           is_read: boolean | null
           receiver_id: string
           sender_id: string
+          subject_context: string | null
         }
         Insert: {
           content: string
+          context?: string | null
           created_at?: string | null
           id?: string
           is_read?: boolean | null
           receiver_id: string
           sender_id: string
+          subject_context?: string | null
         }
         Update: {
           content?: string
+          context?: string | null
           created_at?: string | null
           id?: string
           is_read?: boolean | null
           receiver_id?: string
           sender_id?: string
+          subject_context?: string | null
         }
         Relationships: []
       }

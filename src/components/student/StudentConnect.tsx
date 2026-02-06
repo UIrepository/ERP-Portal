@@ -5,12 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { MessageCircle, User, Shield, Briefcase } from 'lucide-react';
+import { MessageCircle, User, Shield, Briefcase, Headphones } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { StudentDirectMessage } from './StudentDirectMessage'; // We will create this small sub-component next
+import { StudentDirectMessage } from './StudentDirectMessage';
 import { useState } from 'react';
 
-export const StudentConnect = () => {
+interface StudentConnectProps {
+  onOpenSupportDrawer?: () => void;
+}
+
+export const StudentConnect = ({ onOpenSupportDrawer }: StudentConnectProps) => {
   const { profile } = useAuth();
   
   // 1. Fetch Teachers assigned to student's batch(es)
@@ -124,9 +128,17 @@ export const StudentConnect = () => {
 
   return (
     <div className="space-y-8 p-6 max-w-5xl mx-auto">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Your Mentors</h1>
-        <p className="text-muted-foreground mt-2">Connect with your teachers, batch managers, and admins.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Your Mentors</h1>
+          <p className="text-muted-foreground mt-2">Connect with your teachers, batch managers, and admins.</p>
+        </div>
+        {onOpenSupportDrawer && (
+          <Button onClick={onOpenSupportDrawer} className="gap-2">
+            <Headphones className="h-4 w-4" />
+            Get Support
+          </Button>
+        )}
       </div>
 
       {/* Admins */}

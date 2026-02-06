@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Share2, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useChatDrawer } from '@/hooks/useChatDrawer';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,12 +37,14 @@ interface NavigationState {
   block: string | null;
 }
 
-export const StudentMain = () => {
+// Inner component that uses the chat drawer hook
+const StudentMainContent = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>('classes');
   const [isInitialized, setIsInitialized] = useState(false);
+  const { openSupportDrawer } = useChatDrawer();
   
   const [navigation, setNavigation] = useState<NavigationState>({
     level: 'batch',
@@ -291,12 +294,12 @@ export const StudentMain = () => {
         // This case is essentially unreachable if we intercept the click, 
         // but kept as fallback just in case.
         return null;
-      case 'connect':
-        return (
-           <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <StudentConnect />
-           </div>
-        );
+        case 'connect':
+          return (
+             <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <StudentConnect onOpenSupportDrawer={openSupportDrawer} />
+             </div>
+          );
       default:
         return null;
     }
@@ -389,3 +392,6 @@ export const StudentMain = () => {
     </div>
   );
 };
+
+// Export the main component directly (Provider is now at Index level)
+export const StudentMain = StudentMainContent;

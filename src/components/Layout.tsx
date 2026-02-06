@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from './Sidebar';
+import { useChatDrawer } from '@/hooks/useChatDrawer';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -21,8 +22,18 @@ interface LayoutProps {
 }
 
 export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, resolvedRole } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  // Only try to use chat drawer for students (it's wrapped in provider only for students)
+  let openSupportDrawer: (() => void) | undefined;
+  try {
+    const chatDrawer = useChatDrawer();
+    openSupportDrawer = chatDrawer.openSupportDrawer;
+  } catch {
+    // Not in a ChatDrawerProvider context (non-student roles)
+    openSupportDrawer = undefined;
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -44,10 +55,14 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
                         Navigate through the portal sections.
                     </SheetDescription>
                  </SheetHeader>
-                 <Sidebar activeTab={activeTab} onTabChange={(tab) => {
-                   onTabChange(tab);
-                   setIsSidebarOpen(false); // Close sidebar on tab change
-                 }} />
+                 <Sidebar 
+                   activeTab={activeTab} 
+                   onTabChange={(tab) => {
+                     onTabChange(tab);
+                     setIsSidebarOpen(false);
+                   }}
+                   onSupportClick={resolvedRole === 'student' ? openSupportDrawer : undefined}
+                 />
               </SheetContent>
             </Sheet>
             
@@ -88,7 +103,11 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
       <div className="flex flex-1 overflow-hidden">
         {/* Desktop Sidebar */}
         <aside className="hidden md:block h-full w-64 border-r">
-          <Sidebar activeTab={activeTab} onTabChange={onTabChange} />
+          <Sidebar 
+            activeTab={activeTab} 
+            onTabChange={onTabChange}
+            onSupportClick={resolvedRole === 'student' ? openSupportDrawer : undefined}
+          />
         </aside>
         
         {/* Main Content */}
