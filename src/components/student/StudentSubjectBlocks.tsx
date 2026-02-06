@@ -8,8 +8,7 @@ import {
   UserCog,
   PlayCircle,
   Radio,
-  ChevronLeft,
-  Award
+  ChevronLeft
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -21,48 +20,62 @@ interface StudentSubjectBlocksProps {
   onBlockSelect: (blockId: string) => void;
 }
 
+// Updated blocks with specific content counts ("stats")
 const blocks = [
   {
     id: 'live-class',
     label: 'Join Live Class',
-    stats: ['Ongoing', 'Upcoming'],
+    // Live classes usually don't have "notes" counts in the same way, but keeping consistent format
+    stats: ['Ongoing Classes', 'Upcoming Schedule'],
     icon: Radio,
     isLive: true,
   },
   {
     id: 'recordings',
-    label: 'Lectures',
-    stats: ['All Videos', 'Recorded'],
+    label: 'All Contents', // Changed to match "All Contents" from your example
+    stats: ['120 Videos', '45 Exercises', '89 Notes'],
     icon: PlayCircle,
   },
   {
-    id: 'notes',
-    label: 'Notes & PDFs',
-    stats: ['Study Material', 'Assignments'],
+    id: 'mind-maps',
+    label: 'Mind Maps || Only PDF',
+    stats: ['0 Videos', '0 Exercises', '27 Notes'],
+    icon: FileText,
+  },
+  {
+    id: 'short-notes',
+    label: 'Short Notes || Only PDF',
+    stats: ['0 Videos', '0 Exercises', '35 Notes'],
+    icon: FileText,
+  },
+  {
+    id: 'pyq',
+    label: 'PYQ Practice Sheet || Only PDF',
+    stats: ['0 Videos', '0 Exercises', '58 Notes'],
     icon: FileText,
   },
   {
     id: 'ui-ki-padhai',
     label: 'UI Ki Padhai',
-    stats: ['Premium Content', 'Exclusive'],
+    stats: ['Premium Content', 'Exclusive Series'],
     icon: Crown,
   },
   {
     id: 'announcements',
     label: 'Announcements',
-    stats: ['Updates', 'News'],
+    stats: ['Latest Updates', 'Batch News'],
     icon: Megaphone,
   },
   {
     id: 'community',
     label: 'Community',
-    stats: ['Discussions', 'Doubts'],
+    stats: ['Discussions', 'Peer Support'],
     icon: Users,
   },
   {
     id: 'connect',
     label: 'Connect',
-    stats: ['Chat with Teachers', 'Support'],
+    stats: ['Chat with Teachers', 'Mentorship'],
     icon: UserCog,
   },
 ];
@@ -76,7 +89,7 @@ export const StudentSubjectBlocks = ({
   return (
     <div className="min-h-screen bg-[#f4f4f5] font-sans pb-10">
       
-      {/* Top Navbar */}
+      {/* Top Navbar - Clean, no XP badge */}
       <nav className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-10">
         <button 
           onClick={onBack}
@@ -85,16 +98,11 @@ export const StudentSubjectBlocks = ({
           <ChevronLeft className="h-5 w-5" />
           Back
         </button>
-
-        <div className="bg-[#f1f5f9] px-3.5 py-1.5 rounded flex items-center gap-2 border border-slate-200 text-[#475569] text-sm font-semibold">
-          <Award className="h-4 w-4" />
-          XP 0
-        </div>
       </nav>
 
-      {/* Main Content Wrapper */}
-      <div className="max-w-[1000px] mx-auto mt-10 px-4 md:px-0">
-        <div className="bg-white rounded-md border border-slate-200 shadow-sm p-6 md:p-10">
+      {/* Main Content Wrapper - "Zoomed Out" Container */}
+      <div className="max-w-[1000px] mx-auto mt-8 px-4 md:px-0">
+        <div className="bg-white rounded-md border border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-8">
           
           <h2 className="text-[26px] font-bold text-[#1e293b] mb-8 tracking-tight">
             {subject}
@@ -128,6 +136,7 @@ export const StudentSubjectBlocks = ({
                   {block.label}
                 </h3>
                 
+                {/* Stats Row with Separators */}
                 <div className="flex items-center text-[13px] text-[#71717a] font-normal">
                   {block.stats.map((stat, index) => (
                     <span key={index} className="flex items-center">
