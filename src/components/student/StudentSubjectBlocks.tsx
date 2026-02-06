@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface StudentSubjectBlocksProps {
   batch: string;
@@ -20,59 +22,109 @@ interface StudentSubjectBlocksProps {
   onBlockSelect: (blockId: string) => void;
 }
 
-// Blocks updated to match your specific needs with relevant stats
-const blocks = [
-  {
-    id: 'live-class',
-    label: 'Join Live Class',
-    stats: ['Ongoing Classes', 'Upcoming Schedule'],
-    icon: Radio,
-    isLive: true,
-  },
-  {
-    id: 'recordings',
-    label: 'Lectures',
-    stats: ['120 Videos', '45 Exercises'], // Stats relevant to Lectures
-    icon: PlayCircle,
-  },
-  {
-    id: 'notes',
-    label: 'Notes & PDFs',
-    stats: ['89 Notes', 'Assignments'], // Stats relevant to Notes
-    icon: FileText,
-  },
-  {
-    id: 'ui-ki-padhai',
-    label: 'UI Ki Padhai',
-    stats: ['Premium Content', 'Exclusive Series'],
-    icon: Crown,
-  },
-  {
-    id: 'announcements',
-    label: 'Announcements',
-    stats: ['Latest Updates', 'Batch News'],
-    icon: Megaphone,
-  },
-  {
-    id: 'community',
-    label: 'Community',
-    stats: ['Discussions', 'Peer Support'],
-    icon: Users,
-  },
-  {
-    id: 'connect',
-    label: 'Connect',
-    stats: ['Chat with Teachers', 'Mentorship'],
-    icon: UserCog,
-  },
-];
-
 export const StudentSubjectBlocks = ({
   batch,
   subject,
   onBack,
   onBlockSelect,
 }: StudentSubjectBlocksProps) => {
+
+  // Fetch real content counts from the database
+  const { data: stats, isLoading } = useQuery({
+    queryKey: ['subject-stats', batch, subject],
+    queryFn: async () => {
+      // Run all count queries in parallel for performance
+      const [recordings, notes, dpp, premium] = await Promise.all([
+        supabase
+          .from('recordings')
+          .select('*', { count: 'exact', head: true })
+          .eq('batch', batch)
+          .eq('subject', subject),
+        supabase
+          .from('notes')
+          .select('*', { count: 'exact', head: true })
+          .eq('batch', batch)
+          .eq('subject', subject),
+        supabase
+          .from('dpp_content')
+          .select('*', { count: 'exact', head: true })
+          .eq('batch', batch)
+          .eq('subject', subject),
+        supabase
+          .from('ui_ki_padhai_content')
+          .select('*', { count: 'exact', head: true })
+          .eq('batch', batch)
+          .eq('subject', subject),
+      ]);
+
+      return {
+        videos: recordings.count || 0,
+        notes: notes.count || 0,
+        exercises: dpp.count || 0,
+        premium: premium.count || 0,
+      };
+    },
+    staleTime: 1000 * 60 * 5, // Cache stats for 5 minutes
+  });
+
+  // Define blocks with dynamic stats
+  const blocks = [
+    {
+      id: 'live-class',
+      label: 'Join Live Class',
+      stats: ['Ongoing Classes', 'Upcoming Schedule'],
+      icon: Radio,
+      isLive: true,
+    },
+    {
+      id: 'recordings',
+      label: 'Lectures',
+      // Dynamic video and exercise counts
+      stats: [
+        isLoading ? 'Loading...' : `${stats?.videos} Videos`, 
+        isLoading ? '...' : `${stats?.exercises} Exercises`
+      ], 
+      icon: PlayCircle,
+    },
+    {
+      id: 'notes',
+      label: 'Notes & PDFs',
+      // Dynamic notes count
+      stats: [
+        isLoading ? 'Loading...' : `${stats?.notes} Notes`, 
+        'Assignments'
+      ],
+      icon: FileText,
+    },
+    {
+      id: 'ui-ki-padhai',
+      label: 'UI Ki Padhai',
+      stats: [
+        isLoading ? 'Loading...' : `${stats?.premium} Premium Content`, 
+        'Exclusive Series'
+      ],
+      icon: Crown,
+    },
+    {
+      id: 'announcements',
+      label: 'Announcements',
+      stats: ['Latest Updates', 'Batch News'],
+      icon: Megaphone,
+    },
+    {
+      id: 'community',
+      label: 'Community',
+      stats: ['Discussions', 'Peer Support'],
+      icon: Users,
+    },
+    {
+      id: 'connect',
+      label: 'Connect',
+      stats: ['Chat with Teachers', 'Mentorship'],
+      icon: UserCog,
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-[#f4f4f5] font-sans pb-10">
       
@@ -87,7 +139,7 @@ export const StudentSubjectBlocks = ({
         </button>
       </nav>
 
-      {/* Main Content Wrapper - "Zoomed Out" Container */}
+      {/* Main Content Wrapper */}
       <div className="max-w-[1000px] mx-auto mt-8 px-4 md:px-0">
         <div className="bg-white rounded-md border border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-8">
           
@@ -123,7 +175,7 @@ export const StudentSubjectBlocks = ({
                   {block.label}
                 </h3>
                 
-                {/* Stats Row with Separators */}
+                {/* Dynamic Stats Row with Separators */}
                 <div className="flex items-center text-[13px] text-[#71717a] font-normal">
                   {block.stats.map((stat, index) => (
                     <span key={index} className="flex items-center">
