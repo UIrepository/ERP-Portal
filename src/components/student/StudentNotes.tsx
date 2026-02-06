@@ -87,7 +87,7 @@ const getFileMetadata = (url: string, filename: string) => {
 const NotesSkeleton = () => (
   <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
     {[...Array(6)].map((_, i) => (
-      <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 space-y-4 h-[180px] flex flex-col justify-between">
+      <div key={i} className="bg-white p-6 rounded-lg border border-slate-100 space-y-4 h-[180px] flex flex-col justify-between">
         <Skeleton className="h-6 w-3/4 rounded-md" />
         <div className="flex justify-between items-end">
            <div className="flex gap-3 items-center">
@@ -115,7 +115,7 @@ const NoteViewer = ({ note, onBack, onDownload, allNotes, onNoteSelect }: { note
         </Button>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2">
-                <Card className="bg-white rounded-xl overflow-hidden shadow-sm border-slate-200">
+                <Card className="bg-white rounded-lg overflow-hidden shadow-sm border-slate-200">
                     <CardHeader className="p-6 border-b bg-white">
                         <div className="flex justify-between items-center">
                             <CardTitle className="text-xl font-semibold text-slate-800">{note.title}</CardTitle>
@@ -142,7 +142,7 @@ const NoteViewer = ({ note, onBack, onDownload, allNotes, onNoteSelect }: { note
                 </Card>
             </div>
             <div className="md:col-span-1">
-                <Card className="bg-white rounded-xl shadow-sm border-slate-200">
+                <Card className="bg-white rounded-lg shadow-sm border-slate-200">
                     <CardHeader>
                         <CardTitle className="text-lg">Other Files</CardTitle>
                     </CardHeader>
@@ -275,7 +275,7 @@ export const StudentNotes = ({ batch, subject }: StudentNotesProps) => {
   return (
     <div className="p-6 space-y-6 bg-[#fcfcfd] min-h-full font-sans">
       {/* Main Section Holding Container */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 md:p-8 shadow-sm max-w-7xl mx-auto">
+      <div className="bg-white border border-slate-200 rounded-lg p-6 md:p-8 shadow-sm max-w-7xl mx-auto">
           {/* Header Section */}
           <div className="mb-8 border-b border-slate-100 pb-6">
             <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
@@ -300,9 +300,9 @@ export const StudentNotes = ({ batch, subject }: StudentNotesProps) => {
                       className="
                         group relative bg-white 
                         border border-slate-200 
-                        rounded-2xl
+                        rounded-lg
                         p-6 flex flex-col justify-between gap-6
-                        hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-slate-300 transition-all duration-300 cursor-pointer
+                        hover:bg-slate-50 transition-all duration-300 cursor-pointer
                       "
                     >
                       {/* Title Section (Semi Bold) */}
@@ -316,7 +316,7 @@ export const StudentNotes = ({ batch, subject }: StudentNotesProps) => {
                       <div className="flex items-center justify-between gap-4 pt-2 mt-auto">
                         {/* Left: File Info */}
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className={`shrink-0 w-11 h-11 rounded-xl flex items-center justify-center ${meta.bg} ${meta.color}`}>
+                          <div className={`shrink-0 w-11 h-11 rounded-lg flex items-center justify-center ${meta.bg} ${meta.color}`}>
                             {meta.icon}
                           </div>
                           <div className="flex flex-col min-w-0">
@@ -332,7 +332,7 @@ export const StudentNotes = ({ batch, subject }: StudentNotesProps) => {
                         {/* Right: Circular Download Button (Bottom Corner) */}
                         <button 
                           onClick={(e) => handleDownload(e, note)}
-                          className="shrink-0 w-11 h-11 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-md hover:bg-violet-600 hover:scale-110 hover:shadow-xl transition-all duration-300"
+                          className="shrink-0 w-11 h-11 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-slate-700 hover:scale-105 transition-all duration-300"
                           aria-label="Download"
                         >
                           <Download className="w-5 h-5" />
