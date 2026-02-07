@@ -45,27 +45,29 @@ export const StudentSubjectCard = ({ subject, index, onClick }: StudentSubjectCa
       onClick={onClick}
       className={cn(
         "group w-full text-left relative",
-        "bg-white p-6 rounded-xl",
-        "border-[1.5px] border-[#f3f4f6]", // Default subtle border
-        "hover:border-black", // Black border on hover
-        "shadow-[0_1px_3px_rgba(0,0,0,0.05)]", // Subtle shadow
+        // Mobile: p-4, Desktop: p-6
+        "bg-white p-4 sm:p-6 rounded-xl",
+        "border-[1.5px] border-[#f3f4f6]", 
+        "hover:border-black", 
+        "shadow-[0_1px_3px_rgba(0,0,0,0.05)]", 
         "hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:-translate-y-[1px]",
         "transition-all duration-200 ease-in-out",
-        "flex items-center gap-5", // Flex layout: Icon left, Text right
-        "font-sans" // Ensures Inter font
+        // Mobile: gap-3, Desktop: gap-5
+        "flex items-center gap-3 sm:gap-5", 
+        "font-sans"
       )}
     >
-      {/* Icon Container - Matching the specific blue from your snippet */}
+      {/* Icon Container - Scaled for mobile */}
       <div className="shrink-0 text-[#5d87a8]"> 
-        <Icon strokeWidth={1.5} className="h-8 w-8" />
+        <Icon strokeWidth={1.5} className="h-6 w-6 sm:h-8 sm:w-8" />
       </div>
 
       {/* Subject Info */}
       <div className="min-w-0 flex-1">
-        <h3 className="text-[18px] font-semibold text-slate-900 truncate tracking-tight">
+        {/* Mobile: text-[15px], Desktop: text-[18px]. Removed 'truncate' to show full name. */}
+        <h3 className="text-[15px] sm:text-[18px] font-semibold text-slate-900 leading-tight tracking-tight break-words">
           {subject}
         </h3>
-        {/* Chapters count removed as requested */}
       </div>
     </button>
   );
