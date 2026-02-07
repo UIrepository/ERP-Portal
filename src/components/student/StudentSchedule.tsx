@@ -314,7 +314,10 @@ export const StudentSchedule = () => {
                                                 
                                                 <div className="flex items-center justify-between text-[10px] text-slate-500 mb-2">
                                                     <span>{classInfo.batch}</span>
-                                                    <span>{formatTime(classInfo.end_time)}</span>
+                                                    {/* Updated End Time Block */}
+                                                    <span className="bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-[2px] text-[9px] font-medium text-slate-600">
+                                                        Upto {formatTime(classInfo.end_time)}
+                                                    </span>
                                                 </div>
 
                                                 {/* Live Join Button */}
