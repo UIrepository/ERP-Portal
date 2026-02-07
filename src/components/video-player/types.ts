@@ -56,6 +56,8 @@ export interface VideoControlsProps {
   onFullscreenToggle: () => void;
   onSkipForward: () => void;
   onSkipBackward: () => void;
+  onToggleDoubts?: () => void;
+  onToggleLectures?: () => void;
 }
 
 export type VideoSource = 'youtube' | 'mp4' | 'direct';
