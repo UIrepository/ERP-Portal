@@ -1,72 +1,38 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
-import { MessageSquare, Send, Star, Timer, CheckCircle2, AlertCircle, ChevronRight } from 'lucide-react';
+import { Star, ArrowLeft } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { differenceInHours, addDays, differenceInSeconds, format } from 'date-fns';
+import { differenceInHours, format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 
-// Interface for enrollment records
+// --- Types ---
 interface UserEnrollment {
     batch_name: string;
     subject_name: string;
 }
 
-// --- Dynamic Countdown Timer Component ---
-const CooldownTimer = ({ lastSubmissionDate }: { lastSubmissionDate: Date }) => {
-    const [timeLeft, setTimeLeft] = useState('');
-
-    useEffect(() => {
-        const calculateTimeLeft = () => {
-            const cooldownEndDate = addDays(lastSubmissionDate, 3);
-            const totalSeconds = differenceInSeconds(cooldownEndDate, new Date());
-
-            if (totalSeconds <= 0) {
-                setTimeLeft("Ready now");
-                return;
-            }
-
-            const days = Math.floor(totalSeconds / (3600 * 24));
-            const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600);
-            const minutes = Math.floor((totalSeconds % 3600) / 60);
-
-            let parts = [];
-            if (days > 0) parts.push(`${days}d`);
-            if (hours > 0) parts.push(`${hours}h`);
-            parts.push(`${minutes}m`);
-
-            setTimeLeft(`${parts.join(' ')}`);
-        };
-
-        calculateTimeLeft();
-        const intervalId = setInterval(calculateTimeLeft, 60000); 
-
-        return () => clearInterval(intervalId);
-    }, [lastSubmissionDate]);
-
-    return (
-        <div className="flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full text-xs font-medium border border-amber-100">
-            <Timer className="h-3.5 w-3.5" />
-            <span>Available in {timeLeft}</span>
-        </div>
-    );
-};
+interface FeedbackTask {
+    batch: string;
+    subject: string;
+    canSubmit: boolean;
+    lastSubmissionDate?: Date;
+}
 
 // --- Star Rating Component ---
 const StarRating = ({ rating, setRating }: { rating: number, setRating: (rating: number) => void }) => (
-  <div className="flex gap-1.5">
+  <div className="flex gap-2">
     {[1, 2, 3, 4, 5].map((star) => (
       <Star
         key={star}
-        className={`cursor-pointer transition-all duration-200 h-6 w-6 ${
+        className={`cursor-pointer transition-all duration-200 h-8 w-8 ${
             rating >= star 
-                ? 'text-yellow-400 fill-yellow-400 scale-110' 
+                ? 'text-yellow-400 fill-yellow-400' 
                 : 'text-gray-200 hover:text-gray-300'
         }`}
         onClick={() => setRating(star)}
@@ -77,9 +43,12 @@ const StarRating = ({ rating, setRating }: { rating: number, setRating: (rating:
 
 export const StudentFeedback = () => {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
+  
+  // State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedFeedbackTask, setSelectedFeedbackTask] = useState<{ batch: string; subject: string } | null>(null);
+  const [selectedTask, setSelectedTask] = useState<FeedbackTask | null>(null);
   const [ratings, setRatings] = useState({
     teacher_quality: 0,
     concept_clarity: 0,
@@ -104,7 +73,7 @@ export const StudentFeedback = () => {
   });
 
   // 2. Fetch Previous Feedback
-  const { data: submittedFeedback = [], isLoading: isLoadingSubmittedFeedback } = useQuery({
+  const { data: submittedFeedback = [], isLoading: isLoadingFeedback } = useQuery({
     queryKey: ['student-submitted-feedback', profile?.user_id],
     queryFn: async () => {
       if (!profile?.user_id) return [];
@@ -119,8 +88,8 @@ export const StudentFeedback = () => {
     enabled: !!profile?.user_id,
   });
 
-  // 3. Calculate Tasks
-  const feedbackTasks = useMemo(() => {
+  // 3. Process Data
+  const feedbackTasks: FeedbackTask[] = useMemo(() => {
     if (!userEnrollments) return [];
 
     const latestSubmissions = new Map<string, Date>();
@@ -134,7 +103,7 @@ export const StudentFeedback = () => {
     return userEnrollments.map(enrollment => {
         const key = `${enrollment.batch_name}-${enrollment.subject_name}`;
         const lastSubmission = latestSubmissions.get(key);
-        // 72 hours = 3 days cooldown
+        // 72 hours cooldown
         const canSubmit = !lastSubmission || differenceInHours(new Date(), lastSubmission) >= 72;
 
         return {
@@ -149,6 +118,7 @@ export const StudentFeedback = () => {
     });
   }, [userEnrollments, submittedFeedback]);
 
+  // 4. Mutations
   const submitFeedbackMutation = useMutation({
     mutationFn: async (feedbackData: any) => {
       const { error } = await supabase.from('feedback').insert([feedbackData]);
@@ -156,44 +126,38 @@ export const StudentFeedback = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-submitted-feedback'] });
-      toast({ title: 'Submitted Successfully', description: 'Your feedback has been recorded. Thank you!', variant: "default" });
+      toast({ title: 'Success', description: 'Feedback submitted successfully', variant: "default" });
       setIsDialogOpen(false);
       resetForm();
     },
     onError: (error: any) => {
-      toast({ title: 'Submission Failed', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     },
   });
 
   const resetForm = () => {
     setRatings({ teacher_quality: 0, concept_clarity: 0, dpp_quality: 0, premium_content_usefulness: 0 });
     setComments('');
-    setSelectedFeedbackTask(null);
+    setSelectedTask(null);
   };
 
-  const handleOpenDialog = (task: { batch: string, subject: string }) => {
-    setSelectedFeedbackTask(task);
+  const handleOpenDialog = (task: FeedbackTask) => {
+    setSelectedTask(task);
     setIsDialogOpen(true);
   };
 
   const handleSubmit = () => {
     if (Object.values(ratings).some(r => r === 0)) {
-      toast({ title: 'Ratings Required', description: 'Please provide a star rating for all categories.', variant: 'destructive' });
+      toast({ title: 'Ratings Required', description: 'Please rate all categories.', variant: 'destructive' });
       return;
     }
-    if (!comments.trim()) {
-        toast({ title: 'Comment Required', description: 'Please tell us a bit more in the comments section.', variant: 'destructive' });
-        return;
-    }
-
     const feedbackToSubmit = {
-        batch: selectedFeedbackTask?.batch,
-        subject: selectedFeedbackTask?.subject,
+        batch: selectedTask?.batch,
+        subject: selectedTask?.subject,
         ...ratings,
         comments,
         submitted_by: profile?.user_id,
     };
-
     submitFeedbackMutation.mutate(feedbackToSubmit);
   };
 
@@ -204,95 +168,105 @@ export const StudentFeedback = () => {
     { key: 'premium_content_usefulness', text: 'Premium Content' },
   ];
 
-  const isLoading = isLoadingEnrollments || isLoadingSubmittedFeedback;
+  const isLoading = isLoadingEnrollments || isLoadingFeedback;
 
   return (
-    <div className="min-h-full bg-slate-50/50 pb-20">
+    <div className="min-h-screen bg-white font-sans text-[#000000]">
       
-      {/* 1. White Header Section */}
-      <div className="bg-white border-b border-slate-100 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-4xl mx-auto py-8 px-6">
-            <h1 className="text-3xl font-bold text-slate-800 tracking-tight flex items-center gap-3">
-                <div className="bg-violet-100 p-2 rounded-lg">
-                    <MessageSquare className="h-6 w-6 text-violet-600" />
-                </div>
-                Your Voice Matters
-            </h1>
-        </div>
-      </div>
+      {/* Header */}
+      <header className="pt-8 pb-4 px-6 md:px-8 max-w-[900px] mx-auto">
+        <button 
+            onClick={() => navigate(-1)} 
+            className="text-[#666666] hover:text-[#000000] text-[0.9rem] flex items-center gap-1 transition-colors"
+        >
+            <ArrowLeft className="h-4 w-4" /> Back
+        </button>
+      </header>
 
-      {/* 2. Main Content - List View (1 row 1 card) */}
-      <div className="max-w-4xl mx-auto px-6 mt-8">
+      {/* Main Container */}
+      <main className="max-w-[900px] mx-auto px-6 md:px-8 pb-20">
         
-        {isLoading ? (
-            <div className="space-y-4">
-                {[1,2,3].map(i => <Skeleton key={i} className="h-24 rounded-xl w-full" />)}
-            </div>
-        ) : feedbackTasks.length > 0 ? (
-            <div className="flex flex-col gap-4">
-                {feedbackTasks.map((task, index) => (
-                    <Card 
+        {/* Section Header */}
+        <div className="mb-12">
+            <h1 className="text-[2rem] font-semibold tracking-tight mb-2">Your Voice Matters</h1>
+            <p className="text-[#666666] text-base">Provide feedback for your enrolled subjects.</p>
+        </div>
+
+        {/* Feedback List */}
+        <div className="flex flex-col gap-6">
+            {isLoading ? (
+                // Loading Skeletons
+                [1, 2, 3].map((i) => (
+                    <div key={i} className="border border-[#ededed] rounded-xl p-8 flex justify-between items-center">
+                        <div className="space-y-3 w-full">
+                            <Skeleton className="h-6 w-24 rounded-md" />
+                            <Skeleton className="h-8 w-64 rounded-md" />
+                            <Skeleton className="h-4 w-48 rounded-md" />
+                        </div>
+                        <Skeleton className="h-12 w-32 rounded-lg hidden md:block" />
+                    </div>
+                ))
+            ) : feedbackTasks.length > 0 ? (
+                feedbackTasks.map((task, index) => (
+                    <div 
                         key={index} 
-                        className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:shadow-md transition-shadow duration-200 border-slate-200"
+                        className="group border border-[#ededed] rounded-xl p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 hover:border-[#d1d1d1] transition-colors duration-200 bg-white"
                     >
-                        <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-2">
-                                <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-normal">
-                                    {task.batch}
-                                </Badge>
-                                {!task.canSubmit && (
-                                    <span className="text-xs text-green-600 flex items-center gap-1">
-                                        <CheckCircle2 className="h-3 w-3" /> Submitted
-                                    </span>
-                                )}
-                            </div>
-                            <h3 className="text-lg font-bold text-slate-800">
+                        {/* Card Content */}
+                        <div className="flex flex-col gap-2">
+                            <span className="bg-[#f5f5f5] text-[#666666] text-[0.7rem] font-semibold uppercase tracking-wider px-3 py-1 rounded-[4px] w-fit">
+                                {task.batch}
+                            </span>
+                            <h2 className="text-[1.2rem] font-semibold text-black">
                                 {task.subject}
-                            </h3>
+                            </h2>
+                            <p className="text-[0.85rem] text-[#666666]">
+                                {task.lastSubmissionDate 
+                                    ? `Last feedback given: ${format(new Date(task.lastSubmissionDate), 'd MMM yyyy')}`
+                                    : "No feedback given yet"
+                                }
+                            </p>
                         </div>
 
-                        <div className="flex-shrink-0">
-                            {task.canSubmit ? (
-                                <Button 
-                                    onClick={() => handleOpenDialog(task)}
-                                    className="w-full sm:w-auto bg-violet-600 hover:bg-violet-700 text-white font-medium shadow-sm"
-                                >
-                                    Share Feedback <ChevronRight className="ml-2 h-4 w-4" />
-                                </Button>
-                            ) : (
-                                <div className="w-full sm:w-auto flex justify-center sm:justify-end">
-                                    {task.lastSubmissionDate && <CooldownTimer lastSubmissionDate={task.lastSubmissionDate} />}
-                                </div>
-                            )}
-                        </div>
-                    </Card>
-                ))}
-            </div>
-        ) : (
-             <div className="text-center py-16 bg-white rounded-xl border border-dashed border-slate-300">
-                <AlertCircle className="h-10 w-10 text-slate-400 mx-auto mb-3" />
-                <h3 className="text-lg font-medium text-slate-900">No active classes found</h3>
-                <p className="text-slate-500">You need to be enrolled in a batch to give feedback.</p>
-            </div>
-        )}
-      </div>
+                        {/* Action / Status */}
+                        {task.canSubmit ? (
+                            <button 
+                                onClick={() => handleOpenDialog(task)}
+                                className="w-full md:w-auto bg-[#000000] text-white px-6 py-3 rounded-lg font-medium text-[0.9rem] hover:opacity-85 transition-opacity"
+                            >
+                                Share Feedback
+                            </button>
+                        ) : (
+                            <span className="text-[#10b981] text-[0.85rem] font-semibold bg-[#f0fdf4] px-4 py-2 rounded-lg whitespace-nowrap">
+                                Submitted
+                            </span>
+                        )}
+                    </div>
+                ))
+            ) : (
+                <div className="text-center py-20 border border-dashed border-[#ededed] rounded-xl">
+                    <p className="text-[#666666]">You are not enrolled in any batches yet.</p>
+                </div>
+            )}
+        </div>
+      </main>
 
-      {/* 3. Feedback Dialog */}
+      {/* Feedback Dialog Form */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-md w-full rounded-2xl p-0 overflow-hidden bg-white">
-            <DialogHeader className="p-5 border-b bg-slate-50/80">
-                <DialogTitle className="text-xl font-bold text-slate-800">
-                    Feedback for {selectedFeedbackTask?.subject}
+          <DialogContent className="max-w-xl bg-white rounded-xl border-[#ededed]">
+            <DialogHeader className="border-b border-[#ededed] pb-4">
+                <DialogTitle className="text-xl font-semibold">
+                    Feedback for {selectedTask?.subject}
                 </DialogTitle>
-                <DialogDescription>
-                    Rate your experience below
+                <DialogDescription className="text-[#666666]">
+                   {selectedTask?.batch}
                 </DialogDescription>
             </DialogHeader>
 
-            <div className="p-5 space-y-6 overflow-y-auto max-h-[60vh]">
+            <div className="py-4 space-y-6 max-h-[60vh] overflow-y-auto px-1">
                 {questions.map(({ key, text }) => (
-                    <div key={key} className="flex flex-col gap-2">
-                        <label className="text-sm font-medium text-slate-700">{text}</label>
+                    <div key={key} className="space-y-3">
+                        <label className="text-sm font-medium text-[#000000]">{text}</label>
                         <StarRating
                             rating={ratings[key as keyof typeof ratings]}
                             setRating={(rating) => setRatings(prev => ({ ...prev, [key]: rating }))}
@@ -300,25 +274,29 @@ export const StudentFeedback = () => {
                     </div>
                 ))}
 
-                <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium text-slate-700">Comments</label>
+                <div className="space-y-3">
+                    <label className="text-sm font-medium text-[#000000]">Additional Comments</label>
                     <Textarea
-                        className="resize-none min-h-[100px]"
-                        placeholder="Write your feedback here..."
+                        className="resize-none min-h-[100px] border-[#ededed] focus:border-black focus:ring-0"
+                        placeholder="Tell us more about your experience..."
                         value={comments}
                         onChange={(e) => setComments(e.target.value)}
                     />
                 </div>
             </div>
 
-            <DialogFooter className="p-5 border-t bg-slate-50/80 flex-col sm:flex-row gap-2">
-                <Button variant="ghost" onClick={resetForm} className="w-full sm:w-auto">Cancel</Button>
+            <DialogFooter className="border-t border-[#ededed] pt-4 gap-3">
+                <DialogClose asChild>
+                    <Button variant="outline" onClick={resetForm} className="border-[#ededed] text-[#666666]">
+                        Cancel
+                    </Button>
+                </DialogClose>
                 <Button 
                     onClick={handleSubmit} 
-                    className="bg-violet-600 hover:bg-violet-700 w-full sm:w-auto"
+                    className="bg-black hover:bg-black/90 text-white"
                     disabled={submitFeedbackMutation.isPending}
                 >
-                    {submitFeedbackMutation.isPending ? 'Submitting...' : 'Submit'}
+                    {submitFeedbackMutation.isPending ? 'Submitting...' : 'Submit Feedback'}
                 </Button>
             </DialogFooter>
           </DialogContent>
