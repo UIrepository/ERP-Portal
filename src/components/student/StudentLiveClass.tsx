@@ -3,8 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, addMinutes, isWithinInterval, differenceInMinutes } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { generateJitsiRoomName } from '@/lib/jitsiUtils';
-import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/button'; // Ensure Button is imported
+import { useAuth } from '@/hooks/useAuth'; // Ensure this is imported
 import { toast } from 'sonner';
 
 interface StudentLiveClassProps {
@@ -63,7 +62,7 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
       }
       const { data: meetingLinks } = await linkQuery;
 
-      // 3. Get Active Classes (To check if teacher is inside)
+      // 3. Get Active Classes
       let activeClassQuery = supabase
         .from('active_classes')
         .select('*')
@@ -83,15 +82,12 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
         return schedule.day_of_week === currentDayOfWeek;
       });
 
-      // 5. Map Links & Status
+      // 5. Map Links
       return validSchedules.map(schedule => {
         const activeJitsi = activeClasses?.find(ac => ac.subject === schedule.subject);
         const subjectLink = meetingLinks?.find(l => l.subject === schedule.subject);
         
-        // Base Jitsi Link
-        const roomName = generateJitsiRoomName(schedule.batch, schedule.subject);
-        const generatedJitsiLink = `https://meet.jit.si/${roomName}`;
-        
+        const generatedJitsiLink = `https://meet.jit.si/${generateJitsiRoomName(schedule.batch, schedule.subject)}`;
         const dbLink = activeJitsi?.room_url || schedule.link || subjectLink?.link;
 
         let finalLink = null;
@@ -108,12 +104,12 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
         return {
           ...schedule,
           meeting_link_url: finalLink,
-          is_jitsi_live: !!activeJitsi // True only if teacher has started class
+          is_jitsi_live: !!activeJitsi
         };
       });
     },
     enabled: !!batch,
-    refetchInterval: 5000 // Faster refresh to catch when teacher starts
+    refetchInterval: 5000 
   });
 
   const now = new Date();
@@ -148,27 +144,29 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
   const handleJoinClass = (item: ScheduleWithLink) => {
     if (!item.meeting_link_url) return;
 
-    // Check if it's a Jitsi link
     if (item.meeting_link_url.includes('meet.jit.si')) {
-      
-      // 1. Construct Safe URL for Students
+      // 1. Construct URL object
       const urlObj = new URL(item.meeting_link_url);
       
-      // 2. Append Configuration Hash
-      // This forces the "Stop Live Stream" button to disappear for students
+      // 2. Define restrictions directly here
       const configParams = [
-        `config.liveStreamingEnabled=false`,
-        `config.prejoinPageEnabled=false`,
-        `config.disableRemoteMute=true`, // Prevent students muting others
-        `userInfo.displayName="${profile?.name || user?.email || 'Student'}"`
+        `config.liveStreamingEnabled=false`,       // Disable Stream
+        `config.fileRecordingsEnabled=false`,      // Disable Dropbox/File Recording
+        `config.localRecording.enabled=false`,     // Disable Local Recording
+        `config.prejoinPageEnabled=false`,         // Skip prejoin
+        `config.disableRemoteMute=true`,           // Prevent muting others
+        `config.remoteVideoMenu.disableKick=true`, // Prevent kicking others
+        `config.remoteVideoMenu.disableGrantModerator=true`, // Prevent granting mod rights
+        `userInfo.displayName="${profile?.name || user?.email || 'Student'}"` // Auto-name
       ];
 
-      // Jitsi reads config from the hash
+      // 3. Attach config to hash
       urlObj.hash = configParams.join('&');
 
+      // 4. Open in new tab
       window.open(urlObj.toString(), '_blank');
     } else {
-      // Zoom or Google Meet
+      // Zoom/GMeet
       window.open(item.meeting_link_url, '_blank');
     }
   };
@@ -187,7 +185,6 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
     return <Skeleton className="h-64 w-full rounded-[4px]" />;
   }
 
-  // Combine lists for rendering in grid, prioritizing live classes
   const allClasses = [...liveClasses, ...upcomingClasses];
 
   return (
@@ -200,7 +197,6 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
 
       {allClasses.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          
           {/* Render Live Classes */}
           {liveClasses.map((item) => (
              <div key={item.id} className="bg-white border border-slate-200 rounded-[4px] p-6 flex flex-col justify-between min-h-[180px] transition-colors hover:border-slate-300 shadow-sm">
@@ -223,22 +219,18 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
                    <span className="text-[13px] font-normal text-slate-900">
                       {formatTimeRange(item.start_time, item.end_time)}
                    </span>
-                   
-                   {/* CRITICAL FIX: 
-                     Only show "Join Class" if the teacher is actually LIVE.
-                     This forces the teacher to join first, making THEM the moderator.
-                   */}
+                   {/* Check if teacher is truly live before allowing join */}
                    {item.is_jitsi_live ? (
-                       <button 
-                         onClick={() => handleJoinClass(item)}
-                         className="bg-slate-900 text-white px-4 py-2 text-[12px] font-normal rounded-[4px] hover:bg-slate-800 transition-opacity"
-                       >
-                         Join Class
-                       </button>
+                     <button 
+                       onClick={() => handleJoinClass(item)}
+                       className="bg-slate-900 text-white px-4 py-2 text-[12px] font-normal rounded-[4px] hover:bg-slate-800 transition-opacity"
+                     >
+                       Join Class
+                     </button>
                    ) : (
-                       <Button disabled variant="secondary" className="text-[12px] h-9 opacity-70">
-                         Waiting for Teacher...
-                       </Button>
+                     <button disabled className="bg-slate-100 text-slate-400 px-4 py-2 text-[12px] font-normal rounded-[4px] cursor-not-allowed border border-slate-200">
+                       Waiting for Teacher...
+                     </button>
                    )}
                 </div>
              </div>
@@ -266,24 +258,21 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
                    <span className="text-[13px] font-normal text-slate-900">
                       {formatTimeRange(item.start_time, item.end_time)}
                    </span>
-                   
-                    {/* Allow joining early only if teacher started early */}
                    {item.is_jitsi_live ? (
-                       <button 
-                         onClick={() => handleJoinClass(item)}
-                         className="bg-slate-900 text-white px-4 py-2 text-[12px] font-normal rounded-[4px] hover:bg-slate-800 transition-opacity"
-                       >
-                         Join Early
-                       </button>
+                     <button 
+                       onClick={() => handleJoinClass(item)}
+                       className="bg-slate-900 text-white px-4 py-2 text-[12px] font-normal rounded-[4px] hover:bg-slate-800 transition-opacity"
+                     >
+                       Join Early
+                     </button>
                    ) : (
-                       <span className="text-[12px] font-normal text-slate-500 bg-[#f9fafb] px-2.5 py-1 border border-slate-200 rounded-[4px]">
-                          Starts later
-                       </span>
+                     <span className="text-[12px] font-normal text-slate-500 bg-[#f9fafb] px-2.5 py-1 border border-slate-200 rounded-[4px]">
+                        Starts later
+                     </span>
                    )}
                 </div>
              </div>
           ))}
-
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-12 border border-dashed border-slate-200 rounded-[4px] bg-slate-50/50">
