@@ -226,6 +226,12 @@ export const FullScreenVideoPlayer = ({
       if (seekingRef.current) return;
       
       if (youtubePlayerRef.current && typeof youtubePlayerRef.current.getCurrentTime === 'function') {
+        // UPDATE: Check for buffering state (3)
+        // This prevents the progress bar from jumping back to old time while buffering new seek position
+        if (youtubePlayerRef.current.getPlayerState && youtubePlayerRef.current.getPlayerState() === 3) {
+          return;
+        }
+
         const time = youtubePlayerRef.current.getCurrentTime();
         setCurrentTime(time);
         const loaded = youtubePlayerRef.current.getVideoLoadedFraction();
