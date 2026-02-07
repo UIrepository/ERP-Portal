@@ -11,7 +11,7 @@ import { StudentCommunity } from './StudentCommunity';
 import { StudentConnect } from './StudentConnect';
 import { StudentLiveClass } from './StudentLiveClass';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ExternalLink, ChevronDown } from 'lucide-react'; // Changed Share2 to ExternalLink
+import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useChatDrawer } from '@/hooks/useChatDrawer';
@@ -284,7 +284,7 @@ const StudentMainContent = () => {
       {/* HEADER SECTION - Light Purple/Violet Theme */}
       <header className="w-full rounded-t-lg rounded-b-none overflow-hidden shadow-sm border border-indigo-100/50 relative z-10 group">
         
-        {/* Banner */}
+        {/* Banner with Premium Light Violet Gradient */}
         <div className="relative bg-gradient-to-br from-violet-100 via-indigo-50 to-purple-100 px-6 py-8 text-slate-900">
           
           {/* Dot Pattern Overlay */}
@@ -323,7 +323,7 @@ const StudentMainContent = () => {
           </div>
         </div>
 
-        {/* Navigation Tabs - Glassy effect */}
+        {/* Navigation Tabs */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-6 bg-white/70 backdrop-blur-md border-t border-indigo-50">
           <nav className="flex gap-6 overflow-x-auto w-full sm:w-auto no-scrollbar">
             {[
@@ -351,12 +351,16 @@ const StudentMainContent = () => {
             ))}
           </nav>
 
-          {/* Updated Enroll More Button */}
+          {/* Enroll More Button with Logo */}
           <button 
             onClick={() => window.open('https://www.unknowniitians.com/courses', '_blank')}
             className="hidden sm:flex items-center gap-2 px-4 py-2 my-3 sm:my-0 rounded-lg bg-white border border-indigo-100 text-[13px] font-medium text-slate-600 hover:text-violet-700 hover:border-violet-200 hover:bg-violet-50/50 transition-all shadow-sm"
           >
-            <ExternalLink className="h-4 w-4" />
+            <img 
+              src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
+              alt="UI" 
+              className="h-4 w-auto object-contain" 
+            />
             Enroll More
           </button>
         </div>
