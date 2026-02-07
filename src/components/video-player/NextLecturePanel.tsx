@@ -1,9 +1,9 @@
 /**
  * Next Lecture Panel Component
- * Shows a list of upcoming/available lectures for quick navigation
+ * Design: X-style Dark Theme (Clean list, no clutter)
  */
 
-import { PlayCircle, CheckCircle2, Clock, BookOpen } from 'lucide-react';
+import { Play, CheckCircle2, Lock } from 'lucide-react';
 import { Lecture } from './types';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -19,130 +19,88 @@ export const NextLecturePanel = ({
   currentLectureId, 
   onSelectLecture 
 }: NextLecturePanelProps) => {
-  // Find current lecture index
-  const currentIndex = lectures.findIndex(l => l.id === currentLectureId);
-
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-black text-[#e7e9ea]">
       {/* Header */}
-      <div className="p-4 border-b border-zinc-700">
-        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-          <BookOpen className="w-5 h-5 text-primary" />
-          All Lectures
-        </h3>
-        <p className="text-sm text-zinc-400 mt-1">
-          {currentIndex + 1} of {lectures.length} lectures
-        </p>
+      <div className="sticky top-0 z-10 bg-black/65 backdrop-blur-md border-b border-[#2f3336] p-3">
+        <h3 className="text-xl font-bold">Playlist</h3>
+        <p className="text-[13px] text-[#71767b]">{lectures.length} videos</p>
       </div>
 
       {/* Lectures List */}
-      <ScrollArea className="flex-1">
-        <div className="p-2">
+      <ScrollArea className="flex-1 w-full">
+        <div className="flex flex-col pb-20"> {/* Added padding bottom for mobile drawer safety */}
           {lectures.map((lecture, index) => {
             const isCurrent = lecture.id === currentLectureId;
-            const isCompleted = lecture.isCompleted;
-            const isUpcoming = index > currentIndex;
 
             return (
-              <button
+              <div 
                 key={lecture.id}
                 onClick={() => onSelectLecture(lecture)}
                 className={cn(
-                  "w-full flex items-start gap-3 p-3 rounded-lg transition-all text-left group",
-                  isCurrent 
-                    ? "bg-primary/20 border border-primary/30" 
-                    : "hover:bg-zinc-800/80 border border-transparent",
-                  isCompleted && !isCurrent && "opacity-70"
+                  "group relative flex gap-3 p-3 border-b border-[#2f3336] cursor-pointer transition-colors",
+                  isCurrent ? "bg-white/5" : "hover:bg-white/5"
                 )}
               >
-                {/* Thumbnail / Index */}
-                <div className={cn(
-                  "w-16 h-10 rounded flex items-center justify-center flex-shrink-0 relative overflow-hidden",
-                  isCurrent ? "bg-primary/30" : "bg-zinc-700"
-                )}>
+                {/* Active Indicator (Blue Bar) */}
+                {isCurrent && (
+                  <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-[#1d9bf0]" />
+                )}
+
+                {/* Thumbnail Container */}
+                <div className="relative w-[100px] h-[56px] bg-[#16181c] rounded overflow-hidden border border-[#2f3336] flex-shrink-0 flex items-center justify-center">
                   {lecture.thumbnail ? (
                     <img 
                       src={lecture.thumbnail} 
-                      alt={lecture.title}
-                      className="w-full h-full object-cover"
+                      alt=""
+                      className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
                     />
                   ) : (
-                    <span className="text-sm font-bold text-zinc-400">
-                      {index + 1}
-                    </span>
+                    // Fallback Icon
+                    <div className="flex items-center justify-center w-full h-full">
+                      {isCurrent ? (
+                         <div className="w-3 h-3 bg-[#1d9bf0] rounded-sm animate-pulse" />
+                      ) : (
+                        <Play className="w-5 h-5 text-[#71767b]" fill="currentColor" />
+                      )}
+                    </div>
                   )}
                   
-                  {/* Playing indicator */}
-                  {isCurrent && (
-                    <div className="absolute inset-0 bg-primary/40 flex items-center justify-center">
-                      <PlayCircle className="w-5 h-5 text-white" />
+                  {/* Duration Badge */}
+                  {lecture.duration && (
+                    <div className="absolute bottom-1 right-1 bg-black/80 text-[#e7e9ea] text-[10px] font-medium px-1 rounded">
+                      {lecture.duration}
                     </div>
                   )}
                 </div>
 
-                {/* Lecture Info */}
-                <div className="flex-1 min-w-0">
+                {/* Info Section */}
+                <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
                   <div className="flex items-start justify-between gap-2">
                     <h4 className={cn(
-                      "text-sm font-medium line-clamp-2",
-                      isCurrent ? "text-primary" : "text-white group-hover:text-primary/90"
+                      "text-[14px] leading-tight font-normal line-clamp-2",
+                      isCurrent ? "text-[#e7e9ea] font-medium" : "text-[#e7e9ea]"
                     )}>
-                      {lecture.title}
+                      {index + 1}. {lecture.title}
                     </h4>
-                    
-                    {/* Status indicator */}
-                    {isCompleted && !isCurrent && (
-                      <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                    )}
                   </div>
-
-                  <div className="flex items-center gap-2 mt-1">
+                  
+                  <div className="flex items-center gap-2">
                     {lecture.subject && (
-                      <span className="text-xs text-zinc-500">
+                      <span className="text-[13px] text-[#71767b] truncate">
                         {lecture.subject}
                       </span>
                     )}
-                    {lecture.duration && (
-                      <span className="text-xs text-zinc-500 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {lecture.duration}
-                      </span>
+                    {lecture.isCompleted && (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-[#00ba7c]" />
                     )}
                   </div>
-
-                  {/* Current indicator */}
-                  {isCurrent && (
-                    <span className="inline-flex items-center gap-1 text-xs text-primary mt-2">
-                      <span className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-                      Now Playing
-                    </span>
-                  )}
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
       </ScrollArea>
-
-      {/* Quick Navigation */}
-      {currentIndex < lectures.length - 1 && (
-        <div className="p-4 border-t border-zinc-700 bg-zinc-900/50">
-          <button
-            onClick={() => onSelectLecture(lectures[currentIndex + 1])}
-            className="w-full flex items-center justify-between p-3 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors group"
-          >
-            <div className="flex items-center gap-3">
-              <PlayCircle className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
-              <div className="text-left">
-                <p className="text-xs text-zinc-400">Up Next</p>
-                <p className="text-sm text-white font-medium line-clamp-1">
-                  {lectures[currentIndex + 1].title}
-                </p>
-              </div>
-            </div>
-          </button>
-        </div>
-      )}
     </div>
   );
 };
