@@ -210,22 +210,13 @@ export const TeacherJoinClass = () => {
       // If stream fails, allow opening Jitsi anyway? For now, we rely on the dialog flow.
       toast.error("Could not generate stream key, please try again.");
     }
-    
-    // Legacy: Don't set active meeting to avoid embedded player
-    /*
-    setActiveMeeting({
-      roomName: generateJitsiRoomName(cls.batch, cls.subject),
-      subject: cls.subject,
-      batch: cls.batch,
-      scheduleId: cls.id
-    });
-    */
   };
 
   const proceedToMeeting = () => {
     if (!currentClass) return;
     
-    // CORRECTED: Use generateJitsiRoomName to ensure Teacher joins the same room as Students
+    // FIX: Use the standardized room name generator
+    // This ensures consistency with the Student view
     const roomName = generateJitsiRoomName(currentClass.batch, currentClass.subject);
     const roomUrl = `https://meet.jit.si/${encodeURIComponent(roomName)}`;
     
