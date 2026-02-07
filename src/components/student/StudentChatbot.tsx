@@ -1,340 +1,540 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  MessageCircle, 
-  X, 
-  Send, 
-  Loader2, 
-  Bot, 
-  User, 
-  ChevronRight 
-} from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useChatDrawer } from '@/hooks/useChatDrawer';
+import { Loader2, Send, X, MessageSquare, Minus, ChevronLeft } from 'lucide-react';
+import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useIsMobile } from '@/hooks/use-mobile';
+import { 
+  Drawer, 
+  DrawerContent, 
+  DrawerHeader, 
+  DrawerTitle, 
+  DrawerDescription 
+} from '@/components/ui/drawer';
 
 interface Message {
   id: string;
   content: string;
-  sender_type: 'user' | 'admin' | 'bot';
-  created_at: string;
-  options?: string[]; // For bot choices
-  action?: 'batch' | 'subject' | 'issue';
+  sender_id: string;
+  receiver_id: string;
+  created_at: string | null;
+  context?: string | null;
+  subject_context?: string | null;
 }
-
-// Common Support Options
-const ISSUE_TYPES = [
-  "Video Playback Issue",
-  "Audio Problem",
-  "PDF/Notes Not Opening",
-  "Live Class Joining Error",
-  "App Crash / Bug",
-  "Other"
-];
 
 export const StudentChatbot = () => {
   const { profile } = useAuth();
-  const [isOpen, setIsOpen] = useState(false);
-  const [newMessage, setNewMessage] = useState('');
+  const { 
+    state, 
+    closeDrawer, 
+    selectSupportRole, 
+    setRecipient, 
+    resetToRoleSelection,
+    toggleChatbot 
+  } = useChatDrawer();
+  const [message, setMessage] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+  const [isLoadingRecipient, setIsLoadingRecipient] = useState(false);
+  const [managerUnavailable, setManagerUnavailable] = useState(false);
+  const isMobile = useIsMobile();
 
-  // Triage State
-  const [triageStep, setTriageStep] = useState<'batch' | 'subject' | 'issue' | 'chat'>('batch');
-  const [selectedBatch, setSelectedBatch] = useState<string | null>(null);
-  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
-  const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
-  const [localMessages, setLocalMessages] = useState<Message[]>([]);
+  // Custom styles from design
+  const bubbleMeClass = "rounded-[12px_12px_2px_12px]";
+  const bubbleThemClass = "rounded-[12px_12px_12px_2px]";
+  const premiumShadowClass = "shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_-1px_rgba(0,0,0,0.1)]";
+  const chatWindowShadowClass = "shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1),0_0_0_1px_rgba(0,0,0,0.05)]";
 
-  // 1. Fetch User Enrollments (For Batches & Subjects)
-  const { data: enrollments } = useQuery({
-    queryKey: ['chatbot-enrollments', profile?.user_id],
+  // Pre-fetch available staff
+  const { data: availableStaff } = useQuery({
+    queryKey: ['available-support-staff', profile?.user_id],
+    queryFn: async () => {
+      const [admins, managers] = await Promise.all([
+        supabase.from('admins').select('user_id').not('user_id', 'is', null),
+        supabase.from('managers').select('user_id, assigned_batches').not('user_id', 'is', null)
+      ]);
+      
+      return {
+        hasAdmin: (admins.data?.length || 0) > 0,
+        hasManager: (managers.data?.length || 0) > 0,
+        managers: managers.data || []
+      };
+    },
+    enabled: !!profile?.user_id && state.isOpen,
+  });
+
+  // Fetch admin for support
+  const fetchAdmin = async () => {
+    const { data, error } = await supabase
+      .from('admins')
+      .select('user_id, name')
+      .not('user_id', 'is', null)
+      .limit(1)
+      .maybeSingle();
+    
+    if (error || !data) {
+      return null;
+    }
+    return data;
+  };
+
+  // Fetch manager for support with better fallback
+  const fetchManager = async (studentBatches: string[]) => {
+    const { data, error } = await supabase
+      .from('managers')
+      .select('user_id, name, assigned_batches')
+      .not('user_id', 'is', null);
+    
+    if (error || !data || data.length === 0) {
+      return null;
+    }
+
+    // Find manager whose assigned_batches overlaps with student batches
+    const matchingManager = data.find(manager => 
+      manager.assigned_batches?.some((b: string) => studentBatches.includes(b))
+    );
+
+    // Return matching manager or first available
+    return matchingManager || data[0];
+  };
+
+  // Fetch teacher for subject connect
+  const fetchTeacher = async (batch: string, subject: string) => {
+    const { data, error } = await supabase
+      .from('teachers')
+      .select('user_id, name, assigned_batches, assigned_subjects')
+      .not('user_id', 'is', null);
+    
+    if (error || !data || data.length === 0) {
+      return null;
+    }
+
+    // Find teacher matching both batch and subject
+    const matchingTeacher = data.find(teacher => 
+      teacher.assigned_batches?.includes(batch) && 
+      teacher.assigned_subjects?.includes(subject)
+    );
+
+    return matchingTeacher || null;
+  };
+
+  // Fetch student batches for manager lookup
+  const { data: studentBatches } = useQuery({
+    queryKey: ['studentBatches', profile?.user_id],
     queryFn: async () => {
       if (!profile?.user_id) return [];
       const { data } = await supabase
         .from('user_enrollments')
-        .select('batch_name, subject_name')
+        .select('batch_name')
         .eq('user_id', profile.user_id);
-      return data || [];
+      return [...new Set(data?.map(e => e.batch_name) || [])];
     },
-    enabled: !!profile?.user_id,
+    enabled: !!profile?.user_id && state.isOpen,
   });
 
-  // Derive Batches
-  const uniqueBatches = Array.from(new Set(enrollments?.map(e => e.batch_name) || [])).sort();
+  // Handle role selection for support mode
+  const handleRoleSelect = async (role: 'admin' | 'manager') => {
+    setManagerUnavailable(false);
+    selectSupportRole(role);
+    setIsLoadingRecipient(true);
 
-  // Derive Subjects (Dynamic based on selected batch)
-  const availableSubjects = enrollments
-    ?.filter(e => e.batch_name === selectedBatch)
-    .map(e => e.subject_name)
-    .sort() || [];
+    try {
+      let staffMember: { user_id: string | null; name: string } | null = null;
 
-  // 2. Fetch Chat History (Once Triage is Done)
-  const { data: chatHistory, isLoading } = useQuery({
-    queryKey: ['student-chat', profile?.user_id],
+      if (role === 'admin') {
+        staffMember = await fetchAdmin();
+      } else {
+        staffMember = await fetchManager(studentBatches || []);
+      }
+
+      if (staffMember && staffMember.user_id) {
+        setRecipient({
+          id: staffMember.user_id,
+          name: staffMember.name,
+          displayName: role === 'admin' ? 'Support Admin' : 'Academic Manager',
+        });
+      } else {
+        if (role === 'manager') {
+          setManagerUnavailable(true);
+        }
+        resetToRoleSelection();
+      }
+    } catch {
+      resetToRoleSelection();
+    } finally {
+      setIsLoadingRecipient(false);
+    }
+  };
+
+  // Auto-fetch teacher when subject-connect mode opens
+  useEffect(() => {
+    if (state.mode === 'subject-connect' && state.subjectContext && state.isOpen && !state.selectedRecipient) {
+      const fetchTeacherForSubject = async () => {
+        setIsLoadingRecipient(true);
+        try {
+          const teacher = await fetchTeacher(
+            state.subjectContext!.batch, 
+            state.subjectContext!.subject
+          );
+          if (teacher && teacher.user_id) {
+            setRecipient({
+              id: teacher.user_id,
+              name: teacher.name,
+              displayName: `${state.subjectContext!.subject} Mentor`,
+            });
+          }
+        } catch {
+          // Silent fail - UI will handle
+        } finally {
+          setIsLoadingRecipient(false);
+        }
+      };
+      fetchTeacherForSubject();
+    }
+  }, [state.mode, state.subjectContext, state.isOpen, state.selectedRecipient, setRecipient]);
+
+  // Fetch messages
+  const { data: messages, isLoading: loadingMessages } = useQuery({
+    queryKey: ['chat-messages', profile?.user_id, state.selectedRecipient?.id],
     queryFn: async () => {
-      if (!profile?.user_id) return [];
-      const { data } = await supabase
-        .from('support_chats')
+      if (!profile?.user_id || !state.selectedRecipient?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('direct_messages')
         .select('*')
-        .eq('user_id', profile.user_id)
+        .or(`and(sender_id.eq.${profile.user_id},receiver_id.eq.${state.selectedRecipient.id}),and(sender_id.eq.${state.selectedRecipient.id},receiver_id.eq.${profile.user_id})`)
         .order('created_at', { ascending: true });
+      
+      if (error) throw error;
       return data as Message[];
     },
-    enabled: !!profile?.user_id && triageStep === 'chat',
+    enabled: !!profile?.user_id && !!state.selectedRecipient?.id,
+    refetchInterval: 3000,
   });
 
-  // 3. Mutation to Send Message
-  const sendMessageMutation = useMutation({
-    mutationFn: async (content: string) => {
-      if (!profile?.user_id) return;
+  // Send message mutation
+  const sendMessage = useMutation({
+    mutationFn: async () => {
+      if (!message.trim() || !state.selectedRecipient?.id || !profile?.user_id) return;
       
-      // Construct the initial context if this is the first message after triage
-      let finalContent = content;
-      if (localMessages.length > 0 && chatHistory?.length === 0) {
-         finalContent = `[ISSUE REPORT]\nBatch: ${selectedBatch}\nSubject: ${selectedSubject}\nIssue: ${selectedIssue}\n\nUser Message: ${content}`;
+      // Determine context based on mode
+      let context = 'general';
+      let subjectContext: string | null = null;
+
+      if (state.mode === 'support') {
+        context = state.supportRole === 'admin' ? 'support_admin' : 'support_manager';
+      } else if (state.mode === 'subject-connect' && state.subjectContext) {
+        context = 'subject_doubt';
+        subjectContext = state.subjectContext.subject;
       }
 
-      await supabase.from('support_chats').insert({
-        user_id: profile.user_id,
-        content: finalContent,
-        sender_type: 'user',
-        is_read: false,
+      const { error } = await supabase.from('direct_messages').insert({
+        sender_id: profile.user_id,
+        receiver_id: state.selectedRecipient.id,
+        content: message.trim(),
+        context,
+        subject_context: subjectContext,
       });
+      
+      if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['student-chat'] });
-      setNewMessage('');
+      setMessage('');
+      queryClient.invalidateQueries({ queryKey: ['chat-messages'] });
     },
   });
 
-  // Initialize Triage on Open
-  useEffect(() => {
-    if (isOpen && localMessages.length === 0 && (!chatHistory || chatHistory.length === 0)) {
-       startTriage();
-    }
-  }, [isOpen, chatHistory]);
-
-  const startTriage = () => {
-    setTriageStep('batch');
-    setLocalMessages([
-      {
-        id: 'bot-1',
-        content: `Hi ${profile?.full_name?.split(' ')[0] || 'there'}! 👋 I can help you connect with support. First, which batch are you facing an issue with?`,
-        sender_type: 'bot',
-        created_at: new Date().toISOString(),
-        options: uniqueBatches,
-        action: 'batch'
-      }
-    ]);
-  };
-
-  const handleOptionSelect = (option: string, action: 'batch' | 'subject' | 'issue') => {
-    // Add User Response to Local UI
-    const userMsg: Message = {
-        id: `user-${Date.now()}`,
-        content: option,
-        sender_type: 'user',
-        created_at: new Date().toISOString()
-    };
-    
-    let nextBotMsg: Message | null = null;
-
-    if (action === 'batch') {
-        setSelectedBatch(option);
-        setTriageStep('subject');
-        
-        // Calculate subjects for the selected batch immediately
-        const subjects = enrollments
-            ?.filter(e => e.batch_name === option)
-            .map(e => e.subject_name)
-            .sort() || [];
-
-        nextBotMsg = {
-            id: `bot-${Date.now()}`,
-            content: "Got it. Which subject is this related to?",
-            sender_type: 'bot',
-            created_at: new Date().toISOString(),
-            options: subjects,
-            action: 'subject'
-        };
-    } else if (action === 'subject') {
-        setSelectedSubject(option);
-        setTriageStep('issue');
-        nextBotMsg = {
-            id: `bot-${Date.now()}`,
-            content: "Okay. What kind of issue are you facing?",
-            sender_type: 'bot',
-            created_at: new Date().toISOString(),
-            options: ISSUE_TYPES,
-            action: 'issue'
-        };
-    } else if (action === 'issue') {
-        setSelectedIssue(option);
-        setTriageStep('chat');
-        nextBotMsg = {
-            id: `bot-${Date.now()}`,
-            content: "Thanks! Please describe your issue in detail below, and a support agent will get back to you shortly.",
-            sender_type: 'bot',
-            created_at: new Date().toISOString(),
-        };
-    }
-
-    setLocalMessages(prev => nextBotMsg ? [...prev, userMsg, nextBotMsg] : [...prev, userMsg]);
-  };
-
-  const handleSend = (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (!newMessage.trim()) return;
-    sendMessageMutation.mutate(newMessage);
-  };
-
-  // Auto-scroll
+  // Auto-scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [localMessages, chatHistory, isOpen]);
+  }, [messages]);
 
-  // Combine local triage messages with real chat history
-  const displayMessages = triageStep === 'chat' && chatHistory && chatHistory.length > 0
-    ? chatHistory 
-    : localMessages;
+  // Reset manager unavailable state when drawer closes
+  useEffect(() => {
+    if (!state.isOpen) {
+      setManagerUnavailable(false);
+    }
+  }, [state.isOpen]);
+
+  // Handle Back Button Logic
+  const handleBack = () => {
+    if (state.mode === 'subject-connect') {
+      closeDrawer();
+    } else {
+      resetToRoleSelection();
+    }
+  };
+
+  // Welcome View
+  const renderWelcomeView = () => (
+    <div className="flex flex-col h-full bg-slate-50">
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
+        <div className="flex items-center gap-2.5">
+          <img 
+            src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
+            alt="Logo" 
+            className="h-7 w-auto object-contain" 
+          />
+          <span className="font-bold text-slate-800 text-sm tracking-tight">Support Center</span>
+        </div>
+        <button onClick={closeDrawer} className="text-slate-400 hover:text-slate-600 transition-colors">
+          <Minus className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Welcome Content */}
+      <div className="flex-1 p-6 space-y-8 overflow-y-auto no-scrollbar">
+        <div className="space-y-2 animate-in slide-in-from-bottom-2 fade-in duration-500">
+          <h1 className="text-xl font-bold text-slate-900">Hello there.</h1>
+          <p className="text-slate-500 text-sm leading-relaxed">
+            How can we help you today? Please select a department to start a conversation.
+          </p>
+        </div>
+
+        {managerUnavailable && (
+           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 animate-in fade-in">
+             Manager currently unavailable. Try Admin support.
+           </div>
+        )}
+
+        {/* Grid Options */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Admin Option */}
+          <button 
+            onClick={() => handleRoleSelect('admin')}
+            disabled={isLoadingRecipient || !availableStaff?.hasAdmin}
+            className={cn(
+              "flex flex-col items-center justify-center p-4 rounded-md border border-slate-200 bg-white transition-all text-center group",
+              premiumShadowClass,
+              availableStaff?.hasAdmin 
+                ? "hover:border-slate-400 hover:bg-slate-50 cursor-pointer" 
+                : "opacity-60 cursor-not-allowed grayscale"
+            )}
+          >
+            <span className="text-[13px] font-semibold text-slate-800">Admin</span>
+            <span className="text-[10px] text-slate-400 uppercase mt-1 tracking-wider">Tech Support</span>
+          </button>
+
+          {/* Manager Option */}
+          <button 
+            onClick={() => handleRoleSelect('manager')}
+            disabled={isLoadingRecipient || !availableStaff?.hasManager}
+            className={cn(
+              "flex flex-col items-center justify-center p-4 rounded-md border border-slate-200 bg-white transition-all text-center group",
+              premiumShadowClass,
+              availableStaff?.hasManager 
+                ? "hover:border-slate-400 hover:bg-slate-50 cursor-pointer" 
+                : "opacity-60 cursor-not-allowed grayscale"
+            )}
+          >
+            <span className="text-[13px] font-semibold text-slate-800">Manager</span>
+            <span className="text-[10px] text-slate-400 uppercase mt-1 tracking-wider">Academics</span>
+          </button>
+
+          {/* Mentor Option - Only visible if active */}
+          {state.mode === 'subject-connect' && state.subjectContext && (
+            <button 
+              onClick={() => {/* Triggered by effect mostly, but good for UX */}}
+              disabled={isLoadingRecipient}
+              className={cn(
+                "flex flex-col items-center justify-center p-4 rounded-md border border-slate-200 bg-white transition-all text-center group col-span-2",
+                premiumShadowClass,
+                "hover:border-slate-400 hover:bg-slate-50 cursor-pointer"
+              )}
+            >
+              <span className="text-[13px] font-semibold text-slate-800">Mentor</span>
+              <span className="text-[10px] text-slate-400 uppercase mt-1 tracking-wider">
+                {state.subjectContext.subject} Doubt Solving
+              </span>
+            </button>
+          )}
+
+          {isLoadingRecipient && (
+             <div className="col-span-2 flex items-center justify-center py-4 text-xs text-slate-400 gap-2">
+               <Loader2 className="h-3 w-3 animate-spin" /> Connecting...
+             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Footer Logo */}
+      <div className="p-4 flex justify-center border-t border-slate-100 bg-white/50">
+         <div className="flex items-center gap-2 opacity-50 grayscale hover:grayscale-0 transition-all duration-300">
+            <img 
+              src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
+              alt="UI" 
+              className="h-5 w-auto" 
+            />
+            <span className="text-[10px] font-bold text-slate-600">Unknown IITians</span>
+         </div>
+      </div>
+    </div>
+  );
+
+  // Chat View
+  const renderChatView = () => (
+    <div className="flex flex-col h-full bg-white">
+      {/* Chat Header */}
+      <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3 bg-white z-10 shadow-sm">
+        <button 
+          onClick={handleBack}
+          className="p-1.5 hover:bg-slate-100 rounded transition-colors text-slate-500"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <div className="flex-1">
+          <h3 className="font-bold text-slate-900 text-sm">
+            {state.selectedRecipient?.displayName || 'Support'}
+          </h3>
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter">Online</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50/30" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <style>{`
+          div::-webkit-scrollbar { display: none; }
+        `}</style>
+        
+        {loadingMessages ? (
+          <div className="flex justify-center py-10">
+            <Loader2 className="h-6 w-6 animate-spin text-slate-300" />
+          </div>
+        ) : messages?.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center space-y-3 opacity-60">
+             <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center">
+                <MessageSquare className="w-6 h-6 text-slate-400" />
+             </div>
+             <p className="text-sm text-slate-500">Start a conversation</p>
+          </div>
+        ) : (
+          messages?.map((msg) => {
+            const isMe = msg.sender_id === profile?.user_id;
+            return (
+              <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}>
+                <div 
+                  className={cn(
+                    "p-3 text-sm shadow-sm max-w-[85%]",
+                    isMe 
+                      ? `bg-slate-900 text-white ${bubbleMeClass}`
+                      : `bg-white border border-slate-200 text-slate-700 ${bubbleThemClass}`
+                  )}
+                >
+                  {msg.content}
+                  <div className={cn(
+                    "text-[9px] mt-1 text-right opacity-60",
+                    isMe ? "text-slate-300" : "text-slate-400"
+                  )}>
+                    {msg.created_at ? format(new Date(msg.created_at), 'h:mm a') : ''}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+        <div ref={scrollRef} />
+      </div>
+
+      {/* Input */}
+      <div className="p-4 bg-white border-t border-slate-100">
+        <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-lg border border-slate-200 focus-within:border-slate-400 transition-all">
+          <input 
+            type="text" 
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage.mutate()}
+            placeholder="Type a message..." 
+            className="flex-1 bg-transparent border-none px-2 py-1.5 text-sm outline-none text-slate-800 placeholder:text-slate-400"
+          />
+          <button 
+            onClick={() => sendMessage.mutate()}
+            disabled={!message.trim() || sendMessage.isPending}
+            className="p-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {sendMessage.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Loading state for subject-connect auto-connect
+  const renderLoadingView = () => (
+    <div className="flex flex-col h-full bg-slate-50">
+      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
+        <span className="font-bold text-slate-800 text-sm">Connecting...</span>
+        <button onClick={closeDrawer}><X className="w-4 h-4 text-slate-400" /></button>
+      </div>
+      <div className="flex-1 flex flex-col items-center justify-center gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-slate-900" />
+        <p className="text-sm text-slate-500">Finding your mentor...</p>
+      </div>
+    </div>
+  );
+
+  // Render logic based on content
+  const renderContent = () => {
+    if (isLoadingRecipient && state.mode === 'subject-connect') {
+      return renderLoadingView();
+    }
+    if (state.selectedRecipient) {
+      return renderChatView();
+    }
+    return renderWelcomeView();
+  };
 
   return (
     <>
-      {/* Floating Button */}
-      <Button
-        onClick={() => setIsOpen(true)}
+      {/* Floating Action Button - Always visible to trigger/toggle */}
+      <button
+        onClick={toggleChatbot}
         className={cn(
-          "fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg transition-all duration-300 z-50",
-          isOpen ? "scale-0 opacity-0" : "scale-100 opacity-100 bg-indigo-600 hover:bg-indigo-700"
+          "fixed bottom-6 right-6 w-14 h-14 bg-slate-900 hover:bg-slate-800 text-white rounded-full flex items-center justify-center shadow-xl transition-all hover:scale-105 active:scale-95 z-50",
+          state.isOpen && !isMobile ? "rotate-0" : "" // Rotate animation mostly for desktop X icon
         )}
       >
-        <MessageCircle className="h-7 w-7 text-white" />
-      </Button>
+        {state.isOpen && !isMobile ? (
+          <X className="w-6 h-6" />
+        ) : (
+          <MessageSquare className="w-6 h-6" />
+        )}
+      </button>
 
-      {/* Chat Window */}
-      <div
-        className={cn(
-          "fixed bottom-6 right-6 w-[380px] h-[600px] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col transition-all duration-300 z-50 overflow-hidden font-sans",
-          isOpen ? "translate-y-0 opacity-100" : "translate-y-[120%] opacity-0 pointer-events-none"
-        )}
-      >
-        {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 p-4 flex items-center justify-between text-white shrink-0">
-          <div className="flex items-center gap-3">
-             <div className="relative">
-                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                   <Bot className="h-6 w-6 text-white" />
-                </div>
-                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-400 border-2 border-indigo-700 rounded-full"></span>
+      {/* Mobile: Drawer Interface */}
+      {isMobile ? (
+        <Drawer open={state.isOpen} onOpenChange={(open) => !open && closeDrawer()}>
+          <DrawerContent className="h-[85vh] p-0 outline-none">
+             <div className="sr-only">
+               <DrawerTitle>Student Support</DrawerTitle>
+               <DrawerDescription>Chat with support staff or mentors</DrawerDescription>
              </div>
-             <div>
-                <h3 className="font-bold text-base leading-tight">Student Support</h3>
-                <p className="text-[11px] text-indigo-100 opacity-90">Usually replies in 10 mins</p>
+             <div className="flex-1 h-full overflow-hidden rounded-t-[10px]">
+                {renderContent()}
              </div>
-          </div>
-          <Button 
-             variant="ghost" 
-             size="icon" 
-             onClick={() => setIsOpen(false)} 
-             className="text-white/80 hover:text-white hover:bg-white/10 rounded-full h-8 w-8"
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        /* Desktop: Floating Window */
+        state.isOpen && (
+          <div 
+            className={cn(
+              "fixed bottom-24 right-6 w-[380px] h-[520px] bg-white rounded-xl flex flex-col overflow-hidden z-50 animate-in slide-in-from-bottom-4 duration-300 ease-out",
+              chatWindowShadowClass
+            )}
           >
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
-
-        {/* Messages Area */}
-        <ScrollArea className="flex-1 bg-slate-50 p-4">
-          <div className="space-y-4 pb-2">
-            
-            {/* Loading State */}
-            {isLoading && (
-               <div className="flex justify-center py-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
-               </div>
-            )}
-
-            {/* Messages List */}
-            {displayMessages.map((msg) => (
-              <div
-                key={msg.id}
-                className={cn(
-                  "flex w-full animate-in fade-in slide-in-from-bottom-2 duration-300",
-                  msg.sender_type === 'user' ? "justify-end" : "justify-start"
-                )}
-              >
-                <div
-                  className={cn(
-                    "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm",
-                    msg.sender_type === 'user'
-                      ? "bg-indigo-600 text-white rounded-tr-none"
-                      : "bg-white text-slate-700 border border-slate-200 rounded-tl-none"
-                  )}
-                >
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
-                </div>
-              </div>
-            ))}
-
-            {/* Bot Options (Only for last bot message if options exist) */}
-            {displayMessages.length > 0 && 
-             displayMessages[displayMessages.length - 1].sender_type === 'bot' && 
-             displayMessages[displayMessages.length - 1].options && (
-               <div className="flex flex-col gap-2 mt-2 ml-1 max-w-[85%] animate-in fade-in zoom-in duration-300">
-                  {displayMessages[displayMessages.length - 1].options!.map((opt) => (
-                     <button
-                        key={opt}
-                        onClick={() => handleOptionSelect(opt, displayMessages[displayMessages.length - 1].action!)}
-                        className="w-full text-left px-4 py-3 bg-white border border-indigo-100 text-indigo-700 text-sm font-medium rounded-xl hover:bg-indigo-50 hover:border-indigo-300 transition-all shadow-sm flex items-center justify-between group"
-                     >
-                        {opt}
-                        <ChevronRight className="h-4 w-4 text-indigo-300 group-hover:text-indigo-600 transition-colors" />
-                     </button>
-                  ))}
-               </div>
-            )}
-
-            <div ref={scrollRef} />
+            {renderContent()}
           </div>
-        </ScrollArea>
-
-        {/* Input Area */}
-        <form onSubmit={handleSend} className="p-3 bg-white border-t border-slate-100 shrink-0">
-          {triageStep === 'chat' ? (
-             <div className="flex gap-2 items-end">
-               <Input
-                 value={newMessage}
-                 onChange={(e) => setNewMessage(e.target.value)}
-                 placeholder="Type your message..."
-                 className="flex-1 bg-slate-50 border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500 min-h-[44px]"
-                 autoFocus
-               />
-               <Button 
-                 type="submit" 
-                 size="icon" 
-                 disabled={sendMessageMutation.isPending || !newMessage.trim()}
-                 className="h-11 w-11 rounded-lg bg-indigo-600 hover:bg-indigo-700 shrink-0"
-               >
-                 {sendMessageMutation.isPending ? (
-                   <Loader2 className="h-5 w-5 animate-spin" />
-                 ) : (
-                   <Send className="h-5 w-5" />
-                 )}
-               </Button>
-             </div>
-          ) : (
-             <div className="text-center py-2 text-xs text-slate-400 italic bg-slate-50 rounded-lg border border-dashed border-slate-200">
-                Please select an option above to continue
-             </div>
-          )}
-        </form>
-      </div>
+        )
+      )}
     </>
   );
 };
