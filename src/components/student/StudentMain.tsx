@@ -11,7 +11,7 @@ import { StudentCommunity } from './StudentCommunity';
 import { StudentConnect } from './StudentConnect';
 import { StudentLiveClass } from './StudentLiveClass';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Share2, ChevronDown } from 'lucide-react';
+import { ExternalLink, ChevronDown } from 'lucide-react'; // Changed Share2 to ExternalLink
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useChatDrawer } from '@/hooks/useChatDrawer';
@@ -284,7 +284,7 @@ const StudentMainContent = () => {
       {/* HEADER SECTION - Light Purple/Violet Theme */}
       <header className="w-full rounded-t-lg rounded-b-none overflow-hidden shadow-sm border border-indigo-100/50 relative z-10 group">
         
-        {/* Banner with Premium Light Violet Gradient */}
+        {/* Banner */}
         <div className="relative bg-gradient-to-br from-violet-100 via-indigo-50 to-purple-100 px-6 py-8 text-slate-900">
           
           {/* Dot Pattern Overlay */}
@@ -351,15 +351,18 @@ const StudentMainContent = () => {
             ))}
           </nav>
 
-          <button className="hidden sm:flex items-center gap-2 px-4 py-2 my-3 sm:my-0 rounded-lg bg-white border border-indigo-100 text-[13px] font-medium text-slate-600 hover:text-violet-700 hover:border-violet-200 hover:bg-violet-50/50 transition-all shadow-sm">
-            <Share2 className="h-4 w-4" />
-            Share Batch
+          {/* Updated Enroll More Button */}
+          <button 
+            onClick={() => window.open('https://www.unknowniitians.com/courses', '_blank')}
+            className="hidden sm:flex items-center gap-2 px-4 py-2 my-3 sm:my-0 rounded-lg bg-white border border-indigo-100 text-[13px] font-medium text-slate-600 hover:text-violet-700 hover:border-violet-200 hover:bg-violet-50/50 transition-all shadow-sm"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Enroll More
           </button>
         </div>
       </header>
 
       {/* CONTENT SECTION */}
-      {/* rounded-t-none (sharp), rounded-b-lg (slight), dynamic height */}
       <div className="w-full bg-white rounded-t-none rounded-b-lg shadow-sm border border-slate-100 p-6 md:p-8 h-auto min-h-[400px]">
         {renderTabContent()}
       </div>
