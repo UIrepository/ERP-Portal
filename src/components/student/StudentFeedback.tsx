@@ -2,11 +2,11 @@ import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
-import { MessageSquare, Send, Star, Sparkles, Timer, CheckCircle2, AlertCircle } from 'lucide-react';
+import { MessageSquare, Send, Star, Timer, CheckCircle2, AlertCircle, ChevronRight } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { differenceInHours, addDays, differenceInSeconds, format } from 'date-fns';
@@ -45,7 +45,7 @@ const CooldownTimer = ({ lastSubmissionDate }: { lastSubmissionDate: Date }) => 
         };
 
         calculateTimeLeft();
-        const intervalId = setInterval(calculateTimeLeft, 60000); // Update every minute is enough for this view
+        const intervalId = setInterval(calculateTimeLeft, 60000); 
 
         return () => clearInterval(intervalId);
     }, [lastSubmissionDate]);
@@ -64,7 +64,7 @@ const StarRating = ({ rating, setRating }: { rating: number, setRating: (rating:
     {[1, 2, 3, 4, 5].map((star) => (
       <Star
         key={star}
-        className={`cursor-pointer transition-all duration-200 h-7 w-7 ${
+        className={`cursor-pointer transition-all duration-200 h-6 w-6 ${
             rating >= star 
                 ? 'text-yellow-400 fill-yellow-400 scale-110' 
                 : 'text-gray-200 hover:text-gray-300'
@@ -97,10 +97,7 @@ export const StudentFeedback = () => {
             .from('user_enrollments')
             .select('batch_name, subject_name')
             .eq('user_id', profile.user_id);
-        if (error) {
-            console.error("Error fetching user enrollments:", error);
-            return [];
-        }
+        if (error) return [];
         return data || [];
     },
     enabled: !!profile?.user_id
@@ -116,11 +113,7 @@ export const StudentFeedback = () => {
         .select('batch, subject, created_at')
         .eq('submitted_by', profile?.user_id)
         .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error("Error fetching submitted feedback:", error);
-        return [];
-      }
+      if (error) return [];
       return data || [];
     },
     enabled: !!profile?.user_id,
@@ -151,7 +144,6 @@ export const StudentFeedback = () => {
             lastSubmissionDate: lastSubmission,
         };
     }).sort((a,b) => {
-        // Sort: Can submit first, then alphabetical
         if (a.canSubmit !== b.canSubmit) return a.canSubmit ? -1 : 1;
         return a.subject.localeCompare(b.subject);
     });
@@ -185,7 +177,6 @@ export const StudentFeedback = () => {
   };
 
   const handleSubmit = () => {
-    // Basic validation
     if (Object.values(ratings).some(r => r === 0)) {
       toast({ title: 'Ratings Required', description: 'Please provide a star rating for all categories.', variant: 'destructive' });
       return;
@@ -207,10 +198,10 @@ export const StudentFeedback = () => {
   };
 
   const questions = [
-    { key: 'teacher_quality', text: 'How would you rate the teacher quality?' },
-    { key: 'concept_clarity', text: 'How clear are the concepts taught?' },
-    { key: 'dpp_quality', text: 'How is the quality of the DPPs?' },
-    { key: 'premium_content_usefulness', text: 'Is the premium content useful to you?' },
+    { key: 'teacher_quality', text: 'Teacher Quality' },
+    { key: 'concept_clarity', text: 'Concept Clarity' },
+    { key: 'dpp_quality', text: 'DPP Quality' },
+    { key: 'premium_content_usefulness', text: 'Premium Content' },
   ];
 
   const isLoading = isLoadingEnrollments || isLoadingSubmittedFeedback;
@@ -218,120 +209,90 @@ export const StudentFeedback = () => {
   return (
     <div className="min-h-full bg-slate-50/50 pb-20">
       
-      {/* 1. Hero / Header Section */}
-      <div className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white pt-12 pb-24 px-6 md:px-12 relative overflow-hidden">
-        <div className="absolute top-0 right-0 opacity-10 transform translate-x-1/3 -translate-y-1/4">
-             <MessageSquare className="w-96 h-96" />
-        </div>
-        <div className="max-w-6xl mx-auto relative z-10 text-center md:text-left">
-            <h1 className="text-3xl md:text-5xl font-bold mb-4 tracking-tight">Your Voice Matters</h1>
-            <p className="text-violet-100 text-lg md:text-xl max-w-2xl font-light leading-relaxed">
-                Help us improve your learning experience by sharing your honest feedback. 
-                Your insights directly shape our future classes.
-            </p>
+      {/* 1. White Header Section */}
+      <div className="bg-white border-b border-slate-100 sticky top-0 z-10 shadow-sm">
+        <div className="max-w-4xl mx-auto py-8 px-6">
+            <h1 className="text-3xl font-bold text-slate-800 tracking-tight flex items-center gap-3">
+                <div className="bg-violet-100 p-2 rounded-lg">
+                    <MessageSquare className="h-6 w-6 text-violet-600" />
+                </div>
+                Your Voice Matters
+            </h1>
         </div>
       </div>
 
-      {/* 2. Main Content Area */}
-      <div className="max-w-6xl mx-auto px-6 -mt-16 relative z-20">
+      {/* 2. Main Content - List View (1 row 1 card) */}
+      <div className="max-w-4xl mx-auto px-6 mt-8">
         
-        {/* Section Title */}
-        <div className="flex items-center gap-3 mb-6">
-            <div className="bg-white p-2 rounded-lg shadow-sm">
-                <MessageSquare className="h-5 w-5 text-violet-600" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-800">Share Your Feedbacks</h2>
-        </div>
-
-        {/* 3. Cards Grid */}
         {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1,2,3].map(i => <Skeleton key={i} className="h-48 rounded-xl w-full" />)}
+            <div className="space-y-4">
+                {[1,2,3].map(i => <Skeleton key={i} className="h-24 rounded-xl w-full" />)}
             </div>
         ) : feedbackTasks.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="flex flex-col gap-4">
                 {feedbackTasks.map((task, index) => (
-                    <Card key={index} className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden group bg-white">
-                        <div className={`h-2 w-full ${task.canSubmit ? 'bg-violet-500' : 'bg-gray-200'}`} />
-                        
-                        <CardHeader className="pb-3">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <Badge variant="outline" className="mb-2 text-xs font-normal text-gray-500 border-gray-200">
-                                        {task.batch}
-                                    </Badge>
-                                    <CardTitle className="text-xl font-bold text-gray-800 group-hover:text-violet-700 transition-colors">
-                                        {task.subject}
-                                    </CardTitle>
-                                </div>
-                                {task.canSubmit ? (
-                                    <div className="bg-green-50 p-1.5 rounded-full">
-                                        <Sparkles className="h-4 w-4 text-green-600" />
-                                    </div>
-                                ) : (
-                                    <div className="bg-gray-50 p-1.5 rounded-full">
-                                        <CheckCircle2 className="h-4 w-4 text-gray-400" />
-                                    </div>
+                    <Card 
+                        key={index} 
+                        className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:shadow-md transition-shadow duration-200 border-slate-200"
+                    >
+                        <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-normal">
+                                    {task.batch}
+                                </Badge>
+                                {!task.canSubmit && (
+                                    <span className="text-xs text-green-600 flex items-center gap-1">
+                                        <CheckCircle2 className="h-3 w-3" /> Submitted
+                                    </span>
                                 )}
                             </div>
-                        </CardHeader>
-                        
-                        <CardContent className="flex-grow pt-0 pb-4">
-                            <CardDescription className="text-sm">
-                                {task.canSubmit 
-                                    ? "We're listening! Share your recent experience with this subject." 
-                                    : task.lastSubmissionDate && `Last feedback submitted on ${format(task.lastSubmissionDate, 'MMM d, yyyy')}`
-                                }
-                            </CardDescription>
-                        </CardContent>
+                            <h3 className="text-lg font-bold text-slate-800">
+                                {task.subject}
+                            </h3>
+                        </div>
 
-                        <CardFooter className="pt-0 bg-gray-50/50 p-6 border-t border-gray-100">
+                        <div className="flex-shrink-0">
                             {task.canSubmit ? (
                                 <Button 
                                     onClick={() => handleOpenDialog(task)}
-                                    className="w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold shadow-md shadow-violet-200"
+                                    className="w-full sm:w-auto bg-violet-600 hover:bg-violet-700 text-white font-medium shadow-sm"
                                 >
-                                    <Send className="mr-2 h-4 w-4" /> Give Feedback
+                                    Share Feedback <ChevronRight className="ml-2 h-4 w-4" />
                                 </Button>
                             ) : (
-                                <div className="w-full flex justify-between items-center">
-                                    <span className="text-sm text-gray-500 font-medium">Next feedback:</span>
+                                <div className="w-full sm:w-auto flex justify-center sm:justify-end">
                                     {task.lastSubmissionDate && <CooldownTimer lastSubmissionDate={task.lastSubmissionDate} />}
                                 </div>
                             )}
-                        </CardFooter>
+                        </div>
                     </Card>
                 ))}
             </div>
         ) : (
-             <Card className="p-12 text-center border-dashed border-2 bg-white/50">
-                <div className="flex flex-col items-center justify-center text-gray-400">
-                    <AlertCircle className="h-12 w-12 mb-4" />
-                    <p className="text-lg font-medium text-gray-600">No active classes found</p>
-                    <p className="text-sm">You need to be enrolled in a batch to give feedback.</p>
-                </div>
-            </Card>
+             <div className="text-center py-16 bg-white rounded-xl border border-dashed border-slate-300">
+                <AlertCircle className="h-10 w-10 text-slate-400 mx-auto mb-3" />
+                <h3 className="text-lg font-medium text-slate-900">No active classes found</h3>
+                <p className="text-slate-500">You need to be enrolled in a batch to give feedback.</p>
+            </div>
         )}
       </div>
 
-      {/* 4. Feedback Dialog (Dropdown/Modal) */}
+      {/* 3. Feedback Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden rounded-2xl bg-white">
-            <DialogHeader className="p-6 bg-gradient-to-r from-violet-600 to-indigo-600 text-white">
-                <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+          <DialogContent className="max-w-md w-full rounded-2xl p-0 overflow-hidden bg-white">
+            <DialogHeader className="p-5 border-b bg-slate-50/80">
+                <DialogTitle className="text-xl font-bold text-slate-800">
                     Feedback for {selectedFeedbackTask?.subject}
                 </DialogTitle>
-                <DialogDescription className="text-violet-100">
-                    Your responses are anonymous and help us improve.
+                <DialogDescription>
+                    Rate your experience below
                 </DialogDescription>
             </DialogHeader>
 
-            <div className="p-6 max-h-[60vh] overflow-y-auto space-y-8">
+            <div className="p-5 space-y-6 overflow-y-auto max-h-[60vh]">
                 {questions.map(({ key, text }) => (
-                    <div key={key} className="space-y-3">
-                        <label className="text-sm font-semibold text-gray-700 block">
-                            {text} <span className="text-red-500">*</span>
-                        </label>
+                    <div key={key} className="flex flex-col gap-2">
+                        <label className="text-sm font-medium text-slate-700">{text}</label>
                         <StarRating
                             rating={ratings[key as keyof typeof ratings]}
                             setRating={(rating) => setRatings(prev => ({ ...prev, [key]: rating }))}
@@ -339,29 +300,25 @@ export const StudentFeedback = () => {
                     </div>
                 ))}
 
-                <div className="space-y-3">
-                    <label className="text-sm font-semibold text-gray-700 block">
-                        Additional Comments <span className="text-red-500">*</span>
-                    </label>
+                <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-slate-700">Comments</label>
                     <Textarea
-                        className="min-h-[100px] resize-none focus-visible:ring-violet-500"
-                        placeholder="What did you like? What can be improved?"
+                        className="resize-none min-h-[100px]"
+                        placeholder="Write your feedback here..."
                         value={comments}
                         onChange={(e) => setComments(e.target.value)}
                     />
                 </div>
             </div>
 
-            <DialogFooter className="p-6 bg-gray-50 border-t flex-col sm:flex-row gap-3">
-                <DialogClose asChild>
-                    <Button variant="outline" onClick={resetForm} className="sm:w-auto w-full">Cancel</Button>
-                </DialogClose>
+            <DialogFooter className="p-5 border-t bg-slate-50/80 flex-col sm:flex-row gap-2">
+                <Button variant="ghost" onClick={resetForm} className="w-full sm:w-auto">Cancel</Button>
                 <Button 
                     onClick={handleSubmit} 
-                    className="bg-violet-600 hover:bg-violet-700 text-white sm:w-auto w-full"
+                    className="bg-violet-600 hover:bg-violet-700 w-full sm:w-auto"
                     disabled={submitFeedbackMutation.isPending}
                 >
-                    {submitFeedbackMutation.isPending ? 'Submitting...' : 'Submit Feedback'}
+                    {submitFeedbackMutation.isPending ? 'Submitting...' : 'Submit'}
                 </Button>
             </DialogFooter>
           </DialogContent>
