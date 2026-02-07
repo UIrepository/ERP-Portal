@@ -37,7 +37,6 @@ interface NavigationState {
   block: string | null;
 }
 
-// Inner component that uses the chat drawer hook
 const StudentMainContent = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
@@ -82,7 +81,7 @@ const StudentMainContent = () => {
     setSearchParams(params, { replace: true });
   }, [setSearchParams]);
 
-  // Read URL params on mount and when enrollments load
+  // Read URL params on mount
   useEffect(() => {
     if (!userEnrollments || userEnrollments.length === 0 || isInitialized) return;
     
@@ -90,12 +89,10 @@ const StudentMainContent = () => {
     const subjectParam = searchParams.get('subject');
     const blockParam = searchParams.get('block');
     
-    // Validate batch exists in enrollments
     const validBatch = batchParam && availableBatches.includes(batchParam) 
       ? batchParam 
       : availableBatches[0] || null;
     
-    // Validate subject exists for the batch
     const subjectsForBatch = userEnrollments
       .filter(e => e.batch_name === validBatch)
       .map(e => e.subject_name);
@@ -103,7 +100,6 @@ const StudentMainContent = () => {
       ? subjectParam 
       : null;
     
-    // Determine level
     let level: NavigationLevel = 'batch';
     if (blockParam && validSubject) {
       level = 'block';
@@ -135,86 +131,51 @@ const StudentMainContent = () => {
     ).sort();
   }, [userEnrollments, navigation.batch]);
 
-  // Real-time sync for enrollments
+  // Real-time sync
   useEffect(() => {
     if (!profile?.user_id) return;
     const channel = supabase
       .channel('student-main-enrollments')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_enrollments',
-          filter: `user_id=eq.${profile.user_id}`,
-        },
-        () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_enrollments', filter: `user_id=eq.${profile.user_id}` }, () => {
           queryClient.invalidateQueries({ queryKey: ['studentMainEnrollments'] });
         }
       )
       .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [profile?.user_id, queryClient]);
 
   // Navigation handlers
   const handleSelectBatch = (batch: string) => {
-    const newNav: NavigationState = {
-      level: 'batch',
-      batch,
-      subject: null,
-      block: null,
-    };
+    const newNav: NavigationState = { level: 'batch', batch, subject: null, block: null };
     setNavigation(newNav);
     updateUrl(newNav);
     setActiveTab('classes');
   };
 
   const handleSelectSubject = (subject: string) => {
-    const newNav: NavigationState = {
-      ...navigation,
-      level: 'subject',
-      subject,
-      block: null,
-    };
+    const newNav: NavigationState = { ...navigation, level: 'subject', subject, block: null };
     setNavigation(newNav);
     updateUrl(newNav);
   };
 
   const handleSelectBlock = (block: string) => {
-    // Intercept Community Block Selection
     if (block === 'community') {
       window.open('/portal/student/community', '_blank');
       return;
     }
-
-    const newNav: NavigationState = {
-      ...navigation,
-      level: 'block',
-      block,
-    };
+    const newNav: NavigationState = { ...navigation, level: 'block', block };
     setNavigation(newNav);
     updateUrl(newNav);
   };
 
   const handleBackToSubjects = () => {
-    const newNav: NavigationState = {
-      ...navigation,
-      level: 'batch',
-      subject: null,
-      block: null,
-    };
+    const newNav: NavigationState = { ...navigation, level: 'batch', subject: null, block: null };
     setNavigation(newNav);
     updateUrl(newNav);
   };
 
   const handleBackToBlocks = () => {
-    const newNav: NavigationState = {
-      ...navigation,
-      level: 'subject',
-      block: null,
-    };
+    const newNav: NavigationState = { ...navigation, level: 'subject', block: null };
     setNavigation(newNav);
     updateUrl(newNav);
   };
@@ -249,19 +210,19 @@ const StudentMainContent = () => {
       case 'classes':
         return (
           <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div className="mb-4">
+            <div className="mb-6">
               <h2 className="text-lg font-semibold text-[#1e293b] mb-0.5">Subjects</h2>
               <p className="text-[13px] text-[#64748b]">Select your subjects & start learning</p>
             </div>
 
             {isLoadingEnrollments ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {[...Array(4)].map((_, i) => (
-                  <Skeleton key={i} className="h-16 rounded-lg" />
+                  <Skeleton key={i} className="h-20 rounded-lg" />
                 ))}
               </div>
             ) : subjectsForBatch.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {subjectsForBatch.map((subject, index) => (
                   <StudentSubjectCard
                     key={subject}
@@ -272,7 +233,7 @@ const StudentMainContent = () => {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-12">
+              <div className="text-center py-16 bg-slate-50 rounded-lg border border-dashed border-slate-200">
                 <p className="text-[#64748b] text-sm">No subjects found for this batch.</p>
               </div>
             )}
@@ -317,35 +278,34 @@ const StudentMainContent = () => {
   };
 
   return (
-    // Updated container: reduced max-width constraint, removed horizontal padding on mobile
-    <div className="w-full mx-auto px-0 sm:px-4 py-3 flex flex-col items-center min-h-screen">
+    // Outer container: Centralized, comfortable max-width, proper vertical padding
+    <div className="w-full max-w-5xl mx-auto px-4 md:px-6 py-6 flex flex-col items-center min-h-screen font-sans">
       
-      {/* FLOAT HEADER - Updated shape */}
-      {/* rounded-t-xl rounded-b-none, full width utilisation */}
-      <header className="w-full bg-white rounded-t-xl rounded-b-none overflow-hidden shadow-sm mb-0.5 border-b border-slate-100">
+      {/* HEADER SECTION - Rounded Top Only, Zero Bottom Margin */}
+      <header className="w-full bg-white rounded-t-2xl border-b border-slate-100 overflow-hidden shadow-sm relative z-10">
         
-        {/* Top Banner - Dark Gradient */}
-        <div className="relative bg-gradient-to-br from-slate-900 to-slate-800 px-4 py-6 text-white overflow-hidden">
+        {/* Banner with Gradient & Texture */}
+        <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-6 py-8 text-white">
           <div 
-            className="absolute top-0 right-0 w-[200px] h-full bg-teal-500/10 z-0"
+            className="absolute top-0 right-0 w-[240px] h-full bg-teal-500/10 z-0"
             style={{ clipPath: 'polygon(100% 0, 0% 100%, 100% 100%)' }}
           />
           
           <div className="relative z-10 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold tracking-tight">
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold tracking-tight">
                 {navigation.batch || "No Batch Selected"}
               </h1>
               {availableBatches.length > 1 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="text-white/70 hover:text-white hover:bg-white/10 h-7 w-7">
-                      <ChevronDown className="h-4 w-4" />
+                    <Button variant="ghost" size="icon" className="text-white/70 hover:text-white hover:bg-white/10 h-8 w-8 rounded-full">
+                      <ChevronDown className="h-5 w-5" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
+                  <DropdownMenuContent align="start" className="w-56">
                     {availableBatches.map((b) => (
-                      <DropdownMenuItem key={b} onClick={() => handleSelectBatch(b)}>
+                      <DropdownMenuItem key={b} onClick={() => handleSelectBatch(b)} className="py-2.5 cursor-pointer">
                         {b}
                       </DropdownMenuItem>
                     ))}
@@ -356,9 +316,9 @@ const StudentMainContent = () => {
           </div>
         </div>
 
-        {/* Navigation Tabs - Reduced padding */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-4">
-          <nav className="flex gap-4 overflow-x-auto w-full sm:w-auto no-scrollbar">
+        {/* Navigation Tabs - Seamlessly attached */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-6 bg-white">
+          <nav className="flex gap-6 overflow-x-auto w-full sm:w-auto no-scrollbar">
             {[
               { id: 'classes', label: 'All Classes' },
               { id: 'live', label: 'Join Live Class' },
@@ -370,34 +330,33 @@ const StudentMainContent = () => {
                 key={tab.id}
                 onClick={() => handleTabClick(tab.id)}
                 className={cn(
-                  "py-3 text-[13px] font-medium transition-colors relative whitespace-nowrap",
+                  "py-4 text-[14px] font-medium transition-colors relative whitespace-nowrap",
                   activeTab === tab.id 
-                    ? "text-teal-600" 
+                    ? "text-teal-600 font-semibold" 
                     : "text-slate-500 hover:text-slate-800"
                 )}
               >
                 {tab.label}
                 {activeTab === tab.id && (
-                  <div className="absolute bottom-0 left-0 w-full h-[2px] bg-teal-600 rounded-t" />
+                  <div className="absolute bottom-0 left-0 w-full h-[3px] bg-teal-600 rounded-t-full" />
                 )}
               </button>
             ))}
           </nav>
 
-          <button className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 my-3 sm:my-0 rounded-lg bg-slate-50 text-[12px] font-medium text-slate-700 hover:bg-slate-100 transition-colors">
-            <Share2 className="h-3.5 w-3.5" />
+          <button className="hidden sm:flex items-center gap-2 px-4 py-2 my-3 sm:my-0 rounded-lg bg-slate-50 text-[13px] font-medium text-slate-700 hover:bg-slate-100 transition-colors border border-slate-100">
+            <Share2 className="h-4 w-4" />
             Share Batch
           </button>
         </div>
       </header>
 
-      {/* MAIN CONTENT - Sharp top corners to match header bottom, rounded bottom corners */}
-      <div className="w-full bg-white rounded-b-xl rounded-t-none shadow-lg p-4 sm:p-6 min-h-[500px]">
+      {/* CONTENT SECTION - Rounded Bottom Only, Zero Top Margin */}
+      <div className="w-full bg-white rounded-b-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 md:p-8 min-h-[600px] border-x border-b border-slate-100/50">
         {renderTabContent()}
       </div>
     </div>
   );
 };
 
-// Export the main component directly
 export const StudentMain = StudentMainContent;
