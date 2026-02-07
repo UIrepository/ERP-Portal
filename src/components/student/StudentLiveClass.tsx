@@ -3,7 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, addMinutes, isWithinInterval, differenceInMinutes } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { generateJitsiRoomName } from '@/lib/jitsiUtils';
-import { cn } from '@/lib/utils';
 
 interface StudentLiveClassProps {
   batch: string | null;
@@ -165,11 +164,11 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
   const allClasses = [...liveClasses, ...upcomingClasses];
 
   return (
-    // Main Container matching .section-container
-    <div className="w-full bg-white border border-slate-200 rounded-[4px] p-8 font-sans antialiased text-slate-900">
+    // Clean Container - No border, no bg, no extra padding
+    <div className="w-full font-sans antialiased text-slate-900">
       
       {/* Header */}
-      <div className="border-b border-slate-100 pb-4 mb-6">
+      <div className="mb-6">
         <h1 className="text-[18px] font-semibold tracking-tight text-slate-900">
            Live Class Sessions
         </h1>
@@ -180,7 +179,7 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
           
           {/* Render Live Classes First */}
           {liveClasses.map((item) => (
-             <div key={item.id} className="bg-white border border-slate-200 rounded-[4px] p-6 flex flex-col justify-between min-h-[180px] transition-colors hover:border-slate-300">
+             <div key={item.id} className="bg-white border border-slate-200 rounded-[4px] p-6 flex flex-col justify-between min-h-[180px] transition-colors hover:border-slate-300 shadow-sm">
                 <div className="mb-5">
                    {/* Status Badge */}
                    <div className="flex items-center gap-1.5 mb-3">
@@ -215,7 +214,7 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
 
           {/* Render Upcoming Classes */}
           {upcomingClasses.map((item) => (
-             <div key={item.id} className="bg-white border border-slate-200 rounded-[4px] p-6 flex flex-col justify-between min-h-[180px] transition-colors hover:border-slate-300">
+             <div key={item.id} className="bg-white border border-slate-200 rounded-[4px] p-6 flex flex-col justify-between min-h-[180px] transition-colors hover:border-slate-300 shadow-sm">
                 <div className="mb-5">
                    {/* Status Badge */}
                    <div className="flex items-center gap-1.5 mb-3">
@@ -248,9 +247,9 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
         </div>
       ) : (
         /* Empty State */
-        <div className="flex flex-col items-center justify-center py-16 opacity-80">
-           <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-3">
-              <span className="text-xl opacity-40">☕</span>
+        <div className="flex flex-col items-center justify-center py-12 border border-dashed border-slate-200 rounded-[4px] bg-slate-50/50">
+           <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mb-3">
+              <span className="text-lg opacity-40">☕</span>
            </div>
            <h3 className="text-sm font-semibold text-slate-900">No classes scheduled</h3>
            <p className="text-xs text-slate-500 mt-1">There are no live or upcoming sessions for today.</p>
