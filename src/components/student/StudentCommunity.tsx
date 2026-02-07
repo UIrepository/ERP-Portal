@@ -512,7 +512,7 @@ export const StudentCommunity = () => {
         
         {/* BACK TO SSP BUTTON */}
         <div className="p-4 border-b bg-gray-50 flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/portal/student')} className="mr-1 text-gray-500 hover:text-gray-900 hover:bg-gray-200">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="mr-1 text-gray-500 hover:text-gray-900 hover:bg-gray-200">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Users className="h-5 w-5 text-teal-600" /> Communities</h2>
