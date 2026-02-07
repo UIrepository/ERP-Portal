@@ -1,7 +1,10 @@
 /**
  * Custom video controls overlay component
  * Features: Play/Pause, Seek, Volume, Speed, Fullscreen, Sidebar Toggles
- * Updates: "White on hover" effect for all controls
+ * Updates: 
+ * - Fixed seek functionality (prevention of play/pause toggle on click)
+ * - Removed text from skip buttons
+ * - Added pointer-events handling
  */
 
 import { useState, useRef } from 'react';
@@ -15,8 +18,8 @@ import {
   SkipBack,
   SkipForward,
   Settings,
-  FileText, // PDF-like symbol for Doubts
-  ListVideo, // List symbol for Lectures
+  FileText,
+  ListVideo,
   Check
 } from 'lucide-react';
 import { VideoControlsProps } from './types';
@@ -81,6 +84,7 @@ export const VideoControls = ({
 
   // Handle progress bar click/drag
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation(); // Prevent toggling play/pause on the parent container
     if (!progressRef.current) return;
     const rect = progressRef.current.getBoundingClientRect();
     const percent = (e.clientX - rect.left) / rect.width;
@@ -96,7 +100,10 @@ export const VideoControls = ({
   };
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/80 to-transparent pt-12 pb-4 px-4 transition-opacity duration-300">
+    <div 
+      className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/80 to-transparent pt-12 pb-4 px-4 transition-opacity duration-300 pointer-events-auto"
+      onClick={(e) => e.stopPropagation()} // Stop propagation for the entire control bar
+    >
       
       {/* Top Row: Time | Speed | Progress | Total Time */}
       <div className="flex items-center gap-3 mb-3 px-1">
@@ -113,13 +120,13 @@ export const VideoControls = ({
         {/* Progress Bar Container */}
         <div 
           ref={progressRef}
-          className="relative flex-1 h-1 group cursor-pointer py-2" // Added py-2 to increase clickable area
+          className="relative flex-1 h-1 group cursor-pointer py-3" // Increased py-3 for easier clicking
           onClick={handleProgressClick}
           onMouseMove={handleProgressHover}
           onMouseLeave={() => setSeekPreview(null)}
         >
           {/* Track Background */}
-          <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1 bg-white/20 rounded-full overflow-hidden">
+          <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1 bg-white/20 rounded-full overflow-hidden pointer-events-none">
              {/* Buffered progress */}
             <div 
               className="absolute top-0 left-0 h-full bg-white/30"
@@ -135,7 +142,7 @@ export const VideoControls = ({
           {/* Hover Preview Tooltip */}
           {seekPreview !== null && (
             <div 
-              className="absolute bottom-4 transform -translate-x-1/2 bg-black/90 border border-white/10 text-white text-xs px-2 py-1 rounded shadow-xl"
+              className="absolute bottom-6 transform -translate-x-1/2 bg-black/90 border border-white/10 text-white text-xs px-2 py-1 rounded shadow-xl pointer-events-none"
               style={{ left: `${(seekPreview / duration) * 100}%` }}
             >
               {formatTime(seekPreview)}
@@ -179,7 +186,6 @@ export const VideoControls = ({
             aria-label="Skip backward 10 seconds"
           >
             <SkipBack className="w-6 h-6" />
-            <span className="absolute text-[8px] font-bold top-[7px]">10</span>
           </button>
 
           {/* Skip Forward 10s */}
@@ -189,7 +195,6 @@ export const VideoControls = ({
             aria-label="Skip forward 10 seconds"
           >
             <SkipForward className="w-6 h-6" />
-            <span className="absolute text-[8px] font-bold top-[7px]">10</span>
           </button>
 
           {/* Volume Control */}
