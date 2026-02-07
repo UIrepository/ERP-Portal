@@ -175,7 +175,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
   const tabs = getTabs();
 
   return (
-    <div className="w-full bg-white border-r border-slate-200 h-full flex flex-col">
+    <div className="w-full bg-white h-full flex flex-col overflow-hidden">
       {/* Header - Fixed at top */}
       <div className="p-4 border-b border-slate-200 shrink-0">
         <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-16 w-auto mx-auto mb-4 md:hidden" />
@@ -198,8 +198,8 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
         )}
       </div>
       
-      {/* Navigation - Takes available space */}
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+      {/* Navigation - Scrollable only if needed */}
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto min-h-0">
           {tabs.map((tab) => {
             const isContactAdminTab = tab.id === 'contact-admin';
             const isSupportTab = tab.id === 'support';
@@ -270,8 +270,8 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
           })}
       </nav>
       
-      {/* Logout Button - Pinned to bottom using Flexbox */}
-      <div className="p-4 border-t border-slate-200 bg-white shrink-0 mt-auto">
+      {/* Logout Button - Always fixed at bottom */}
+      <div className="p-4 border-t border-slate-200 bg-white shrink-0">
         <Button
           variant="destructive"
           className="w-full justify-center"
