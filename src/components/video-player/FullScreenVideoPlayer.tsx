@@ -3,17 +3,19 @@
  * * Features:
  * - High Z-Index to cover floating chat widgets
  * - Custom controls passed to VideoControls
- * - Integrated Sidebar
+ * - Integrated Sidebar (Desktop) / Drawer (Mobile)
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, ChevronRight, Play } from 'lucide-react';
+import { Drawer } from "vaul";
 import { VideoPlayerProps, Lecture } from './types';
 import { useVideoPlayer, parseVideoUrl } from './useVideoPlayer';
 import { VideoControls } from './VideoControls';
 import { DoubtsPanel } from './DoubtsPanel';
 import { NextLecturePanel } from './NextLecturePanel';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 type SidebarTab = 'doubts' | 'lectures' | null;
 
@@ -30,6 +32,7 @@ export const FullScreenVideoPlayer = ({
   const [activeSidebar, setActiveSidebar] = useState<SidebarTab>(null);
   const youtubeInitialized = useRef(false);
   const [showVignette, setShowVignette] = useState(true); // Show vignette at start
+  const isMobile = useIsMobile();
   
   // Video player hook
   const {
@@ -76,7 +79,11 @@ export const FullScreenVideoPlayer = ({
   const handleLectureChange = useCallback((lecture: Lecture) => {
     setShowVignette(true);
     onLectureChange?.(lecture);
-  }, [onLectureChange]);
+    // Close sidebar/drawer on mobile when selection is made
+    if (isMobile) {
+      setActiveSidebar(null);
+    }
+  }, [onLectureChange, isMobile]);
 
   // Handle doubt submission
   const handleDoubtSubmit = useCallback((question: string) => {
@@ -219,6 +226,26 @@ export const FullScreenVideoPlayer = ({
     return () => window.removeEventListener('keydown', handleEsc);
   }, [isFullscreen, handleClose]);
 
+  // Render content for panels (shared between Drawer and Sidebar)
+  const renderPanelContent = () => (
+    <>
+      {activeSidebar === 'doubts' && (
+        <DoubtsPanel
+          doubts={doubts}
+          onSubmitDoubt={handleDoubtSubmit}
+          userName={userName}
+        />
+      )}
+      {activeSidebar === 'lectures' && (
+        <NextLecturePanel
+          lectures={lectures}
+          currentLectureId={currentLecture.id}
+          onSelectLecture={handleLectureChange}
+        />
+      )}
+    </>
+  );
+
   return (
     <div 
       ref={containerRef}
@@ -235,7 +262,8 @@ export const FullScreenVideoPlayer = ({
       {/* Main Video Area */}
       <div className={cn(
         "flex-1 relative transition-all duration-300",
-        activeSidebar && "mr-80"
+        // Only add right margin on desktop when sidebar is open
+        activeSidebar && !isMobile && "mr-80"
       )}>
         {/* Close Button */}
         <button
@@ -347,36 +375,52 @@ export const FullScreenVideoPlayer = ({
         </div>
       </div>
 
-      {/* Right Sidebar */}
-      <div className={cn(
-        "fixed top-0 right-0 h-full w-80 bg-zinc-900 border-l border-zinc-700 z-30 transition-transform duration-300 ease-out",
-        activeSidebar ? "translate-x-0" : "translate-x-full"
-      )}>
-        {/* Sidebar Close Button */}
-        <button
-          onClick={() => setActiveSidebar(null)}
-          className="absolute top-4 left-4 p-1 hover:bg-zinc-800 rounded transition-colors z-10"
-          aria-label="Close sidebar"
+      {/* Mobile Drawer (Portrait Mode) */}
+      {isMobile && (
+        <Drawer.Root 
+          shouldScaleBackground
+          open={!!activeSidebar}
+          onOpenChange={(open) => {
+            if (!open) setActiveSidebar(null);
+          }}
         >
-          <ChevronRight className="w-5 h-5 text-white/60 hover:text-white" />
-        </button>
+          <Drawer.Portal>
+            {/* High Z-Index to appear on top of video player */}
+            <Drawer.Overlay className="fixed inset-0 z-[2147483647] bg-black/80" />
+            <Drawer.Content 
+              className="fixed inset-x-0 bottom-0 z-[2147483648] mt-24 flex h-[80vh] flex-col rounded-t-[10px] border-t border-zinc-700 bg-zinc-900 outline-none"
+            >
+              {/* Handle */}
+              <div className="mx-auto mt-4 h-1.5 w-[100px] flex-shrink-0 rounded-full bg-zinc-700" />
+              
+              {/* Scrollable Content */}
+              <div className="flex-1 overflow-y-auto p-4 min-h-0">
+                {renderPanelContent()}
+              </div>
+            </Drawer.Content>
+          </Drawer.Portal>
+        </Drawer.Root>
+      )}
 
-        {/* Sidebar Content */}
-        {activeSidebar === 'doubts' && (
-          <DoubtsPanel
-            doubts={doubts}
-            onSubmitDoubt={handleDoubtSubmit}
-            userName={userName}
-          />
-        )}
-        {activeSidebar === 'lectures' && (
-          <NextLecturePanel
-            lectures={lectures}
-            currentLectureId={currentLecture.id}
-            onSelectLecture={handleLectureChange}
-          />
-        )}
-      </div>
+      {/* Desktop Sidebar (Render only if NOT mobile) */}
+      {!isMobile && (
+        <div className={cn(
+          "fixed top-0 right-0 h-full w-80 bg-zinc-900 border-l border-zinc-700 z-30 transition-transform duration-300 ease-out",
+          activeSidebar ? "translate-x-0" : "translate-x-full"
+        )}>
+          {/* Sidebar Close Button */}
+          <button
+            onClick={() => setActiveSidebar(null)}
+            className="absolute top-4 left-4 p-1 hover:bg-zinc-800 rounded transition-colors z-10"
+            aria-label="Close sidebar"
+          >
+            <ChevronRight className="w-5 h-5 text-white/60 hover:text-white" />
+          </button>
+
+          {/* Sidebar Content */}
+          {renderPanelContent()}
+        </div>
+      )}
     </div>
   );
 };
