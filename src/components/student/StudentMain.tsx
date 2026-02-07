@@ -7,11 +7,10 @@ import { StudentSubjectCard } from './StudentSubjectCard';
 import { StudentSubjectBlocks } from './StudentSubjectBlocks';
 import { StudentBlockContent } from './StudentBlockContent';
 import { StudentAnnouncements } from './StudentAnnouncements';
-import { StudentCommunity } from './StudentCommunity';
 import { StudentConnect } from './StudentConnect';
 import { StudentLiveClass } from './StudentLiveClass';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ChevronDown } from 'lucide-react';
+import { ArrowRightLeft } from 'lucide-react'; 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useChatDrawer } from '@/hooks/useChatDrawer';
@@ -298,10 +297,10 @@ const StudentMainContent = () => {
     // Outer Container
     <div className="w-full max-w-[1600px] mx-auto px-4 md:px-6 py-6 flex flex-col gap-6 min-h-screen font-sans">
       
-      {/* HEADER SECTION - Light Purple/Violet Theme */}
+      {/* HEADER SECTION */}
       <header className="w-full rounded-t-lg rounded-b-none overflow-hidden shadow-sm border border-indigo-100/50 relative z-10 group">
         
-        {/* Banner with Premium Light Violet Gradient */}
+        {/* Banner */}
         <div className="relative bg-gradient-to-br from-violet-100 via-indigo-50 to-purple-100 px-6 py-8 text-slate-900">
           
           {/* Dot Pattern Overlay */}
@@ -315,16 +314,24 @@ const StudentMainContent = () => {
             style={{ clipPath: 'polygon(100% 0, 0% 100%, 100% 100%)' }}
           />
           
-          <div className="relative z-10 flex items-center justify-between">
+          <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            {/* Title - Arrow REMOVED */}
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold tracking-tight text-slate-900">
                 {navigation.batch || "No Batch Selected"}
               </h1>
-              {availableBatches.length > 1 && (
+            </div>
+
+            {/* SWITCH BATCH BUTTON */}
+            {availableBatches.length > 1 && (
                 <Sheet open={isBatchSheetOpen} onOpenChange={setIsBatchSheetOpen}>
                   <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-900 hover:bg-white/50 h-8 w-8 rounded-full transition-all">
-                      <ChevronDown className="h-5 w-5" />
+                    <Button 
+                      variant="outline" 
+                      className="bg-white/80 backdrop-blur-sm border-indigo-200 text-indigo-700 hover:bg-white hover:text-indigo-800 shadow-sm gap-2 font-medium"
+                    >
+                      Switch Batch
+                      <ArrowRightLeft className="h-4 w-4 opacity-70" />
                     </Button>
                   </SheetTrigger>
                   <SheetContent side="right" className="w-full sm:w-[400px] flex flex-col p-0 z-[100]">
@@ -376,11 +383,10 @@ const StudentMainContent = () => {
                   </SheetContent>
                 </Sheet>
               )}
-            </div>
           </div>
         </div>
 
-        {/* Navigation Tabs - Glassy effect */}
+        {/* Navigation Tabs */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-6 bg-white/70 backdrop-blur-md border-t border-indigo-50">
           <nav className="flex gap-6 overflow-x-auto w-full sm:w-auto no-scrollbar">
             {[
@@ -408,7 +414,7 @@ const StudentMainContent = () => {
             ))}
           </nav>
 
-          {/* Enroll More Button with Logo */}
+          {/* Enroll More Button */}
           <button 
             onClick={() => window.open('https://www.unknowniitians.com/courses', '_blank')}
             className="hidden sm:flex items-center gap-2 px-4 py-2 my-3 sm:my-0 rounded-lg bg-white border border-indigo-100 text-[13px] font-medium text-slate-600 hover:text-violet-700 hover:border-violet-200 hover:bg-violet-50/50 transition-all shadow-sm"
