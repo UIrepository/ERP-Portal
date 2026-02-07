@@ -1,128 +1,179 @@
-import { HelpCircle, MessageCircle, FileText, Video, Clock, ChevronRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useState } from 'react';
+import { Search, ChevronRight, ChevronDown, Mail, Video, Clock, FileText, HelpCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { StudentAnnouncements } from './StudentAnnouncements';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface StudentConnectProps {
   onOpenSupportDrawer?: () => void;
 }
 
 export const StudentConnect = ({ onOpenSupportDrawer }: StudentConnectProps) => {
+  const [activeTab, setActiveTab] = useState<'help' | 'notice'>('help');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // FAQs Data based on your design + previous useful context
+  const faqs = [
+    {
+      id: "item-1",
+      question: "Where can I find notes and PYQs?",
+      answer: "You can find all study materials under the **Study Material** section of your specific batch. Previous Year Questions (PYQs) are usually located in the 'Resources' tab of each subject."
+    },
+    {
+      id: "item-2",
+      question: "How do I join live classes?",
+      answer: "Navigate to your Dashboard. When a class is about to start (usually 5-10 mins prior), a 'Join Now' button will appear on the class card. Simply click that to enter the virtual classroom."
+    },
+    {
+      id: "item-3",
+      question: "Is offline viewing possible?",
+      answer: "Yes, on the mobile app, you can download recordings and watch them later without an internet connection. Web portal currently supports streaming only."
+    },
+    {
+      id: "item-4",
+      question: "How to update my profile details?",
+      answer: "Go to Settings > Profile in the sidebar. There you can update your phone number, email address, and profile picture. Some details like Name may require Admin approval."
+    },
+    {
+      id: "item-5",
+      question: "My FastTrack batch is not showing up.",
+      answer: "This usually happens if the payment is still being processed or cache is old. Please wait 30 minutes, or try logging out and logging back in to refresh your library."
+    }
+  ];
+
+  const filteredFaqs = faqs.filter(f => 
+    f.question.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    f.answer.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
-    <div className="space-y-8 p-6 max-w-4xl mx-auto animate-in fade-in duration-500">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Help & Support</h1>
-          <p className="text-slate-500 mt-2 text-lg">
-            Find answers to common questions or connect with our support team.
-          </p>
-        </div>
+    <div className="max-w-[850px] mx-auto p-4 md:p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      
+      {/* --- Top Navigation & Search --- */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
         
-        {/* Get Support Button */}
-        {onOpenSupportDrawer && (
-          <Button 
-            onClick={onOpenSupportDrawer} 
-            size="lg" 
-            className="bg-slate-900 text-white hover:bg-slate-800 shadow-lg shadow-slate-200/50 gap-2 transition-all hover:scale-105 active:scale-95"
+        {/* Tabs */}
+        <div className="bg-slate-100 p-1 rounded-xl inline-flex self-start">
+          <button
+            onClick={() => setActiveTab('help')}
+            className={cn(
+              "px-5 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+              activeTab === 'help' 
+                ? "bg-white text-indigo-600 shadow-sm" 
+                : "text-slate-500 hover:text-slate-700 bg-transparent"
+            )}
           >
-            <MessageCircle className="h-5 w-5" />
-            Contact Support
-          </Button>
-        )}
-      </div>
-
-      {/* FAQs Section */}
-      <div className="grid gap-6">
-        <Card className="border-slate-200 shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <HelpCircle className="h-5 w-5 text-blue-600" />
-              Frequently Asked Questions
-            </CardTitle>
-            <CardDescription>
-              Quick answers to the most common queries about your classes and portal.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Accordion type="single" collapsible className="w-full">
-              
-              <AccordionItem value="item-1">
-                <AccordionTrigger className="text-base font-medium text-slate-800 hover:no-underline">
-                  <div className="flex items-center gap-3">
-                    <Video className="h-4 w-4 text-slate-400" />
-                    How do I join my live class?
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="text-slate-600 leading-relaxed pl-7 pb-4">
-                  Navigate to your <strong>Dashboard</strong> or <strong>Schedule</strong> tab. When a class is live (usually 5 minutes before start time), a "Join Now" button will appear on the class card. Click it to enter the classroom.
-                </AccordionContent>
-              </AccordionItem>
-
-              <AccordionItem value="item-2">
-                <AccordionTrigger className="text-base font-medium text-slate-800 hover:no-underline">
-                  <div className="flex items-center gap-3">
-                    <Clock className="h-4 w-4 text-slate-400" />
-                    Where can I view class recordings?
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="text-slate-600 leading-relaxed pl-7 pb-4">
-                  Go to the <strong>Recordings</strong> tab in your batch view. Recordings are typically uploaded within 24 hours of the live session completing. You can filter them by subject and date.
-                </AccordionContent>
-              </AccordionItem>
-
-              <AccordionItem value="item-3">
-                <AccordionTrigger className="text-base font-medium text-slate-800 hover:no-underline">
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-4 w-4 text-slate-400" />
-                    How do I submit an assignment?
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="text-slate-600 leading-relaxed pl-7 pb-4">
-                  Go to the specific subject, select the <strong>Assignments</strong> or <strong>DPP</strong> tab. Click on the pending assignment, and use the "Upload Solution" button to submit your work (PDF or Image format).
-                </AccordionContent>
-              </AccordionItem>
-
-              <AccordionItem value="item-4">
-                <AccordionTrigger className="text-base font-medium text-slate-800 hover:no-underline">
-                  <div className="flex items-center gap-3">
-                    <HelpCircle className="h-4 w-4 text-slate-400" />
-                    My attendance isn't updating?
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="text-slate-600 leading-relaxed pl-7 pb-4">
-                  Attendance is marked automatically when you stay in a live class for more than 15 minutes. Note that it may take up to 2 hours after the class ends for the system to update your attendance record.
-                </AccordionContent>
-              </AccordionItem>
-
-            </Accordion>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Still need help banner */}
-      <div className="bg-blue-50 border border-blue-100 rounded-xl p-6 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div>
-          <h3 className="font-semibold text-blue-900 text-lg">Still need help?</h3>
-          <p className="text-blue-700 text-sm mt-1">
-            Our support team is available Mon-Sat, 9 AM - 6 PM.
-          </p>
+            Help Centre
+          </button>
+          <button
+            onClick={() => setActiveTab('notice')}
+            className={cn(
+              "px-5 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+              activeTab === 'notice' 
+                ? "bg-white text-indigo-600 shadow-sm" 
+                : "text-slate-500 hover:text-slate-700 bg-transparent"
+            )}
+          >
+            Notice Board
+          </button>
         </div>
-        {onOpenSupportDrawer && (
-           <Button 
-             variant="outline" 
-             onClick={onOpenSupportDrawer}
-             className="border-blue-200 text-blue-700 hover:bg-blue-100 hover:text-blue-800 bg-white"
-           >
-             Chat with Us
-           </Button>
-        )}
+
+        {/* Search Box */}
+        <div className="relative w-full md:max-w-[300px]">
+          <input
+            type="text"
+            placeholder="Type your query here..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all placeholder:text-slate-400"
+          />
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        </div>
       </div>
+
+      {/* --- Content Area --- */}
+      {activeTab === 'help' ? (
+        <div className="space-y-8">
+          
+          {/* Headline */}
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-800 tracking-tight">
+            Tell us how we can help 👋
+          </h1>
+
+          {/* FAQ Accordion */}
+          <div className="space-y-3">
+            <Accordion type="single" collapsible className="w-full space-y-3">
+              {filteredFaqs.map((faq) => (
+                <AccordionItem 
+                  key={faq.id} 
+                  value={faq.id} 
+                  className="border-none rounded-xl bg-[#f5f8ff] overflow-hidden data-[state=open]:bg-[#edf2ff] transition-colors duration-200"
+                >
+                  <AccordionTrigger className="px-6 py-4 hover:no-underline text-[15px] font-medium text-slate-700 hover:text-slate-900">
+                    {faq.question}
+                  </AccordionTrigger>
+                  <AccordionContent className="px-6 pb-5 pt-0 text-slate-500 text-sm leading-relaxed">
+                    {faq.answer}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+            
+            {filteredFaqs.length === 0 && (
+              <p className="text-center text-slate-400 py-8">No results found for "{searchQuery}"</p>
+            )}
+          </div>
+
+          {/* Show More Button (Mock) */}
+          {filteredFaqs.length > 0 && (
+            <button className="w-full flex items-center justify-center gap-2 text-indigo-600 font-semibold text-sm hover:text-indigo-700 transition-colors py-2">
+              Show More <ChevronDown className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Support Card */}
+          <div className="mt-8 bg-gradient-to-br from-white to-[#f9faff] rounded-xl border border-slate-200 p-6 md:p-8 flex flex-col-reverse md:flex-row items-center justify-between gap-6 shadow-[0_4px_12px_rgba(0,0,0,0.03)]">
+            <div className="flex-1 text-center md:text-left space-y-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-800">Need help?</h2>
+                <p className="text-slate-500 text-sm mt-1">Get in touch and we will be happy to help you.</p>
+              </div>
+              
+              {onOpenSupportDrawer && (
+                <button 
+                  onClick={onOpenSupportDrawer}
+                  className="inline-flex items-center gap-2 bg-indigo-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 active:scale-95 transition-all shadow-sm"
+                >
+                  <Mail className="w-4 h-4" />
+                  Contact Us
+                </button>
+              )}
+            </div>
+            
+            {/* Illustration */}
+            <div className="shrink-0">
+               <img 
+                 src="https://illustrations.popsy.co/blue/customer-support.svg" 
+                 alt="Customer Support" 
+                 className="w-32 md:w-40 h-auto opacity-90 drop-shadow-sm"
+                 loading="lazy"
+               />
+            </div>
+          </div>
+
+        </div>
+      ) : (
+        /* --- Notice Board Tab Content --- */
+        <div className="animate-in fade-in duration-300">
+           <StudentAnnouncements />
+        </div>
+      )}
+
     </div>
   );
 };
