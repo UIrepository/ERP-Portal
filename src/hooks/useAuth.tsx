@@ -6,91 +6,44 @@ type AuthContextType = {
   session: Session | null;
   user: User | null;
   isLoading: boolean;
-  signIn: () => void; // Legacy stubs
-  signUp: () => void; // Legacy stubs
+  signIn: () => void;
+  signUp: () => void;
   signOut: () => Promise<void>;
-  setGoogleUser: (user: any) => void; // New method to handle manual Google login
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
-  const [googleUser, setGoogleUserState] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Check for existing Supabase session
+    // Check for initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (!session) {
-        // 2. If no Supabase session, check for manually stored Google user
-        const storedGoogleUser = localStorage.getItem('google_user');
-        if (storedGoogleUser) {
-          setGoogleUserState(JSON.parse(storedGoogleUser));
-        }
-      }
       setIsLoading(false);
     });
 
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session) {
-        // If Supabase session exists, clear manual Google user to avoid conflicts
-        setGoogleUserState(null);
-        localStorage.removeItem('google_user');
-      }
       setIsLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const setGoogleUser = (user: any) => {
-    setGoogleUserState(user);
-    if (user) {
-      localStorage.setItem('google_user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('google_user');
-    }
-  };
-
   const signOut = async () => {
     await supabase.auth.signOut();
-    setGoogleUser(null);
-    window.location.href = '/auth';
   };
 
-  // Create a mock session object if we have a googleUser but no Supabase session
-  const effectiveSession = session || (googleUser ? { 
-    access_token: 'google-access-token', 
-    token_type: 'bearer',
-    expires_in: 3600,
-    refresh_token: '',
-    user: { 
-      id: googleUser.sub, 
-      email: googleUser.email,
-      user_metadata: { ...googleUser } 
-    } 
-  } as unknown as Session : null);
-
-  const effectiveUser = session?.user || (googleUser ? {
-    id: googleUser.sub,
-    email: googleUser.email,
-    user_metadata: { ...googleUser },
-    app_metadata: {},
-    aud: 'authenticated',
-    created_at: new Date().toISOString()
-  } as unknown as User : null);
-
   const value = {
-    session: effectiveSession,
-    user: effectiveUser,
+    session,
+    user: session?.user ?? null,
     isLoading,
-    signIn: () => {},
-    signUp: () => {},
-    signOut,
-    setGoogleUser
+    signIn: () => {}, // Legacy stubs
+    signUp: () => {}, // Legacy stubs
+    signOut
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
