@@ -224,7 +224,11 @@ export const TeacherJoinClass = () => {
 
   const proceedToMeeting = () => {
     if (!currentClass) return;
-    const roomUrl = `https://meet.jit.si/${encodeURIComponent(currentClass.batch)}/${encodeURIComponent(currentClass.subject)}`;
+    
+    // CORRECTED: Use generateJitsiRoomName to ensure Teacher joins the same room as Students
+    const roomName = generateJitsiRoomName(currentClass.batch, currentClass.subject);
+    const roomUrl = `https://meet.jit.si/${encodeURIComponent(roomName)}`;
+    
     window.open(roomUrl, '_blank');
     setShowStreamDialog(false);
   };
