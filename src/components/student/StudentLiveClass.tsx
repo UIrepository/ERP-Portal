@@ -3,6 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, addMinutes, isWithinInterval, differenceInMinutes } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { generateJitsiRoomName } from '@/lib/jitsiUtils';
+import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button'; // Ensure Button is imported
+import { toast } from 'sonner';
 
 interface StudentLiveClassProps {
   batch: string | null;
@@ -23,6 +26,7 @@ interface ScheduleWithLink {
 }
 
 export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
+  const { profile, user } = useAuth();
   const today = new Date();
   const currentDayOfWeek = today.getDay();
   const todayDateStr = format(today, 'yyyy-MM-dd');
@@ -59,7 +63,7 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
       }
       const { data: meetingLinks } = await linkQuery;
 
-      // 3. Get Active Classes
+      // 3. Get Active Classes (To check if teacher is inside)
       let activeClassQuery = supabase
         .from('active_classes')
         .select('*')
@@ -79,12 +83,15 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
         return schedule.day_of_week === currentDayOfWeek;
       });
 
-      // 5. Map Links
+      // 5. Map Links & Status
       return validSchedules.map(schedule => {
         const activeJitsi = activeClasses?.find(ac => ac.subject === schedule.subject);
         const subjectLink = meetingLinks?.find(l => l.subject === schedule.subject);
         
-        const generatedJitsiLink = `https://meet.jit.si/${generateJitsiRoomName(schedule.batch, schedule.subject)}`;
+        // Base Jitsi Link
+        const roomName = generateJitsiRoomName(schedule.batch, schedule.subject);
+        const generatedJitsiLink = `https://meet.jit.si/${roomName}`;
+        
         const dbLink = activeJitsi?.room_url || schedule.link || subjectLink?.link;
 
         let finalLink = null;
@@ -101,12 +108,12 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
         return {
           ...schedule,
           meeting_link_url: finalLink,
-          is_jitsi_live: !!activeJitsi
+          is_jitsi_live: !!activeJitsi // True only if teacher has started class
         };
       });
     },
     enabled: !!batch,
-    refetchInterval: 10000 
+    refetchInterval: 5000 // Faster refresh to catch when teacher starts
   });
 
   const now = new Date();
@@ -125,14 +132,12 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
     const endTime = new Date(today);
     endTime.setHours(endHour, endMin, 0, 0);
     
-    // Live: Buffer -15 min start, +15 min end
     const bufferStart = addMinutes(startTime, -15);
     const bufferEnd = addMinutes(endTime, 15);
     
     if (isWithinInterval(now, { start: bufferStart, end: bufferEnd })) {
       liveClasses.push(schedule);
     } 
-    // Upcoming: Starts within the next 4 hours
     else if (now < startTime && differenceInMinutes(startTime, now) < 240) {
       upcomingClasses.push(schedule);
     }
@@ -140,9 +145,31 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
 
   upcomingClasses.sort((a, b) => a.start_time.localeCompare(b.start_time));
 
-  const handleJoinClass = (meetingLink: string | null) => {
-    if (meetingLink) {
-      window.open(meetingLink, '_blank');
+  const handleJoinClass = (item: ScheduleWithLink) => {
+    if (!item.meeting_link_url) return;
+
+    // Check if it's a Jitsi link
+    if (item.meeting_link_url.includes('meet.jit.si')) {
+      
+      // 1. Construct Safe URL for Students
+      const urlObj = new URL(item.meeting_link_url);
+      
+      // 2. Append Configuration Hash
+      // This forces the "Stop Live Stream" button to disappear for students
+      const configParams = [
+        `config.liveStreamingEnabled=false`,
+        `config.prejoinPageEnabled=false`,
+        `config.disableRemoteMute=true`, // Prevent students muting others
+        `userInfo.displayName="${profile?.name || user?.email || 'Student'}"`
+      ];
+
+      // Jitsi reads config from the hash
+      urlObj.hash = configParams.join('&');
+
+      window.open(urlObj.toString(), '_blank');
+    } else {
+      // Zoom or Google Meet
+      window.open(item.meeting_link_url, '_blank');
     }
   };
 
@@ -164,10 +191,7 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
   const allClasses = [...liveClasses, ...upcomingClasses];
 
   return (
-    // Clean Container - No border, no bg, no extra padding
     <div className="w-full font-sans antialiased text-slate-900 p-4 md:p-6">
-      
-      {/* Header */}
       <div className="mb-6">
         <h1 className="text-[18px] font-semibold tracking-tight text-slate-900">
            Live Class Sessions
@@ -177,22 +201,19 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
       {allClasses.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           
-          {/* Render Live Classes First */}
+          {/* Render Live Classes */}
           {liveClasses.map((item) => (
              <div key={item.id} className="bg-white border border-slate-200 rounded-[4px] p-6 flex flex-col justify-between min-h-[180px] transition-colors hover:border-slate-300 shadow-sm">
                 <div className="mb-5">
-                   {/* Status Badge */}
                    <div className="flex items-center gap-1.5 mb-3">
                       <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>
                       <span className="text-[11px] font-semibold uppercase tracking-wider text-red-600">
                         Live Now
                       </span>
                    </div>
-                   {/* Subject Title */}
                    <h2 className="text-[16px] font-semibold text-slate-900 mb-1 leading-tight">
                       {item.subject}
                    </h2>
-                   {/* Batch Name */}
                    <p className="text-[13px] font-normal text-slate-500">
                       {item.batch}
                    </p>
@@ -202,12 +223,23 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
                    <span className="text-[13px] font-normal text-slate-900">
                       {formatTimeRange(item.start_time, item.end_time)}
                    </span>
-                   <button 
-                     onClick={() => handleJoinClass(item.meeting_link_url)}
-                     className="bg-slate-900 text-white px-4 py-2 text-[12px] font-normal rounded-[4px] hover:bg-slate-800 transition-opacity"
-                   >
-                     Join Class
-                   </button>
+                   
+                   {/* CRITICAL FIX: 
+                     Only show "Join Class" if the teacher is actually LIVE.
+                     This forces the teacher to join first, making THEM the moderator.
+                   */}
+                   {item.is_jitsi_live ? (
+                       <button 
+                         onClick={() => handleJoinClass(item)}
+                         className="bg-slate-900 text-white px-4 py-2 text-[12px] font-normal rounded-[4px] hover:bg-slate-800 transition-opacity"
+                       >
+                         Join Class
+                       </button>
+                   ) : (
+                       <Button disabled variant="secondary" className="text-[12px] h-9 opacity-70">
+                         Waiting for Teacher...
+                       </Button>
+                   )}
                 </div>
              </div>
           ))}
@@ -216,18 +248,15 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
           {upcomingClasses.map((item) => (
              <div key={item.id} className="bg-white border border-slate-200 rounded-[4px] p-6 flex flex-col justify-between min-h-[180px] transition-colors hover:border-slate-300 shadow-sm">
                 <div className="mb-5">
-                   {/* Status Badge */}
                    <div className="flex items-center gap-1.5 mb-3">
                       <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
                       <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                         Upcoming
                       </span>
                    </div>
-                   {/* Subject Title */}
                    <h2 className="text-[16px] font-semibold text-slate-900 mb-1 leading-tight">
                       {item.subject}
                    </h2>
-                   {/* Batch Name */}
                    <p className="text-[13px] font-normal text-slate-500">
                       {item.batch}
                    </p>
@@ -237,16 +266,26 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
                    <span className="text-[13px] font-normal text-slate-900">
                       {formatTimeRange(item.start_time, item.end_time)}
                    </span>
-                   <span className="text-[12px] font-normal text-slate-500 bg-[#f9fafb] px-2.5 py-1 border border-slate-200 rounded-[4px]">
-                      Starts later
-                   </span>
+                   
+                    {/* Allow joining early only if teacher started early */}
+                   {item.is_jitsi_live ? (
+                       <button 
+                         onClick={() => handleJoinClass(item)}
+                         className="bg-slate-900 text-white px-4 py-2 text-[12px] font-normal rounded-[4px] hover:bg-slate-800 transition-opacity"
+                       >
+                         Join Early
+                       </button>
+                   ) : (
+                       <span className="text-[12px] font-normal text-slate-500 bg-[#f9fafb] px-2.5 py-1 border border-slate-200 rounded-[4px]">
+                          Starts later
+                       </span>
+                   )}
                 </div>
              </div>
           ))}
 
         </div>
       ) : (
-        /* Empty State */
         <div className="flex flex-col items-center justify-center py-12 border border-dashed border-slate-200 rounded-[4px] bg-slate-50/50">
            <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mb-3">
               <span className="text-lg opacity-40">☕</span>
@@ -255,7 +294,6 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
            <p className="text-xs text-slate-500 mt-1">There are no live or upcoming sessions for today.</p>
         </div>
       )}
-
     </div>
   );
 };
