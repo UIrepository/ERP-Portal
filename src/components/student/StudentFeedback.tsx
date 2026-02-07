@@ -1,440 +1,376 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { StudentSubjectCard } from './StudentSubjectCard';
-import { StudentSubjectBlocks } from './StudentSubjectBlocks';
-import { StudentBlockContent } from './StudentBlockContent';
-import { StudentAnnouncements } from './StudentAnnouncements';
-import { StudentCommunity } from './StudentCommunity';
-import { StudentConnect } from './StudentConnect';
-import { StudentLiveClass } from './StudentLiveClass';
-import { Skeleton } from '@/components/ui/skeleton';
-import { ChevronDown, ArrowRightLeft } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { useChatDrawer } from '@/hooks/useChatDrawer';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from '@/hooks/use-toast';
+import { Star, ArrowLeft } from 'lucide-react';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter, 
+  DialogClose, 
+  DialogDescription 
+} from '@/components/ui/dialog';
 import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerClose
+} from '@/components/ui/drawer';
+import { differenceInHours, format } from 'date-fns';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useIsMobile } from '@/hooks/use-mobile'; 
 
+// --- Types ---
 interface UserEnrollment {
-  batch_name: string;
-  subject_name: string;
+    batch_name: string;
+    subject_name: string;
 }
 
-type NavigationLevel = 'batch' | 'subject' | 'block';
-type TabType = 'classes' | 'live' | 'announcements' | 'community' | 'connect';
-
-interface NavigationState {
-  level: NavigationLevel;
-  batch: string | null;
-  subject: string | null;
-  block: string | null;
+interface FeedbackTask {
+    batch: string;
+    subject: string;
+    canSubmit: boolean;
+    lastSubmissionDate?: Date;
 }
 
-const StudentMainContent = () => {
+// --- Star Rating Component ---
+const StarRating = ({ rating, setRating }: { rating: number, setRating: (rating: number) => void }) => (
+  <div className="flex gap-2">
+    {[1, 2, 3, 4, 5].map((star) => (
+      <Star
+        key={star}
+        className={`cursor-pointer transition-all duration-200 h-8 w-8 ${
+            rating >= star 
+                ? 'text-yellow-400 fill-yellow-400' 
+                : 'text-gray-200 hover:text-gray-300'
+        }`}
+        onClick={() => setRating(star)}
+      />
+    ))}
+  </div>
+);
+
+// --- Shared Form Content ---
+const FeedbackFormContent = ({ 
+  questions, 
+  ratings, 
+  setRatings, 
+  comments, 
+  setComments 
+}: { 
+  questions: { key: string; text: string }[],
+  ratings: any,
+  setRatings: React.Dispatch<React.SetStateAction<any>>,
+  comments: string,
+  setComments: (value: string) => void
+}) => (
+  <div className="py-4 space-y-6">
+      {questions.map(({ key, text }) => (
+          <div key={key} className="space-y-3">
+              <label className="text-sm font-medium text-[#000000]">{text}</label>
+              <StarRating
+                  rating={ratings[key as keyof typeof ratings]}
+                  setRating={(rating) => setRatings(prev => ({ ...prev, [key]: rating }))}
+              />
+          </div>
+      ))}
+
+      <div className="space-y-3">
+          <label className="text-sm font-medium text-[#000000]">Additional Comments</label>
+          <Textarea
+              className="resize-none min-h-[100px] border-[#ededed] focus:border-black focus:ring-0"
+              placeholder="Tell us more about your experience..."
+              value={comments}
+              onChange={(e) => setComments(e.target.value)}
+          />
+      </div>
+  </div>
+);
+
+export const StudentFeedback = () => {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState<TabType>('classes');
-  const [isInitialized, setIsInitialized] = useState(false);
-  const { openSupportDrawer } = useChatDrawer();
+  const isMobile = useIsMobile(); 
   
-  const [navigation, setNavigation] = useState<NavigationState>({
-    level: 'batch',
-    batch: null,
-    subject: null,
-    block: null,
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<FeedbackTask | null>(null);
+  const [ratings, setRatings] = useState({
+    teacher_quality: 0,
+    concept_clarity: 0,
+    dpp_quality: 0,
+    premium_content_usefulness: 0,
+  });
+  const [comments, setComments] = useState('');
+
+  const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
+    queryKey: ['userEnrollments', profile?.user_id],
+    queryFn: async () => {
+        if (!profile?.user_id) return [];
+        const { data, error } = await supabase
+            .from('user_enrollments')
+            .select('batch_name, subject_name')
+            .eq('user_id', profile.user_id);
+        if (error) return [];
+        return data || [];
+    },
+    enabled: !!profile?.user_id
   });
 
-  // Batch Switcher State
-  const [isBatchSheetOpen, setIsBatchSheetOpen] = useState(false);
-  const [tempSelectedBatch, setTempSelectedBatch] = useState<string | null>(null);
-
-  // Fetch user enrollments
-  const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
-    queryKey: ['studentMainEnrollments', profile?.user_id],
+  const { data: submittedFeedback = [], isLoading: isLoadingFeedback } = useQuery({
+    queryKey: ['student-submitted-feedback', profile?.user_id],
     queryFn: async () => {
       if (!profile?.user_id) return [];
       const { data, error } = await supabase
-        .from('user_enrollments')
-        .select('batch_name, subject_name')
-        .eq('user_id', profile.user_id);
+        .from('feedback')
+        .select('batch, subject, created_at')
+        .eq('submitted_by', profile?.user_id)
+        .order('created_at', { ascending: false });
       if (error) return [];
       return data || [];
     },
     enabled: !!profile?.user_id,
   });
 
-  // Derive available batches
-  const availableBatches = useMemo(() => {
-    return Array.from(new Set(userEnrollments?.map((e) => e.batch_name) || [])).sort();
-  }, [userEnrollments]);
+  const feedbackTasks: FeedbackTask[] = useMemo(() => {
+    if (!userEnrollments) return [];
 
-  // Update URL when navigation changes
-  const updateUrl = useCallback((nav: NavigationState) => {
-    const params = new URLSearchParams();
-    if (nav.batch) params.set('batch', nav.batch);
-    if (nav.subject) params.set('subject', nav.subject);
-    if (nav.block) params.set('block', nav.block);
-    setSearchParams(params, { replace: true });
-  }, [setSearchParams]);
-
-  // Initialize navigation from URL
-  useEffect(() => {
-    if (!userEnrollments || userEnrollments.length === 0 || isInitialized) return;
-    
-    const batchParam = searchParams.get('batch');
-    const subjectParam = searchParams.get('subject');
-    const blockParam = searchParams.get('block');
-    
-    const validBatch = batchParam && availableBatches.includes(batchParam) 
-      ? batchParam 
-      : availableBatches[0] || null;
-    
-    const subjectsForBatch = userEnrollments
-      .filter(e => e.batch_name === validBatch)
-      .map(e => e.subject_name);
-    const validSubject = subjectParam && subjectsForBatch.includes(subjectParam) 
-      ? subjectParam 
-      : null;
-    
-    let level: NavigationLevel = 'batch';
-    if (blockParam && validSubject) {
-      level = 'block';
-    } else if (validSubject) {
-      level = 'subject';
-    }
-    
-    const newNav: NavigationState = {
-      level,
-      batch: validBatch,
-      subject: validSubject,
-      block: blockParam || null,
-    };
-    
-    setNavigation(newNav);
-    updateUrl(newNav);
-    setIsInitialized(true);
-  }, [userEnrollments, availableBatches, searchParams, isInitialized, updateUrl]);
-
-  // Initialize temp batch selection when sheet opens
-  useEffect(() => {
-    if (isBatchSheetOpen && navigation.batch) {
-      setTempSelectedBatch(navigation.batch);
-    }
-  }, [isBatchSheetOpen, navigation.batch]);
-
-  // Derive subjects for selected batch
-  const subjectsForBatch = useMemo(() => {
-    if (!navigation.batch || !userEnrollments) return [];
-    return Array.from(
-      new Set(
-        userEnrollments
-          .filter((e) => e.batch_name === navigation.batch)
-          .map((e) => e.subject_name)
-      )
-    ).sort();
-  }, [userEnrollments, navigation.batch]);
-
-  // Real-time sync
-  useEffect(() => {
-    if (!profile?.user_id) return;
-    const channel = supabase
-      .channel('student-main-enrollments')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_enrollments', filter: `user_id=eq.${profile.user_id}` }, () => {
-          queryClient.invalidateQueries({ queryKey: ['studentMainEnrollments'] });
+    const latestSubmissions = new Map<string, Date>();
+    submittedFeedback.forEach(f => {
+        const key = `${f.batch}-${f.subject}`;
+        if (!latestSubmissions.has(key)) {
+            latestSubmissions.set(key, new Date(f.created_at));
         }
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [profile?.user_id, queryClient]);
+    });
 
-  // Navigation handlers
-  const handleSelectBatch = (batch: string) => {
-    const newNav: NavigationState = { level: 'batch', batch, subject: null, block: null };
-    setNavigation(newNav);
-    updateUrl(newNav);
-    setActiveTab('classes');
+    return userEnrollments.map(enrollment => {
+        const key = `${enrollment.batch_name}-${enrollment.subject_name}`;
+        const lastSubmission = latestSubmissions.get(key);
+        const canSubmit = !lastSubmission || differenceInHours(new Date(), lastSubmission) >= 72;
+
+        return {
+            batch: enrollment.batch_name,
+            subject: enrollment.subject_name,
+            canSubmit,
+            lastSubmissionDate: lastSubmission,
+        };
+    }).sort((a,b) => {
+        if (a.canSubmit !== b.canSubmit) return a.canSubmit ? -1 : 1;
+        return a.subject.localeCompare(b.subject);
+    });
+  }, [userEnrollments, submittedFeedback]);
+
+  const submitFeedbackMutation = useMutation({
+    mutationFn: async (feedbackData: any) => {
+      const { error } = await supabase.from('feedback').insert([feedbackData]);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['student-submitted-feedback'] });
+      toast({ title: 'Success', description: 'Feedback submitted successfully', variant: "default" });
+      setIsDialogOpen(false);
+      resetForm();
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const resetForm = () => {
+    setRatings({ teacher_quality: 0, concept_clarity: 0, dpp_quality: 0, premium_content_usefulness: 0 });
+    setComments('');
+    setSelectedTask(null);
   };
 
-  const confirmBatchSwitch = () => {
-    if (tempSelectedBatch) {
-      handleSelectBatch(tempSelectedBatch);
-      setIsBatchSheetOpen(false);
-    }
+  const handleOpenDialog = (task: FeedbackTask) => {
+    setSelectedTask(task);
+    setIsDialogOpen(true);
   };
 
-  const handleSelectSubject = (subject: string) => {
-    const newNav: NavigationState = { ...navigation, level: 'subject', subject, block: null };
-    setNavigation(newNav);
-    updateUrl(newNav);
-  };
-
-  const handleSelectBlock = (block: string) => {
-    if (block === 'community') {
-      window.open('/portal/student/community', '_blank');
+  const handleSubmit = () => {
+    if (Object.values(ratings).some(r => r === 0)) {
+      toast({ title: 'Ratings Required', description: 'Please rate all categories.', variant: 'destructive' });
       return;
     }
-    const newNav: NavigationState = { ...navigation, level: 'block', block };
-    setNavigation(newNav);
-    updateUrl(newNav);
+    const feedbackToSubmit = {
+        batch: selectedTask?.batch,
+        subject: selectedTask?.subject,
+        ...ratings,
+        comments,
+        submitted_by: profile?.user_id,
+    };
+    submitFeedbackMutation.mutate(feedbackToSubmit);
   };
 
-  const handleBackToSubjects = () => {
-    const newNav: NavigationState = { ...navigation, level: 'batch', subject: null, block: null };
-    setNavigation(newNav);
-    updateUrl(newNav);
-  };
+  const questions = [
+    { key: 'teacher_quality', text: 'Teacher Quality' },
+    { key: 'concept_clarity', text: 'Concept Clarity' },
+    { key: 'dpp_quality', text: 'DPP Quality' },
+    { key: 'premium_content_usefulness', text: 'Premium Content' },
+  ];
 
-  const handleBackToBlocks = () => {
-    const newNav: NavigationState = { ...navigation, level: 'subject', block: null };
-    setNavigation(newNav);
-    updateUrl(newNav);
-  };
-
-  // Render block content view
-  if (navigation.level === 'block' && navigation.batch && navigation.subject && navigation.block) {
-    return (
-      <StudentBlockContent
-        blockId={navigation.block}
-        batch={navigation.batch}
-        subject={navigation.subject}
-        onBack={handleBackToBlocks}
-      />
-    );
-  }
-
-  // Render subject blocks view
-  if (navigation.level === 'subject' && navigation.batch && navigation.subject) {
-    return (
-      <StudentSubjectBlocks
-        batch={navigation.batch}
-        subject={navigation.subject}
-        onBack={handleBackToSubjects}
-        onBlockSelect={handleSelectBlock}
-      />
-    );
-  }
-
-  // --- Main Batch Level View ---
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'classes':
-        return (
-          <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold text-[#1e293b] mb-0.5">Subjects</h2>
-              <p className="text-[13px] text-[#64748b]">Select your subjects & start learning</p>
-            </div>
-
-            {isLoadingEnrollments ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {[...Array(4)].map((_, i) => (
-                  <Skeleton key={i} className="h-20 rounded-lg" />
-                ))}
-              </div>
-            ) : subjectsForBatch.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {subjectsForBatch.map((subject, index) => (
-                  <StudentSubjectCard
-                    key={subject}
-                    subject={subject}
-                    index={index}
-                    onClick={() => handleSelectSubject(subject)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-16 bg-slate-50 rounded-lg border border-dashed border-slate-200">
-                <p className="text-[#64748b] text-sm">No subjects found for this batch.</p>
-              </div>
-            )}
-          </div>
-        );
-      case 'live':
-        return (
-          <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-             <StudentLiveClass batch={navigation.batch} />
-          </div>
-        );
-      case 'announcements':
-        return (
-          <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {navigation.batch && (
-                <StudentAnnouncements 
-                    batch={navigation.batch} 
-                    enrolledSubjects={subjectsForBatch}
-                />
-            )}
-          </div>
-        );
-      case 'community':
-        return null;
-        case 'connect':
-          return (
-             <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <StudentConnect onOpenSupportDrawer={openSupportDrawer} />
-             </div>
-          );
-      default:
-        return null;
-    }
-  };
-
-  const handleTabClick = (tabId: string) => {
-    if (tabId === 'community') {
-      window.open('/portal/student/community', '_blank');
-    } else {
-      setActiveTab(tabId as TabType);
-    }
-  };
+  const isLoading = isLoadingEnrollments || isLoadingFeedback;
 
   return (
-    // Outer Container
-    <div className="w-full max-w-[1600px] mx-auto px-4 md:px-6 py-6 flex flex-col gap-6 min-h-screen font-sans">
+    <div className="min-h-screen bg-white font-sans text-[#000000]">
       
-      {/* HEADER SECTION - Light Purple/Violet Theme */}
-      <header className="w-full rounded-t-lg rounded-b-none overflow-hidden shadow-sm border border-indigo-100/50 relative z-10 group">
-        
-        {/* Banner with Premium Light Violet Gradient */}
-        <div className="relative bg-gradient-to-br from-violet-100 via-indigo-50 to-purple-100 px-6 py-8 text-slate-900">
-          
-          {/* Dot Pattern Overlay */}
-          <div className="absolute inset-0 z-0 opacity-[0.3]" 
-               style={{ backgroundImage: 'radial-gradient(#8b5cf6 0.5px, transparent 0.5px)', backgroundSize: '12px 12px' }}>
-          </div>
-
-          {/* Decorative Blur Accent */}
-          <div 
-            className="absolute top-0 right-0 w-[400px] h-full bg-indigo-200/20 blur-3xl z-0 pointer-events-none"
-            style={{ clipPath: 'polygon(100% 0, 0% 100%, 100% 100%)' }}
-          />
-          
-          <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                {navigation.batch || "No Batch Selected"}
-              </h1>
-            </div>
-
-            {/* Replaced Icon Button with Switch Batch Button */}
-            {availableBatches.length > 1 && (
-                <Sheet open={isBatchSheetOpen} onOpenChange={setIsBatchSheetOpen}>
-                  <SheetTrigger asChild>
-                    <Button 
-                      variant="outline" 
-                      className="bg-white/80 backdrop-blur-sm border-indigo-200 text-indigo-700 hover:bg-white hover:text-indigo-800 shadow-sm gap-2 font-medium"
-                    >
-                      Switch Batch
-                      <ArrowRightLeft className="h-4 w-4 opacity-70" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="right" className="w-full sm:w-[400px] flex flex-col p-0 z-[100]">
-                     <div className="p-6 border-b border-slate-100 mt-6 sm:mt-0">
-                        <h2 className="text-xl font-bold text-slate-900">Switch Batch</h2>
-                        <p className="text-sm text-slate-500 mt-1">Select the batch you want to switch to.</p>
-                     </div>
-                     
-                     <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                        {availableBatches.map((b) => (
-                            <div 
-                                key={b}
-                                onClick={() => setTempSelectedBatch(b)}
-                                className={cn(
-                                    "p-4 rounded-xl border cursor-pointer transition-all flex items-center justify-between",
-                                    tempSelectedBatch === b 
-                                        ? "border-indigo-600 bg-indigo-50/50 shadow-sm ring-1 ring-indigo-600/20" 
-                                        : "border-slate-200 hover:border-indigo-200 hover:bg-slate-50"
-                                )}
-                            >
-                                <span className={cn(
-                                    "font-medium text-sm sm:text-base", 
-                                    tempSelectedBatch === b ? "text-indigo-900" : "text-slate-700"
-                                )}>
-                                    {b}
-                                </span>
-                                <div className={cn(
-                                    "w-5 h-5 rounded-full border flex items-center justify-center transition-colors",
-                                    tempSelectedBatch === b 
-                                        ? "border-indigo-600 bg-indigo-600" 
-                                        : "border-slate-300"
-                                )}>
-                                    {tempSelectedBatch === b && (
-                                        <div className="w-2 h-2 bg-white rounded-full" />
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                     </div>
-
-                     <div className="p-6 border-t border-slate-100 bg-white">
-                        <Button 
-                            onClick={confirmBatchSwitch}
-                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white h-12 rounded-xl text-base font-semibold shadow-lg shadow-indigo-200 active:scale-[0.98] transition-all"
-                        >
-                            Switch Batch
-                        </Button>
-                     </div>
-                  </SheetContent>
-                </Sheet>
-              )}
-          </div>
-        </div>
-
-        {/* Navigation Tabs - Glassy effect */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-6 bg-white/70 backdrop-blur-md border-t border-indigo-50">
-          <nav className="flex gap-6 overflow-x-auto w-full sm:w-auto no-scrollbar">
-            {[
-              { id: 'classes', label: 'All Classes' },
-              { id: 'live', label: 'Join Live Class' },
-              { id: 'announcements', label: 'Announcements' },
-              { id: 'community', label: 'Community' },
-              { id: 'connect', label: 'Support Connect' },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => handleTabClick(tab.id)}
-                className={cn(
-                  "py-4 text-[14px] font-medium transition-colors relative whitespace-nowrap",
-                  activeTab === tab.id 
-                    ? "text-violet-700 font-semibold" 
-                    : "text-slate-500 hover:text-slate-900"
-                )}
-              >
-                {tab.label}
-                {activeTab === tab.id && (
-                  <div className="absolute bottom-0 left-0 w-full h-[3px] bg-violet-600 rounded-t-full" />
-                )}
-              </button>
-            ))}
-          </nav>
-
-          {/* Enroll More Button with Logo */}
-          <button 
-            onClick={() => window.open('https://www.unknowniitians.com/courses', '_blank')}
-            className="hidden sm:flex items-center gap-2 px-4 py-2 my-3 sm:my-0 rounded-lg bg-white border border-indigo-100 text-[13px] font-medium text-slate-600 hover:text-violet-700 hover:border-violet-200 hover:bg-violet-50/50 transition-all shadow-sm"
-          >
-            <img 
-              src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
-              alt="UI" 
-              className="h-4 w-auto object-contain" 
-            />
-            Enroll More
-          </button>
-        </div>
+      <header className="pt-8 pb-4 px-6 md:px-8 max-w-[900px] mx-auto">
+        <button 
+            onClick={() => navigate(-1)} 
+            className="text-[#666666] hover:text-[#000000] text-[0.9rem] flex items-center gap-1 transition-colors"
+        >
+            <ArrowLeft className="h-4 w-4" /> Back
+        </button>
       </header>
 
-      {/* CONTENT SECTION */}
-      <div className="w-full bg-white rounded-t-none rounded-b-lg shadow-sm border border-slate-100 p-6 md:p-8 h-auto min-h-[400px]">
-        {renderTabContent()}
-      </div>
+      <main className="max-w-[900px] mx-auto px-6 md:px-8 pb-20">
+        
+        <div className="mb-12">
+            <h1 className="text-[2rem] font-semibold tracking-tight mb-2">Your Voice Matters</h1>
+            <p className="text-[#666666] text-base">Provide feedback for your enrolled subjects.</p>
+        </div>
+
+        <div className="flex flex-col gap-6">
+            {isLoading ? (
+                [1, 2, 3].map((i) => (
+                    <div key={i} className="border border-[#ededed] rounded-xl p-8 flex justify-between items-center">
+                        <div className="space-y-3 w-full">
+                            <Skeleton className="h-6 w-24 rounded-md" />
+                            <Skeleton className="h-8 w-64 rounded-md" />
+                            <Skeleton className="h-4 w-48 rounded-md" />
+                        </div>
+                        <Skeleton className="h-12 w-32 rounded-lg hidden md:block" />
+                    </div>
+                ))
+            ) : feedbackTasks.length > 0 ? (
+                feedbackTasks.map((task, index) => (
+                    <div 
+                        key={index} 
+                        className="group border border-[#ededed] rounded-xl p-6 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 hover:border-[#d1d1d1] transition-colors duration-200 bg-white"
+                    >
+                        <div className="flex flex-col gap-2">
+                            <span className="bg-[#f5f5f5] text-[#666666] text-[0.7rem] font-semibold uppercase tracking-wider px-3 py-1 rounded-[4px] w-fit">
+                                {task.batch}
+                            </span>
+                            <h2 className="text-[1.2rem] font-semibold text-black">
+                                {task.subject}
+                            </h2>
+                            <p className="text-[0.85rem] text-[#666666]">
+                                {task.lastSubmissionDate 
+                                    ? `Last feedback given: ${format(new Date(task.lastSubmissionDate), 'd MMM yyyy')}`
+                                    : "No feedback given yet"
+                                }
+                            </p>
+                        </div>
+
+                        {task.canSubmit ? (
+                            <button 
+                                onClick={() => handleOpenDialog(task)}
+                                className="w-full md:w-auto bg-[#000000] text-white px-6 py-3 rounded-lg font-medium text-[0.9rem] hover:opacity-85 transition-opacity"
+                            >
+                                Share Feedback
+                            </button>
+                        ) : (
+                            <span className="text-[#10b981] text-[0.85rem] font-semibold bg-[#f0fdf4] px-4 py-2 rounded-lg whitespace-nowrap">
+                                Submitted
+                            </span>
+                        )}
+                    </div>
+                ))
+            ) : (
+                <div className="text-center py-20 border border-dashed border-[#ededed] rounded-xl">
+                    <p className="text-[#666666]">You are not enrolled in any batches yet.</p>
+                </div>
+            )}
+        </div>
+      </main>
+
+      {isMobile ? (
+        <Drawer open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DrawerContent className="max-h-[85vh]">
+            <DrawerHeader className="text-left border-b border-[#ededed] pb-4">
+              <DrawerTitle className="text-xl font-semibold">
+                Feedback for {selectedTask?.subject}
+              </DrawerTitle>
+              <DrawerDescription className="text-[#666666]">
+                {selectedTask?.batch}
+              </DrawerDescription>
+            </DrawerHeader>
+            
+            <div className="px-4 overflow-y-auto">
+              <FeedbackFormContent 
+                questions={questions}
+                ratings={ratings}
+                setRatings={setRatings}
+                comments={comments}
+                setComments={setComments}
+              />
+            </div>
+
+            <DrawerFooter className="border-t border-[#ededed] pt-4">
+              <Button 
+                onClick={handleSubmit} 
+                className="bg-black hover:bg-black/90 text-white w-full"
+                disabled={submitFeedbackMutation.isPending}
+              >
+                {submitFeedbackMutation.isPending ? 'Submitting...' : 'Submit Feedback'}
+              </Button>
+              <DrawerClose asChild>
+                <Button variant="outline" onClick={resetForm} className="border-[#ededed] text-[#666666] w-full">
+                  Cancel
+                </Button>
+              </DrawerClose>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogContent className="max-w-xl bg-white rounded-xl border-[#ededed]">
+              <DialogHeader className="border-b border-[#ededed] pb-4">
+                  <DialogTitle className="text-xl font-semibold">
+                      Feedback for {selectedTask?.subject}
+                  </DialogTitle>
+                  <DialogDescription className="text-[#666666]">
+                    {selectedTask?.batch}
+                  </DialogDescription>
+              </DialogHeader>
+
+              <div className="max-h-[60vh] overflow-y-auto px-1">
+                <FeedbackFormContent 
+                  questions={questions}
+                  ratings={ratings}
+                  setRatings={setRatings}
+                  comments={comments}
+                  setComments={setComments}
+                />
+              </div>
+
+              <DialogFooter className="border-t border-[#ededed] pt-4 gap-3">
+                  <DialogClose asChild>
+                      <Button variant="outline" onClick={resetForm} className="border-[#ededed] text-[#666666]">
+                          Cancel
+                      </Button>
+                  </DialogClose>
+                  <Button 
+                      onClick={handleSubmit} 
+                      className="bg-black hover:bg-black/90 text-white"
+                      disabled={submitFeedbackMutation.isPending}
+                  >
+                      {submitFeedbackMutation.isPending ? 'Submitting...' : 'Submit Feedback'}
+                  </Button>
+              </DialogFooter>
+            </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
-
-export const StudentMain = StudentMainContent;
