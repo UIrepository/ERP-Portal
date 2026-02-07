@@ -34,6 +34,7 @@ export const parseVideoUrl = (url: string): ParsedVideoUrl => {
 };
 
 // YouTube Player type for ref
+// UPDATE: Added getPlayerState to the type definition
 type YouTubePlayer = {
   playVideo: () => void;
   pauseVideo: () => void;
@@ -45,6 +46,7 @@ type YouTubePlayer = {
   getDuration: () => number;
   getCurrentTime: () => number;
   getVideoLoadedFraction: () => number;
+  getPlayerState: () => number; // Added this
   destroy: () => void;
 } | null;
 
@@ -113,6 +115,8 @@ export const useVideoPlayer = () => {
     }
     
     // Clear seeking flag after YouTube has time to update
+    // Note: The FullScreenVideoPlayer interval also checks for buffering state
+    // which provides additional protection against sticking
     setTimeout(() => {
       seekingRef.current = false;
     }, 500);
