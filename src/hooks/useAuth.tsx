@@ -1,187 +1,103 @@
-import * as React from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Database } from '@/integrations/supabase/types';
+import { Session, User } from '@supabase/supabase-js';
 
-type Profile = Database['public']['Tables']['profiles']['Row'];
-
-// Extended role type that includes all 4 roles
-type ExtendedRole = 'student' | 'admin' | 'manager' | 'teacher';
-
-interface AuthContextType {
-  user: User | null;
+type AuthContextType = {
   session: Session | null;
-  profile: Profile | null;
-  loading: boolean;
-  resolvedRole: ExtendedRole | null;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, name: string) => Promise<{ error: any }>;
+  user: User | null;
+  isLoading: boolean;
+  signIn: () => void; // Legacy stubs
+  signUp: () => void; // Legacy stubs
   signOut: () => Promise<void>;
-}
+  setGoogleUser: (user: any) => void; // New method to handle manual Google login
+};
 
-const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = React.useState<User | null>(null);
-  const [session, setSession] = React.useState<Session | null>(null);
-  const [profile, setProfile] = React.useState<Profile | null>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [resolvedRole, setResolvedRole] = React.useState<ExtendedRole | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [googleUser, setGoogleUserState] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Function to resolve role from role-specific tables (checks both user_id and email)
-  const resolveUserRole = React.useCallback(async (userId: string, userEmail: string): Promise<ExtendedRole> => {
-    // Check admin table first (highest privilege) - by user_id OR email
-    const { data: adminData } = await supabase
-      .from('admins')
-      .select('id')
-      .or(`user_id.eq.${userId},email.eq.${userEmail}`)
-      .limit(1)
-      .maybeSingle();
-
-    if (adminData) return 'admin';
-
-    // Check manager table - by user_id OR email
-    const { data: managerData } = await supabase
-      .from('managers')
-      .select('id')
-      .or(`user_id.eq.${userId},email.eq.${userEmail}`)
-      .limit(1)
-      .maybeSingle();
-
-    if (managerData) return 'manager';
-
-    // Check teacher table - by user_id OR email
-    const { data: teacherData } = await supabase
-      .from('teachers')
-      .select('id')
-      .or(`user_id.eq.${userId},email.eq.${userEmail}`)
-      .limit(1)
-      .maybeSingle();
-
-    if (teacherData) return 'teacher';
-
-    // Default to student
-    return 'student';
-  }, []);
-
-  React.useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-
-        if (session?.user) {
-          // Fetch user profile and resolve role
-          setTimeout(async () => {
-            const userId = session.user.id;
-            const userEmail = session.user.email || '';
-
-            // Call the role sync RPC and use its detected_role as the primary source of truth
-            let detectedRole: ExtendedRole | null = null;
-            try {
-              const { data, error } = await supabase.rpc('check_user_role_sync');
-              if (error) throw error;
-              const roleFromRpc = (data as any)?.detected_role as ExtendedRole | undefined;
-              if (roleFromRpc && ['admin', 'manager', 'teacher', 'student'].includes(roleFromRpc)) {
-                detectedRole = roleFromRpc;
-              }
-            } catch (err) {
-              console.warn('Role sync check failed:', err);
-            }
-
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('user_id', userId)
-              .single();
-            setProfile(profileData);
-
-          // Resolve the actual role from role tables (fallback if RPC failed)
-            const role = detectedRole ?? (await resolveUserRole(userId, userEmail));
-            setResolvedRole(role);
-
-            // Link user enrollments from external payments
-            try {
-              await supabase.functions.invoke('link-user-enrollments', {
-                body: {
-                  email: userEmail,
-                  user_id: userId
-                }
-              });
-              console.log('User enrollments linked successfully');
-            } catch (err) {
-              console.warn('Failed to link enrollments:', err);
-            }
-
-            setLoading(false);
-          }, 0);
-        } else {
-          setProfile(null);
-          setResolvedRole(null);
-          setLoading(false);
-        }
-      }
-    );
-
+  useEffect(() => {
+    // 1. Check for existing Supabase session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setUser(session?.user ?? null);
       if (!session) {
-        setLoading(false);
+        // 2. If no Supabase session, check for manually stored Google user
+        const storedGoogleUser = localStorage.getItem('google_user');
+        if (storedGoogleUser) {
+          setGoogleUserState(JSON.parse(storedGoogleUser));
+        }
       }
+      setIsLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) {
+        // If Supabase session exists, clear manual Google user to avoid conflicts
+        setGoogleUserState(null);
+        localStorage.removeItem('google_user');
+      }
+      setIsLoading(false);
     });
 
     return () => subscription.unsubscribe();
-  }, [resolveUserRole]);
+  }, []);
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error };
-  };
-
-  const signUp = async (email: string, password: string, name: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          name: name
-        }
-      }
-    });
-    return { error };
+  const setGoogleUser = (user: any) => {
+    setGoogleUserState(user);
+    if (user) {
+      localStorage.setItem('google_user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('google_user');
+    }
   };
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    setGoogleUser(null);
+    window.location.href = '/auth';
   };
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        session,
-        profile,
-        loading,
-        resolvedRole,
-        signIn,
-        signUp,
-        signOut,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  // Create a mock session object if we have a googleUser but no Supabase session
+  const effectiveSession = session || (googleUser ? { 
+    access_token: 'google-access-token', 
+    token_type: 'bearer',
+    expires_in: 3600,
+    refresh_token: '',
+    user: { 
+      id: googleUser.sub, 
+      email: googleUser.email,
+      user_metadata: { ...googleUser } 
+    } 
+  } as unknown as Session : null);
+
+  const effectiveUser = session?.user || (googleUser ? {
+    id: googleUser.sub,
+    email: googleUser.email,
+    user_metadata: { ...googleUser },
+    app_metadata: {},
+    aud: 'authenticated',
+    created_at: new Date().toISOString()
+  } as unknown as User : null);
+
+  const value = {
+    session: effectiveSession,
+    user: effectiveUser,
+    isLoading,
+    signIn: () => {},
+    signUp: () => {},
+    signOut,
+    setGoogleUser
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => {
-  const context = React.useContext(AuthContext);
+  const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
