@@ -258,9 +258,11 @@ export const StudentChatbot = () => {
       {/* Header */}
       <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 bg-slate-900 rounded flex items-center justify-center shadow-sm">
-            <span className="text-white font-bold text-[10px]">UK</span>
-          </div>
+          <img 
+            src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
+            alt="Logo" 
+            className="h-7 w-auto object-contain" 
+          />
           <span className="font-bold text-slate-800 text-sm tracking-tight">Support Center</span>
         </div>
         <button onClick={closeDrawer} className="text-slate-400 hover:text-slate-600 transition-colors">
@@ -345,8 +347,12 @@ export const StudentChatbot = () => {
 
       {/* Footer Logo */}
       <div className="p-4 flex justify-center border-t border-slate-100 bg-white/50">
-         <div className="flex items-center gap-1 opacity-40 grayscale">
-            <img src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" alt="UI" className="h-4 w-auto" />
+         <div className="flex items-center gap-2 opacity-50 grayscale hover:grayscale-0 transition-all duration-300">
+            <img 
+              src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
+              alt="UI" 
+              className="h-5 w-auto" 
+            />
             <span className="text-[10px] font-bold text-slate-600">Unknown IITians</span>
          </div>
       </div>
