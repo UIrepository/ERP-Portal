@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { useNavigate } from 'react-router-dom'; // Added import
 import { 
   Send, 
   Image as ImageIcon, 
@@ -18,13 +19,12 @@ import {
   X,
   Ban,
   Lock,
-  AlertCircle,
   Megaphone
 } from 'lucide-react';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { motion, AnimatePresence } from 'framer-motion'; // Requires framer-motion
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,8 +39,8 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
-  ContextMenuTrigger,
   ContextMenuSeparator,
+  ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import {
   Popover,
@@ -60,7 +60,7 @@ interface CommunityMessage {
   reply_to_id: string | null;
   created_at: string;
   is_deleted: boolean;
-  is_priority: boolean; // New Field
+  is_priority: boolean;
   profiles: { name: string } | null;
   message_likes: { user_id: string; reaction_type: string }[]; 
 }
@@ -175,7 +175,6 @@ const MessageItem = ({
     ? "rounded-tl-2xl rounded-tr-2xl rounded-bl-2xl rounded-br-none" 
     : "rounded-tl-2xl rounded-tr-2xl rounded-br-2xl rounded-bl-none";
 
-  // Priority Styles
   const priorityClass = msg.is_priority 
     ? "bg-rose-50 border-2 border-rose-200 text-rose-900 shadow-md" 
     : isMe 
@@ -211,7 +210,6 @@ const MessageItem = ({
         <ContextMenuTrigger className={`block max-w-[85%] md:max-w-[65%] relative ${reactionsCount > 0 ? 'mb-5' : 'mb-0'}`}>
           <div className={`relative px-4 py-3 shadow-sm text-sm transition-all ${bubbleShapeClass} ${priorityClass}`}>
             
-            {/* Priority Badge */}
             {msg.is_priority && (
               <div className="flex items-center gap-1.5 text-[10px] font-bold text-rose-600 uppercase tracking-wider mb-1.5 pb-1 border-b border-rose-200/50">
                 <Megaphone className="h-3 w-3 fill-rose-600" /> 
@@ -315,6 +313,7 @@ export const StudentCommunity = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
+  const navigate = useNavigate(); // Hook for navigation
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -510,7 +509,11 @@ export const StudentCommunity = () => {
       
       {/* GROUP LIST SIDEBAR */}
       <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
-        <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
+        {/* ADDED BACK BUTTON HERE */}
+        <div className="p-4 border-b bg-gray-50 flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="mr-1 text-gray-500 hover:text-gray-900 hover:bg-gray-200">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
           <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Users className="h-5 w-5 text-teal-600" /> Communities</h2>
         </div>
         <ScrollArea className="flex-1">
