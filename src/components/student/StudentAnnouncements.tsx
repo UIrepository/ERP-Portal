@@ -52,20 +52,20 @@ const AnnouncementCard = ({ announcement }: { announcement: Announcement }) => {
         <div className="bg-white border border-[#eaebed] rounded-[4px] p-5 hover:border-[#d1d5db] transition-colors duration-200 flex flex-col h-fit">
             {/* Sender Block */}
             <div className="flex items-center gap-3 mb-3.5">
-                 {/* Avatar - Clean, no grey background */}
-                 <div className="w-[34px] h-[34px] shrink-0 rounded-full overflow-hidden flex items-center justify-center">
+                 {/* Avatar - Clean, no grey background, perfect fit */}
+                 <div className="w-[36px] h-[36px] shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-transparent border border-slate-100">
                      <img 
                         src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
-                        alt="Logo" 
-                        className="w-full h-full object-contain"
+                        alt="UI" 
+                        className="w-full h-full object-contain p-0.5"
                      />
                  </div>
                  <div className="flex flex-col">
-                    {/* Main Sender - Static UI Team */}
-                    <span className="text-[14px] font-normal text-black font-sans leading-tight">
+                    {/* Main Sender - UI Team (Inter SemiBold) */}
+                    <span className="text-[14px] font-semibold text-black font-sans leading-tight">
                         UI Team
                     </span>
-                    {/* Meta Info - Sent by X • Time */}
+                    {/* Meta Info */}
                     <span className="text-[11px] text-[#888888] font-sans mt-0.5">
                         Sent by {announcement.created_by_name || 'Admin'} • {formatDistanceToNow(new Date(announcement.created_at), { addSuffix: true })}
                     </span>
