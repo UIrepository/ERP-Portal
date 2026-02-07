@@ -104,7 +104,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
     return () => { supabase.removeChannel(channel); };
   }, [profile?.user_id, queryClient, resolvedRole]);
 
-  // --- 1. STUDENT TABS (Simplified - Live class now inside subject blocks) ---
+  // --- 1. STUDENT TABS ---
   const studentTabs = [
     { id: 'dashboard', label: 'My Learning', icon: LayoutDashboard },
     { id: 'schedule', label: 'Schedule', icon: Calendar },
@@ -175,7 +175,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
   const tabs = getTabs();
 
   return (
-    <div className="w-full bg-white border-r border-slate-200 h-full flex flex-col relative">
+    <div className="w-full bg-white border-r border-slate-200 h-full flex flex-col">
       {/* Header - Fixed at top */}
       <div className="p-4 border-b border-slate-200 shrink-0">
         <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-16 w-auto mx-auto mb-4 md:hidden" />
@@ -198,8 +198,8 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
         )}
       </div>
       
-      {/* Navigation - Takes available space, with padding at bottom for logout */}
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto pb-20">
+      {/* Navigation - Takes available space */}
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {tabs.map((tab) => {
             const isContactAdminTab = tab.id === 'contact-admin';
             const isSupportTab = tab.id === 'support';
@@ -270,8 +270,8 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
           })}
       </nav>
       
-      {/* Logout Button - Absolutely fixed at bottom of sidebar */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-200 bg-white">
+      {/* Logout Button - Pinned to bottom using Flexbox */}
+      <div className="p-4 border-t border-slate-200 bg-white shrink-0 mt-auto">
         <Button
           variant="destructive"
           className="w-full justify-center"
