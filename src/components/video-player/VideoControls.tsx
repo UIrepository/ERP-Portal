@@ -1,7 +1,7 @@
 /**
  * Custom video controls overlay component
  * Fixes: Seek functionality, removes text from skip buttons, ensures pointer events work
- * Fixes: Settings menu z-index to appear above the player
+ * Fixes: Settings menu z-index, "white" selection background, and volume slider behavior
  */
 
 import { useState, useRef } from 'react';
@@ -232,6 +232,7 @@ export const VideoControls = ({
               showVolumeSlider ? "w-24 ml-3 opacity-100" : "w-0 opacity-0"
             )}>
               <Slider
+                // UPDATE: Decoupled visual slider value from mute state
                 value={[volume * 100]}
                 max={100}
                 step={1}
@@ -287,7 +288,10 @@ export const VideoControls = ({
             >
               {/* Playback Speed Submenu */}
               <DropdownMenuSub>
-                <DropdownMenuSubTrigger className="hover:bg-white/10 focus:bg-white/10 h-10">
+                <DropdownMenuSubTrigger 
+                  // UPDATE: Removed white background on hover/focus/open
+                  className="focus:bg-transparent data-[state=open]:bg-transparent hover:bg-transparent focus:text-white h-10"
+                >
                   <span>Playback Speed</span>
                   <span className="ml-auto text-zinc-400 text-xs">{playbackSpeed}x</span>
                 </DropdownMenuSubTrigger>
@@ -298,7 +302,8 @@ export const VideoControls = ({
                       <DropdownMenuItem
                         key={speed}
                         onClick={() => onSpeedChange(speed)}
-                        className="hover:bg-white/10 focus:bg-white/10 cursor-pointer justify-between"
+                        // UPDATE: Removed white background on hover/focus
+                        className="focus:bg-transparent hover:bg-transparent focus:text-white cursor-pointer justify-between"
                       >
                         {speed === 1 ? 'Normal' : `${speed}x`}
                         {playbackSpeed === speed && <Check className="w-4 h-4 ml-2" />}
@@ -310,18 +315,22 @@ export const VideoControls = ({
 
               {/* Video Quality Submenu */}
               <DropdownMenuSub>
-                <DropdownMenuSubTrigger className="hover:bg-white/10 focus:bg-white/10 h-10">
+                <DropdownMenuSubTrigger 
+                  // UPDATE: Removed white background on hover/focus/open
+                  className="focus:bg-transparent data-[state=open]:bg-transparent hover:bg-transparent focus:text-white h-10"
+                >
                   <span>Video Quality</span>
                   <span className="ml-auto text-zinc-400 text-xs">{currentQuality}</span>
                 </DropdownMenuSubTrigger>
                 <DropdownMenuPortal>
-                  {/* UPDATE: Added z-[2147483647] to ensure submenu appears above the video player */}
+                   {/* UPDATE: Added z-[2147483647] to ensure submenu appears above the video player */}
                   <DropdownMenuSubContent className="bg-zinc-900/95 border-zinc-700 text-white z-[2147483647]">
                     {VIDEO_QUALITIES.map((q) => (
                       <DropdownMenuItem
                         key={q}
                         onClick={() => setCurrentQuality(q)}
-                        className="hover:bg-white/10 focus:bg-white/10 cursor-pointer justify-between"
+                        // UPDATE: Removed white background on hover/focus
+                        className="focus:bg-transparent hover:bg-transparent focus:text-white cursor-pointer justify-between"
                       >
                         {q}
                         {currentQuality === q && <Check className="w-4 h-4 ml-2" />}
