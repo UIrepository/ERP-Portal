@@ -6,7 +6,6 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { cn } from '@/lib/utils';
 
 interface StudentConnectProps {
   onOpenSupportDrawer?: () => void;
@@ -127,24 +126,39 @@ export const StudentConnect = ({ onOpenSupportDrawer }: StudentConnectProps) => 
           )}
         </div>
 
-        {/* Support Card */}
-        <div className="bg-slate-50 border border-slate-200 rounded-lg p-6 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex-1 text-center md:text-left">
-            <h2 className="text-lg font-semibold text-slate-900">Still need help?</h2>
-            <p className="text-slate-500 text-sm mt-1">
-              Can't find what you're looking for? Contact our support team.
-            </p>
+        {/* Restored Rich Support Card */}
+        <div className="mt-8 bg-gradient-to-br from-white to-[#f9faff] rounded-2xl border border-slate-200 p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-8 shadow-[0_4px_20px_rgba(0,0,0,0.02)] relative overflow-hidden">
+          {/* Decorative background element */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 opacity-50 pointer-events-none" />
+
+          <div className="flex-1 text-center md:text-left space-y-4 relative z-10">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">Still need help?</h2>
+              <p className="text-slate-500 text-sm mt-1.5 leading-relaxed max-w-md">
+                Can't find the answer you're looking for? Chat with our support team directly.
+              </p>
+            </div>
+            
+            {onOpenSupportDrawer && (
+              <button 
+                onClick={onOpenSupportDrawer}
+                className="inline-flex items-center gap-2.5 bg-indigo-600 text-white px-6 py-3 rounded-xl text-sm font-semibold hover:bg-indigo-700 active:scale-95 transition-all shadow-lg shadow-indigo-200"
+              >
+                <Mail className="w-4 h-4" />
+                Contact Support
+              </button>
+            )}
           </div>
           
-          {onOpenSupportDrawer && (
-            <button 
-              onClick={onOpenSupportDrawer}
-              className="shrink-0 inline-flex items-center gap-2 bg-white border border-slate-200 text-slate-700 hover:text-slate-900 hover:border-slate-300 px-5 py-2.5 rounded-lg text-sm font-medium transition-all shadow-sm active:scale-95"
-            >
-              <Mail className="w-4 h-4" />
-              Contact Support
-            </button>
-          )}
+          {/* Illustration */}
+          <div className="shrink-0 relative z-10">
+             <img 
+               src="https://illustrations.popsy.co/blue/customer-support.svg" 
+               alt="Customer Support" 
+               className="w-40 md:w-48 h-auto drop-shadow-sm transform hover:scale-105 transition-transform duration-500"
+               loading="lazy"
+             />
+          </div>
         </div>
 
       </div>
