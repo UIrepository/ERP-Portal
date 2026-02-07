@@ -1,16 +1,9 @@
 /**
  * FullScreenVideoPlayer Component
- * * A professional, distraction-free video player for coaching platforms.
- * Supports YouTube embeds (with hidden branding) and direct video files.
  * * Features:
- * - Custom controls (play/pause, seek, volume, speed, fullscreen)
- * - Auto-hiding controls overlay
- * - Right sidebar with Doubts and Next Lecture panels
- * - Keyboard shortcuts support
- * - Smooth transitions and dark theme
- * - Prevents YouTube redirects and hides external branding
- * - Vignette effect at start/end to hide YouTube branding
- * - Video progress tracking with resume functionality
+ * - High Z-Index to cover floating chat widgets
+ * - Custom controls passed to VideoControls
+ * - Integrated Sidebar
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -22,7 +15,6 @@ import { DoubtsPanel } from './DoubtsPanel';
 import { NextLecturePanel } from './NextLecturePanel';
 import { useVideoProgress } from '@/hooks/useVideoProgress';
 import { cn } from '@/lib/utils';
-// Button import removed as it's no longer used for the top toggle
 
 type SidebarTab = 'doubts' | 'lectures' | null;
 
@@ -273,7 +265,8 @@ export const FullScreenVideoPlayer = ({
   return (
     <div 
       ref={containerRef}
-      className="fixed inset-0 z-50 bg-black flex"
+      // UPDATE: Changed z-50 to z-[2147483647] to cover the student support chat
+      className="fixed inset-0 z-[2147483647] bg-black flex"
       onMouseMove={showControlsTemporarily}
       onClick={(e) => {
         const target = e.target as HTMLElement;
@@ -291,12 +284,12 @@ export const FullScreenVideoPlayer = ({
         <button
           onClick={handleClose}
           className={cn(
-            "absolute top-4 left-4 z-20 p-2 bg-black/50 hover:bg-black/70 rounded-full transition-all",
+            "absolute top-4 left-4 z-20 p-2 bg-black/50 hover:bg-black/70 rounded-full transition-all group",
             showControls ? "opacity-100" : "opacity-0"
           )}
           aria-label="Close player"
         >
-          <X className="w-6 h-6 text-white" />
+          <X className="w-6 h-6 text-white/70 group-hover:text-white transition-colors" />
         </button>
 
         {/* Lecture Title */}
@@ -380,7 +373,6 @@ export const FullScreenVideoPlayer = ({
               onFullscreenToggle={toggleFullscreen}
               onSkipForward={skipForward}
               onSkipBackward={skipBackward}
-              // Pass the toggle handlers here
               onToggleDoubts={() => toggleSidebar('doubts')}
               onToggleLectures={() => toggleSidebar('lectures')}
             />
@@ -393,7 +385,7 @@ export const FullScreenVideoPlayer = ({
           !isPlaying && showControls ? "opacity-100" : "opacity-0"
         )} style={{ zIndex: 15 }}>
           <div className="w-20 h-20 rounded-full bg-black/50 flex items-center justify-center">
-            <Play className="w-10 h-10 text-white ml-1" fill="white" />
+            <Play className="w-10 h-10 text-white ml-1" fill="currentColor" />
           </div>
         </div>
       </div>
@@ -409,7 +401,7 @@ export const FullScreenVideoPlayer = ({
           className="absolute top-4 left-4 p-1 hover:bg-zinc-800 rounded transition-colors z-10"
           aria-label="Close sidebar"
         >
-          <ChevronRight className="w-5 h-5 text-white/60" />
+          <ChevronRight className="w-5 h-5 text-white/60 hover:text-white" />
         </button>
 
         {/* Sidebar Content */}
