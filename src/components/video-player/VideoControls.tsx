@@ -231,7 +231,9 @@ export const VideoControls = ({
               showVolumeSlider ? "w-24 ml-3 opacity-100" : "w-0 opacity-0"
             )}>
               <Slider
-                value={[isMuted ? 0 : volume * 100]}
+                // UPDATE: Decoupled visual slider value from mute state
+                // It now always shows the volume level, even if muted.
+                value={[volume * 100]}
                 max={100}
                 step={1}
                 onValueChange={([val]) => onVolumeChange(val / 100)}
