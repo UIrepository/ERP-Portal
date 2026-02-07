@@ -4,19 +4,18 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useGoogleLogin } from '@react-oauth/google';
+import { useNavigate } from 'react-router-dom';
 
 export const AuthPage = () => {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  // signIn and signUp are not directly used but kept for AuthContext compatibility
-  const { signIn, signUp } = useAuth(); 
+  const { setGoogleUser } = useAuth(); 
+  const navigate = useNavigate();
 
   const login = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       try {
-        // Verify the user via the Google User Info endpoint as strictly necessary
-        // (Since useGoogleLogin implicit flow returns an access_token, not an OIDC id_token)
+        // Fetch user info from Google using the access token
         const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
           headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
         });
@@ -27,17 +26,17 @@ export const AuthPage = () => {
 
         const userInfo = await userInfoResponse.json();
 
-        // Attempt to establish Supabase session. 
-        // Note: Without a signed OIDC ID token, we cannot securely create a Supabase session client-side.
-        // We proceed based on the successful Google verification.
         if (userInfo.email) {
+          // Manually set the user in AuthContext to bypass Supabase session check
+          setGoogleUser(userInfo);
+          
           toast({
             title: 'Success',
             description: `Signed in as ${userInfo.email}`,
           });
           
-          // Redirect to home/dashboard
-          window.location.href = '/';
+          // Navigate to dashboard
+          navigate('/');
         } else {
           throw new Error('No email found in Google profile');
         }
