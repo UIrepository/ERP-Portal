@@ -1,174 +1,127 @@
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { HelpCircle, MessageCircle, FileText, Video, Clock, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { MessageCircle, User, Shield, Briefcase, Headphones } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { StudentDirectMessage } from './StudentDirectMessage';
-import { useState } from 'react';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface StudentConnectProps {
   onOpenSupportDrawer?: () => void;
 }
 
 export const StudentConnect = ({ onOpenSupportDrawer }: StudentConnectProps) => {
-  const { profile } = useAuth();
-  
-  // 1. Fetch Teachers assigned to student's batch(es)
-  const { data: teachers, isLoading: loadingTeachers } = useQuery({
-    queryKey: ['my-teachers', profile?.user_id],
-    queryFn: async () => {
-      // First get student's enrolled batches
-      const { data: enrollments } = await supabase
-        .from('user_enrollments')
-        .select('batch_name')
-        .eq('user_id', profile?.user_id);
-      
-      const myBatches = enrollments?.map(e => e.batch_name) || [];
-
-      if (myBatches.length === 0) return [];
-
-      // Fetch teachers who have these batches in their assigned_batches array
-      const { data, error } = await supabase
-        .from('teachers')
-        .select('*')
-        .overlaps('assigned_batches', myBatches);
-      
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!profile?.user_id
-  });
-
-  // 2. Fetch Managers assigned to student's batch(es)
-  const { data: managers, isLoading: loadingManagers } = useQuery({
-    queryKey: ['my-managers', profile?.user_id],
-    queryFn: async () => {
-      const { data: enrollments } = await supabase
-        .from('user_enrollments')
-        .select('batch_name')
-        .eq('user_id', profile?.user_id);
-      
-      const myBatches = enrollments?.map(e => e.batch_name) || [];
-      if (myBatches.length === 0) return [];
-
-      const { data, error } = await supabase
-        .from('managers')
-        .select('*')
-        .overlaps('assigned_batches', myBatches);
-      
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!profile?.user_id
-  });
-
-  // 3. Fetch Admins (Always visible)
-  const { data: admins } = useQuery({
-    queryKey: ['all-admins'],
-    queryFn: async () => {
-      const { data } = await supabase.from('admins').select('*');
-      return data || [];
-    }
-  });
-
-  const [selectedContact, setSelectedContact] = useState<{id: string, name: string, role: string} | null>(null);
-
-  const renderCard = (person: any, role: string, icon: any) => (
-    <Card key={person.id} className="hover:shadow-md transition-all">
-      <CardContent className="p-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Avatar className="h-12 w-12 border-2 border-gray-100">
-            <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${person.name}`} />
-            <AvatarFallback>{person.name.substring(0, 2).toUpperCase()}</AvatarFallback>
-          </Avatar>
-          <div>
-            <h3 className="font-semibold text-gray-800">{person.name}</h3>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge variant="secondary" className="text-xs capitalize">
-                {role}
-              </Badge>
-              {role === 'Teacher' && person.assigned_subjects && (
-                <span className="text-xs text-muted-foreground">
-                  • {person.assigned_subjects.join(', ')}
-                </span>
-              )}
-            </div>
-          </div>
+  return (
+    <div className="space-y-8 p-6 max-w-4xl mx-auto animate-in fade-in duration-500">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Help & Support</h1>
+          <p className="text-slate-500 mt-2 text-lg">
+            Find answers to common questions or connect with our support team.
+          </p>
         </div>
         
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button 
-              size="sm" 
-              variant="default" 
-              className="gap-2"
-              onClick={() => setSelectedContact({ id: person.user_id, name: person.name, role })}
-            >
-              <MessageCircle className="h-4 w-4" />
-              Chat
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Chat with {person.name}</DialogTitle>
-            </DialogHeader>
-            {/* We render the chat component inside the dialog */}
-            {selectedContact && (
-              <StudentDirectMessage receiverId={person.user_id} receiverName={person.name} />
-            )}
-          </DialogContent>
-        </Dialog>
-      </CardContent>
-    </Card>
-  );
-
-  return (
-    <div className="space-y-8 p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Your Mentors</h1>
-          <p className="text-muted-foreground mt-2">Connect with your teachers, batch managers, and admins.</p>
-        </div>
+        {/* Get Support Button */}
         {onOpenSupportDrawer && (
-          <Button onClick={onOpenSupportDrawer} className="gap-2">
-            <Headphones className="h-4 w-4" />
-            Get Support
+          <Button 
+            onClick={onOpenSupportDrawer} 
+            size="lg" 
+            className="bg-slate-900 text-white hover:bg-slate-800 shadow-lg shadow-slate-200/50 gap-2 transition-all hover:scale-105 active:scale-95"
+          >
+            <MessageCircle className="h-5 w-5" />
+            Contact Support
           </Button>
         )}
       </div>
 
-      {/* Admins */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold flex items-center gap-2">
-          <Shield className="h-5 w-5 text-red-500" /> Admins
-        </h2>
-        <div className="grid md:grid-cols-2 gap-4">
-          {admins?.map(admin => renderCard(admin, 'Admin', Shield))}
-        </div>
+      {/* FAQs Section */}
+      <div className="grid gap-6">
+        <Card className="border-slate-200 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <HelpCircle className="h-5 w-5 text-blue-600" />
+              Frequently Asked Questions
+            </CardTitle>
+            <CardDescription>
+              Quick answers to the most common queries about your classes and portal.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Accordion type="single" collapsible className="w-full">
+              
+              <AccordionItem value="item-1">
+                <AccordionTrigger className="text-base font-medium text-slate-800 hover:no-underline">
+                  <div className="flex items-center gap-3">
+                    <Video className="h-4 w-4 text-slate-400" />
+                    How do I join my live class?
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="text-slate-600 leading-relaxed pl-7 pb-4">
+                  Navigate to your <strong>Dashboard</strong> or <strong>Schedule</strong> tab. When a class is live (usually 5 minutes before start time), a "Join Now" button will appear on the class card. Click it to enter the classroom.
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="item-2">
+                <AccordionTrigger className="text-base font-medium text-slate-800 hover:no-underline">
+                  <div className="flex items-center gap-3">
+                    <Clock className="h-4 w-4 text-slate-400" />
+                    Where can I view class recordings?
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="text-slate-600 leading-relaxed pl-7 pb-4">
+                  Go to the <strong>Recordings</strong> tab in your batch view. Recordings are typically uploaded within 24 hours of the live session completing. You can filter them by subject and date.
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="item-3">
+                <AccordionTrigger className="text-base font-medium text-slate-800 hover:no-underline">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-4 w-4 text-slate-400" />
+                    How do I submit an assignment?
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="text-slate-600 leading-relaxed pl-7 pb-4">
+                  Go to the specific subject, select the <strong>Assignments</strong> or <strong>DPP</strong> tab. Click on the pending assignment, and use the "Upload Solution" button to submit your work (PDF or Image format).
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="item-4">
+                <AccordionTrigger className="text-base font-medium text-slate-800 hover:no-underline">
+                  <div className="flex items-center gap-3">
+                    <HelpCircle className="h-4 w-4 text-slate-400" />
+                    My attendance isn't updating?
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="text-slate-600 leading-relaxed pl-7 pb-4">
+                  Attendance is marked automatically when you stay in a live class for more than 15 minutes. Note that it may take up to 2 hours after the class ends for the system to update your attendance record.
+                </AccordionContent>
+              </AccordionItem>
+
+            </Accordion>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Managers */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold flex items-center gap-2">
-          <Briefcase className="h-5 w-5 text-blue-500" /> Managers
-        </h2>
-        <div className="grid md:grid-cols-2 gap-4">
-          {managers?.length ? managers.map(mgr => renderCard(mgr, 'Manager', Briefcase)) : <p className="text-muted-foreground">No managers assigned.</p>}
+      {/* Still need help banner */}
+      <div className="bg-blue-50 border border-blue-100 rounded-xl p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div>
+          <h3 className="font-semibold text-blue-900 text-lg">Still need help?</h3>
+          <p className="text-blue-700 text-sm mt-1">
+            Our support team is available Mon-Sat, 9 AM - 6 PM.
+          </p>
         </div>
-      </div>
-
-      {/* Teachers */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold flex items-center gap-2">
-          <User className="h-5 w-5 text-green-500" /> Teachers
-        </h2>
-        <div className="grid md:grid-cols-2 gap-4">
-          {teachers?.length ? teachers.map(teacher => renderCard(teacher, 'Teacher', User)) : <p className="text-muted-foreground">No teachers assigned.</p>}
-        </div>
+        {onOpenSupportDrawer && (
+           <Button 
+             variant="outline" 
+             onClick={onOpenSupportDrawer}
+             className="border-blue-200 text-blue-700 hover:bg-blue-100 hover:text-blue-800 bg-white"
+           >
+             Chat with Us
+           </Button>
+        )}
       </div>
     </div>
   );
