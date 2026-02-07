@@ -278,11 +278,12 @@ const StudentMainContent = () => {
   };
 
   return (
-    // Outer Container: Flex column with gap-5 for the "visible differentiator"
-    <div className="w-full max-w-5xl mx-auto px-4 md:px-6 py-6 flex flex-col gap-5 min-h-screen font-sans">
+    // Outer Container: Increased Max Width to 7xl (wider)
+    <div className="w-full max-w-[1600px] mx-auto px-4 md:px-6 py-6 flex flex-col gap-6 min-h-screen font-sans">
       
-      {/* HEADER SECTION - Fully Rounded Independent Block */}
-      <header className="w-full bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100 relative z-10">
+      {/* HEADER SECTION */}
+      {/* rounded-t-lg (slight), rounded-b-none (sharp) */}
+      <header className="w-full bg-white rounded-t-lg rounded-b-none overflow-hidden shadow-sm border border-slate-100 relative z-10">
         
         {/* Banner */}
         <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-6 py-8 text-white">
@@ -351,9 +352,9 @@ const StudentMainContent = () => {
         </div>
       </header>
 
-      {/* CONTENT SECTION - Fully Rounded Independent Block */}
-      {/* Reduced min-height to avoid looking "too long" */}
-      <div className="w-full bg-white rounded-2xl shadow-sm border border-slate-100 p-6 md:p-8 min-h-[400px]">
+      {/* CONTENT SECTION */}
+      {/* rounded-t-none (sharp), rounded-b-lg (slight), h-auto (dynamic height) */}
+      <div className="w-full bg-white rounded-t-none rounded-b-lg shadow-sm border border-slate-100 p-6 md:p-8 h-auto">
         {renderTabContent()}
       </div>
     </div>
