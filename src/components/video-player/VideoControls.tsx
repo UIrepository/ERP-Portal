@@ -1,6 +1,7 @@
 /**
  * Custom video controls overlay component
  * Features: Play/Pause, Seek, Volume, Speed, Fullscreen, Sidebar Toggles
+ * Updates: "White on hover" effect for all controls
  */
 
 import { useState, useRef } from 'react';
@@ -30,8 +31,6 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
   DropdownMenuPortal,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 
 // Format time in MM:SS or HH:MM:SS
@@ -101,12 +100,12 @@ export const VideoControls = ({
       
       {/* Top Row: Time | Speed | Progress | Total Time */}
       <div className="flex items-center gap-3 mb-3 px-1">
-        <span className="text-white text-xs font-medium min-w-[40px]">
+        <span className="text-white/90 text-xs font-medium min-w-[40px]">
           {formatTime(currentTime)}
         </span>
         
         {playbackSpeed !== 1 && (
-           <span className="border border-white/50 text-white text-[10px] px-1 rounded font-bold">
+           <span className="border border-white/50 text-white/90 text-[10px] px-1 rounded font-bold">
              {playbackSpeed}x
            </span>
         )}
@@ -150,7 +149,7 @@ export const VideoControls = ({
           />
         </div>
 
-        <span className="text-white/70 text-xs font-medium min-w-[40px] text-right">
+        <span className="text-white/50 text-xs font-medium min-w-[40px] text-right">
           {formatTime(duration)}
         </span>
       </div>
@@ -163,34 +162,34 @@ export const VideoControls = ({
           {/* Play/Pause */}
           <button
             onClick={onPlayPause}
-            className="hover:opacity-80 transition-opacity"
+            className="text-white/70 hover:text-white transition-colors"
             aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             {isPlaying ? (
-              <Pause className="w-7 h-7 text-white" fill="white" />
+              <Pause className="w-7 h-7" fill="currentColor" />
             ) : (
-              <Play className="w-7 h-7 text-white" fill="white" />
+              <Play className="w-7 h-7" fill="currentColor" />
             )}
           </button>
 
           {/* Skip Backward 10s */}
           <button
             onClick={onSkipBackward}
-            className="relative flex items-center justify-center hover:opacity-80 transition-opacity group"
+            className="relative flex items-center justify-center text-white/70 hover:text-white transition-colors group"
             aria-label="Skip backward 10 seconds"
           >
-            <SkipBack className="w-6 h-6 text-white" />
-            <span className="absolute text-[8px] font-bold text-white top-[7px]">10</span>
+            <SkipBack className="w-6 h-6" />
+            <span className="absolute text-[8px] font-bold top-[7px]">10</span>
           </button>
 
           {/* Skip Forward 10s */}
           <button
             onClick={onSkipForward}
-            className="relative flex items-center justify-center hover:opacity-80 transition-opacity group"
+            className="relative flex items-center justify-center text-white/70 hover:text-white transition-colors group"
             aria-label="Skip forward 10 seconds"
           >
-            <SkipForward className="w-6 h-6 text-white" />
-            <span className="absolute text-[8px] font-bold text-white top-[7px]">10</span>
+            <SkipForward className="w-6 h-6" />
+            <span className="absolute text-[8px] font-bold top-[7px]">10</span>
           </button>
 
           {/* Volume Control */}
@@ -201,13 +200,13 @@ export const VideoControls = ({
           >
             <button
               onClick={onMuteToggle}
-              className="hover:opacity-80 transition-opacity"
+              className="text-white/70 hover:text-white transition-colors"
               aria-label={isMuted ? 'Unmute' : 'Mute'}
             >
               {isMuted || volume === 0 ? (
-                <VolumeX className="w-6 h-6 text-white" />
+                <VolumeX className="w-6 h-6" />
               ) : (
-                <Volume2 className="w-6 h-6 text-white" />
+                <Volume2 className="w-6 h-6" />
               )}
             </button>
             
@@ -234,11 +233,11 @@ export const VideoControls = ({
           {onToggleLectures && (
             <button
               onClick={onToggleLectures}
-              className="hover:opacity-80 transition-opacity"
+              className="text-white/70 hover:text-white transition-colors"
               aria-label="Lectures"
               title="Lectures List"
             >
-              <ListVideo className="w-6 h-6 text-white" />
+              <ListVideo className="w-6 h-6" />
             </button>
           )}
 
@@ -246,11 +245,11 @@ export const VideoControls = ({
           {onToggleDoubts && (
             <button
               onClick={onToggleDoubts}
-              className="hover:opacity-80 transition-opacity"
+              className="text-white/70 hover:text-white transition-colors"
               aria-label="Doubts"
               title="Doubts & Notes"
             >
-              <FileText className="w-5 h-5 text-white" />
+              <FileText className="w-5 h-5" />
             </button>
           )}
 
@@ -258,10 +257,10 @@ export const VideoControls = ({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
-                className="hover:opacity-80 transition-opacity rotate-0 hover:rotate-45 duration-300"
+                className="text-white/70 hover:text-white transition-colors rotate-0 hover:rotate-45 duration-300"
                 aria-label="Settings"
               >
-                <Settings className="w-6 h-6 text-white" />
+                <Settings className="w-6 h-6" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent 
@@ -318,13 +317,13 @@ export const VideoControls = ({
           {/* Fullscreen Toggle */}
           <button
             onClick={onFullscreenToggle}
-            className="hover:opacity-80 transition-opacity"
+            className="text-white/70 hover:text-white transition-colors"
             aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
           >
             {isFullscreen ? (
-              <Minimize className="w-6 h-6 text-white" />
+              <Minimize className="w-6 h-6" />
             ) : (
-              <Maximize className="w-6 h-6 text-white" />
+              <Maximize className="w-6 h-6" />
             )}
           </button>
         </div>
