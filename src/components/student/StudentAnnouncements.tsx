@@ -46,7 +46,7 @@ const AnnouncementCard = ({ announcement }: { announcement: Announcement }) => {
         <div className="bg-white border border-[#eaebed] rounded-[4px] p-5 hover:border-[#d1d5db] transition-colors duration-200 flex flex-col h-[240px]">
             {/* Sender Block */}
             <div className="flex items-center gap-3 mb-3 shrink-0">
-                 {/* Avatar */}
+                 {/* Avatar - Clean, no background, perfect fit */}
                  <div className="w-[36px] h-[36px] shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-transparent border border-slate-100">
                      <img 
                         src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
@@ -55,7 +55,7 @@ const AnnouncementCard = ({ announcement }: { announcement: Announcement }) => {
                      />
                  </div>
                  <div className="flex flex-col">
-                    {/* Main Sender */}
+                    {/* Main Sender - UI Team (Inter SemiBold) */}
                     <span className="text-[14px] font-semibold text-black font-sans leading-tight">
                         UI Team
                     </span>
@@ -144,6 +144,11 @@ export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [] }: 
                     background-color: #cbd5e1;
                 }
             `}</style>
+            
+            {/* Common Section Title */}
+            <div className="mb-6">
+                <h2 className="text-xl font-bold text-gray-900 tracking-tight">Notices</h2>
+            </div>
 
             {isLoading ? (
                 <AnnouncementSkeleton />
