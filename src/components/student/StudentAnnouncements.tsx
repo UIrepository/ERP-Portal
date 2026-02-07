@@ -127,8 +127,8 @@ export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [] }: 
     });
 
     return (
-        // Main Container - White Section with reduced rounded corners (rounded-lg)
-        <div className="w-full bg-white border border-slate-200 rounded-lg p-6 font-sans antialiased shadow-sm">
+        // Container with padding but no background/border
+        <div className="w-full font-sans antialiased p-4">
             
             {/* Custom scrollbar styling embedded */}
             <style>{`
@@ -147,11 +147,6 @@ export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [] }: 
                 }
             `}</style>
             
-            {/* Section Title */}
-            <div className="mb-6">
-                <h2 className="text-xl font-bold text-gray-900 tracking-tight">Notices</h2>
-            </div>
-
             {isLoading ? (
                 <AnnouncementSkeleton />
             ) : announcements && announcements.length > 0 ? (
