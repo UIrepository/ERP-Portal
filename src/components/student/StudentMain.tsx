@@ -287,7 +287,12 @@ const StudentMainContent = () => {
       case 'announcements':
         return (
           <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {navigation.batch && <StudentAnnouncements batch={navigation.batch} />}
+            {navigation.batch && (
+                <StudentAnnouncements 
+                    batch={navigation.batch} 
+                    enrolledSubjects={subjectsForBatch}
+                />
+            )}
           </div>
         );
       case 'community':
