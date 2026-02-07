@@ -1,10 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { format, addMinutes, isWithinInterval, parseISO, differenceInMinutes } from 'date-fns';
-import { ExternalLink, Lock, ArrowRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { format, addMinutes, isWithinInterval, differenceInMinutes } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { generateJitsiRoomName } from '@/lib/jitsiUtils';
+import { cn } from '@/lib/utils';
 
 interface StudentLiveClassProps {
   batch: string | null;
@@ -29,7 +28,7 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
   const currentDayOfWeek = today.getDay();
   const todayDateStr = format(today, 'yyyy-MM-dd');
 
-  // Fetch schedules for today matching batch (and subject if provided)
+  // Fetch schedules logic
   const { data: schedules, isLoading } = useQuery<ScheduleWithLink[]>({
     queryKey: ['studentLiveClass', batch, subject, todayDateStr],
     queryFn: async () => {
@@ -91,7 +90,6 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
 
         let finalLink = null;
         if (dbLink) {
-          // If DB has a Jitsi link, ensure it matches the dynamic standard
           if (dbLink.includes('meet.jit.si')) {
              finalLink = generatedJitsiLink;
           } else {
@@ -141,7 +139,6 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
     }
   });
 
-  // Sort upcoming by nearest time
   upcomingClasses.sort((a, b) => a.start_time.localeCompare(b.start_time));
 
   const handleJoinClass = (meetingLink: string | null) => {
@@ -155,160 +152,111 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
       const [h, m] = t.split(':');
       const date = new Date();
       date.setHours(Number(h), Number(m));
-      return format(date, 'HH:mm');
+      return format(date, 'h:mm a');
     };
     return `${formatSingle(start)} — ${formatSingle(end)}`;
   };
 
   if (isLoading) {
-    return (
-      <div className="w-full">
-        <Skeleton className="h-64 w-full rounded-2xl" />
-      </div>
-    );
+    return <Skeleton className="h-64 w-full rounded-[4px]" />;
   }
 
-  // If absolutely nothing is happening today
-  if (liveClasses.length === 0 && upcomingClasses.length === 0) {
-    return (
-      <div className="space-y-6">
-         <div className="flex items-end justify-between px-2">
-            <h2 className="text-4xl font-serif text-slate-800">No Sessions</h2>
-            <span className="text-[10px] font-bold uppercase tracking-widest border-b border-transparent pb-1 text-gray-400">
-               Relax for now
-            </span>
-        </div>
-        <div className="bg-slate-50 border border-dashed border-slate-200 rounded-none p-12 flex flex-col items-center justify-center text-center h-64">
-           <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
-             <Lock className="w-5 h-5 text-slate-300" />
-           </div>
-           <h3 className="font-serif text-2xl text-slate-400 mb-1">Studio Offline</h3>
-           <p className="text-xs font-bold uppercase tracking-widest text-slate-300">No classes scheduled for today</p>
-        </div>
-      </div>
-    );
-  }
+  // Combine lists for rendering in grid, prioritizing live classes
+  const allClasses = [...liveClasses, ...upcomingClasses];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    // Main Container matching .section-container
+    <div className="w-full bg-white border border-slate-200 rounded-[4px] p-8 font-sans antialiased text-slate-900">
       
-      {/* Header Section */}
-      <div className="flex items-end justify-between px-1">
-        <h2 className="font-serif text-4xl text-slate-900 tracking-tight">Now Playing</h2>
-        <a href="#schedule" className="text-[10px] font-bold uppercase tracking-widest border-b border-black pb-1 hover:text-gray-500 hover:border-gray-500 transition-all">
-            All Schedules
-        </a>
+      {/* Header */}
+      <div className="border-b border-slate-100 pb-4 mb-6">
+        <h1 className="text-[18px] font-semibold tracking-tight text-slate-900">
+           Live Class Sessions
+        </h1>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* LEFT COLUMN: LIVE CLASS (Dark Theme) */}
-        {liveClasses.length > 0 ? (
-          liveClasses.map((classItem) => (
-            <div 
-              key={classItem.id}
-              className="bg-black text-white rounded-none p-8 flex flex-col justify-between h-72 relative overflow-hidden group hover:shadow-2xl transition-all duration-500"
-            >
-              {/* Top Content */}
-              <div className="relative z-10">
-                <div className="flex items-center gap-3 mb-6">
-                  {/* Animated Bars */}
-                  <div className="flex items-end gap-[3px] h-4">
-                     <span className="w-1 bg-red-500 h-full animate-[pulse_0.8s_ease-in-out_infinite]"></span>
-                     <span className="w-1 bg-red-500 h-2/3 animate-[pulse_1.2s_ease-in-out_infinite_0.1s]"></span>
-                     <span className="w-1 bg-red-500 h-1/2 animate-[pulse_1s_ease-in-out_infinite_0.2s]"></span>
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-500">
-                    Live Session
-                  </span>
+      {allClasses.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          
+          {/* Render Live Classes First */}
+          {liveClasses.map((item) => (
+             <div key={item.id} className="bg-white border border-slate-200 rounded-[4px] p-6 flex flex-col justify-between min-h-[180px] transition-colors hover:border-slate-300">
+                <div className="mb-5">
+                   {/* Status Badge */}
+                   <div className="flex items-center gap-1.5 mb-3">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-red-600">
+                        Live Now
+                      </span>
+                   </div>
+                   {/* Subject Title */}
+                   <h2 className="text-[16px] font-semibold text-slate-900 mb-1 leading-tight">
+                      {item.subject}
+                   </h2>
+                   {/* Batch Name */}
+                   <p className="text-[13px] font-normal text-slate-500">
+                      {item.batch}
+                   </p>
                 </div>
-                
-                <h3 className="font-serif text-3xl md:text-4xl mb-2 leading-none">
-                  {classItem.subject}
-                </h3>
-                {/* Faculty name removed as requested */}
-                <p className="text-gray-500 text-xs font-mono uppercase tracking-wider">
-                  {classItem.batch}
-                </p>
-              </div>
 
-              {/* Bottom Action */}
-              <div className="relative z-10 flex items-center justify-between mt-4">
-                <span className="text-[11px] font-medium text-gray-400 font-mono">
-                  {formatTimeRange(classItem.start_time, classItem.end_time)}
-                </span>
-                <button 
-                  onClick={() => handleJoinClass(classItem.meeting_link_url)}
-                  disabled={!classItem.meeting_link_url}
-                  className="bg-white text-black px-6 py-3 rounded-none text-[10px] font-bold uppercase tracking-[0.15em] hover:bg-[#d4af37] hover:text-white transition-colors flex items-center gap-2"
-                >
-                  Enter Room <ExternalLink className="w-3 h-3" />
-                </button>
-              </div>
-              
-              {/* Decorative Big Text Background */}
-              <span className="absolute -bottom-10 -right-6 text-[140px] font-black text-white/[0.03] select-none pointer-events-none tracking-tighter italic">
-                NOW
-              </span>
-            </div>
-          ))
-        ) : (
-          // Empty State for Live (if only upcoming exists)
-          <div className="bg-gray-100 border border-gray-200 rounded-none p-8 flex flex-col justify-between h-72 relative overflow-hidden">
-             <div className="relative z-10 opacity-50">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">
-                    Offline
-                  </span>
+                <div className="flex items-center justify-between mt-auto">
+                   <span className="text-[13px] font-normal text-slate-900">
+                      {formatTimeRange(item.start_time, item.end_time)}
+                   </span>
+                   <button 
+                     onClick={() => handleJoinClass(item.meeting_link_url)}
+                     className="bg-slate-900 text-white px-4 py-2 text-[12px] font-normal rounded-[4px] hover:bg-slate-800 transition-opacity"
+                   >
+                     Join Class
+                   </button>
                 </div>
-                <h3 className="font-serif text-3xl text-gray-400 mb-2">Studio Empty</h3>
-                <p className="text-gray-400 text-xs italic">No session currently live.</p>
              </div>
-             <span className="absolute -bottom-10 -right-6 text-[140px] font-black text-black/[0.02] select-none pointer-events-none tracking-tighter italic">
-                OFF
-              </span>
-          </div>
-        )}
+          ))}
 
-        {/* RIGHT COLUMN: UPCOMING CLASS (Light Theme) */}
-        {upcomingClasses.length > 0 ? (
-          <div className="bg-white border border-gray-100 rounded-none p-8 flex flex-col justify-between h-72 shadow-sm">
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-600 block mb-6">
-                Up Next
-              </span>
-              <h3 className="font-serif text-3xl mb-2 text-black leading-tight">
-                {upcomingClasses[0].subject}
-              </h3>
-              <p className="text-gray-400 text-xs font-mono uppercase tracking-wider">
-                {upcomingClasses[0].batch}
-              </p>
-            </div>
+          {/* Render Upcoming Classes */}
+          {upcomingClasses.map((item) => (
+             <div key={item.id} className="bg-white border border-slate-200 rounded-[4px] p-6 flex flex-col justify-between min-h-[180px] transition-colors hover:border-slate-300">
+                <div className="mb-5">
+                   {/* Status Badge */}
+                   <div className="flex items-center gap-1.5 mb-3">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                        Upcoming
+                      </span>
+                   </div>
+                   {/* Subject Title */}
+                   <h2 className="text-[16px] font-semibold text-slate-900 mb-1 leading-tight">
+                      {item.subject}
+                   </h2>
+                   {/* Batch Name */}
+                   <p className="text-[13px] font-normal text-slate-500">
+                      {item.batch}
+                   </p>
+                </div>
 
-            <div className="flex items-center justify-between border-t border-gray-50 pt-6">
-              <div className="flex flex-col">
-                 <span className="text-[10px] font-bold uppercase text-gray-400 mb-1">Starts At</span>
-                 <span className="text-lg font-serif text-black">
-                    {format(new Date().setHours(...(upcomingClasses[0].start_time.split(':').map(Number) as [number, number])), 'h:mm a')}
-                 </span>
-              </div>
-              <div className="w-12 h-12 border border-gray-100 rounded-none flex items-center justify-center text-gray-300 bg-gray-50">
-                <Lock className="w-4 h-4" />
-              </div>
-            </div>
-          </div>
-        ) : (
-           // Placeholder if no upcoming classes either
-           <div className="bg-white border border-gray-100 rounded-none p-8 flex flex-col justify-center items-center h-72 text-center opacity-70">
-              <div className="w-16 h-1 bg-gray-100 mb-4"></div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-300">
-                 No upcoming sessions
-              </p>
+                <div className="flex items-center justify-between mt-auto">
+                   <span className="text-[13px] font-normal text-slate-900">
+                      {formatTimeRange(item.start_time, item.end_time)}
+                   </span>
+                   <span className="text-[12px] font-normal text-slate-500 bg-[#f9fafb] px-2.5 py-1 border border-slate-200 rounded-[4px]">
+                      Starts later
+                   </span>
+                </div>
+             </div>
+          ))}
+
+        </div>
+      ) : (
+        /* Empty State */
+        <div className="flex flex-col items-center justify-center py-16 opacity-80">
+           <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-3">
+              <span className="text-xl opacity-40">☕</span>
            </div>
-        )}
+           <h3 className="text-sm font-semibold text-slate-900">No classes scheduled</h3>
+           <p className="text-xs text-slate-500 mt-1">There are no live or upcoming sessions for today.</p>
+        </div>
+      )}
 
-      </div>
     </div>
   );
 };
