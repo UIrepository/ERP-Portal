@@ -20,6 +20,7 @@ interface ScheduleWithLink {
   end_time: string;
   link: string | null;
   meeting_link_url: string | null;
+  is_jitsi_live?: boolean;
 }
 
 export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
@@ -33,8 +34,7 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
     queryFn: async () => {
       if (!batch) return [];
 
-      // Build query for schedules
-      // We initially fetch loosely (Day Match OR Date Match) to capture all potential candidates
+      // 1. Get Schedules (Base Plan)
       let query = supabase
         .from('schedules')
         .select('*')
@@ -46,10 +46,9 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
       }
 
       const { data: schedulesData, error } = await query;
-
       if (error) throw error;
 
-      // Get meeting links for this batch
+      // 2. Get Static Meeting Links (Fallback)
       let linkQuery = supabase
         .from('meeting_links')
         .select('*')
@@ -59,39 +58,50 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
       if (subject) {
         linkQuery = linkQuery.eq('subject', subject);
       }
-
       const { data: meetingLinks } = await linkQuery;
 
+      // 3. Get ACTIVE JITSI CLASSES (Primary Source for Live Classes)
+      let activeClassQuery = supabase
+        .from('active_classes')
+        .select('*')
+        .eq('batch', batch)
+        .eq('is_active', true);
+
+      if (subject) {
+        activeClassQuery = activeClassQuery.eq('subject', subject);
+      }
+      const { data: activeClasses } = await activeClassQuery;
+
       // STRICT FILTERING LOGIC
-      // Ensure we don't show future/past dates just because the weekday matches
       const validSchedules = (schedulesData || []).filter(schedule => {
-        // Rule 1: If a specific date is defined, it MUST match today.
-        // This handles cases like "Next Monday" vs "Today (Monday)".
+        // Rule 1: Specific Date Priority (e.g. Rescheduled class)
         if (schedule.date) {
           return schedule.date === todayDateStr;
         }
-        
-        // Rule 2: If it is a recurring class (date is null), the day_of_week MUST match.
-        // (Supabase OR query might return a date-match that has a different weekday, though rare)
+        // Rule 2: Recurring Schedule (must match today's weekday)
         return schedule.day_of_week === currentDayOfWeek;
       });
 
-      // Map schedules to their specific subject links
+      // Map schedules to the best available link
       return validSchedules.map(schedule => {
-        // Find a link specifically for this subject
+        // Check if there is a LIVE Jitsi class for this subject
+        const activeJitsi = activeClasses?.find(ac => ac.subject === schedule.subject);
+        
+        // Check if there is a static link
         const subjectLink = meetingLinks?.find(l => l.subject === schedule.subject);
         
-        // Priority: Specific Schedule Link > General Subject Link
-        const finalLink = schedule.link || subjectLink?.link || null;
+        // PRIORITY: Active Jitsi > Schedule Specific Link > Static Subject Link
+        const finalLink = activeJitsi?.room_url || schedule.link || subjectLink?.link || null;
 
         return {
           ...schedule,
           meeting_link_url: finalLink,
+          is_jitsi_live: !!activeJitsi // Flag to show "Live" UI distinctively
         };
       });
     },
     enabled: !!batch,
-    refetchInterval: 30000 // Refetch every 30s to keep live status accurate
+    refetchInterval: 10000 // Refetch often to catch when teacher starts class
   });
 
   const now = new Date();
@@ -107,7 +117,7 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
     const endTime = new Date(today);
     endTime.setHours(endHour, endMin, 0, 0);
     
-    // Add 15 min buffer before and after for "Live" status
+    // Buffer: 15 mins before, 15 mins after
     const bufferStart = addMinutes(startTime, -15);
     const bufferEnd = addMinutes(endTime, 15);
     
@@ -143,7 +153,7 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
         </div>
         <h3 className="text-sm font-semibold text-slate-700">No Live Class</h3>
         <p className="text-xs text-slate-500 max-w-[200px] mx-auto mt-1">
-          No classes are currently live. Check your schedule.
+          No classes are currently live.
         </p>
       </div>
     );
@@ -154,22 +164,32 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
       {ongoingClasses.map((classItem) => (
         <div
           key={classItem.id}
-          className="relative overflow-hidden rounded-2xl bg-white border border-emerald-100 p-5 shadow-sm transition-all hover:shadow-md hover:border-emerald-200"
+          className={`relative overflow-hidden rounded-2xl bg-white border p-5 shadow-sm transition-all hover:shadow-md ${
+            classItem.is_jitsi_live ? 'border-emerald-200 ring-1 ring-emerald-100' : 'border-slate-100'
+          }`}
         >
           {/* Live Badge */}
           <div className="absolute top-4 right-4 z-10">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-white bg-emerald-500 shadow-sm animate-pulse">
-              <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
-              Live
-            </span>
+            {classItem.is_jitsi_live ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-white bg-red-500 shadow-sm animate-pulse">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
+                  Live Now
+                </span>
+            ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 border border-emerald-100">
+                  Scheduled
+                </span>
+            )}
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0 border border-emerald-100">
-              <Video className="h-6 w-6 text-emerald-600" />
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 border ${
+                classItem.is_jitsi_live ? 'bg-red-50 border-red-100' : 'bg-slate-50 border-slate-100'
+            }`}>
+              <Video className={`h-6 w-6 ${classItem.is_jitsi_live ? 'text-red-500' : 'text-slate-500'}`} />
             </div>
             
-            <div className="flex-1 min-w-0 pr-16">
+            <div className="flex-1 min-w-0 pr-20">
               <h3 className="text-lg font-bold text-slate-900 truncate">
                 {classItem.subject}
               </h3>
@@ -183,15 +203,19 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
             <Button
               onClick={() => handleJoinClass(classItem.meeting_link_url)}
               disabled={!classItem.meeting_link_url}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm h-10 transition-colors"
+              className={`w-full font-semibold shadow-sm h-10 transition-all ${
+                  classItem.meeting_link_url 
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                    : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+              }`}
             >
               <ExternalLink className="h-4 w-4 mr-2" />
-              Join Class Now
+              {classItem.meeting_link_url ? "Join Class" : "Waiting for Teacher..."}
             </Button>
             
             {!classItem.meeting_link_url && (
               <p className="mt-2 text-center text-[10px] font-medium text-amber-600 bg-amber-50 py-1 rounded">
-                Link will be available shortly...
+                Teacher hasn't started the class yet.
               </p>
             )}
           </div>
