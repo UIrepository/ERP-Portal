@@ -45,41 +45,43 @@ const AnnouncementSkeleton = () => (
 
 const AnnouncementCard = ({ announcement }: { announcement: Announcement }) => {
     const [isExpanded, setIsExpanded] = useState(false);
-    // Determine if text is potentially long (rough estimate for conditional rendering)
+    // Determine if text is potentially long
     const isLong = announcement.message.length > 120 || announcement.message.split('\n').length > 3;
 
     return (
         <div className="bg-white border border-[#eaebed] rounded-[4px] p-5 hover:border-[#d1d5db] transition-colors duration-200 flex flex-col h-fit">
-            {/* Sender Block (Rectangular & Inter Regular) */}
+            {/* Sender Block */}
             <div className="flex items-center gap-3 mb-3.5">
-                 <div className="w-[34px] h-[34px] shrink-0 rounded-full overflow-hidden bg-gray-50 border border-gray-100 flex items-center justify-center">
+                 {/* Avatar - Clean, no grey background */}
+                 <div className="w-[34px] h-[34px] shrink-0 rounded-full overflow-hidden flex items-center justify-center">
                      <img 
                         src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
                         alt="Logo" 
-                        className="w-full h-full object-contain p-1"
+                        className="w-full h-full object-contain"
                      />
                  </div>
                  <div className="flex flex-col">
-                    {/* Inter Regular for Sender */}
+                    {/* Main Sender - Static UI Team */}
                     <span className="text-[14px] font-normal text-black font-sans leading-tight">
-                        {announcement.created_by_name || 'Admin Team'}
+                        UI Team
                     </span>
+                    {/* Meta Info - Sent by X • Time */}
                     <span className="text-[11px] text-[#888888] font-sans mt-0.5">
-                        {formatDistanceToNow(new Date(announcement.created_at), { addSuffix: true })}
+                        Sent by {announcement.created_by_name || 'Admin'} • {formatDistanceToNow(new Date(announcement.created_at), { addSuffix: true })}
                     </span>
                  </div>
             </div>
 
-            {/* Title */}
-            <h3 className="text-[15px] font-bold text-black mb-2 leading-snug tracking-tight">
+            {/* Title - Inter SemiBold */}
+            <h3 className="text-[15px] font-semibold text-black mb-2 leading-snug tracking-tight">
                 {announcement.title}
             </h3>
 
-            {/* Message Content with Read More */}
+            {/* Message Content */}
             <div>
                 <p className={cn(
                     "text-[13px] text-[#444444] font-normal leading-relaxed whitespace-pre-wrap font-sans transition-all duration-300",
-                    !isExpanded && "line-clamp-3" // Restricts vertical length when not expanded
+                    !isExpanded && "line-clamp-3"
                 )}>
                     {announcement.message}
                 </p>
@@ -95,7 +97,7 @@ const AnnouncementCard = ({ announcement }: { announcement: Announcement }) => {
                 )}
             </div>
 
-            {/* Optional Context Badge (Only if specific target exists) */}
+            {/* Optional Context Badge */}
             {(announcement.target_subject || announcement.target_batch) && (
                 <div className="mt-4 pt-3 border-t border-dashed border-gray-100">
                     <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">
@@ -148,7 +150,6 @@ export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [] }: 
             {isLoading ? (
                 <AnnouncementSkeleton />
             ) : announcements && announcements.length > 0 ? (
-                // Grid layout with NO common holder styling (border/bg removed from container)
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {announcements.map((announcement) => (
                         <AnnouncementCard key={announcement.id} announcement={announcement} />
