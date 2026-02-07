@@ -1,10 +1,6 @@
 /**
  * Custom video controls overlay component
- * Features: Play/Pause, Seek, Volume, Speed, Fullscreen, Sidebar Toggles
- * Updates: 
- * - Fixed seek functionality (prevention of play/pause toggle on click)
- * - Removed text from skip buttons
- * - Added pointer-events handling
+ * Fixes: Seek functionality, removes text from skip buttons, ensures pointer events work
  */
 
 import { useState, useRef } from 'react';
@@ -84,25 +80,37 @@ export const VideoControls = ({
 
   // Handle progress bar click/drag
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    e.stopPropagation(); // Prevent toggling play/pause on the parent container
-    if (!progressRef.current) return;
-    const rect = progressRef.current.getBoundingClientRect();
+    e.stopPropagation(); // Prevent play/pause toggle
+    
+    // Use currentTarget to ensure we get the dimensions of the clickable div
+    const bar = e.currentTarget;
+    const rect = bar.getBoundingClientRect();
+    
+    // Safety check for zero width
+    if (rect.width === 0 || duration <= 0) return;
+
     const percent = (e.clientX - rect.left) / rect.width;
-    onSeek(percent * duration);
+    // Clamp between 0 and duration
+    const newTime = Math.max(0, Math.min(percent * duration, duration));
+    
+    onSeek(newTime);
   };
 
   // Handle progress bar hover for preview
   const handleProgressHover = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!progressRef.current) return;
-    const rect = progressRef.current.getBoundingClientRect();
+    const bar = e.currentTarget;
+    const rect = bar.getBoundingClientRect();
+    if (rect.width === 0 || duration <= 0) return;
+
     const percent = (e.clientX - rect.left) / rect.width;
-    setSeekPreview(percent * duration);
+    const previewTime = Math.max(0, Math.min(percent * duration, duration));
+    setSeekPreview(previewTime);
   };
 
   return (
     <div 
       className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/80 to-transparent pt-12 pb-4 px-4 transition-opacity duration-300 pointer-events-auto"
-      onClick={(e) => e.stopPropagation()} // Stop propagation for the entire control bar
+      onClick={(e) => e.stopPropagation()}
     >
       
       {/* Top Row: Time | Speed | Progress | Total Time */}
@@ -120,13 +128,13 @@ export const VideoControls = ({
         {/* Progress Bar Container */}
         <div 
           ref={progressRef}
-          className="relative flex-1 h-1 group cursor-pointer py-3" // Increased py-3 for easier clicking
+          className="relative flex-1 h-1 group cursor-pointer py-3 select-none" // Increased click area
           onClick={handleProgressClick}
           onMouseMove={handleProgressHover}
           onMouseLeave={() => setSeekPreview(null)}
         >
-          {/* Track Background */}
-          <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1 bg-white/20 rounded-full overflow-hidden pointer-events-none">
+          {/* Track Background - Inner elements allow bubbling to parent onClick */}
+          <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1 bg-white/20 rounded-full overflow-hidden">
              {/* Buffered progress */}
             <div 
               className="absolute top-0 left-0 h-full bg-white/30"
@@ -179,19 +187,19 @@ export const VideoControls = ({
             )}
           </button>
 
-          {/* Skip Backward 10s */}
+          {/* Skip Backward 10s (Icon Only) */}
           <button
             onClick={onSkipBackward}
-            className="relative flex items-center justify-center text-white/70 hover:text-white transition-colors group"
+            className="text-white/70 hover:text-white transition-colors flex items-center justify-center"
             aria-label="Skip backward 10 seconds"
           >
             <SkipBack className="w-6 h-6" />
           </button>
 
-          {/* Skip Forward 10s */}
+          {/* Skip Forward 10s (Icon Only) */}
           <button
             onClick={onSkipForward}
-            className="relative flex items-center justify-center text-white/70 hover:text-white transition-colors group"
+            className="text-white/70 hover:text-white transition-colors flex items-center justify-center"
             aria-label="Skip forward 10 seconds"
           >
             <SkipForward className="w-6 h-6" />
