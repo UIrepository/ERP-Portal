@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface Announcement {
   id: string;
@@ -35,12 +37,75 @@ const AnnouncementSkeleton = () => (
                 <div className="space-y-2">
                     <Skeleton className="h-3 w-full" />
                     <Skeleton className="h-3 w-full" />
-                    <Skeleton className="h-3 w-2/3" />
                 </div>
             </div>
         ))}
     </div>
 );
+
+const AnnouncementCard = ({ announcement }: { announcement: Announcement }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    // Determine if text is potentially long (rough estimate for conditional rendering)
+    const isLong = announcement.message.length > 120 || announcement.message.split('\n').length > 3;
+
+    return (
+        <div className="bg-white border border-[#eaebed] rounded-[4px] p-5 hover:border-[#d1d5db] transition-colors duration-200 flex flex-col h-fit">
+            {/* Sender Block (Rectangular & Inter Regular) */}
+            <div className="flex items-center gap-3 mb-3.5">
+                 <div className="w-[34px] h-[34px] shrink-0 rounded-full overflow-hidden bg-gray-50 border border-gray-100 flex items-center justify-center">
+                     <img 
+                        src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
+                        alt="Logo" 
+                        className="w-full h-full object-contain p-1"
+                     />
+                 </div>
+                 <div className="flex flex-col">
+                    {/* Inter Regular for Sender */}
+                    <span className="text-[14px] font-normal text-black font-sans leading-tight">
+                        {announcement.created_by_name || 'Admin Team'}
+                    </span>
+                    <span className="text-[11px] text-[#888888] font-sans mt-0.5">
+                        {formatDistanceToNow(new Date(announcement.created_at), { addSuffix: true })}
+                    </span>
+                 </div>
+            </div>
+
+            {/* Title */}
+            <h3 className="text-[15px] font-bold text-black mb-2 leading-snug tracking-tight">
+                {announcement.title}
+            </h3>
+
+            {/* Message Content with Read More */}
+            <div>
+                <p className={cn(
+                    "text-[13px] text-[#444444] font-normal leading-relaxed whitespace-pre-wrap font-sans transition-all duration-300",
+                    !isExpanded && "line-clamp-3" // Restricts vertical length when not expanded
+                )}>
+                    {announcement.message}
+                </p>
+                
+                {isLong && (
+                    <button
+                        onClick={() => setIsExpanded(!isExpanded)}
+                        className="text-[11px] font-semibold text-black mt-2 hover:underline flex items-center gap-1 transition-colors"
+                    >
+                        {isExpanded ? "Read less" : "Read more"}
+                        {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    </button>
+                )}
+            </div>
+
+            {/* Optional Context Badge (Only if specific target exists) */}
+            {(announcement.target_subject || announcement.target_batch) && (
+                <div className="mt-4 pt-3 border-t border-dashed border-gray-100">
+                    <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">
+                         {announcement.target_subject ? `For ${announcement.target_subject}` : 'General Update'}
+                    </span>
+                </div>
+            )}
+        </div>
+    );
+};
 
 export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [] }: StudentAnnouncementsProps) => {
     
@@ -54,10 +119,8 @@ export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [] }: 
                 .select('id, title, message, created_at, created_by_name, target_batch, target_subject');
 
             if (batch && subject) {
-                // Specific Subject View
                 query = query.or(`and(target_batch.eq.${batch},target_subject.eq.${subject}),and(target_batch.eq.${batch},target_subject.is.null),and(target_batch.is.null,target_subject.eq.${subject}),and(target_batch.is.null,target_subject.is.null)`);
             } else if (batch) {
-                // Batch Dashboard View
                 let orConditions = [
                     `and(target_batch.is.null,target_subject.is.null)`, 
                     `and(target_batch.eq.${batch},target_subject.is.null)`
@@ -81,76 +144,23 @@ export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [] }: 
     });
 
     return (
-        <div className="max-w-[1200px] mx-auto p-4 md:p-8 bg-[#f8f9fa] min-h-full font-sans antialiased">
-            
-            {/* Section Header */}
-            <div className="mb-8">
-                <h1 className="text-[22px] font-bold text-black tracking-tight">Announcements</h1>
-            </div>
-
+        <div className="w-full bg-[#f8f9fa] min-h-full font-sans antialiased">
             {isLoading ? (
                 <AnnouncementSkeleton />
             ) : announcements && announcements.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {announcements.map((announcement) => {
-                        // Generate initials for avatar (e.g., "Physics Wallah" -> "PW")
-                        const authorName = announcement.created_by_name || 'Admin';
-                        const initials = authorName
-                            .split(' ')
-                            .map(n => n[0])
-                            .join('')
-                            .substring(0, 2)
-                            .toUpperCase();
-
-                        return (
-                            <div 
-                                key={announcement.id} 
-                                className="flex flex-col bg-white border border-[#eaebed] rounded-[4px] p-6 hover:border-[#d1d5db] transition-colors duration-200"
-                            >
-                                {/* Meta Header */}
-                                <div className="flex items-center gap-3 mb-5">
-                                    <div className="w-[34px] h-[34px] bg-black text-white rounded-full flex items-center justify-center text-[11px] font-bold shrink-0">
-                                        {initials}
-                                    </div>
-                                    <div className="flex flex-col leading-tight">
-                                        <span className="text-sm font-semibold text-black">
-                                            {authorName}
-                                        </span>
-                                        <span className="text-xs text-[#888888]">
-                                            {formatDistanceToNow(new Date(announcement.created_at), { addSuffix: true })}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {/* Content */}
-                                <h2 className="text-base font-bold text-black mb-2.5 leading-snug">
-                                    {announcement.title}
-                                </h2>
-                                <p className="text-sm font-normal text-[#444444] leading-relaxed whitespace-pre-wrap">
-                                    {announcement.message}
-                                </p>
-                                
-                                {/* Optional Tags (kept subtle) */}
-                                {(announcement.target_batch || announcement.target_subject) && (
-                                    <div className="mt-4 pt-3 border-t border-dashed border-gray-100 flex gap-2">
-                                        {announcement.target_subject && (
-                                            <span className="text-[10px] uppercase font-bold text-[#888888] tracking-wider">
-                                                {announcement.target_subject}
-                                            </span>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
+                // Grid layout with NO common holder styling (border/bg removed from container)
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {announcements.map((announcement) => (
+                        <AnnouncementCard key={announcement.id} announcement={announcement} />
+                    ))}
                 </div>
             ) : (
-                <div className="flex flex-col items-center justify-center py-20 bg-white border border-[#eaebed] rounded-[4px]">
-                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                        <span className="text-xl">📭</span>
+                <div className="flex flex-col items-center justify-center py-16 bg-white border border-[#eaebed] rounded-[4px]">
+                    <div className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center mb-3">
+                        <span className="text-lg opacity-50">📭</span>
                     </div>
-                    <h3 className="text-lg font-bold text-black">No updates yet</h3>
-                    <p className="text-sm text-[#888888] mt-1">Check back later for important announcements.</p>
+                    <h3 className="text-sm font-bold text-black">No updates yet</h3>
+                    <p className="text-xs text-[#888888] mt-1">Check back later for important announcements.</p>
                 </div>
             )}
         </div>
