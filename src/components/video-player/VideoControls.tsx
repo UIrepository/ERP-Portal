@@ -1,9 +1,9 @@
 /**
  * Custom video controls overlay component
- * Features: Play/Pause, Seek, Volume, Speed, Fullscreen
+ * Features: Play/Pause, Seek, Volume, Speed, Fullscreen, Sidebar Toggles
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { 
   Play, 
   Pause, 
@@ -11,10 +11,12 @@ import {
   VolumeX, 
   Maximize, 
   Minimize,
-  SkipForward,
   SkipBack,
+  SkipForward,
   Settings,
-  ChevronUp
+  FileText, // PDF-like symbol for Doubts
+  ListVideo, // List symbol for Lectures
+  Check
 } from 'lucide-react';
 import { VideoControlsProps } from './types';
 import { cn } from '@/lib/utils';
@@ -28,6 +30,8 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
   DropdownMenuPortal,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 
 // Format time in MM:SS or HH:MM:SS
@@ -45,6 +49,7 @@ const formatTime = (seconds: number): string => {
 };
 
 const PLAYBACK_SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+const VIDEO_QUALITIES = ['Auto', '1080p', '720p', '480p', '360p'];
 
 export const VideoControls = ({
   isPlaying,
@@ -63,9 +68,12 @@ export const VideoControls = ({
   onFullscreenToggle,
   onSkipForward,
   onSkipBackward,
+  onToggleDoubts,
+  onToggleLectures,
 }: VideoControlsProps) => {
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [seekPreview, setSeekPreview] = useState<number | null>(null);
+  const [currentQuality, setCurrentQuality] = useState('Auto');
   const progressRef = useRef<HTMLDivElement>(null);
 
   // Calculate progress percentage
@@ -89,147 +97,183 @@ export const VideoControls = ({
   };
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent pt-16 pb-4 px-4 transition-opacity duration-300">
-      {/* Progress Bar */}
-      <div 
-        ref={progressRef}
-        className="relative h-1.5 bg-white/20 rounded-full cursor-pointer group mb-4 hover:h-2 transition-all"
-        onClick={handleProgressClick}
-        onMouseMove={handleProgressHover}
-        onMouseLeave={() => setSeekPreview(null)}
-      >
-        {/* Buffered progress */}
-        <div 
-          className="absolute top-0 left-0 h-full bg-white/30 rounded-full"
-          style={{ width: `${bufferedPercent}%` }}
-        />
+    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/80 to-transparent pt-12 pb-4 px-4 transition-opacity duration-300">
+      
+      {/* Top Row: Time | Speed | Progress | Total Time */}
+      <div className="flex items-center gap-3 mb-3 px-1">
+        <span className="text-white text-xs font-medium min-w-[40px]">
+          {formatTime(currentTime)}
+        </span>
         
-        {/* Current progress */}
-        <div 
-          className="absolute top-0 left-0 h-full bg-primary rounded-full transition-all"
-          style={{ width: `${progressPercent}%` }}
-        />
-        
-        {/* Seek preview indicator */}
-        {seekPreview !== null && (
-          <div 
-            className="absolute -top-8 transform -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded"
-            style={{ left: `${(seekPreview / duration) * 100}%` }}
-          >
-            {formatTime(seekPreview)}
-          </div>
+        {playbackSpeed !== 1 && (
+           <span className="border border-white/50 text-white text-[10px] px-1 rounded font-bold">
+             {playbackSpeed}x
+           </span>
         )}
-        
-        {/* Progress handle */}
+
+        {/* Progress Bar Container */}
         <div 
-          className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-          style={{ left: `calc(${progressPercent}% - 8px)` }}
-        />
+          ref={progressRef}
+          className="relative flex-1 h-1 group cursor-pointer py-2" // Added py-2 to increase clickable area
+          onClick={handleProgressClick}
+          onMouseMove={handleProgressHover}
+          onMouseLeave={() => setSeekPreview(null)}
+        >
+          {/* Track Background */}
+          <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1 bg-white/20 rounded-full overflow-hidden">
+             {/* Buffered progress */}
+            <div 
+              className="absolute top-0 left-0 h-full bg-white/30"
+              style={{ width: `${bufferedPercent}%` }}
+            />
+            {/* Current progress */}
+            <div 
+              className="absolute top-0 left-0 h-full bg-primary"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+
+          {/* Hover Preview Tooltip */}
+          {seekPreview !== null && (
+            <div 
+              className="absolute bottom-4 transform -translate-x-1/2 bg-black/90 border border-white/10 text-white text-xs px-2 py-1 rounded shadow-xl"
+              style={{ left: `${(seekPreview / duration) * 100}%` }}
+            >
+              {formatTime(seekPreview)}
+            </div>
+          )}
+          
+          {/* Progress handle (visible on hover) */}
+          <div 
+            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg pointer-events-none"
+            style={{ left: `calc(${progressPercent}% - 6px)` }}
+          />
+        </div>
+
+        <span className="text-white/70 text-xs font-medium min-w-[40px] text-right">
+          {formatTime(duration)}
+        </span>
       </div>
 
-      {/* Controls Row */}
+      {/* Bottom Row: Controls */}
       <div className="flex items-center justify-between">
-        {/* Left Controls */}
-        <div className="flex items-center gap-2">
+        
+        {/* Left Controls Group */}
+        <div className="flex items-center gap-4">
           {/* Play/Pause */}
           <button
             onClick={onPlayPause}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors"
+            className="hover:opacity-80 transition-opacity"
             aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             {isPlaying ? (
-              <Pause className="w-6 h-6 text-white" fill="white" />
+              <Pause className="w-7 h-7 text-white" fill="white" />
             ) : (
-              <Play className="w-6 h-6 text-white" fill="white" />
+              <Play className="w-7 h-7 text-white" fill="white" />
             )}
           </button>
 
-          {/* Skip Backward */}
+          {/* Skip Backward 10s */}
           <button
             onClick={onSkipBackward}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors group"
+            className="relative flex items-center justify-center hover:opacity-80 transition-opacity group"
             aria-label="Skip backward 10 seconds"
           >
-            <SkipBack className="w-5 h-5 text-white" />
-            <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs text-white opacity-0 group-hover:opacity-100 whitespace-nowrap">
-              -10s
-            </span>
+            <SkipBack className="w-6 h-6 text-white" />
+            <span className="absolute text-[8px] font-bold text-white top-[7px]">10</span>
           </button>
 
-          {/* Skip Forward */}
+          {/* Skip Forward 10s */}
           <button
             onClick={onSkipForward}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors group"
+            className="relative flex items-center justify-center hover:opacity-80 transition-opacity group"
             aria-label="Skip forward 10 seconds"
           >
-            <SkipForward className="w-5 h-5 text-white" />
-            <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs text-white opacity-0 group-hover:opacity-100 whitespace-nowrap">
-              +10s
-            </span>
+            <SkipForward className="w-6 h-6 text-white" />
+            <span className="absolute text-[8px] font-bold text-white top-[7px]">10</span>
           </button>
 
           {/* Volume Control */}
           <div 
-            className="relative flex items-center"
+            className="flex items-center group relative"
             onMouseEnter={() => setShowVolumeSlider(true)}
             onMouseLeave={() => setShowVolumeSlider(false)}
           >
             <button
               onClick={onMuteToggle}
-              className="p-2 hover:bg-white/10 rounded-full transition-colors"
+              className="hover:opacity-80 transition-opacity"
               aria-label={isMuted ? 'Unmute' : 'Mute'}
             >
               {isMuted || volume === 0 ? (
-                <VolumeX className="w-5 h-5 text-white" />
+                <VolumeX className="w-6 h-6 text-white" />
               ) : (
-                <Volume2 className="w-5 h-5 text-white" />
+                <Volume2 className="w-6 h-6 text-white" />
               )}
             </button>
             
-            {/* Volume Slider */}
+            {/* Volume Slider - Reveal on Hover */}
             <div className={cn(
-              "flex items-center overflow-hidden transition-all duration-200",
-              showVolumeSlider ? "w-24 opacity-100 ml-2" : "w-0 opacity-0"
+              "overflow-hidden transition-all duration-200 ease-out origin-left flex items-center",
+              showVolumeSlider ? "w-24 ml-3 opacity-100" : "w-0 opacity-0"
             )}>
               <Slider
                 value={[isMuted ? 0 : volume * 100]}
                 max={100}
                 step={1}
                 onValueChange={([val]) => onVolumeChange(val / 100)}
-                className="w-full"
+                className="w-full cursor-pointer"
               />
             </div>
           </div>
-
-          {/* Time Display */}
-          <span className="text-white text-sm font-medium ml-2">
-            {formatTime(currentTime)} / {formatTime(duration)}
-          </span>
         </div>
 
-        {/* Right Controls */}
-        <div className="flex items-center gap-2">
-          {/* Settings Menu (Speed, Quality) */}
+        {/* Right Controls Group */}
+        <div className="flex items-center gap-5">
+          
+          {/* Lectures List Button */}
+          {onToggleLectures && (
+            <button
+              onClick={onToggleLectures}
+              className="hover:opacity-80 transition-opacity"
+              aria-label="Lectures"
+              title="Lectures List"
+            >
+              <ListVideo className="w-6 h-6 text-white" />
+            </button>
+          )}
+
+          {/* Doubts Button (PDF-like symbol) */}
+          {onToggleDoubts && (
+            <button
+              onClick={onToggleDoubts}
+              className="hover:opacity-80 transition-opacity"
+              aria-label="Doubts"
+              title="Doubts & Notes"
+            >
+              <FileText className="w-5 h-5 text-white" />
+            </button>
+          )}
+
+          {/* Settings Menu (Quality & Speed) */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
-                className="p-2 hover:bg-white/10 rounded-full transition-colors flex items-center gap-1"
+                className="hover:opacity-80 transition-opacity rotate-0 hover:rotate-45 duration-300"
                 aria-label="Settings"
               >
-                <Settings className="w-5 h-5 text-white" />
-                {playbackSpeed !== 1 && (
-                  <span className="text-xs text-white">{playbackSpeed}x</span>
-                )}
+                <Settings className="w-6 h-6 text-white" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent 
               align="end" 
-              className="bg-zinc-900/95 border-zinc-700 text-white min-w-[180px]"
+              sideOffset={10}
+              className="bg-zinc-900/95 border-zinc-700 text-white min-w-[220px] backdrop-blur-sm"
             >
+              {/* Playback Speed Submenu */}
               <DropdownMenuSub>
-                <DropdownMenuSubTrigger className="hover:bg-white/10 focus:bg-white/10">
+                <DropdownMenuSubTrigger className="hover:bg-white/10 focus:bg-white/10 h-10">
                   <span>Playback Speed</span>
-                  <span className="ml-auto text-muted-foreground">{playbackSpeed}x</span>
+                  <span className="ml-auto text-zinc-400 text-xs">{playbackSpeed}x</span>
                 </DropdownMenuSubTrigger>
                 <DropdownMenuPortal>
                   <DropdownMenuSubContent className="bg-zinc-900/95 border-zinc-700 text-white">
@@ -237,12 +281,32 @@ export const VideoControls = ({
                       <DropdownMenuItem
                         key={speed}
                         onClick={() => onSpeedChange(speed)}
-                        className={cn(
-                          "hover:bg-white/10 focus:bg-white/10 cursor-pointer",
-                          playbackSpeed === speed && "bg-white/20"
-                        )}
+                        className="hover:bg-white/10 focus:bg-white/10 cursor-pointer justify-between"
                       >
                         {speed === 1 ? 'Normal' : `${speed}x`}
+                        {playbackSpeed === speed && <Check className="w-4 h-4 ml-2" />}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuPortal>
+              </DropdownMenuSub>
+
+              {/* Video Quality Submenu */}
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="hover:bg-white/10 focus:bg-white/10 h-10">
+                  <span>Video Quality</span>
+                  <span className="ml-auto text-zinc-400 text-xs">{currentQuality}</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuPortal>
+                  <DropdownMenuSubContent className="bg-zinc-900/95 border-zinc-700 text-white">
+                    {VIDEO_QUALITIES.map((q) => (
+                      <DropdownMenuItem
+                        key={q}
+                        onClick={() => setCurrentQuality(q)}
+                        className="hover:bg-white/10 focus:bg-white/10 cursor-pointer justify-between"
+                      >
+                        {q}
+                        {currentQuality === q && <Check className="w-4 h-4 ml-2" />}
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuSubContent>
@@ -254,25 +318,15 @@ export const VideoControls = ({
           {/* Fullscreen Toggle */}
           <button
             onClick={onFullscreenToggle}
-            className="p-2 hover:bg-white/10 rounded-full transition-colors"
+            className="hover:opacity-80 transition-opacity"
             aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
           >
             {isFullscreen ? (
-              <Minimize className="w-5 h-5 text-white" />
+              <Minimize className="w-6 h-6 text-white" />
             ) : (
-              <Maximize className="w-5 h-5 text-white" />
+              <Maximize className="w-6 h-6 text-white" />
             )}
           </button>
-        </div>
-      </div>
-
-      {/* Keyboard Shortcuts Hint */}
-      <div className="absolute bottom-full left-4 mb-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <div className="text-xs text-white/60 flex gap-4">
-          <span>Space: Play/Pause</span>
-          <span>←/→: Seek</span>
-          <span>↑/↓: Volume</span>
-          <span>F: Fullscreen</span>
         </div>
       </div>
     </div>
