@@ -346,7 +346,7 @@ export const StudentChatbot = () => {
       {/* Footer Logo */}
       <div className="p-4 flex justify-center border-t border-slate-100 bg-white/50">
          <div className="flex items-center gap-1 opacity-40 grayscale">
-            <img src="/imagelogo.png" alt="UI" className="h-4 w-auto" />
+            <img src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" alt="UI" className="h-4 w-auto" />
             <span className="text-[10px] font-bold text-slate-600">Unknown IITians</span>
          </div>
       </div>
