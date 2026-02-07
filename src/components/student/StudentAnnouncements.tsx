@@ -19,6 +19,7 @@ interface Announcement {
 interface StudentAnnouncementsProps {
   batch?: string;
   subject?: string;
+  enrolledSubjects?: string[]; // New prop to handle batch-level view
 }
 
 const AnnouncementSkeleton = () => (
@@ -46,23 +47,48 @@ const AnnouncementSkeleton = () => (
 );
 
 
-export const StudentAnnouncements = ({ batch, subject }: StudentAnnouncementsProps) => {
-    // Direct query when batch/subject props are provided (context-aware mode)
+export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [] }: StudentAnnouncementsProps) => {
+    
     const { data: announcements, isLoading } = useQuery({
-        queryKey: ['student-announcements', batch, subject],
+        queryKey: ['student-announcements', batch, subject, enrolledSubjects],
         queryFn: async (): Promise<Announcement[]> => {
-            if (!batch || !subject) return [];
+            // Case 1: No context provided at all (shouldn't happen in this UI, but good safeguard)
+            if (!batch && !subject) return [];
             
-            // Get announcements that are:
-            // 1. Targeted to this specific batch AND subject
-            // 2. Targeted to this batch only (no subject filter)
-            // 3. Targeted to this subject only (no batch filter)
-            // 4. Global announcements (no batch and no subject filter)
-            const { data, error } = await supabase
+            let query = supabase
                 .from('notifications')
-                .select('id, title, message, created_at, created_by_name, target_batch, target_subject')
-                .or(`and(target_batch.eq.${batch},target_subject.eq.${subject}),and(target_batch.eq.${batch},target_subject.is.null),and(target_batch.is.null,target_subject.eq.${subject}),and(target_batch.is.null,target_subject.is.null)`)
-                .order('created_at', { ascending: false });
+                .select('id, title, message, created_at, created_by_name, target_batch, target_subject');
+
+            if (batch && subject) {
+                // Case 2: Specific Subject View (Strict Context)
+                // Show: Global, Batch-Global, Subject-Global, or Specific Batch+Subject
+                query = query.or(`and(target_batch.eq.${batch},target_subject.eq.${subject}),and(target_batch.eq.${batch},target_subject.is.null),and(target_batch.is.null,target_subject.eq.${subject}),and(target_batch.is.null,target_subject.is.null)`);
+            } else if (batch) {
+                // Case 3: Batch Dashboard View (Broader Context)
+                // Show: 
+                // 1. Global (no batch, no subject)
+                // 2. Batch General (batch match, no subject)
+                // 3. Batch + Enrolled Subject (batch match, subject in enrolled list)
+                // 4. Global + Enrolled Subject (no batch, subject in enrolled list)
+                
+                let orConditions = [
+                    `and(target_batch.is.null,target_subject.is.null)`, // Global
+                    `and(target_batch.eq.${batch},target_subject.is.null)` // Batch General
+                ];
+
+                if (enrolledSubjects.length > 0) {
+                    // Format array for Supabase filter: ("Math","Physics")
+                    const subjectList = `(${enrolledSubjects.map(s => `"${s}"`).join(',')})`;
+                    
+                    // Add enrolled subject conditions
+                    orConditions.push(`and(target_batch.eq.${batch},target_subject.in.${subjectList})`);
+                    orConditions.push(`and(target_batch.is.null,target_subject.in.${subjectList})`);
+                }
+
+                query = query.or(orConditions.join(','));
+            }
+
+            const { data, error } = await query.order('created_at', { ascending: false });
             
             if (error) {
                 console.error("Error fetching announcements:", error);
@@ -70,7 +96,8 @@ export const StudentAnnouncements = ({ batch, subject }: StudentAnnouncementsPro
             }
             return (data || []) as Announcement[];
         },
-        enabled: !!batch && !!subject,
+        // Enable if we have at least a batch
+        enabled: !!batch,
     });
 
     return (
@@ -80,7 +107,9 @@ export const StudentAnnouncements = ({ batch, subject }: StudentAnnouncementsPro
                     <Megaphone className="mr-3 h-8 w-8 text-primary" />
                     Notice Board
                 </h1>
-                <p className="text-gray-500 mt-1">Important updates for {subject}</p>
+                <p className="text-gray-500 mt-1">
+                    {subject ? `Updates for ${subject}` : `Important updates for ${batch}`}
+                </p>
             </div>
 
             <div>
