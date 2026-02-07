@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,128 +6,30 @@ import { toast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
-// Declare google identity services types
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        id: {
-          initialize: (config: {
-            client_id: string;
-            callback: (response: { credential: string }) => void;
-            auto_select?: boolean;
-          }) => void;
-          prompt: () => void;
-          renderButton: (element: HTMLElement, options: {
-            type?: string;
-            theme?: string;
-            size?: string;
-            text?: string;
-            shape?: string;
-            width?: number;
-          }) => void;
-        };
-      };
-    };
-  }
-}
-
-const GOOGLE_CLIENT_ID = "561606523690-f4a0387bv89guvm5922v725gdtinch1n.apps.googleusercontent.com";
-
 export const AuthPage = () => {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [isGsiLoaded, setIsGsiLoaded] = useState(false);
   // signIn and signUp are not directly used but kept for AuthContext compatibility
   const { signIn, signUp } = useAuth(); 
 
-  const handleCredentialResponse = useCallback(async (response: { credential: string }) => {
+  const handleGoogleAuth = async () => {
     setIsGoogleLoading(true);
-    try {
-      // The credential is an ID token (JWT) that Supabase can verify
-      const { data, error } = await supabase.auth.signInWithIdToken({
-        provider: 'google',
-        token: response.credential,
-      });
-
-      if (error) {
-        console.error('Supabase auth error:', error);
-        toast({
-          title: 'Authentication Error',
-          description: error.message || 'Failed to sign in with Google',
-          variant: 'destructive',
-        });
-        return;
+    
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/`
       }
-
-      // Success - user is now authenticated
-      toast({
-        title: 'Welcome!',
-        description: 'Successfully signed in',
-      });
-      
-    } catch (error: any) {
-      console.error('Google auth error:', error);
-      toast({
-        title: 'Authentication Error',
-        description: error.message || 'Failed to sign in with Google',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsGoogleLoading(false);
-    }
-  }, []);
-
-  // Load Google Identity Services script
-  useEffect(() => {
-    const loadGoogleScript = () => {
-      if (document.getElementById('google-gsi-script')) {
-        setIsGsiLoaded(true);
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.id = 'google-gsi-script';
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      script.onload = () => {
-        setIsGsiLoaded(true);
-      };
-      document.head.appendChild(script);
-    };
-
-    loadGoogleScript();
-  }, []);
-
-  // Initialize Google Sign-In when script is loaded
-  useEffect(() => {
-    if (!isGsiLoaded || !window.google) return;
-
-    window.google.accounts.id.initialize({
-      client_id: GOOGLE_CLIENT_ID,
-      callback: handleCredentialResponse,
-      auto_select: false,
     });
-  }, [isGsiLoaded, handleCredentialResponse]);
 
-  const handleGoogleAuth = () => {
-    if (!window.google) {
+    if (error) {
       toast({
         title: 'Error',
-        description: 'Google Sign-In is not loaded yet. Please try again.',
+        description: error.message,
         variant: 'destructive',
       });
-      return;
     }
-
-    setIsGoogleLoading(true);
-    // Trigger the One Tap prompt
-    window.google.accounts.id.prompt();
     
-    // Reset loading state after a timeout if prompt is dismissed
-    setTimeout(() => {
-      setIsGoogleLoading(false);
-    }, 30000);
+    setIsGoogleLoading(false);
   };
 
   return (
@@ -162,7 +64,7 @@ export const AuthPage = () => {
                   variant="outline"
                   className="w-full bg-white hover:bg-gray-50 text-gray-700 text-base py-6 rounded-lg shadow-sm transition-all duration-300 flex items-center justify-center gap-2 border-gray-300" 
                   onClick={handleGoogleAuth}
-                  disabled={isGoogleLoading || !isGsiLoaded}
+                  disabled={isGoogleLoading}
                 >
                   {isGoogleLoading ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

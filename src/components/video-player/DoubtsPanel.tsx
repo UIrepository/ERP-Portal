@@ -97,7 +97,8 @@ export const DoubtsPanel = ({ doubts, onSubmitDoubt }: DoubtsPanelProps) => {
                       <div className="flex items-center gap-1 mb-1">
                         <span className="text-[15px] font-bold text-[#e7e9ea] flex items-center gap-1">
                           Instructor
-                          <CheckCircle2 className="w-4 h-4 text-[#1d9bf0] fill-white" />
+                          <CheckCircle2 className="w-4 h-4 text-[#1d9bf0]" fill="currentColor" className="text-white" /> 
+                          {/* Note: Using blue badge style from X design */}
                         </span>
                         <span className="text-[#71767b] text-[15px]">
                           · {doubt.answeredAt && format(new Date(doubt.answeredAt), 'h:mm a')}
