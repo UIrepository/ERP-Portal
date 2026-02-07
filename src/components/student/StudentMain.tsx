@@ -336,7 +336,7 @@ const StudentMainContent = () => {
                   </SheetTrigger>
                   <SheetContent side="right" className="w-full sm:w-[400px] flex flex-col p-0 z-[100]">
                      <div className="p-6 border-b border-slate-100 mt-6 sm:mt-0">
-                        <h2 className="text-xl font-bold text-slate-900">Switch Batch</h2>
+                        <h2 className="text-xl font-bold text-slate-900">Switch</h2>
                         <p className="text-sm text-slate-500 mt-1">Select the batch you want to switch to.</p>
                      </div>
                      
