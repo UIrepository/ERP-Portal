@@ -1,9 +1,10 @@
 /**
  * FullScreenVideoPlayer Component
- * * Features:
+ * Features:
  * - High Z-Index to cover floating chat widgets
  * - Custom controls passed to VideoControls
  * - Integrated Sidebar (Desktop) / Drawer (Mobile)
+ * - Updated to X-style Dark Theme (Black background, specific borders)
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -145,9 +146,7 @@ export const FullScreenVideoPlayer = ({
           disablekb: 1,
           playsinline: 1,
           origin: window.location.origin,
-          // Hide end screen recommendations and related videos
           endscreen: 0,
-          // Prevent showing related videos at the end
           autoplay_on_end: 0,
         },
         events: {
@@ -169,7 +168,6 @@ export const FullScreenVideoPlayer = ({
       });
     };
 
-    // Load YouTube IFrame API if not loaded
     if (!window.YT) {
       const tag = document.createElement('script');
       tag.src = 'https://www.youtube.com/iframe_api';
@@ -180,14 +178,10 @@ export const FullScreenVideoPlayer = ({
       initPlayer();
     }
 
-    // Update current time periodically for YouTube
     const timeUpdateInterval = setInterval(() => {
-      // Skip time updates while user is actively seeking to prevent overwriting seek position
       if (seekingRef.current) return;
       
       if (youtubePlayerRef.current && typeof youtubePlayerRef.current.getCurrentTime === 'function') {
-        // Fix for seeking sticking: Check if player is BUFFERING (State 3)
-        // If buffering, do not update current time, as it might revert the UI to old position
         if (youtubePlayerRef.current.getPlayerState && youtubePlayerRef.current.getPlayerState() === 3) {
           return;
         }
@@ -198,7 +192,6 @@ export const FullScreenVideoPlayer = ({
         const dur = youtubePlayerRef.current.getDuration();
         setBuffered(loaded * dur);
         
-        // Hide vignette after 1 second
         if (time > 1 && showVignette) {
           setShowVignette(false);
         }
@@ -215,7 +208,6 @@ export const FullScreenVideoPlayer = ({
     };
   }, [videoSource.type, videoSource.videoId, setCurrentTime, setDuration, setIsPlaying, setBuffered, youtubePlayerRef, showVignette]);
 
-  // Handle ESC key to close
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !isFullscreen) {
@@ -226,7 +218,6 @@ export const FullScreenVideoPlayer = ({
     return () => window.removeEventListener('keydown', handleEsc);
   }, [isFullscreen, handleClose]);
 
-  // Render content for panels (shared between Drawer and Sidebar)
   const renderPanelContent = () => (
     <>
       {activeSidebar === 'doubts' && (
@@ -249,7 +240,6 @@ export const FullScreenVideoPlayer = ({
   return (
     <div 
       ref={containerRef}
-      // UPDATE: Changed z-50 to z-[2147483647] to cover the student support chat
       className="fixed inset-0 z-[2147483647] bg-black flex"
       onMouseMove={showControlsTemporarily}
       onClick={(e) => {
@@ -262,7 +252,6 @@ export const FullScreenVideoPlayer = ({
       {/* Main Video Area */}
       <div className={cn(
         "flex-1 relative transition-all duration-300",
-        // Only add right margin on desktop when sidebar is open
         activeSidebar && !isMobile && "mr-80"
       )}>
         {/* Close Button */}
@@ -292,11 +281,9 @@ export const FullScreenVideoPlayer = ({
 
         {/* Video Container */}
         <div className="video-area absolute inset-0 flex items-center justify-center">
-          {/* YouTube Player */}
           {videoSource.type === 'youtube' && (
             <>
               <div id="youtube-player" className="w-full h-full" />
-              {/* Overlay to prevent YouTube clicks */}
               <div 
                 className="absolute inset-0 z-10"
                 onClick={(e) => {
@@ -307,7 +294,6 @@ export const FullScreenVideoPlayer = ({
             </>
           )}
 
-          {/* HTML5 Video Player (MP4, WebM, direct links) */}
           {(videoSource.type === 'mp4' || videoSource.type === 'direct') && (
             <video
               ref={videoRef}
@@ -323,7 +309,6 @@ export const FullScreenVideoPlayer = ({
             />
           )}
           
-          {/* Vignette overlay to hide YouTube branding at start and end */}
           <div 
             className={cn(
               "absolute inset-0 z-12 pointer-events-none transition-opacity duration-500",
@@ -385,16 +370,16 @@ export const FullScreenVideoPlayer = ({
           }}
         >
           <Drawer.Portal>
-            {/* High Z-Index to appear on top of video player */}
             <Drawer.Overlay className="fixed inset-0 z-[2147483647] bg-black/80" />
             <Drawer.Content 
-              className="fixed inset-x-0 bottom-0 z-[2147483648] mt-24 flex h-[80vh] flex-col rounded-t-[10px] border-t border-zinc-700 bg-zinc-900 outline-none"
+              // UPDATE: Black background, dark border, no internal padding
+              className="fixed inset-x-0 bottom-0 z-[2147483648] mt-24 flex h-[80vh] flex-col rounded-t-[10px] border-t border-[#2f3336] bg-black outline-none"
             >
-              {/* Handle */}
-              <div className="mx-auto mt-4 h-1.5 w-[100px] flex-shrink-0 rounded-full bg-zinc-700" />
+              {/* Handle - Updated color */}
+              <div className="mx-auto mt-4 h-1.5 w-[100px] flex-shrink-0 rounded-full bg-[#2f3336]" />
               
-              {/* Scrollable Content */}
-              <div className="flex-1 overflow-y-auto p-4 min-h-0">
+              {/* Scrollable Content - Removed padding p-4 */}
+              <div className="flex-1 overflow-y-auto min-h-0">
                 {renderPanelContent()}
               </div>
             </Drawer.Content>
@@ -405,13 +390,14 @@ export const FullScreenVideoPlayer = ({
       {/* Desktop Sidebar (Render only if NOT mobile) */}
       {!isMobile && (
         <div className={cn(
-          "fixed top-0 right-0 h-full w-80 bg-zinc-900 border-l border-zinc-700 z-30 transition-transform duration-300 ease-out",
+          // UPDATE: Black background, dark border
+          "fixed top-0 right-0 h-full w-80 bg-black border-l border-[#2f3336] z-30 transition-transform duration-300 ease-out",
           activeSidebar ? "translate-x-0" : "translate-x-full"
         )}>
           {/* Sidebar Close Button */}
           <button
             onClick={() => setActiveSidebar(null)}
-            className="absolute top-4 left-4 p-1 hover:bg-zinc-800 rounded transition-colors z-10"
+            className="absolute top-4 left-4 p-1 hover:bg-[#16181c] rounded-full transition-colors z-10"
             aria-label="Close sidebar"
           >
             <ChevronRight className="w-5 h-5 text-white/60 hover:text-white" />
