@@ -21,6 +21,7 @@ import {
 import { VideoControlsProps } from './types';
 import { cn } from '@/lib/utils';
 import { Slider } from '@/components/ui/slider';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -73,6 +74,7 @@ export const VideoControls = ({
   const [seekPreview, setSeekPreview] = useState<number | null>(null);
   const [currentQuality, setCurrentQuality] = useState('Auto');
   const progressRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   // Calculate progress percentage
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
@@ -327,18 +329,20 @@ export const VideoControls = ({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Fullscreen Toggle */}
-          <button
-            onClick={onFullscreenToggle}
-            className="text-white/70 hover:text-white transition-colors"
-            aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-          >
-            {isFullscreen ? (
-              <Minimize className="w-6 h-6" />
-            ) : (
-              <Maximize className="w-6 h-6" />
-            )}
-          </button>
+          {/* Fullscreen Toggle - Hidden on mobile */}
+          {!isMobile && (
+            <button
+              onClick={onFullscreenToggle}
+              className="text-white/70 hover:text-white transition-colors"
+              aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+            >
+              {isFullscreen ? (
+                <Minimize className="w-6 h-6" />
+              ) : (
+                <Maximize className="w-6 h-6" />
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>

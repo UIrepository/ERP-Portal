@@ -65,6 +65,7 @@ export const useVideoPlayer = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const youtubePlayerRef = useRef<YouTubePlayer>(null);
+  const seekingRef = useRef(false);
 
   // Control visibility logic
   const showControlsTemporarily = useCallback(() => {
@@ -100,6 +101,9 @@ export const useVideoPlayer = () => {
 
   // Seek to specific time
   const seek = useCallback((time: number) => {
+    // Set seeking flag to prevent interval from overwriting the seek position
+    seekingRef.current = true;
+    
     if (videoRef.current) {
       videoRef.current.currentTime = time;
       setCurrentTime(time);
@@ -107,6 +111,11 @@ export const useVideoPlayer = () => {
       youtubePlayerRef.current.seekTo(time, true);
       setCurrentTime(time);
     }
+    
+    // Clear seeking flag after YouTube has time to update
+    setTimeout(() => {
+      seekingRef.current = false;
+    }, 500);
   }, []);
 
   // Skip forward/backward
@@ -249,6 +258,7 @@ export const useVideoPlayer = () => {
     videoRef,
     containerRef,
     youtubePlayerRef,
+    seekingRef,
     // Actions
     togglePlayPause,
     seek,

@@ -51,6 +51,7 @@ export const FullScreenVideoPlayer = ({
     videoRef,
     containerRef,
     youtubePlayerRef,
+    seekingRef,
     togglePlayPause,
     seek,
     skipForward,
@@ -221,6 +222,9 @@ export const FullScreenVideoPlayer = ({
 
     // Update current time periodically for YouTube
     const timeUpdateInterval = setInterval(() => {
+      // Skip time updates while user is actively seeking to prevent overwriting seek position
+      if (seekingRef.current) return;
+      
       if (youtubePlayerRef.current && typeof youtubePlayerRef.current.getCurrentTime === 'function') {
         const time = youtubePlayerRef.current.getCurrentTime();
         setCurrentTime(time);
