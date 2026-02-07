@@ -296,8 +296,6 @@ const StudentMainContent = () => {
           </div>
         );
       case 'community':
-        // This case is essentially unreachable if we intercept the click, 
-        // but kept as fallback just in case.
         return null;
         case 'connect':
           return (
@@ -319,12 +317,15 @@ const StudentMainContent = () => {
   };
 
   return (
-    <div className="w-full max-w-[1000px] mx-auto px-4 py-5 flex flex-col items-center min-h-screen">
-      {/* FLOAT HEADER */}
-      <header className="w-full bg-white rounded-2xl overflow-hidden shadow-lg mb-5">
+    // Updated container: reduced max-width constraint, removed horizontal padding on mobile
+    <div className="w-full mx-auto px-0 sm:px-4 py-3 flex flex-col items-center min-h-screen">
+      
+      {/* FLOAT HEADER - Updated shape */}
+      {/* rounded-t-xl rounded-b-none, full width utilisation */}
+      <header className="w-full bg-white rounded-t-xl rounded-b-none overflow-hidden shadow-sm mb-0.5 border-b border-slate-100">
         
         {/* Top Banner - Dark Gradient */}
-        <div className="relative bg-gradient-to-br from-slate-900 to-slate-800 px-6 py-8 text-white overflow-hidden">
+        <div className="relative bg-gradient-to-br from-slate-900 to-slate-800 px-4 py-6 text-white overflow-hidden">
           <div 
             className="absolute top-0 right-0 w-[200px] h-full bg-teal-500/10 z-0"
             style={{ clipPath: 'polygon(100% 0, 0% 100%, 100% 100%)' }}
@@ -355,9 +356,9 @@ const StudentMainContent = () => {
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-6">
-          <nav className="flex gap-5 overflow-x-auto w-full sm:w-auto no-scrollbar">
+        {/* Navigation Tabs - Reduced padding */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-4">
+          <nav className="flex gap-4 overflow-x-auto w-full sm:w-auto no-scrollbar">
             {[
               { id: 'classes', label: 'All Classes' },
               { id: 'live', label: 'Join Live Class' },
@@ -390,13 +391,13 @@ const StudentMainContent = () => {
         </div>
       </header>
 
-      {/* MAIN CONTENT - White, no border */}
-      <div className="w-full bg-white rounded-2xl shadow-lg p-6">
+      {/* MAIN CONTENT - Sharp top corners to match header bottom, rounded bottom corners */}
+      <div className="w-full bg-white rounded-b-xl rounded-t-none shadow-lg p-4 sm:p-6 min-h-[500px]">
         {renderTabContent()}
       </div>
     </div>
   );
 };
 
-// Export the main component directly (Provider is now at Index level)
+// Export the main component directly
 export const StudentMain = StudentMainContent;
