@@ -278,13 +278,13 @@ const StudentMainContent = () => {
   };
 
   return (
-    // Outer container: Centralized, comfortable max-width, proper vertical padding
-    <div className="w-full max-w-5xl mx-auto px-4 md:px-6 py-6 flex flex-col items-center min-h-screen font-sans">
+    // Outer Container: Flex column with gap-5 for the "visible differentiator"
+    <div className="w-full max-w-5xl mx-auto px-4 md:px-6 py-6 flex flex-col gap-5 min-h-screen font-sans">
       
-      {/* HEADER SECTION - Rounded Top Only, Zero Bottom Margin */}
-      <header className="w-full bg-white rounded-t-2xl border-b border-slate-100 overflow-hidden shadow-sm relative z-10">
+      {/* HEADER SECTION - Fully Rounded Independent Block */}
+      <header className="w-full bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100 relative z-10">
         
-        {/* Banner with Gradient & Texture */}
+        {/* Banner */}
         <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-6 py-8 text-white">
           <div 
             className="absolute top-0 right-0 w-[240px] h-full bg-teal-500/10 z-0"
@@ -316,7 +316,7 @@ const StudentMainContent = () => {
           </div>
         </div>
 
-        {/* Navigation Tabs - Seamlessly attached */}
+        {/* Navigation Tabs */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-6 bg-white">
           <nav className="flex gap-6 overflow-x-auto w-full sm:w-auto no-scrollbar">
             {[
@@ -351,8 +351,9 @@ const StudentMainContent = () => {
         </div>
       </header>
 
-      {/* CONTENT SECTION - Rounded Bottom Only, Zero Top Margin */}
-      <div className="w-full bg-white rounded-b-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 md:p-8 min-h-[600px] border-x border-b border-slate-100/50">
+      {/* CONTENT SECTION - Fully Rounded Independent Block */}
+      {/* Reduced min-height to avoid looking "too long" */}
+      <div className="w-full bg-white rounded-2xl shadow-sm border border-slate-100 p-6 md:p-8 min-h-[400px]">
         {renderTabContent()}
       </div>
     </div>
