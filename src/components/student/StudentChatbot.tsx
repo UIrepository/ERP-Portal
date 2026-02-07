@@ -6,6 +6,14 @@ import { useChatDrawer } from '@/hooks/useChatDrawer';
 import { Loader2, Send, X, MessageSquare, Minus, ChevronLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { 
+  Drawer, 
+  DrawerContent, 
+  DrawerHeader, 
+  DrawerTitle, 
+  DrawerDescription 
+} from '@/components/ui/drawer';
 
 interface Message {
   id: string;
@@ -32,6 +40,7 @@ export const StudentChatbot = () => {
   const queryClient = useQueryClient();
   const [isLoadingRecipient, setIsLoadingRecipient] = useState(false);
   const [managerUnavailable, setManagerUnavailable] = useState(false);
+  const isMobile = useIsMobile();
 
   // Custom styles from design
   const bubbleMeClass = "rounded-[12px_12px_2px_12px]";
@@ -463,38 +472,59 @@ export const StudentChatbot = () => {
     </div>
   );
 
+  // Render logic based on content
+  const renderContent = () => {
+    if (isLoadingRecipient && state.mode === 'subject-connect') {
+      return renderLoadingView();
+    }
+    if (state.selectedRecipient) {
+      return renderChatView();
+    }
+    return renderWelcomeView();
+  };
+
   return (
     <>
-      {/* Floating Action Button */}
+      {/* Floating Action Button - Always visible to trigger/toggle */}
       <button
         onClick={toggleChatbot}
         className={cn(
           "fixed bottom-6 right-6 w-14 h-14 bg-slate-900 hover:bg-slate-800 text-white rounded-full flex items-center justify-center shadow-xl transition-all hover:scale-105 active:scale-95 z-50",
-          state.isOpen ? "rotate-0" : ""
+          state.isOpen && !isMobile ? "rotate-0" : "" // Rotate animation mostly for desktop X icon
         )}
       >
-        {state.isOpen ? (
+        {state.isOpen && !isMobile ? (
           <X className="w-6 h-6" />
         ) : (
           <MessageSquare className="w-6 h-6" />
         )}
       </button>
 
-      {/* Chat Window */}
-      {state.isOpen && (
-        <div 
-          className={cn(
-            "fixed bottom-24 right-6 w-[380px] h-[520px] bg-white rounded-xl flex flex-col overflow-hidden z-50 animate-in slide-in-from-bottom-4 duration-300 ease-out",
-            chatWindowShadowClass
-          )}
-        >
-          {isLoadingRecipient && state.mode === 'subject-connect' 
-            ? renderLoadingView() 
-            : state.selectedRecipient 
-              ? renderChatView() 
-              : renderWelcomeView()
-          }
-        </div>
+      {/* Mobile: Drawer Interface */}
+      {isMobile ? (
+        <Drawer open={state.isOpen} onOpenChange={(open) => !open && closeDrawer()}>
+          <DrawerContent className="h-[85vh] p-0 outline-none">
+             <div className="sr-only">
+               <DrawerTitle>Student Support</DrawerTitle>
+               <DrawerDescription>Chat with support staff or mentors</DrawerDescription>
+             </div>
+             <div className="flex-1 h-full overflow-hidden rounded-t-[10px]">
+                {renderContent()}
+             </div>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        /* Desktop: Floating Window */
+        state.isOpen && (
+          <div 
+            className={cn(
+              "fixed bottom-24 right-6 w-[380px] h-[520px] bg-white rounded-xl flex flex-col overflow-hidden z-50 animate-in slide-in-from-bottom-4 duration-300 ease-out",
+              chatWindowShadowClass
+            )}
+          >
+            {renderContent()}
+          </div>
+        )
       )}
     </>
   );
