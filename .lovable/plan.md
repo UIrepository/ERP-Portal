@@ -1,161 +1,206 @@
 
-# Implementation Plan: Connect Video Cards to FullScreen Video Player
+# Fix Plan: Video Player Seek Issues and Mobile Fullscreen Button
 
 ## Overview
-This plan connects the existing recording cards in `StudentRecordings` to open the professional `FullScreenVideoPlayer` component, enabling a distraction-free viewing experience with custom controls and integrated doubts/lecture navigation.
+This plan fixes two issues with the video player:
+1. The seek bar not updating properly when clicked (related to progress tracking interference)
+2. Removing the fullscreen icon control on mobile devices
 
-## What Will Change
+## Problems Identified
 
-### User Experience
-- Clicking any lecture card opens a full-screen dark-themed video player
-- The player shows custom controls (play/pause, seek, speed, volume) that auto-hide
-- A right sidebar allows students to:
-  - **Doubts tab**: Ask questions and see answers from instructors
-  - **Lectures tab**: Navigate to other lectures in the same subject
-- Students can switch lectures without leaving the player
-- Pressing ESC or clicking the X button closes the player
+### Issue 1: Seek Not Updating Properly
+The problem occurs because:
+- When a user clicks on the seek bar to jump to a new position, the `useVideoProgress` hook's auto-save logic and the YouTube interval time update can interfere
+- The `lastSavedProgress` ref comparison causes issues when seeking back and forth quickly
+- For YouTube, the 250ms interval updates `currentTime` which can momentarily overwrite the seeked position before YouTube finishes seeking
+
+### Issue 2: Fullscreen Button on Mobile
+- The fullscreen toggle is currently visible on all devices
+- On mobile, it should be hidden since the player is already "fullscreen" (covers the entire viewport)
+
+---
 
 ## Implementation Steps
 
-### Step 1: Add Fullscreen Player State
-Add new state variables to `StudentRecordings` to manage when the fullscreen player is open and which lecture is playing.
+### Step 1: Fix Seek in `useVideoPlayer.ts`
+Update the `seek` function to:
+- Immediately set `currentTime` state after calling `seekTo` on YouTube
+- Add a flag to temporarily pause time update interval during seek operation
 
-### Step 2: Create Data Transformation Functions
-Build helper functions to convert:
-- `RecordingContent` (database format) to `Lecture` (player format)
-- Database doubts to the `Doubt` format expected by the player
+```typescript
+// Add a seekingRef to track when we're actively seeking
+const seekingRef = useRef(false);
 
-### Step 3: Fetch Doubts for Player
-Use React Query to fetch doubts for the selected recording, transforming them to include user names and any answers.
+const seek = useCallback((time: number) => {
+  seekingRef.current = true;
+  
+  if (videoRef.current) {
+    videoRef.current.currentTime = time;
+    setCurrentTime(time);
+  } else if (youtubePlayerRef.current) {
+    youtubePlayerRef.current.seekTo(time, true);
+    setCurrentTime(time);
+  }
+  
+  // Reset seeking flag after a brief delay
+  setTimeout(() => {
+    seekingRef.current = false;
+  }, 500);
+}, []);
+```
 
-### Step 4: Connect Card Click Handlers
-Modify the card click handler to:
-1. Set the selected recording
-2. Open the fullscreen player
-3. Log the activity (existing behavior)
+### Step 2: Update `FullScreenVideoPlayer.tsx` YouTube Time Update
+Modify the interval that updates current time to respect the seeking flag:
 
-### Step 5: Implement Player Event Handlers
-- **onLectureChange**: Switch to a different lecture within the player
-- **onDoubtSubmit**: Submit a new question to the database
-- **onClose**: Close the fullscreen player and return to the grid view
+```typescript
+const timeUpdateInterval = setInterval(() => {
+  // Skip update if currently seeking (prevents overwriting user's seek position)
+  if (seekingRef) return;
+  
+  if (youtubePlayerRef.current && typeof youtubePlayerRef.current.getCurrentTime === 'function') {
+    // ... existing code
+  }
+}, 250);
+```
 
-### Step 6: Render the FullScreenVideoPlayer
-Add the `FullScreenVideoPlayer` component conditionally when a lecture is selected for fullscreen viewing.
+The issue is `seekingRef` is inside `useVideoPlayer`, so we need to expose it or handle this differently.
+
+### Step 3: Better Approach - Handle in FullScreenVideoPlayer
+Instead of modifying the hook's internals extensively, we can:
+1. Pass a callback for seek that also manages the time update pause
+2. Or add a local seeking state in FullScreenVideoPlayer that skips time updates
+
+### Step 4: Fix `useVideoProgress.ts` Save Logic
+Update `saveProgress` to accept a `force` parameter that bypasses the 5-second check:
+
+```typescript
+const saveProgress = useCallback(async (currentTime: number, duration: number, force = false) => {
+  if (!user?.id || !recordingId || duration <= 0) return;
+
+  // Don't save if progress hasn't changed significantly, unless forced
+  if (!force && Math.abs(currentTime - lastSavedProgress.current) < 5) return;
+  // ... rest of save logic
+}, [user?.id, recordingId]);
+```
+
+### Step 5: Add Mobile Detection to `VideoControls.tsx`
+Import and use the `useIsMobile` hook:
+
+```typescript
+import { useIsMobile } from '@/hooks/use-mobile';
+
+// Inside component:
+const isMobile = useIsMobile();
+
+// Conditionally render fullscreen button
+{!isMobile && (
+  <button onClick={onFullscreenToggle} ...>
+    {isFullscreen ? <Minimize /> : <Maximize />}
+  </button>
+)}
+```
+
+---
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/components/video-player/useVideoPlayer.ts` | Add `seekingRef` and expose it; update seek function to set the flag |
+| `src/components/video-player/FullScreenVideoPlayer.tsx` | Check `seekingRef` before updating time in the YouTube interval |
+| `src/hooks/useVideoProgress.ts` | Add optional `force` parameter to `saveProgress` |
+| `src/components/video-player/VideoControls.tsx` | Import `useIsMobile` and hide fullscreen button on mobile |
 
 ---
 
 ## Technical Details
 
-### File Modified
-- `src/components/student/StudentRecordings.tsx`
-
-### New Imports
+### Modified `useVideoPlayer.ts`
 ```typescript
-import { FullScreenVideoPlayer } from '@/components/video-player';
-import { Lecture, Doubt as PlayerDoubt } from '@/components/video-player/types';
-```
+// Add ref
+const seekingRef = useRef(false);
 
-### State Additions
-```typescript
-const [isPlayerOpen, setIsPlayerOpen] = useState(false);
-const [playerLecture, setPlayerLecture] = useState<Lecture | null>(null);
-```
+// Update seek function
+const seek = useCallback((time: number) => {
+  // Set seeking flag to prevent interval overwrites
+  seekingRef.current = true;
+  
+  if (videoRef.current) {
+    videoRef.current.currentTime = time;
+    setCurrentTime(time);
+  } else if (youtubePlayerRef.current) {
+    youtubePlayerRef.current.seekTo(time, true);
+    setCurrentTime(time);
+  }
+  
+  // Clear seeking flag after YouTube has time to update
+  setTimeout(() => {
+    seekingRef.current = false;
+  }, 500);
+}, []);
 
-### Data Transformation
-```typescript
-// Convert database recording to player lecture format
-const recordingToLecture = (rec: RecordingContent, index: number): Lecture => ({
-  id: rec.id,
-  title: rec.topic,
-  subject: rec.subject,
-  videoUrl: rec.embed_link,
-  isCompleted: false,
-});
-
-// Convert all recordings to lectures array
-const allLectures = recordings?.map(recordingToLecture) || [];
-```
-
-### Doubts Integration
-The existing doubts query and answers query will be transformed to match the `PlayerDoubt` interface:
-```typescript
-interface PlayerDoubt {
-  id: string;
-  question: string;
-  askedBy: string;
-  askedAt: Date;
-  answer?: string;
-  answeredBy?: string;
-  answeredAt?: Date;
-}
-```
-
-### Card Click Handler Update
-```typescript
-const handlePlayInFullscreen = (recording: RecordingContent, index: number) => {
-  const lecture = recordingToLecture(recording, index);
-  setPlayerLecture(lecture);
-  setSelectedRecording(recording);
-  setIsPlayerOpen(true);
-  logActivity('recording_view', `Opened fullscreen: ${recording.topic}`, {...});
+// Return seekingRef in the hook's return object
+return {
+  // ... existing returns
+  seekingRef,
 };
 ```
 
-### Doubt Submission Handler
+### Modified `FullScreenVideoPlayer.tsx` YouTube Interval
 ```typescript
-const handleDoubtSubmit = async (question: string) => {
-  if (!user || !selectedRecording) return;
-  await supabase.from('doubts').insert({
-    recording_id: selectedRecording.id,
-    user_id: user.id,
-    question_text: question,
-    batch: batch,
-    subject: subject
-  });
-  // Invalidate doubts query to refresh
+const timeUpdateInterval = setInterval(() => {
+  // Skip time updates while user is actively seeking
+  if (seekingRef.current) return;
+  
+  if (youtubePlayerRef.current && typeof youtubePlayerRef.current.getCurrentTime === 'function') {
+    const time = youtubePlayerRef.current.getCurrentTime();
+    setCurrentTime(time);
+    // ... rest
+  }
+}, 250);
+```
+
+### Modified `VideoControls.tsx`
+```typescript
+import { useIsMobile } from '@/hooks/use-mobile';
+
+export const VideoControls = ({ ... }: VideoControlsProps) => {
+  const isMobile = useIsMobile();
+  // ... existing code
+
+  return (
+    <div ...>
+      {/* Right Controls Group */}
+      <div className="flex items-center gap-5">
+        {/* ... other controls */}
+        
+        {/* Fullscreen Toggle - Hidden on mobile */}
+        {!isMobile && (
+          <button
+            onClick={onFullscreenToggle}
+            className="text-white/70 hover:text-white transition-colors"
+            aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+          >
+            {isFullscreen ? <Minimize className="w-6 h-6" /> : <Maximize className="w-6 h-6" />}
+          </button>
+        )}
+      </div>
+    </div>
+  );
 };
 ```
 
-### Conditional Rendering
-```tsx
-{isPlayerOpen && playerLecture && (
-  <FullScreenVideoPlayer
-    currentLecture={playerLecture}
-    lectures={allLectures}
-    doubts={transformedDoubts}
-    onLectureChange={(lecture) => {
-      setPlayerLecture(lecture);
-      const rec = recordings?.find(r => r.id === lecture.id);
-      if (rec) setSelectedRecording(rec);
-    }}
-    onDoubtSubmit={handleDoubtSubmit}
-    onClose={() => setIsPlayerOpen(false)}
-    userName={profile?.name || user?.email}
-  />
-)}
-```
+---
 
-## Diagram: User Flow
-
-```text
-+------------------+     Click Card     +----------------------+
-|                  | -----------------> |                      |
-|  Lecture Grid    |                    |  FullScreen Player   |
-|  (Recording      |                    |  - Custom controls   |
-|   Cards)         | <----------------- |  - Doubts sidebar    |
-|                  |     Press ESC      |  - Lectures sidebar  |
-+------------------+     or X button    +----------------------+
-                                              |
-                                              | Click other lecture
-                                              v
-                                        +----------------------+
-                                        |  Same Player, New    |
-                                        |  Video (no reload)   |
-                                        +----------------------+
-```
+## Expected Outcome
+- Clicking on the seek bar will immediately update the video position without being overwritten
+- The progress bar UI will reflect the new position instantly
+- Video progress will continue to be saved every 10 seconds
+- On mobile devices (viewport width < 768px), the fullscreen button will be hidden
+- All other controls remain functional on mobile
 
 ## Edge Cases Handled
-- Empty recordings list - player won't open
-- Missing embed_link - player still opens but video won't play
-- Doubts loading state - shows "No questions yet" until loaded
-- Real-time doubt updates - existing Supabase channel subscription continues to work
+- Rapid successive seeks work correctly (500ms debounce on seeking flag)
+- YouTube buffering delays won't reset seek position
+- Progress still saves correctly on close/switch lectures
+- Mobile detection handles viewport resize events
