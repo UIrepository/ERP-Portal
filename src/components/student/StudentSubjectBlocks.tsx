@@ -135,7 +135,8 @@ export const StudentSubjectBlocks = ({
       <div className="max-w-[1200px] mx-auto mt-8 px-4 md:px-6">
         <div className="bg-white rounded-md border border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-8">
           
-          <h2 className="text-[26px] font-bold text-[#1e293b] mb-8 tracking-tight">
+          {/* Subject Title - Updated for wrapping and sizing */}
+          <h2 className="text-xl md:text-2xl font-bold text-[#1e293b] mb-8 tracking-tight whitespace-normal break-words leading-tight">
             {subject}
           </h2>
 
