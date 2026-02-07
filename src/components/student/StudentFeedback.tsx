@@ -6,10 +6,28 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
-import { Star, ArrowLeft } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
+import { Star, ArrowLeft, Send, Sparkles, MessageSquare } from 'lucide-react';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter, 
+  DialogClose, 
+  DialogDescription 
+} from '@/components/ui/dialog';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerClose
+} from '@/components/ui/drawer';
 import { differenceInHours, format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useIsMobile } from '@/hooks/use-mobile'; // Import the mobile hook
 
 // --- Types ---
 interface UserEnrollment {
@@ -41,10 +59,49 @@ const StarRating = ({ rating, setRating }: { rating: number, setRating: (rating:
   </div>
 );
 
+// --- Shared Form Content Component ---
+// We extract this to avoid duplicating code between Dialog and Drawer
+const FeedbackFormContent = ({ 
+  questions, 
+  ratings, 
+  setRatings, 
+  comments, 
+  setComments 
+}: { 
+  questions: { key: string; text: string }[],
+  ratings: any,
+  setRatings: React.Dispatch<React.SetStateAction<any>>,
+  comments: string,
+  setComments: (value: string) => void
+}) => (
+  <div className="py-4 space-y-6">
+      {questions.map(({ key, text }) => (
+          <div key={key} className="space-y-3">
+              <label className="text-sm font-medium text-[#000000]">{text}</label>
+              <StarRating
+                  rating={ratings[key as keyof typeof ratings]}
+                  setRating={(rating) => setRatings(prev => ({ ...prev, [key]: rating }))}
+              />
+          </div>
+      ))}
+
+      <div className="space-y-3">
+          <label className="text-sm font-medium text-[#000000]">Additional Comments</label>
+          <Textarea
+              className="resize-none min-h-[100px] border-[#ededed] focus:border-black focus:ring-0"
+              placeholder="Tell us more about your experience..."
+              value={comments}
+              onChange={(e) => setComments(e.target.value)}
+          />
+      </div>
+  </div>
+);
+
 export const StudentFeedback = () => {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile(); // Detect mobile screen
   
   // State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -251,56 +308,84 @@ export const StudentFeedback = () => {
         </div>
       </main>
 
-      {/* Feedback Dialog Form */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-xl bg-white rounded-xl border-[#ededed]">
-            <DialogHeader className="border-b border-[#ededed] pb-4">
-                <DialogTitle className="text-xl font-semibold">
-                    Feedback for {selectedTask?.subject}
-                </DialogTitle>
-                <DialogDescription className="text-[#666666]">
-                   {selectedTask?.batch}
-                </DialogDescription>
-            </DialogHeader>
-
-            <div className="py-4 space-y-6 max-h-[60vh] overflow-y-auto px-1">
-                {questions.map(({ key, text }) => (
-                    <div key={key} className="space-y-3">
-                        <label className="text-sm font-medium text-[#000000]">{text}</label>
-                        <StarRating
-                            rating={ratings[key as keyof typeof ratings]}
-                            setRating={(rating) => setRatings(prev => ({ ...prev, [key]: rating }))}
-                        />
-                    </div>
-                ))}
-
-                <div className="space-y-3">
-                    <label className="text-sm font-medium text-[#000000]">Additional Comments</label>
-                    <Textarea
-                        className="resize-none min-h-[100px] border-[#ededed] focus:border-black focus:ring-0"
-                        placeholder="Tell us more about your experience..."
-                        value={comments}
-                        onChange={(e) => setComments(e.target.value)}
-                    />
-                </div>
+      {/* Conditional Rendering: Drawer for Mobile, Dialog for Desktop */}
+      {isMobile ? (
+        <Drawer open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DrawerContent className="max-h-[85vh]">
+            <DrawerHeader className="text-left border-b border-[#ededed] pb-4">
+              <DrawerTitle className="text-xl font-semibold">
+                Feedback for {selectedTask?.subject}
+              </DrawerTitle>
+              <DrawerDescription className="text-[#666666]">
+                {selectedTask?.batch}
+              </DrawerDescription>
+            </DrawerHeader>
+            
+            <div className="px-4 overflow-y-auto">
+              <FeedbackFormContent 
+                questions={questions}
+                ratings={ratings}
+                setRatings={setRatings}
+                comments={comments}
+                setComments={setComments}
+              />
             </div>
 
-            <DialogFooter className="border-t border-[#ededed] pt-4 gap-3">
-                <DialogClose asChild>
-                    <Button variant="outline" onClick={resetForm} className="border-[#ededed] text-[#666666]">
-                        Cancel
-                    </Button>
-                </DialogClose>
-                <Button 
-                    onClick={handleSubmit} 
-                    className="bg-black hover:bg-black/90 text-white"
-                    disabled={submitFeedbackMutation.isPending}
-                >
-                    {submitFeedbackMutation.isPending ? 'Submitting...' : 'Submit Feedback'}
+            <DrawerFooter className="border-t border-[#ededed] pt-4">
+              <Button 
+                onClick={handleSubmit} 
+                className="bg-black hover:bg-black/90 text-white w-full"
+                disabled={submitFeedbackMutation.isPending}
+              >
+                {submitFeedbackMutation.isPending ? 'Submitting...' : 'Submit Feedback'}
+              </Button>
+              <DrawerClose asChild>
+                <Button variant="outline" onClick={resetForm} className="border-[#ededed] text-[#666666] w-full">
+                  Cancel
                 </Button>
-            </DialogFooter>
-          </DialogContent>
-      </Dialog>
+              </DrawerClose>
+            </DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogContent className="max-w-xl bg-white rounded-xl border-[#ededed]">
+              <DialogHeader className="border-b border-[#ededed] pb-4">
+                  <DialogTitle className="text-xl font-semibold">
+                      Feedback for {selectedTask?.subject}
+                  </DialogTitle>
+                  <DialogDescription className="text-[#666666]">
+                    {selectedTask?.batch}
+                  </DialogDescription>
+              </DialogHeader>
+
+              <div className="max-h-[60vh] overflow-y-auto px-1">
+                <FeedbackFormContent 
+                  questions={questions}
+                  ratings={ratings}
+                  setRatings={setRatings}
+                  comments={comments}
+                  setComments={setComments}
+                />
+              </div>
+
+              <DialogFooter className="border-t border-[#ededed] pt-4 gap-3">
+                  <DialogClose asChild>
+                      <Button variant="outline" onClick={resetForm} className="border-[#ededed] text-[#666666]">
+                          Cancel
+                      </Button>
+                  </DialogClose>
+                  <Button 
+                      onClick={handleSubmit} 
+                      className="bg-black hover:bg-black/90 text-white"
+                      disabled={submitFeedbackMutation.isPending}
+                  >
+                      {submitFeedbackMutation.isPending ? 'Submitting...' : 'Submit Feedback'}
+                  </Button>
+              </DialogFooter>
+            </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
