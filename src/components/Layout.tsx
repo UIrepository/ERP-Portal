@@ -36,83 +36,84 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      {/* Desktop Sidebar - Fixed full height */}
-      <aside className="hidden md:flex h-screen w-64 border-r flex-shrink-0">
-        <Sidebar 
-          activeTab={activeTab} 
-          onTabChange={onTabChange}
-          onSupportClick={resolvedRole === 'student' ? openSupportDrawer : undefined}
-        />
-      </aside>
-
-      {/* Main Content Area */}
-      <div className="flex flex-col flex-1 min-w-0 h-screen">
-        <header className="border-b bg-card shrink-0 z-30">
-          <div className="flex h-16 items-center justify-between px-4 sm:px-6">
-            <div className="flex items-center gap-4">
-              {/* Mobile Sidebar Toggle */}
-              <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
-                <SheetTrigger asChild className="md:hidden">
-                  <Button size="icon" variant="outline">
-                    <PanelLeft className="h-5 w-5" />
-                    <span className="sr-only">Toggle Menu</span>
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-72 p-0">
-                   <SheetHeader className="sr-only">
-                      <SheetTitle>Sidebar Menu</SheetTitle>
-                      <SheetDescription>
-                          Navigate through the portal sections.
-                      </SheetDescription>
-                   </SheetHeader>
-                   <Sidebar 
-                     activeTab={activeTab} 
-                     onTabChange={(tab) => {
-                       onTabChange(tab);
-                       setIsSidebarOpen(false);
-                     }}
-                     onSupportClick={resolvedRole === 'student' ? openSupportDrawer : undefined}
-                   />
-                </SheetContent>
-              </Sheet>
-              
-              <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-12 w-auto hidden sm:block" />
-            </div>
+    <div className="flex flex-col h-screen overflow-hidden bg-background">
+      {/* Full-width Header */}
+      <header className="border-b bg-card shrink-0 z-30 w-full">
+        <div className="flex h-16 items-center justify-between px-4 sm:px-6">
+          <div className="flex items-center gap-4">
+            {/* Mobile Sidebar Toggle */}
+            <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
+              <SheetTrigger asChild className="md:hidden">
+                <Button size="icon" variant="outline">
+                  <PanelLeft className="h-5 w-5" />
+                  <span className="sr-only">Toggle Menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-72 p-0">
+                 <SheetHeader className="sr-only">
+                    <SheetTitle>Sidebar Menu</SheetTitle>
+                    <SheetDescription>
+                        Navigate through the portal sections.
+                    </SheetDescription>
+                 </SheetHeader>
+                 <Sidebar 
+                   activeTab={activeTab} 
+                   onTabChange={(tab) => {
+                     onTabChange(tab);
+                     setIsSidebarOpen(false);
+                   }}
+                   onSupportClick={resolvedRole === 'student' ? openSupportDrawer : undefined}
+                 />
+              </SheetContent>
+            </Sheet>
             
-            <div className="flex items-center space-x-4">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback>
-                        {profile?.name?.charAt(0)?.toUpperCase() || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end" forceMount>
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{profile?.name}</p>
-                      <p className="text-xs leading-none text-muted-foreground capitalize">
-                        {profile?.role?.replace('_', ' ')}
-                      </p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={signOut}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+            <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-12 w-auto" />
           </div>
-        </header>
+          
+          <div className="flex items-center space-x-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback>
+                      {profile?.name?.charAt(0)?.toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{profile?.name}</p>
+                    <p className="text-xs leading-none text-muted-foreground capitalize">
+                      {profile?.role?.replace('_', ' ')}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={signOut}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </header>
+
+      {/* Content Area: Sidebar + Main */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Desktop Sidebar - Fixed height below navbar */}
+        <aside className="hidden md:flex h-full w-64 border-r flex-shrink-0">
+          <Sidebar 
+            activeTab={activeTab} 
+            onTabChange={onTabChange}
+            onSupportClick={resolvedRole === 'student' ? openSupportDrawer : undefined}
+          />
+        </aside>
 
         {/* Scrollable Main Content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto min-w-0">
           <div className="min-h-full flex flex-col">
             <div className="flex-1">
               {children}
