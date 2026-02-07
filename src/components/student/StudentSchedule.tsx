@@ -2,14 +2,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Clock, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
-import { format, getDay, startOfWeek, addDays, isSameDay, subDays } from 'date-fns';
+import { ChevronLeft, ChevronRight, Clock, Video } from 'lucide-react';
+import { format, getDay, startOfWeek, addDays, isSameDay, subDays, parse, isWithinInterval } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 interface Schedule {
   id: string;
@@ -19,7 +17,7 @@ interface Schedule {
   start_time: string;
   end_time: string;
   link?: string;
-  date?: string; // Optional date for specific, non-recurring classes
+  date?: string; 
 }
 
 interface UserEnrollment {
@@ -27,47 +25,44 @@ interface UserEnrollment {
     subject_name: string;
 }
 
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-// Expanded and updated color palette for subjects
-const subjectColorClasses = [
-    'bg-sky-200',
-    'bg-emerald-200',
-    'bg-amber-200',
-    'bg-violet-200',
-    'bg-rose-200',
-    'bg-cyan-200', // Turquoise-like color
-    'bg-fuchsia-200',
-    'bg-lime-200',
-    'bg-teal-200',
-    'bg-blue-200',
-    'bg-green-200',
-    'bg-yellow-200',
-    'bg-purple-200',
-    'bg-red-200',
-    'bg-indigo-200',
-    'bg-pink-200',
-    'bg-orange-200',
+// Updated palette for thin left-border accents
+const subjectBorderColors = [
+    'bg-blue-500',
+    'bg-purple-500',
+    'bg-emerald-500',
+    'bg-amber-500',
+    'bg-rose-500',
+    'bg-cyan-500',
+    'bg-indigo-500',
+    'bg-lime-500',
+    'bg-teal-500',
+    'bg-fuchsia-500',
 ];
 
 const ScheduleSkeleton = () => (
-    <div className="space-y-6">
-        {[...Array(3)].map((_, i) => (
-            <Card key={i}>
-                <CardHeader>
-                    <Skeleton className="h-6 w-1/3" />
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex justify-between items-center">
-                        <div className="space-y-2">
-                            <Skeleton className="h-4 w-48" />
-                            <Skeleton className="h-5 w-32" />
-                        </div>
-                        <Skeleton className="h-6 w-20" />
+    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+        <div className="grid grid-cols-[80px_repeat(7,1fr)] min-w-[800px]">
+             <div className="h-14 bg-gray-50 border-b border-r border-gray-200" />
+             {[...Array(7)].map((_, i) => (
+                 <div key={i} className="h-14 border-b border-r border-gray-200 bg-gray-50 p-4">
+                     <Skeleton className="h-4 w-8 mx-auto" />
+                 </div>
+             ))}
+             {[...Array(5)].map((_, r) => (
+                 <>
+                    <div key={`time-${r}`} className="h-32 border-b border-r border-gray-200 p-4">
+                        <Skeleton className="h-4 w-12 ml-auto" />
                     </div>
-                </CardContent>
-            </Card>
-        ))}
+                    {[...Array(7)].map((_, c) => (
+                        <div key={`cell-${r}-${c}`} className="h-32 border-b border-r border-gray-200 p-2">
+                             {Math.random() > 0.7 && <Skeleton className="h-20 w-full rounded-md" />}
+                        </div>
+                    ))}
+                 </>
+             ))}
+        </div>
     </div>
 );
 
@@ -77,8 +72,9 @@ export const StudentSchedule = () => {
   const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
   const [displayDate, setDisplayDate] = useState(new Date());
 
+  // Real-time clock
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000); // Update every second
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000); 
     return () => clearInterval(timer);
   }, []);
 
@@ -90,10 +86,7 @@ export const StudentSchedule = () => {
             .from('user_enrollments')
             .select('batch_name, subject_name')
             .eq('user_id', profile.user_id);
-        if (error) {
-            console.error("Error fetching user enrollments:", error);
-            return [];
-        }
+        if (error) return [];
         return data || [];
     },
     enabled: !!profile?.user_id
@@ -121,10 +114,7 @@ export const StudentSchedule = () => {
         query = query.in('batch', batchesToFilter);
         query = query.order('date', { nullsFirst: false }).order('day_of_week').order('start_time');
         const { data, error } = await query;
-        if (error) {
-            console.error("Error fetching schedules directly:", error);
-            throw error;
-        }
+        if (error) throw error;
         return data || [];
     },
     enabled: !!userEnrollments && userEnrollments.length > 0
@@ -133,7 +123,7 @@ export const StudentSchedule = () => {
   const isLoading = isLoadingEnrollments || isLoadingSchedules;
 
   const weekDates = useMemo(() => {
-    const start = startOfWeek(displayDate);
+    const start = startOfWeek(displayDate, { weekStartsOn: 1 }); // Start on Monday
     return Array.from({ length: 7 }).map((_, i) => addDays(start, i));
   }, [displayDate]);
 
@@ -156,20 +146,20 @@ export const StudentSchedule = () => {
     });
 
     return visibleSlots.sort();
-}, [schedules, weekDates]);
+  }, [schedules, weekDates]);
 
   const subjectColorMap = useMemo(() => {
     if (!schedules) return new Map();
     const uniqueSubjects = Array.from(new Set(schedules.map(s => s.subject))).sort();
     const colorMap = new Map<string, string>();
     uniqueSubjects.forEach((subject, index) => {
-        colorMap.set(subject, subjectColorClasses[index % subjectColorClasses.length]);
+        colorMap.set(subject, subjectBorderColors[index % subjectBorderColors.length]);
     });
     return colorMap;
   }, [schedules]);
 
-  const getSubjectColorClass = (subject: string) => {
-    return subjectColorMap.get(subject) || 'bg-gray-200';
+  const getSubjectBorderColor = (subject: string) => {
+    return subjectColorMap.get(subject) || 'bg-gray-400';
   };
 
   const formatTime = (time: string) => {
@@ -179,104 +169,187 @@ export const StudentSchedule = () => {
     return format(date, 'h:mm a');
   };
 
-  const today = new Date();
+  const isClassLive = (schedule: Schedule, classDate: Date) => {
+    // Basic date check first
+    if (!isSameDay(classDate, currentTime)) return false;
 
-  const handlePreviousWeek = () => {
-    setDisplayDate(subDays(displayDate, 7));
+    // Time parsing
+    const [startH, startM] = schedule.start_time.split(':').map(Number);
+    const [endH, endM] = schedule.end_time.split(':').map(Number);
+    
+    const startTime = new Date(currentTime);
+    startTime.setHours(startH, startM, 0);
+    
+    const endTime = new Date(currentTime);
+    endTime.setHours(endH, endM, 0);
+
+    return isWithinInterval(currentTime, { start: startTime, end: endTime });
   };
 
-  const handleNextWeek = () => {
-    setDisplayDate(addDays(displayDate, 7));
-  };
+  const handlePreviousWeek = () => setDisplayDate(subDays(displayDate, 7));
+  const handleNextWeek = () => setDisplayDate(addDays(displayDate, 7));
 
   return (
-    <div className="p-2 sm:p-6 bg-gray-50 min-h-screen">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-        <div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Class Schedule</h2>
-          <p className="text-gray-600 mt-1 text-sm sm:text-base">Your weekly class timetable</p>
+    <div className="p-4 sm:p-8 bg-white min-h-screen font-sans text-slate-900 max-w-7xl mx-auto">
+      
+      {/* HEADER */}
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Class Schedule</h1>
+          <p className="text-sm text-slate-500 font-medium">{format(displayDate, 'MMMM yyyy')}</p>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex items-center gap-4">
-              <Button variant="outline" size="icon" onClick={handlePreviousWeek}>
+
+        <div className="flex flex-wrap items-center gap-3 bg-gray-50/80 p-1.5 rounded-lg border border-gray-200 shadow-sm w-full md:w-auto">
+          {/* Batch Filter */}
+          <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
+            <SelectTrigger className="h-8 w-[180px] border-none bg-transparent shadow-none focus:ring-0 text-xs font-semibold text-slate-700">
+              <SelectValue placeholder="All Batches" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Batches</SelectItem>
+              {availableBatches.map((batch) => (
+                <SelectItem key={batch} value={batch}>{batch}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          <div className="h-5 w-px bg-gray-300 mx-1 hidden sm:block"></div>
+
+          {/* Navigation */}
+          <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500 hover:text-slate-900 hover:bg-white" onClick={handlePreviousWeek}>
                   <ChevronLeft className="h-4 w-4" />
               </Button>
-              <div className="text-center">
-                  <p className="text-sm text-gray-500">{format(weekDates[0], 'MMM d')} - {format(weekDates[6], 'MMM d, yyyy')}</p>
-              </div>
-              <Button variant="outline" size="icon" onClick={handleNextWeek}>
+              <span className="text-xs font-semibold text-slate-700 min-w-[100px] text-center tabular-nums">
+                  {format(weekDates[0], 'd MMM')} — {format(weekDates[6], 'd MMM')}
+              </span>
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500 hover:text-slate-900 hover:bg-white" onClick={handleNextWeek}>
                   <ChevronRight className="h-4 w-4" />
               </Button>
           </div>
-          <div className="text-right">
-                <p className="text-base sm:text-lg font-semibold text-gray-900">{format(currentTime, 'p')}</p>
+
+          <div className="h-5 w-px bg-gray-300 mx-1 hidden sm:block"></div>
+
+          {/* Real-time Timer */}
+          <div className="px-2 flex items-center gap-2 text-slate-600 bg-white border border-gray-200 rounded-md h-7 shadow-sm">
+            <Clock className="h-3.5 w-3.5 text-slate-400" />
+            <span className="text-xs font-mono font-medium tabular-nums tracking-wide">
+                {format(currentTime, 'HH:mm:ss')}
+            </span>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="flex gap-4 mb-6">
-        <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
-          <SelectTrigger className="w-full sm:w-48 h-10 bg-white">
-            <SelectValue placeholder="Filter by batch" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All My Batches</SelectItem>
-            {availableBatches.map((batch) => (
-              <SelectItem key={batch} value={batch}>{batch}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
+      {/* CALENDAR GRID */}
       {isLoading ? <ScheduleSkeleton /> : (
-      <div className="bg-white p-2 sm:p-4 rounded-2xl shadow-lg overflow-x-auto">
-          <div className="min-w-[800px]">
-            <div className="grid grid-cols-[minmax(100px,1fr)_repeat(7,minmax(120px,1fr))]">
-                <div className="text-center font-semibold text-gray-500 py-2 sticky left-0 bg-white z-10">Time</div>
-                {weekDates.map((date, index) => (
-                    <div key={index} className={`text-center font-semibold py-2 ${isSameDay(date, today) ? 'text-primary' : 'text-gray-500'}`}>
-                        <div>{DAYS[getDay(date)]}</div>
-                        <div className="text-xs font-normal">{format(date, 'MMM d')}</div>
+      <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm overflow-x-auto relative">
+          <div className="grid min-w-[900px] grid-cols-[80px_repeat(7,1fr)] bg-slate-50">
+            
+            {/* Header Row */}
+            <div className="p-4 border-b border-r border-gray-200 bg-gray-50/50 sticky left-0 z-20"></div>
+            {weekDates.map((date, index) => {
+                const isToday = isSameDay(date, currentTime);
+                return (
+                    <div key={index} className={cn(
+                        "p-3 text-center border-b border-r border-gray-200 last:border-r-0 transition-colors",
+                        isToday ? "bg-white" : "bg-gray-50/50"
+                    )}>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{format(date, 'EEE')}</div>
+                        <div className={cn(
+                            "text-lg font-medium",
+                            isToday ? "text-indigo-600" : "text-slate-700"
+                        )}>{format(date, 'dd')}</div>
                     </div>
-                ))}
-            </div>
-            <div className="relative">
-                {timeSlots.map(time => {
-                    const sampleScheduleForSlot = schedules?.find(s => s.start_time === time);
-                    const endTime = sampleScheduleForSlot ? sampleScheduleForSlot.end_time : '';
-                    return (
-                        <div key={time} className="grid grid-cols-[minmax(100px,1fr)_repeat(7,minmax(120px,1fr))] border-t">
-                            <div className="text-center text-xs font-medium text-gray-700 py-4 px-2 border-r sticky left-0 bg-white z-10">
-                                {formatTime(time)} - {endTime ? formatTime(endTime) : ''}
+                );
+            })}
+
+            {/* Time Slots Rows */}
+            {timeSlots.map((time, timeIndex) => (
+                <>
+                    {/* Time Label */}
+                    <div key={`time-${time}`} className="sticky left-0 z-10 bg-white p-3 text-right text-[11px] font-medium text-slate-400 border-r border-b border-gray-200 flex flex-col justify-start pt-6">
+                        {formatTime(time)}
+                    </div>
+
+                    {/* Day Cells for this Time Slot */}
+                    {weekDates.map((date, dayIndex) => {
+                        const dayNum = getDay(date);
+                        
+                        // Filter classes for this specific cell (Date + Time)
+                        const cellClasses = schedules?.filter(s => {
+                            const isTimeMatch = s.start_time === time;
+                            const isRecurring = !s.date && s.day_of_week === dayNum;
+                            const isDateSpecific = s.date && isSameDay(new Date(s.date), date);
+                            return isTimeMatch && (isRecurring || isDateSpecific);
+                        }) || [];
+
+                        return (
+                            <div key={`cell-${dayIndex}-${timeIndex}`} className="p-2 border-r border-b border-gray-200 last:border-r-0 bg-white min-h-[140px] hover:bg-slate-50/30 transition-colors relative">
+                                {cellClasses.map(classInfo => {
+                                    const isLive = isClassLive(classInfo, date);
+                                    
+                                    return (
+                                        <div 
+                                          key={classInfo.id} 
+                                          className={cn(
+                                            "relative bg-white border rounded-md p-3 mb-2 shadow-sm transition-all group overflow-hidden",
+                                            isLive ? "border-indigo-200 shadow-md ring-1 ring-indigo-50" : "border-gray-200 hover:border-gray-300"
+                                          )}
+                                        >
+                                            {/* Accent Left Border */}
+                                            <div className={cn("absolute left-0 top-3 bottom-3 w-[3px] rounded-r-sm", getSubjectBorderColor(classInfo.subject))} />
+
+                                            <div className="pl-3">
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <h3 className="text-xs font-semibold text-slate-900 truncate pr-2 flex items-center">
+                                                        {isLive && (
+                                                            <span className="relative flex h-2 w-2 mr-2">
+                                                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                                              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                                                            </span>
+                                                        )}
+                                                        {classInfo.subject}
+                                                    </h3>
+                                                </div>
+                                                
+                                                <div className="flex items-center justify-between text-[10px] text-slate-500 mb-2">
+                                                    <span>{classInfo.batch}</span>
+                                                    <span>{formatTime(classInfo.end_time)}</span>
+                                                </div>
+
+                                                {/* Live Join Button */}
+                                                {classInfo.link && (
+                                                    <Button 
+                                                        size="sm" 
+                                                        variant={isLive ? "default" : "outline"}
+                                                        className={cn(
+                                                            "w-full h-7 text-[10px] font-medium",
+                                                            isLive ? "bg-indigo-600 hover:bg-indigo-700 text-white" : "text-slate-600 border-slate-200 hover:bg-slate-50"
+                                                        )}
+                                                        asChild
+                                                    >
+                                                        <a href={classInfo.link} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5">
+                                                            {isLive ? <Video className="h-3 w-3" /> : null}
+                                                            {isLive ? "Join Live" : "Join Class"}
+                                                        </a>
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
-                            {weekDates.map((date, dayIndex) => {
-                                const recurringClasses = schedules?.filter(s => !s.date && s.day_of_week === getDay(date) && s.start_time === time);
-                                const dateSpecificClasses = schedules?.filter(s => s.date && isSameDay(new Date(s.date), date) && s.start_time === time);
-                                const classesInfo = [...(dateSpecificClasses || []), ...(recurringClasses || [])];
-                                return (
-                                    <div key={`${dayIndex}-${time}`} className={`p-2 border-r last:border-r-0 ${isSameDay(date, today) ? 'bg-blue-50' : ''}`}>
-                                        {classesInfo.map(classInfo => (
-                                            <Card key={classInfo.id} className={cn("shadow-md hover:shadow-lg transition-shadow mb-2", getSubjectColorClass(classInfo.subject))}>
-                                                <CardContent className="p-3">
-                                                    <p className="font-bold text-gray-800 text-sm break-words">{classInfo.subject}</p>
-                                                    <Badge variant="secondary" className="mt-1">{classInfo.batch}</Badge>
-                                                    {classInfo.link && (
-                                                        <Button size="sm" asChild className="w-full mt-2">
-                                                            <a href={classInfo.link} target="_blank" rel="noopener noreferrer">
-                                                                <ExternalLink className="h-4 w-4 mr-1" /> Join
-                                                            </a>
-                                                        </Button>
-                                                    )}
-                                                </CardContent>
-                                            </Card>
-                                        ))}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    );
-                })}
-            </div>
+                        );
+                    })}
+                </>
+            ))}
+            
+            {/* Empty State if no schedules */}
+            {timeSlots.length === 0 && (
+                <div className="col-span-8 py-16 flex flex-col items-center justify-center text-slate-400">
+                    <p className="text-sm">No classes scheduled for this week.</p>
+                </div>
+            )}
           </div>
       </div>
       )}
