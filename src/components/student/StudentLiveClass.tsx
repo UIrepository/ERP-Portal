@@ -165,7 +165,7 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
 
   return (
     // Clean Container - No border, no bg, no extra padding
-    <div className="w-full font-sans antialiased text-slate-900">
+    <div className="w-full font-sans antialiased text-slate-900 p-4 md:p-6">
       
       {/* Header */}
       <div className="mb-6">
