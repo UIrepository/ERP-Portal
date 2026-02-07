@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { format, addMinutes, isWithinInterval } from 'date-fns';
-import { Video, ExternalLink } from 'lucide-react';
+import { format, addMinutes, isWithinInterval, parseISO, differenceInMinutes } from 'date-fns';
+import { ExternalLink, Lock, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { generateJitsiRoomName } from '@/lib/jitsiUtils';
@@ -61,7 +61,7 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
       }
       const { data: meetingLinks } = await linkQuery;
 
-      // 3. Get Active Classes (Real-time status)
+      // 3. Get Active Classes
       let activeClassQuery = supabase
         .from('active_classes')
         .select('*')
@@ -73,7 +73,7 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
       }
       const { data: activeClasses } = await activeClassQuery;
 
-      // 4. Filter Valid Schedules (Strict Date/Day Match)
+      // 4. Filter Valid Schedules
       const validSchedules = (schedulesData || []).filter(schedule => {
         if (schedule.date) {
           return schedule.date === todayDateStr;
@@ -81,40 +81,30 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
         return schedule.day_of_week === currentDayOfWeek;
       });
 
-      // 5. Map to Links
+      // 5. Map Links
       return validSchedules.map(schedule => {
         const activeJitsi = activeClasses?.find(ac => ac.subject === schedule.subject);
         const subjectLink = meetingLinks?.find(l => l.subject === schedule.subject);
         
-        // --- LINK RESOLUTION LOGIC ---
-        
-        // A. Dynamic Jitsi Link (The correct one that matches Teacher)
         const generatedJitsiLink = `https://meet.jit.si/${generateJitsiRoomName(schedule.batch, schedule.subject)}`;
-
-        // B. Database Link (Could be static Jitsi, Zoom, GMeet, etc.)
         const dbLink = activeJitsi?.room_url || schedule.link || subjectLink?.link;
 
         let finalLink = null;
-
         if (dbLink) {
-          // INTELLIGENT OVERRIDE:
-          // If the DB has a Jitsi link (e.g. "meet.jit.si/OldStaticRoom"), 
-          // we IGNORE it because it likely doesn't match the Teacher's dynamic room.
+          // If DB has a Jitsi link, ensure it matches the dynamic standard
           if (dbLink.includes('meet.jit.si')) {
              finalLink = generatedJitsiLink;
           } else {
-             // If it's Zoom/GMeet, trust the DB link.
              finalLink = dbLink;
           }
         } else {
-          // No link in DB? Use the generated one.
           finalLink = generatedJitsiLink;
         }
 
         return {
           ...schedule,
           meeting_link_url: finalLink,
-          is_jitsi_live: !!activeJitsi // Status indicator only
+          is_jitsi_live: !!activeJitsi
         };
       });
     },
@@ -124,8 +114,11 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
 
   const now = new Date();
 
-  // Filter only Ongoing classes (Buffer: -15 min start, +15 min end)
-  const ongoingClasses = schedules?.filter(schedule => {
+  // Logic to separate "Live Now" from "Upcoming"
+  const liveClasses: ScheduleWithLink[] = [];
+  const upcomingClasses: ScheduleWithLink[] = [];
+
+  schedules?.forEach(schedule => {
     const [startHour, startMin] = schedule.start_time.split(':').map(Number);
     const [endHour, endMin] = schedule.end_time.split(':').map(Number);
     
@@ -135,11 +128,21 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
     const endTime = new Date(today);
     endTime.setHours(endHour, endMin, 0, 0);
     
+    // Live: Buffer -15 min start, +15 min end
     const bufferStart = addMinutes(startTime, -15);
     const bufferEnd = addMinutes(endTime, 15);
     
-    return isWithinInterval(now, { start: bufferStart, end: bufferEnd });
-  }) || [];
+    if (isWithinInterval(now, { start: bufferStart, end: bufferEnd })) {
+      liveClasses.push(schedule);
+    } 
+    // Upcoming: Starts within the next 4 hours
+    else if (now < startTime && differenceInMinutes(startTime, now) < 240) {
+      upcomingClasses.push(schedule);
+    }
+  });
+
+  // Sort upcoming by nearest time
+  upcomingClasses.sort((a, b) => a.start_time.localeCompare(b.start_time));
 
   const handleJoinClass = (meetingLink: string | null) => {
     if (meetingLink) {
@@ -147,91 +150,165 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
     }
   };
 
-  const formatTime = (time: string) => {
-    const [hour, min] = time.split(':').map(Number);
-    const date = new Date();
-    date.setHours(hour, min);
-    return format(date, 'h:mm a');
+  const formatTimeRange = (start: string, end: string) => {
+    const formatSingle = (t: string) => {
+      const [h, m] = t.split(':');
+      const date = new Date();
+      date.setHours(Number(h), Number(m));
+      return format(date, 'HH:mm');
+    };
+    return `${formatSingle(start)} — ${formatSingle(end)}`;
   };
 
   if (isLoading) {
     return (
       <div className="w-full">
-        <Skeleton className="h-32 w-full rounded-2xl" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
       </div>
     );
   }
 
-  if (ongoingClasses.length === 0) {
+  // If absolutely nothing is happening today
+  if (liveClasses.length === 0 && upcomingClasses.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-10 text-center bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
-        <div className="bg-white p-3 rounded-full shadow-sm mb-3">
-          <Video className="h-6 w-6 text-slate-400" />
+      <div className="space-y-6">
+         <div className="flex items-end justify-between px-2">
+            <h2 className="text-4xl font-serif text-slate-800">No Sessions</h2>
+            <span className="text-[10px] font-bold uppercase tracking-widest border-b border-transparent pb-1 text-gray-400">
+               Relax for now
+            </span>
         </div>
-        <h3 className="text-sm font-semibold text-slate-700">No Live Class</h3>
-        <p className="text-xs text-slate-500 max-w-[200px] mx-auto mt-1">
-          No classes are currently live.
-        </p>
+        <div className="bg-slate-50 border border-dashed border-slate-200 rounded-none p-12 flex flex-col items-center justify-center text-center h-64">
+           <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
+             <Lock className="w-5 h-5 text-slate-300" />
+           </div>
+           <h3 className="font-serif text-2xl text-slate-400 mb-1">Studio Offline</h3>
+           <p className="text-xs font-bold uppercase tracking-widest text-slate-300">No classes scheduled for today</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full space-y-4">
-      {ongoingClasses.map((classItem) => (
-        <div
-          key={classItem.id}
-          className={`relative overflow-hidden rounded-2xl bg-white border p-5 shadow-sm transition-all hover:shadow-md ${
-            classItem.is_jitsi_live ? 'border-emerald-200 ring-1 ring-emerald-100' : 'border-slate-100'
-          }`}
-        >
-          {/* Live Badge */}
-          <div className="absolute top-4 right-4 z-10">
-            {classItem.is_jitsi_live ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-white bg-red-500 shadow-sm animate-pulse">
-                  <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
-                  Live Now
-                </span>
-            ) : (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 border border-emerald-100">
-                  Scheduled
-                </span>
-            )}
-          </div>
+    <div className="space-y-8 animate-in fade-in duration-500">
+      
+      {/* Header Section */}
+      <div className="flex items-end justify-between px-1">
+        <h2 className="font-serif text-4xl text-slate-900 tracking-tight">Now Playing</h2>
+        <a href="#schedule" className="text-[10px] font-bold uppercase tracking-widest border-b border-black pb-1 hover:text-gray-500 hover:border-gray-500 transition-all">
+            All Schedules
+        </a>
+      </div>
 
-          <div className="flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 border ${
-                classItem.is_jitsi_live ? 'bg-red-50 border-red-100' : 'bg-slate-50 border-slate-100'
-            }`}>
-              <Video className={`h-6 w-6 ${classItem.is_jitsi_live ? 'text-red-500' : 'text-slate-500'}`} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* LEFT COLUMN: LIVE CLASS (Dark Theme) */}
+        {liveClasses.length > 0 ? (
+          liveClasses.map((classItem) => (
+            <div 
+              key={classItem.id}
+              className="bg-black text-white rounded-none p-8 flex flex-col justify-between h-72 relative overflow-hidden group hover:shadow-2xl transition-all duration-500"
+            >
+              {/* Top Content */}
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-6">
+                  {/* Animated Bars */}
+                  <div className="flex items-end gap-[3px] h-4">
+                     <span className="w-1 bg-red-500 h-full animate-[pulse_0.8s_ease-in-out_infinite]"></span>
+                     <span className="w-1 bg-red-500 h-2/3 animate-[pulse_1.2s_ease-in-out_infinite_0.1s]"></span>
+                     <span className="w-1 bg-red-500 h-1/2 animate-[pulse_1s_ease-in-out_infinite_0.2s]"></span>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-500">
+                    Live Session
+                  </span>
+                </div>
+                
+                <h3 className="font-serif text-3xl md:text-4xl mb-2 leading-none">
+                  {classItem.subject}
+                </h3>
+                {/* Faculty name removed as requested */}
+                <p className="text-gray-500 text-xs font-mono uppercase tracking-wider">
+                  {classItem.batch}
+                </p>
+              </div>
+
+              {/* Bottom Action */}
+              <div className="relative z-10 flex items-center justify-between mt-4">
+                <span className="text-[11px] font-medium text-gray-400 font-mono">
+                  {formatTimeRange(classItem.start_time, classItem.end_time)}
+                </span>
+                <button 
+                  onClick={() => handleJoinClass(classItem.meeting_link_url)}
+                  disabled={!classItem.meeting_link_url}
+                  className="bg-white text-black px-6 py-3 rounded-none text-[10px] font-bold uppercase tracking-[0.15em] hover:bg-[#d4af37] hover:text-white transition-colors flex items-center gap-2"
+                >
+                  Enter Room <ExternalLink className="w-3 h-3" />
+                </button>
+              </div>
+              
+              {/* Decorative Big Text Background */}
+              <span className="absolute -bottom-10 -right-6 text-[140px] font-black text-white/[0.03] select-none pointer-events-none tracking-tighter italic">
+                NOW
+              </span>
             </div>
-            
-            <div className="flex-1 min-w-0 pr-20">
-              <h3 className="text-lg font-bold text-slate-900 truncate">
-                {classItem.subject}
+          ))
+        ) : (
+          // Empty State for Live (if only upcoming exists)
+          <div className="bg-gray-100 border border-gray-200 rounded-none p-8 flex flex-col justify-between h-72 relative overflow-hidden">
+             <div className="relative z-10 opacity-50">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">
+                    Offline
+                  </span>
+                </div>
+                <h3 className="font-serif text-3xl text-gray-400 mb-2">Studio Empty</h3>
+                <p className="text-gray-400 text-xs italic">No session currently live.</p>
+             </div>
+             <span className="absolute -bottom-10 -right-6 text-[140px] font-black text-black/[0.02] select-none pointer-events-none tracking-tighter italic">
+                OFF
+              </span>
+          </div>
+        )}
+
+        {/* RIGHT COLUMN: UPCOMING CLASS (Light Theme) */}
+        {upcomingClasses.length > 0 ? (
+          <div className="bg-white border border-gray-100 rounded-none p-8 flex flex-col justify-between h-72 shadow-sm">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-600 block mb-6">
+                Up Next
+              </span>
+              <h3 className="font-serif text-3xl mb-2 text-black leading-tight">
+                {upcomingClasses[0].subject}
               </h3>
-              <p className="text-slate-500 text-sm font-medium">
-                {formatTime(classItem.start_time)} - {formatTime(classItem.end_time)}
+              <p className="text-gray-400 text-xs font-mono uppercase tracking-wider">
+                {upcomingClasses[0].batch}
               </p>
             </div>
+
+            <div className="flex items-center justify-between border-t border-gray-50 pt-6">
+              <div className="flex flex-col">
+                 <span className="text-[10px] font-bold uppercase text-gray-400 mb-1">Starts At</span>
+                 <span className="text-lg font-serif text-black">
+                    {format(new Date().setHours(...(upcomingClasses[0].start_time.split(':').map(Number) as [number, number])), 'h:mm a')}
+                 </span>
+              </div>
+              <div className="w-12 h-12 border border-gray-100 rounded-none flex items-center justify-center text-gray-300 bg-gray-50">
+                <Lock className="w-4 h-4" />
+              </div>
+            </div>
           </div>
-          
-          <div className="mt-4">
-            <Button
-              onClick={() => handleJoinClass(classItem.meeting_link_url)}
-              disabled={!classItem.meeting_link_url}
-              className={`w-full font-semibold shadow-sm h-10 transition-all ${
-                  classItem.meeting_link_url 
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
-                    : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-              }`}
-            >
-              <ExternalLink className="h-4 w-4 mr-2" />
-              {classItem.meeting_link_url ? "Join Class" : "Waiting for Teacher..."}
-            </Button>
-          </div>
-        </div>
-      ))}
+        ) : (
+           // Placeholder if no upcoming classes either
+           <div className="bg-white border border-gray-100 rounded-none p-8 flex flex-col justify-center items-center h-72 text-center opacity-70">
+              <div className="w-16 h-1 bg-gray-100 mb-4"></div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-300">
+                 No upcoming sessions
+              </p>
+           </div>
+        )}
+
+      </div>
     </div>
   );
 };
