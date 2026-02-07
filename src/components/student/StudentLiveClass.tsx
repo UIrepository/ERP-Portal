@@ -4,6 +4,7 @@ import { format, addMinutes, isWithinInterval } from 'date-fns';
 import { Video, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { generateJitsiRoomName } from '@/lib/jitsiUtils';
 
 interface StudentLiveClassProps {
   batch: string | null;
@@ -34,7 +35,7 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
     queryFn: async () => {
       if (!batch) return [];
 
-      // 1. Get Schedules (Base Plan)
+      // 1. Get Schedules
       let query = supabase
         .from('schedules')
         .select('*')
@@ -48,7 +49,7 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
       const { data: schedulesData, error } = await query;
       if (error) throw error;
 
-      // 2. Get Static Meeting Links (Fallback)
+      // 2. Get Static Meeting Links
       let linkQuery = supabase
         .from('meeting_links')
         .select('*')
@@ -60,7 +61,7 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
       }
       const { data: meetingLinks } = await linkQuery;
 
-      // 3. Get ACTIVE JITSI CLASSES (Primary Source for Live Classes)
+      // 3. Get Active Classes (Real-time status)
       let activeClassQuery = supabase
         .from('active_classes')
         .select('*')
@@ -72,41 +73,58 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
       }
       const { data: activeClasses } = await activeClassQuery;
 
-      // STRICT FILTERING LOGIC
+      // 4. Filter Valid Schedules (Strict Date/Day Match)
       const validSchedules = (schedulesData || []).filter(schedule => {
-        // Rule 1: Specific Date Priority (e.g. Rescheduled class)
         if (schedule.date) {
           return schedule.date === todayDateStr;
         }
-        // Rule 2: Recurring Schedule (must match today's weekday)
         return schedule.day_of_week === currentDayOfWeek;
       });
 
-      // Map schedules to the best available link
+      // 5. Map to Links
       return validSchedules.map(schedule => {
-        // Check if there is a LIVE Jitsi class for this subject
         const activeJitsi = activeClasses?.find(ac => ac.subject === schedule.subject);
-        
-        // Check if there is a static link
         const subjectLink = meetingLinks?.find(l => l.subject === schedule.subject);
         
-        // PRIORITY: Active Jitsi > Schedule Specific Link > Static Subject Link
-        const finalLink = activeJitsi?.room_url || schedule.link || subjectLink?.link || null;
+        // --- LINK RESOLUTION LOGIC ---
+        
+        // A. Dynamic Jitsi Link (The correct one that matches Teacher)
+        const generatedJitsiLink = `https://meet.jit.si/${generateJitsiRoomName(schedule.batch, schedule.subject)}`;
+
+        // B. Database Link (Could be static Jitsi, Zoom, GMeet, etc.)
+        const dbLink = activeJitsi?.room_url || schedule.link || subjectLink?.link;
+
+        let finalLink = null;
+
+        if (dbLink) {
+          // INTELLIGENT OVERRIDE:
+          // If the DB has a Jitsi link (e.g. "meet.jit.si/OldStaticRoom"), 
+          // we IGNORE it because it likely doesn't match the Teacher's dynamic room.
+          if (dbLink.includes('meet.jit.si')) {
+             finalLink = generatedJitsiLink;
+          } else {
+             // If it's Zoom/GMeet, trust the DB link.
+             finalLink = dbLink;
+          }
+        } else {
+          // No link in DB? Use the generated one.
+          finalLink = generatedJitsiLink;
+        }
 
         return {
           ...schedule,
           meeting_link_url: finalLink,
-          is_jitsi_live: !!activeJitsi // Flag to show "Live" UI distinctively
+          is_jitsi_live: !!activeJitsi // Status indicator only
         };
       });
     },
     enabled: !!batch,
-    refetchInterval: 10000 // Refetch often to catch when teacher starts class
+    refetchInterval: 10000 
   });
 
   const now = new Date();
 
-  // Filter only Ongoing classes
+  // Filter only Ongoing classes (Buffer: -15 min start, +15 min end)
   const ongoingClasses = schedules?.filter(schedule => {
     const [startHour, startMin] = schedule.start_time.split(':').map(Number);
     const [endHour, endMin] = schedule.end_time.split(':').map(Number);
@@ -117,7 +135,6 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
     const endTime = new Date(today);
     endTime.setHours(endHour, endMin, 0, 0);
     
-    // Buffer: 15 mins before, 15 mins after
     const bufferStart = addMinutes(startTime, -15);
     const bufferEnd = addMinutes(endTime, 15);
     
@@ -212,12 +229,6 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
               <ExternalLink className="h-4 w-4 mr-2" />
               {classItem.meeting_link_url ? "Join Class" : "Waiting for Teacher..."}
             </Button>
-            
-            {!classItem.meeting_link_url && (
-              <p className="mt-2 text-center text-[10px] font-medium text-amber-600 bg-amber-50 py-1 rounded">
-                Teacher hasn't started the class yet.
-              </p>
-            )}
           </div>
         </div>
       ))}
