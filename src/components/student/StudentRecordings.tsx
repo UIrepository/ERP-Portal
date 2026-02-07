@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,6 +16,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
+import { FullScreenVideoPlayer } from '@/components/video-player';
+import { Lecture, Doubt as PlayerDoubt } from '@/components/video-player/types';
 
 // Interfaces
 interface RecordingContent {
@@ -81,7 +83,7 @@ const RecordingSkeleton = () => (
     </div>
 );
 
-// Player Component
+// Player Component (legacy embedded player - kept for detail view)
 const WatermarkedPlayer = ({ recording }: { recording: RecordingContent }) => {
     const { profile } = useAuth();
     return (
@@ -310,11 +312,16 @@ const DoubtsSection = ({ recording }: { recording: RecordingContent }) => {
 
 // Main Component
 export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) => {
-    const { profile } = useAuth();
-    const navigate = useNavigate(); // Added for Back button
+    const { user, profile } = useAuth();
+    const queryClient = useQueryClient();
+    const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRecording, setSelectedRecording] = useState<RecordingContent | null>(null);
     const isMobile = useIsMobile();
+    
+    // Fullscreen player state
+    const [isPlayerOpen, setIsPlayerOpen] = useState(false);
+    const [playerLecture, setPlayerLecture] = useState<Lecture | null>(null);
 
     // Direct query when batch/subject props are provided (context-aware mode)
     const { data: recordings, isLoading } = useQuery<RecordingContent[]>({
@@ -339,6 +346,69 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
         rec.topic.toLowerCase().includes(searchTerm.toLowerCase())
     ) || [], [recordings, searchTerm]);
 
+    // Transform database recording to player Lecture format
+    const recordingToLecture = useCallback((rec: RecordingContent, index: number): Lecture => ({
+        id: rec.id,
+        title: rec.topic,
+        subject: rec.subject,
+        videoUrl: rec.embed_link,
+        isCompleted: false,
+    }), []);
+
+    // All lectures for the sidebar navigation
+    const allLectures = useMemo(() => 
+        filteredRecordings.map((rec, idx) => recordingToLecture(rec, idx)),
+        [filteredRecordings, recordingToLecture]
+    );
+
+    // Query doubts for the selected recording (for fullscreen player)
+    const { data: playerDoubts = [] } = useQuery({
+        queryKey: ['player-doubts', selectedRecording?.id],
+        queryFn: async () => {
+            if (!selectedRecording?.id) return [];
+            
+            // Fetch doubts with profiles
+            const { data: doubtsData, error: doubtsError } = await supabase
+                .from('doubts')
+                .select(`id, question_text, created_at, user_id, profiles!inner(name)`)
+                .eq('recording_id', selectedRecording.id)
+                .order('created_at', { ascending: false });
+            
+            if (doubtsError) throw doubtsError;
+            
+            // Fetch answers for these doubts
+            const doubtIds = (doubtsData || []).map((d: any) => d.id);
+            let answersData: any[] = [];
+            
+            if (doubtIds.length > 0) {
+                const { data: answersResult, error: answersError } = await supabase
+                    .from('doubt_answers')
+                    .select(`id, answer_text, created_at, user_id, doubt_id, profiles!inner(name)`)
+                    .in('doubt_id', doubtIds)
+                    .order('created_at', { ascending: true });
+                
+                if (!answersError) {
+                    answersData = answersResult || [];
+                }
+            }
+            
+            // Transform to PlayerDoubt format
+            return (doubtsData || []).map((doubt: any): PlayerDoubt => {
+                const answer = answersData.find((a: any) => a.doubt_id === doubt.id);
+                return {
+                    id: doubt.id,
+                    question: doubt.question_text,
+                    askedBy: doubt.profiles?.name || 'A student',
+                    askedAt: new Date(doubt.created_at),
+                    answer: answer?.answer_text,
+                    answeredBy: answer?.profiles?.name,
+                    answeredAt: answer ? new Date(answer.created_at) : undefined,
+                };
+            });
+        },
+        enabled: !!selectedRecording?.id && isPlayerOpen,
+    });
+
     const logActivity = async (activityType: string, description: string, metadata?: any) => {
         if (!profile?.user_id) return;
         await supabase.from('student_activities').insert({
@@ -348,6 +418,68 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
         });
     };
 
+    // Handle opening the fullscreen player
+    const handlePlayInFullscreen = useCallback(async (recording: RecordingContent, index: number) => {
+        const lecture = recordingToLecture(recording, index);
+        setPlayerLecture(lecture);
+        setSelectedRecording(recording);
+        setIsPlayerOpen(true);
+        
+        await logActivity('recording_view', `Opened fullscreen: ${recording.topic}`, {
+            recordingId: recording.id, 
+            topic: recording.topic,
+            playMode: 'fullscreen'
+        });
+    }, [recordingToLecture, logActivity]);
+
+    // Handle lecture change from within the player
+    const handleLectureChange = useCallback((lecture: Lecture) => {
+        setPlayerLecture(lecture);
+        const rec = recordings?.find(r => r.id === lecture.id);
+        if (rec) {
+            setSelectedRecording(rec);
+            logActivity('recording_view', `Switched to: ${rec.topic}`, {
+                recordingId: rec.id,
+                topic: rec.topic,
+                playMode: 'fullscreen'
+            });
+        }
+    }, [recordings, logActivity]);
+
+    // Handle doubt submission from the player
+    const handleDoubtSubmit = useCallback(async (question: string) => {
+        if (!user || !selectedRecording) return;
+        
+        const { error } = await supabase.from('doubts').insert({
+            recording_id: selectedRecording.id,
+            user_id: user.id,
+            question_text: question,
+            batch: batch || selectedRecording.batch,
+            subject: subject || selectedRecording.subject
+        });
+        
+        if (error) {
+            toast({ 
+                title: 'Error posting question', 
+                description: error.message, 
+                variant: 'destructive' 
+            });
+        } else {
+            toast({ 
+                title: 'Success', 
+                description: 'Your question has been posted.' 
+            });
+            // Refresh doubts
+            queryClient.invalidateQueries({ queryKey: ['player-doubts', selectedRecording.id] });
+        }
+    }, [user, selectedRecording, batch, subject, queryClient]);
+
+    // Handle closing the player
+    const handleClosePlayer = useCallback(() => {
+        setIsPlayerOpen(false);
+    }, []);
+
+    // Legacy detail view handler (kept for backwards compatibility)
     const handleSelectRecording = async (recording: RecordingContent) => {
         setSelectedRecording(recording);
         await logActivity('recording_view', `Viewed recording: ${recording.topic}`, {
@@ -359,6 +491,21 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
         if (!subj) return 'CS';
         return subj.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
     };
+
+    // Render fullscreen player when open
+    if (isPlayerOpen && playerLecture) {
+        return (
+            <FullScreenVideoPlayer
+                currentLecture={playerLecture}
+                lectures={allLectures}
+                doubts={playerDoubts}
+                onLectureChange={handleLectureChange}
+                onDoubtSubmit={handleDoubtSubmit}
+                onClose={handleClosePlayer}
+                userName={profile?.name || user?.email}
+            />
+        );
+    }
 
     if (selectedRecording) {
         return (
@@ -457,13 +604,14 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                                 return (
                                     <div 
                                         key={recording.id}
-                                        onClick={() => handleSelectRecording(recording)}
+                                        onClick={() => handlePlayInFullscreen(recording, index)}
                                         className={cn(
                                             "bg-white rounded-lg p-3",
                                             "shadow-[0_1px_3px_rgba(0,0,0,0.05)]",
                                             "border border-slate-200",
                                             "cursor-pointer",
-                                            "flex flex-col"
+                                            "flex flex-col",
+                                            "hover:shadow-md hover:border-teal-200 transition-all duration-200"
                                         )}
                                         style={{
                                             width: CARD_WIDTH,
