@@ -25,7 +25,7 @@ interface Schedule {
   start_time: string;
   end_time: string;
   date: string | null;
-  stream_key?: string | null;
+  stream_key?: string | null; // Added stream_key to interface
 }
 
 interface Teacher {
@@ -75,13 +75,13 @@ export const TeacherJoinClass = () => {
     enabled: !!profile?.user_id
   });
 
-  // Fetch all schedules
+  // Fetch all schedules (Updated to include stream_key)
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
     queryKey: ['allSchedulesTeacher'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('schedules')
-        .select('id, subject, batch, day_of_week, start_time, end_time, date, stream_key');
+        .select('id, subject, batch, day_of_week, start_time, end_time, date, stream_key'); // Added stream_key selection
       if (error) throw error;
       return data || [];
     }
@@ -202,18 +202,19 @@ export const TeacherJoinClass = () => {
       console.error("Error marking attendance:", e);
     }
 
-    // 2. Check for existing Stream Key in DB
+    // 2. Check if stream key already exists in the row
     if (cls.stream_key) {
-      setStreamKey(cls.stream_key);
-      setShowStreamDialog(true);
-      toast.info("Resumed session with saved Stream Key.");
-      return;
+        setStreamKey(cls.stream_key);
+        setShowStreamDialog(true);
+        toast.info("Resumed session with saved Stream Key.");
+        return;
     }
 
-    // 3. Generate New Key (if none exists)
+    // 3. Fetch Stream Key and Save it
     const details = await startStream(cls.batch, cls.subject);
     if (details?.streamKey) {
-      // Save the key to the schedule table
+      
+      // Save the key to the database
       const { error } = await supabase
         .from('schedules')
         .update({ stream_key: details.streamKey })
@@ -221,9 +222,9 @@ export const TeacherJoinClass = () => {
 
       if (error) {
         console.error("Error saving stream key:", error);
-        toast.error("Stream started, but failed to save key to schedule.");
+        toast.error("Stream started, but failed to save key to DB.");
       } else {
-        // Invalidate queries to update the UI with the new key
+        // Refresh the list so the key appears in the UI
         queryClient.invalidateQueries({ queryKey: ['allSchedulesTeacher'] });
       }
 
@@ -315,8 +316,8 @@ export const TeacherJoinClass = () => {
                         <Clock className="h-4 w-4" />
                         {formatTime(cls.start_time)} - {formatTime(cls.end_time)}
                       </p>
-                      
-                      {/* Show Stream Key if Exists */}
+
+                      {/* --- VISIBLE STREAM KEY ROW --- */}
                       {cls.stream_key && (
                         <div className="mt-3 flex items-center gap-2 p-2 bg-black/5 rounded-md w-fit border border-black/10">
                           <Key className="h-3 w-3 text-muted-foreground" />
@@ -331,6 +332,8 @@ export const TeacherJoinClass = () => {
                           </Button>
                         </div>
                       )}
+                      {/* ------------------------------ */}
+
                     </div>
                     <div className="flex gap-2">
                       <Button 
@@ -378,7 +381,7 @@ export const TeacherJoinClass = () => {
                         {formatTime(cls.start_time)} - {formatTime(cls.end_time)}
                       </p>
 
-                      {/* Show Stream Key if Exists (e.g. prepared in advance) */}
+                      {/* --- VISIBLE STREAM KEY ROW (If already generated) --- */}
                       {cls.stream_key && (
                         <div className="mt-3 flex items-center gap-2 p-2 bg-muted rounded-md w-fit border">
                           <Key className="h-3 w-3 text-muted-foreground" />
@@ -393,10 +396,12 @@ export const TeacherJoinClass = () => {
                           </Button>
                         </div>
                       )}
+                      {/* ---------------------------------------------------- */}
+
                     </div>
                     <div className="flex gap-2 items-center">
                       <Badge variant="secondary">Upcoming</Badge>
-                      {cls.stream_key && (
+                       {cls.stream_key && (
                          <Button 
                          size="sm" 
                          variant="default"
