@@ -948,6 +948,7 @@ export type Database = {
           id: string
           link: string | null
           start_time: string
+          stream_key: string | null
           subject: string
           updated_at: string
         }
@@ -960,6 +961,7 @@ export type Database = {
           id?: string
           link?: string | null
           start_time: string
+          stream_key?: string | null
           subject: string
           updated_at?: string
         }
@@ -972,6 +974,7 @@ export type Database = {
           id?: string
           link?: string | null
           start_time?: string
+          stream_key?: string | null
           subject?: string
           updated_at?: string
         }
@@ -1281,6 +1284,7 @@ export type Database = {
           id: string
           link: string | null
           start_time: string
+          stream_key: string | null
           subject: string
           updated_at: string
         }[]
