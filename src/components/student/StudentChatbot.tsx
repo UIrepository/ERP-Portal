@@ -261,6 +261,15 @@ export const StudentChatbot = () => {
     }
   }, [state.isOpen]);
 
+  // Handle Back Button Logic
+  const handleBack = () => {
+    if (state.mode === 'subject-connect') {
+      closeDrawer();
+    } else {
+      resetToRoleSelection();
+    }
+  };
+
   // Welcome View
   const renderWelcomeView = () => (
     <div className="flex flex-col h-full bg-slate-50">
@@ -374,7 +383,7 @@ export const StudentChatbot = () => {
       {/* Chat Header */}
       <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3 bg-white z-10 shadow-sm">
         <button 
-          onClick={resetToRoleSelection}
+          onClick={handleBack}
           className="p-1.5 hover:bg-slate-100 rounded transition-colors text-slate-500"
         >
           <ChevronLeft className="w-5 h-5" />
