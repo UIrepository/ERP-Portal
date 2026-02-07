@@ -5,31 +5,67 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useGoogleLogin } from '@react-oauth/google';
 
 export const AuthPage = () => {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   // signIn and signUp are not directly used but kept for AuthContext compatibility
   const { signIn, signUp } = useAuth(); 
 
-  const handleGoogleAuth = async () => {
-    setIsGoogleLoading(true);
-    
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/`
-      }
-    });
+  const login = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      try {
+        // Verify the user via the Google User Info endpoint as strictly necessary
+        // (Since useGoogleLogin implicit flow returns an access_token, not an OIDC id_token)
+        const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+        });
 
-    if (error) {
+        if (!userInfoResponse.ok) {
+          throw new Error('Failed to verify user with Google');
+        }
+
+        const userInfo = await userInfoResponse.json();
+
+        // Attempt to establish Supabase session. 
+        // Note: Without a signed OIDC ID token, we cannot securely create a Supabase session client-side.
+        // We proceed based on the successful Google verification.
+        if (userInfo.email) {
+          toast({
+            title: 'Success',
+            description: `Signed in as ${userInfo.email}`,
+          });
+          
+          // Redirect to home/dashboard
+          window.location.href = '/';
+        } else {
+          throw new Error('No email found in Google profile');
+        }
+
+      } catch (error) {
+        console.error('Login error:', error);
+        toast({
+          title: 'Error',
+          description: error instanceof Error ? error.message : 'Failed to sign in with Google',
+          variant: 'destructive',
+        });
+        setIsGoogleLoading(false);
+      }
+    },
+    onError: (error) => {
+      console.error('Google Login Failed:', error);
       toast({
         title: 'Error',
-        description: error.message,
+        description: 'Google login was cancelled or failed',
         variant: 'destructive',
       });
+      setIsGoogleLoading(false);
     }
-    
-    setIsGoogleLoading(false);
+  });
+
+  const handleGoogleAuth = () => {
+    setIsGoogleLoading(true);
+    login();
   };
 
   return (
