@@ -1,6 +1,7 @@
 /**
  * Custom video controls overlay component
  * Fixes: Seek functionality, removes text from skip buttons, ensures pointer events work
+ * Fixes: Settings menu z-index to appear above the player
  */
 
 import { useState, useRef } from 'react';
@@ -231,8 +232,6 @@ export const VideoControls = ({
               showVolumeSlider ? "w-24 ml-3 opacity-100" : "w-0 opacity-0"
             )}>
               <Slider
-                // UPDATE: Decoupled visual slider value from mute state
-                // It now always shows the volume level, even if muted.
                 value={[volume * 100]}
                 max={100}
                 step={1}
@@ -283,7 +282,8 @@ export const VideoControls = ({
             <DropdownMenuContent 
               align="end" 
               sideOffset={10}
-              className="bg-zinc-900/95 border-zinc-700 text-white min-w-[220px] backdrop-blur-sm"
+              // UPDATE: Added z-[2147483647] to ensure menu appears above the video player
+              className="bg-zinc-900/95 border-zinc-700 text-white min-w-[220px] backdrop-blur-sm z-[2147483647]"
             >
               {/* Playback Speed Submenu */}
               <DropdownMenuSub>
@@ -292,7 +292,8 @@ export const VideoControls = ({
                   <span className="ml-auto text-zinc-400 text-xs">{playbackSpeed}x</span>
                 </DropdownMenuSubTrigger>
                 <DropdownMenuPortal>
-                  <DropdownMenuSubContent className="bg-zinc-900/95 border-zinc-700 text-white">
+                  {/* UPDATE: Added z-[2147483647] to ensure submenu appears above the video player */}
+                  <DropdownMenuSubContent className="bg-zinc-900/95 border-zinc-700 text-white z-[2147483647]">
                     {PLAYBACK_SPEEDS.map((speed) => (
                       <DropdownMenuItem
                         key={speed}
@@ -314,7 +315,8 @@ export const VideoControls = ({
                   <span className="ml-auto text-zinc-400 text-xs">{currentQuality}</span>
                 </DropdownMenuSubTrigger>
                 <DropdownMenuPortal>
-                  <DropdownMenuSubContent className="bg-zinc-900/95 border-zinc-700 text-white">
+                  {/* UPDATE: Added z-[2147483647] to ensure submenu appears above the video player */}
+                  <DropdownMenuSubContent className="bg-zinc-900/95 border-zinc-700 text-white z-[2147483647]">
                     {VIDEO_QUALITIES.map((q) => (
                       <DropdownMenuItem
                         key={q}
