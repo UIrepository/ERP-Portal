@@ -13,7 +13,6 @@ import { useVideoPlayer, parseVideoUrl } from './useVideoPlayer';
 import { VideoControls } from './VideoControls';
 import { DoubtsPanel } from './DoubtsPanel';
 import { NextLecturePanel } from './NextLecturePanel';
-import { useVideoProgress } from '@/hooks/useVideoProgress';
 import { cn } from '@/lib/utils';
 
 type SidebarTab = 'doubts' | 'lectures' | null;
@@ -31,7 +30,6 @@ export const FullScreenVideoPlayer = ({
   const [activeSidebar, setActiveSidebar] = useState<SidebarTab>(null);
   const youtubeInitialized = useRef(false);
   const [showVignette, setShowVignette] = useState(true); // Show vignette at start
-  const progressLoadedRef = useRef(false);
   
   // Video player hook
   const {
@@ -63,9 +61,6 @@ export const FullScreenVideoPlayer = ({
     showControlsTemporarily,
   } = useVideoPlayer();
 
-  // Video progress tracking hook
-  const { fetchProgress, saveProgress, startAutoSave, stopAutoSave } = useVideoProgress(currentLecture.id);
-
   // Parse video URL
   const videoSource = parseVideoUrl(currentLecture.videoUrl);
 
@@ -79,24 +74,19 @@ export const FullScreenVideoPlayer = ({
 
   // Handle lecture change
   const handleLectureChange = useCallback((lecture: Lecture) => {
-    // Save progress before switching
-    saveProgress(currentTime, duration);
-    progressLoadedRef.current = false;
     setShowVignette(true);
     onLectureChange?.(lecture);
-  }, [onLectureChange, saveProgress, currentTime, duration]);
+  }, [onLectureChange]);
 
   // Handle doubt submission
   const handleDoubtSubmit = useCallback((question: string) => {
     onDoubtSubmit?.(question);
   }, [onDoubtSubmit]);
 
-  // Handle close - save progress before closing
+  // Handle close
   const handleClose = useCallback(() => {
-    saveProgress(currentTime, duration);
-    stopAutoSave();
     onClose?.();
-  }, [onClose, saveProgress, currentTime, duration, stopAutoSave]);
+  }, [onClose]);
 
   // Video event handlers for HTML5 video
   const handleVideoTimeUpdate = () => {
@@ -113,25 +103,6 @@ export const FullScreenVideoPlayer = ({
   const handleVideoLoadedMetadata = async () => {
     if (videoRef.current) {
       setDuration(videoRef.current.duration);
-      
-      // Load saved progress and seek to it
-      if (!progressLoadedRef.current) {
-        progressLoadedRef.current = true;
-        const savedProgress = await fetchProgress();
-        if (savedProgress > 0 && videoRef.current) {
-          videoRef.current.currentTime = savedProgress;
-          // If resuming past first second, hide vignette
-          if (savedProgress > 1) {
-            setShowVignette(false);
-          }
-        }
-        
-        // Start auto-saving progress
-        startAutoSave(
-          () => videoRef.current?.currentTime || 0,
-          () => videoRef.current?.duration || 0
-        );
-      }
     }
   };
 
@@ -154,16 +125,6 @@ export const FullScreenVideoPlayer = ({
       
       youtubeInitialized.current = true;
 
-      // Load saved progress first
-      let startTime = 0;
-      if (!progressLoadedRef.current) {
-        progressLoadedRef.current = true;
-        startTime = await fetchProgress();
-        if (startTime > 1) {
-          setShowVignette(false);
-        }
-      }
-
       const player = new window.YT.Player('youtube-player', {
         videoId: videoSource.videoId,
         playerVars: {
@@ -181,8 +142,6 @@ export const FullScreenVideoPlayer = ({
           endscreen: 0,
           // Prevent showing related videos at the end
           autoplay_on_end: 0,
-          // Start from saved position if available
-          start: Math.floor(startTime),
         },
         events: {
           onReady: (event) => {
@@ -190,12 +149,6 @@ export const FullScreenVideoPlayer = ({
               setDuration(event.target.getDuration());
               event.target.playVideo();
               youtubePlayerRef.current = event.target;
-              
-              // Start auto-saving progress for YouTube
-              startAutoSave(
-                () => youtubePlayerRef.current?.getCurrentTime() || 0,
-                () => youtubePlayerRef.current?.getDuration() || 0
-              );
             }
           },
           onStateChange: (event) => {
@@ -226,8 +179,8 @@ export const FullScreenVideoPlayer = ({
       if (seekingRef.current) return;
       
       if (youtubePlayerRef.current && typeof youtubePlayerRef.current.getCurrentTime === 'function') {
-        // UPDATE: Check for buffering state (3)
-        // This prevents the progress bar from jumping back to old time while buffering new seek position
+        // Fix for seeking sticking: Check if player is BUFFERING (State 3)
+        // If buffering, do not update current time, as it might revert the UI to old position
         if (youtubePlayerRef.current.getPlayerState && youtubePlayerRef.current.getPlayerState() === 3) {
           return;
         }
@@ -247,19 +200,13 @@ export const FullScreenVideoPlayer = ({
 
     return () => {
       clearInterval(timeUpdateInterval);
-      // Save progress when unmounting
       if (youtubePlayerRef.current) {
-        saveProgress(
-          youtubePlayerRef.current.getCurrentTime(),
-          youtubePlayerRef.current.getDuration()
-        );
         youtubePlayerRef.current.destroy();
         youtubePlayerRef.current = null;
       }
-      stopAutoSave();
       youtubeInitialized.current = false;
     };
-  }, [videoSource.type, videoSource.videoId, setCurrentTime, setDuration, setIsPlaying, setBuffered, youtubePlayerRef, fetchProgress, startAutoSave, stopAutoSave, saveProgress, showVignette]);
+  }, [videoSource.type, videoSource.videoId, setCurrentTime, setDuration, setIsPlaying, setBuffered, youtubePlayerRef, showVignette]);
 
   // Handle ESC key to close
   useEffect(() => {
