@@ -79,9 +79,10 @@ export const TeacherJoinClass = () => {
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
     queryKey: ['allSchedulesTeacher'],
     queryFn: async () => {
+      // FIX: Explicitly select stream_key so it's available in the frontend
       const { data, error } = await supabase
         .from('schedules')
-        .select('id, subject, batch, day_of_week, start_time, end_time, date, stream_key'); // Added stream_key selection
+        .select('id, subject, batch, day_of_week, start_time, end_time, date, stream_key');
       if (error) throw error;
       return data || [];
     }
@@ -202,19 +203,19 @@ export const TeacherJoinClass = () => {
       console.error("Error marking attendance:", e);
     }
 
-    // 2. Check if stream key already exists in the row
+    // 2. Check if stream key already exists in the row (Persistence Check)
     if (cls.stream_key) {
         setStreamKey(cls.stream_key);
         setShowStreamDialog(true);
-        toast.info("Resumed session with saved Stream Key.");
+        toast.info("Resumed session with existing Stream Key.");
         return;
     }
 
-    // 3. Fetch Stream Key and Save it
+    // 3. Generate New Key (Only if none exists)
     const details = await startStream(cls.batch, cls.subject);
     if (details?.streamKey) {
       
-      // Save the key to the database
+      // FIX: Save the key to the database backend
       const { error } = await supabase
         .from('schedules')
         .update({ stream_key: details.streamKey })
@@ -222,9 +223,9 @@ export const TeacherJoinClass = () => {
 
       if (error) {
         console.error("Error saving stream key:", error);
-        toast.error("Stream started, but failed to save key to DB.");
+        toast.error(`Stream started, but failed to save key to DB: ${error.message}`);
       } else {
-        // Refresh the list so the key appears in the UI
+        // Refresh the list so the key appears in the UI instantly
         queryClient.invalidateQueries({ queryKey: ['allSchedulesTeacher'] });
       }
 
@@ -317,22 +318,23 @@ export const TeacherJoinClass = () => {
                         {formatTime(cls.start_time)} - {formatTime(cls.end_time)}
                       </p>
 
-                      {/* --- VISIBLE STREAM KEY ROW --- */}
+                      {/* --- NEW: Display Stream Key in Row --- */}
                       {cls.stream_key && (
                         <div className="mt-3 flex items-center gap-2 p-2 bg-black/5 rounded-md w-fit border border-black/10">
                           <Key className="h-3 w-3 text-muted-foreground" />
-                          <code className="text-xs font-mono text-foreground">{cls.stream_key}</code>
+                          <code className="text-xs font-mono text-foreground max-w-[200px] truncate">{cls.stream_key}</code>
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-5 w-5 ml-1"
+                            className="h-6 w-6 ml-1"
                             onClick={(e) => copyExistingKey(cls.stream_key!, e)}
+                            title="Copy Stream Key"
                           >
                             <Copy className="h-3 w-3" />
                           </Button>
                         </div>
                       )}
-                      {/* ------------------------------ */}
+                      {/* -------------------------------------- */}
 
                     </div>
                     <div className="flex gap-2">
@@ -381,22 +383,23 @@ export const TeacherJoinClass = () => {
                         {formatTime(cls.start_time)} - {formatTime(cls.end_time)}
                       </p>
 
-                      {/* --- VISIBLE STREAM KEY ROW (If already generated) --- */}
+                      {/* --- NEW: Display Stream Key if available early --- */}
                       {cls.stream_key && (
                         <div className="mt-3 flex items-center gap-2 p-2 bg-muted rounded-md w-fit border">
                           <Key className="h-3 w-3 text-muted-foreground" />
-                          <code className="text-xs font-mono text-muted-foreground">{cls.stream_key}</code>
+                          <code className="text-xs font-mono text-muted-foreground max-w-[200px] truncate">{cls.stream_key}</code>
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-5 w-5 ml-1"
+                            className="h-6 w-6 ml-1"
                             onClick={(e) => copyExistingKey(cls.stream_key!, e)}
+                            title="Copy Stream Key"
                           >
                             <Copy className="h-3 w-3" />
                           </Button>
                         </div>
                       )}
-                      {/* ---------------------------------------------------- */}
+                      {/* ----------------------------------------------- */}
 
                     </div>
                     <div className="flex gap-2 items-center">
