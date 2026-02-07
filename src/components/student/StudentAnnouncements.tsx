@@ -127,7 +127,9 @@ export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [] }: 
     });
 
     return (
-        <div className="w-full font-sans antialiased">
+        // Main Container - White Section with reduced rounded corners (rounded-lg)
+        <div className="w-full bg-white border border-slate-200 rounded-lg p-6 font-sans antialiased shadow-sm">
+            
             {/* Custom scrollbar styling embedded */}
             <style>{`
                 .custom-scrollbar::-webkit-scrollbar {
@@ -145,7 +147,7 @@ export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [] }: 
                 }
             `}</style>
             
-            {/* Common Section Title */}
+            {/* Section Title */}
             <div className="mb-6">
                 <h2 className="text-xl font-bold text-gray-900 tracking-tight">Notices</h2>
             </div>
