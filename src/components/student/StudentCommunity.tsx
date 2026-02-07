@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { useNavigate } from 'react-router-dom'; // Added import
 import { 
   Send, 
   Image as ImageIcon, 
@@ -25,6 +24,7 @@ import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -509,13 +509,15 @@ export const StudentCommunity = () => {
       
       {/* GROUP LIST SIDEBAR */}
       <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
-        {/* ADDED BACK BUTTON HERE */}
+        
+        {/* BACK TO SSP BUTTON */}
         <div className="p-4 border-b bg-gray-50 flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="mr-1 text-gray-500 hover:text-gray-900 hover:bg-gray-200">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/portal/student')} className="mr-1 text-gray-500 hover:text-gray-900 hover:bg-gray-200">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Users className="h-5 w-5 text-teal-600" /> Communities</h2>
         </div>
+
         <ScrollArea className="flex-1">
           <div className="p-2 space-y-1">
             {isLoadingEnrollments ? <div className="p-6 text-center text-gray-500 flex justify-center"><Loader2 className="animate-spin" /></div> : 
