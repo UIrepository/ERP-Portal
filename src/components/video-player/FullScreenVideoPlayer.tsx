@@ -1,10 +1,8 @@
 /**
  * FullScreenVideoPlayer Component
- * 
- * A professional, distraction-free video player for coaching platforms.
+ * * A professional, distraction-free video player for coaching platforms.
  * Supports YouTube embeds (with hidden branding) and direct video files.
- * 
- * Features:
+ * * Features:
  * - Custom controls (play/pause, seek, volume, speed, fullscreen)
  * - Auto-hiding controls overlay
  * - Right sidebar with Doubts and Next Lecture panels
@@ -16,7 +14,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, MessageCircle, List, ChevronRight, Play } from 'lucide-react';
+import { X, ChevronRight, Play } from 'lucide-react';
 import { VideoPlayerProps, Lecture } from './types';
 import { useVideoPlayer, parseVideoUrl } from './useVideoPlayer';
 import { VideoControls } from './VideoControls';
@@ -24,7 +22,7 @@ import { DoubtsPanel } from './DoubtsPanel';
 import { NextLecturePanel } from './NextLecturePanel';
 import { useVideoProgress } from '@/hooks/useVideoProgress';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+// Button import removed as it's no longer used for the top toggle
 
 type SidebarTab = 'doubts' | 'lectures' | null;
 
@@ -314,31 +312,6 @@ export const FullScreenVideoPlayer = ({
           )}
         </div>
 
-        {/* Sidebar Toggle Buttons */}
-        <div className={cn(
-          "absolute top-4 right-4 z-20 flex flex-col gap-2 transition-all",
-          showControls ? "opacity-100" : "opacity-0"
-        )}>
-          <Button
-            variant={activeSidebar === 'doubts' ? 'default' : 'secondary'}
-            size="sm"
-            onClick={() => toggleSidebar('doubts')}
-            className="gap-2"
-          >
-            <MessageCircle className="w-4 h-4" />
-            Doubts
-          </Button>
-          <Button
-            variant={activeSidebar === 'lectures' ? 'default' : 'secondary'}
-            size="sm"
-            onClick={() => toggleSidebar('lectures')}
-            className="gap-2"
-          >
-            <List className="w-4 h-4" />
-            Lectures
-          </Button>
-        </div>
-
         {/* Video Container */}
         <div className="video-area absolute inset-0 flex items-center justify-center">
           {/* YouTube Player */}
@@ -407,6 +380,9 @@ export const FullScreenVideoPlayer = ({
               onFullscreenToggle={toggleFullscreen}
               onSkipForward={skipForward}
               onSkipBackward={skipBackward}
+              // Pass the toggle handlers here
+              onToggleDoubts={() => toggleSidebar('doubts')}
+              onToggleLectures={() => toggleSidebar('lectures')}
             />
           </div>
         </div>
