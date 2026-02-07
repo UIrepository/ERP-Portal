@@ -16,11 +16,10 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useChatDrawer } from '@/hooks/useChatDrawer';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 interface UserEnrollment {
   batch_name: string;
@@ -52,6 +51,10 @@ const StudentMainContent = () => {
     block: null,
   });
 
+  // Batch Switcher State
+  const [isBatchSheetOpen, setIsBatchSheetOpen] = useState(false);
+  const [tempSelectedBatch, setTempSelectedBatch] = useState<string | null>(null);
+
   // Fetch user enrollments
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['studentMainEnrollments', profile?.user_id],
@@ -81,7 +84,7 @@ const StudentMainContent = () => {
     setSearchParams(params, { replace: true });
   }, [setSearchParams]);
 
-  // Read URL params on mount
+  // Initialize navigation from URL
   useEffect(() => {
     if (!userEnrollments || userEnrollments.length === 0 || isInitialized) return;
     
@@ -119,6 +122,13 @@ const StudentMainContent = () => {
     setIsInitialized(true);
   }, [userEnrollments, availableBatches, searchParams, isInitialized, updateUrl]);
 
+  // Initialize temp batch selection when sheet opens
+  useEffect(() => {
+    if (isBatchSheetOpen && navigation.batch) {
+      setTempSelectedBatch(navigation.batch);
+    }
+  }, [isBatchSheetOpen, navigation.batch]);
+
   // Derive subjects for selected batch
   const subjectsForBatch = useMemo(() => {
     if (!navigation.batch || !userEnrollments) return [];
@@ -150,6 +160,13 @@ const StudentMainContent = () => {
     setNavigation(newNav);
     updateUrl(newNav);
     setActiveTab('classes');
+  };
+
+  const confirmBatchSwitch = () => {
+    if (tempSelectedBatch) {
+      handleSelectBatch(tempSelectedBatch);
+      setIsBatchSheetOpen(false);
+    }
   };
 
   const handleSelectSubject = (subject: string) => {
@@ -304,26 +321,66 @@ const StudentMainContent = () => {
                 {navigation.batch || "No Batch Selected"}
               </h1>
               {availableBatches.length > 1 && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+                <Sheet open={isBatchSheetOpen} onOpenChange={setIsBatchSheetOpen}>
+                  <SheetTrigger asChild>
                     <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-900 hover:bg-white/50 h-8 w-8 rounded-full transition-all">
                       <ChevronDown className="h-5 w-5" />
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-56">
-                    {availableBatches.map((b) => (
-                      <DropdownMenuItem key={b} onClick={() => handleSelectBatch(b)} className="py-2.5 cursor-pointer">
-                        {b}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  </SheetTrigger>
+                  <SheetContent side="right" className="w-full sm:w-[400px] flex flex-col p-0 z-[100]">
+                     <div className="p-6 border-b border-slate-100 mt-6 sm:mt-0">
+                        <h2 className="text-xl font-bold text-slate-900">Switch Batch</h2>
+                        <p className="text-sm text-slate-500 mt-1">Select the batch you want to switch to.</p>
+                     </div>
+                     
+                     <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                        {availableBatches.map((b) => (
+                            <div 
+                                key={b}
+                                onClick={() => setTempSelectedBatch(b)}
+                                className={cn(
+                                    "p-4 rounded-xl border cursor-pointer transition-all flex items-center justify-between",
+                                    tempSelectedBatch === b 
+                                        ? "border-indigo-600 bg-indigo-50/50 shadow-sm ring-1 ring-indigo-600/20" 
+                                        : "border-slate-200 hover:border-indigo-200 hover:bg-slate-50"
+                                )}
+                            >
+                                <span className={cn(
+                                    "font-medium text-sm sm:text-base", 
+                                    tempSelectedBatch === b ? "text-indigo-900" : "text-slate-700"
+                                )}>
+                                    {b}
+                                </span>
+                                <div className={cn(
+                                    "w-5 h-5 rounded-full border flex items-center justify-center transition-colors",
+                                    tempSelectedBatch === b 
+                                        ? "border-indigo-600 bg-indigo-600" 
+                                        : "border-slate-300"
+                                )}>
+                                    {tempSelectedBatch === b && (
+                                        <div className="w-2 h-2 bg-white rounded-full" />
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                     </div>
+
+                     <div className="p-6 border-t border-slate-100 bg-white">
+                        <Button 
+                            onClick={confirmBatchSwitch}
+                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white h-12 rounded-xl text-base font-semibold shadow-lg shadow-indigo-200 active:scale-[0.98] transition-all"
+                        >
+                            Switch Batch
+                        </Button>
+                     </div>
+                  </SheetContent>
+                </Sheet>
               )}
             </div>
           </div>
         </div>
 
-        {/* Navigation Tabs */}
+        {/* Navigation Tabs - Glassy effect */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-6 bg-white/70 backdrop-blur-md border-t border-indigo-50">
           <nav className="flex gap-6 overflow-x-auto w-full sm:w-auto no-scrollbar">
             {[
