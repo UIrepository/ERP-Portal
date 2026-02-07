@@ -11,6 +11,8 @@
  * - Keyboard shortcuts support
  * - Smooth transitions and dark theme
  * - Prevents YouTube redirects and hides external branding
+ * - Vignette effect at start/end to hide YouTube branding
+ * - Video progress tracking with resume functionality
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -20,6 +22,7 @@ import { useVideoPlayer, parseVideoUrl } from './useVideoPlayer';
 import { VideoControls } from './VideoControls';
 import { DoubtsPanel } from './DoubtsPanel';
 import { NextLecturePanel } from './NextLecturePanel';
+import { useVideoProgress } from '@/hooks/useVideoProgress';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -37,6 +40,8 @@ export const FullScreenVideoPlayer = ({
   // Sidebar state
   const [activeSidebar, setActiveSidebar] = useState<SidebarTab>(null);
   const youtubeInitialized = useRef(false);
+  const [showVignette, setShowVignette] = useState(true); // Show vignette at start
+  const progressLoadedRef = useRef(false);
   
   // Video player hook
   const {
@@ -67,8 +72,14 @@ export const FullScreenVideoPlayer = ({
     showControlsTemporarily,
   } = useVideoPlayer();
 
+  // Video progress tracking hook
+  const { fetchProgress, saveProgress, startAutoSave, stopAutoSave } = useVideoProgress(currentLecture.id);
+
   // Parse video URL
   const videoSource = parseVideoUrl(currentLecture.videoUrl);
+
+  // Compute vignette visibility - show during first 1 sec and last 1 sec
+  const shouldShowVignette = showVignette || (duration > 0 && currentTime > 0 && (duration - currentTime) <= 1);
 
   // Toggle sidebar
   const toggleSidebar = (tab: SidebarTab) => {
@@ -77,24 +88,59 @@ export const FullScreenVideoPlayer = ({
 
   // Handle lecture change
   const handleLectureChange = useCallback((lecture: Lecture) => {
+    // Save progress before switching
+    saveProgress(currentTime, duration);
+    progressLoadedRef.current = false;
+    setShowVignette(true);
     onLectureChange?.(lecture);
-  }, [onLectureChange]);
+  }, [onLectureChange, saveProgress, currentTime, duration]);
 
   // Handle doubt submission
   const handleDoubtSubmit = useCallback((question: string) => {
     onDoubtSubmit?.(question);
   }, [onDoubtSubmit]);
 
+  // Handle close - save progress before closing
+  const handleClose = useCallback(() => {
+    saveProgress(currentTime, duration);
+    stopAutoSave();
+    onClose?.();
+  }, [onClose, saveProgress, currentTime, duration, stopAutoSave]);
+
   // Video event handlers for HTML5 video
   const handleVideoTimeUpdate = () => {
     if (videoRef.current) {
       setCurrentTime(videoRef.current.currentTime);
+      
+      // Hide vignette after 1 second
+      if (videoRef.current.currentTime > 1 && showVignette) {
+        setShowVignette(false);
+      }
     }
   };
 
-  const handleVideoLoadedMetadata = () => {
+  const handleVideoLoadedMetadata = async () => {
     if (videoRef.current) {
       setDuration(videoRef.current.duration);
+      
+      // Load saved progress and seek to it
+      if (!progressLoadedRef.current) {
+        progressLoadedRef.current = true;
+        const savedProgress = await fetchProgress();
+        if (savedProgress > 0 && videoRef.current) {
+          videoRef.current.currentTime = savedProgress;
+          // If resuming past first second, hide vignette
+          if (savedProgress > 1) {
+            setShowVignette(false);
+          }
+        }
+        
+        // Start auto-saving progress
+        startAutoSave(
+          () => videoRef.current?.currentTime || 0,
+          () => videoRef.current?.duration || 0
+        );
+      }
     }
   };
 
@@ -112,10 +158,20 @@ export const FullScreenVideoPlayer = ({
     if (videoSource.type !== 'youtube' || !videoSource.videoId) return;
     if (youtubeInitialized.current) return;
 
-    const initPlayer = () => {
+    const initPlayer = async () => {
       if (!window.YT?.Player) return;
       
       youtubeInitialized.current = true;
+
+      // Load saved progress first
+      let startTime = 0;
+      if (!progressLoadedRef.current) {
+        progressLoadedRef.current = true;
+        startTime = await fetchProgress();
+        if (startTime > 1) {
+          setShowVignette(false);
+        }
+      }
 
       const player = new window.YT.Player('youtube-player', {
         videoId: videoSource.videoId,
@@ -134,6 +190,8 @@ export const FullScreenVideoPlayer = ({
           endscreen: 0,
           // Prevent showing related videos at the end
           autoplay_on_end: 0,
+          // Start from saved position if available
+          start: Math.floor(startTime),
         },
         events: {
           onReady: (event) => {
@@ -141,6 +199,12 @@ export const FullScreenVideoPlayer = ({
               setDuration(event.target.getDuration());
               event.target.playVideo();
               youtubePlayerRef.current = event.target;
+              
+              // Start auto-saving progress for YouTube
+              startAutoSave(
+                () => youtubePlayerRef.current?.getCurrentTime() || 0,
+                () => youtubePlayerRef.current?.getDuration() || 0
+              );
             }
           },
           onStateChange: (event) => {
@@ -168,33 +232,45 @@ export const FullScreenVideoPlayer = ({
     // Update current time periodically for YouTube
     const timeUpdateInterval = setInterval(() => {
       if (youtubePlayerRef.current && typeof youtubePlayerRef.current.getCurrentTime === 'function') {
-        setCurrentTime(youtubePlayerRef.current.getCurrentTime());
+        const time = youtubePlayerRef.current.getCurrentTime();
+        setCurrentTime(time);
         const loaded = youtubePlayerRef.current.getVideoLoadedFraction();
         const dur = youtubePlayerRef.current.getDuration();
         setBuffered(loaded * dur);
+        
+        // Hide vignette after 1 second
+        if (time > 1 && showVignette) {
+          setShowVignette(false);
+        }
       }
     }, 250);
 
     return () => {
       clearInterval(timeUpdateInterval);
+      // Save progress when unmounting
       if (youtubePlayerRef.current) {
+        saveProgress(
+          youtubePlayerRef.current.getCurrentTime(),
+          youtubePlayerRef.current.getDuration()
+        );
         youtubePlayerRef.current.destroy();
         youtubePlayerRef.current = null;
       }
+      stopAutoSave();
       youtubeInitialized.current = false;
     };
-  }, [videoSource.type, videoSource.videoId, setCurrentTime, setDuration, setIsPlaying, setBuffered, youtubePlayerRef]);
+  }, [videoSource.type, videoSource.videoId, setCurrentTime, setDuration, setIsPlaying, setBuffered, youtubePlayerRef, fetchProgress, startAutoSave, stopAutoSave, saveProgress, showVignette]);
 
   // Handle ESC key to close
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !isFullscreen) {
-        onClose?.();
+        handleClose();
       }
     };
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
-  }, [isFullscreen, onClose]);
+  }, [isFullscreen, handleClose]);
 
   return (
     <div 
@@ -215,7 +291,7 @@ export const FullScreenVideoPlayer = ({
       )}>
         {/* Close Button */}
         <button
-          onClick={onClose}
+          onClick={handleClose}
           className={cn(
             "absolute top-4 left-4 z-20 p-2 bg-black/50 hover:bg-black/70 rounded-full transition-all",
             showControls ? "opacity-100" : "opacity-0"
@@ -295,6 +371,17 @@ export const FullScreenVideoPlayer = ({
               playsInline
             />
           )}
+          
+          {/* Vignette overlay to hide YouTube branding at start and end */}
+          <div 
+            className={cn(
+              "absolute inset-0 z-12 pointer-events-none transition-opacity duration-500",
+              shouldShowVignette ? "opacity-100" : "opacity-0"
+            )}
+            style={{
+              background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.85) 70%, rgba(0,0,0,1) 100%)',
+            }}
+          />
         </div>
 
         {/* Custom Controls Overlay */}

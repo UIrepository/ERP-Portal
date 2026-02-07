@@ -1165,6 +1165,36 @@ export type Database = {
         }
         Relationships: []
       }
+      video_progress: {
+        Row: {
+          created_at: string
+          duration_seconds: number
+          id: string
+          last_watched_at: string
+          progress_seconds: number
+          recording_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_seconds?: number
+          id?: string
+          last_watched_at?: string
+          progress_seconds?: number
+          recording_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_seconds?: number
+          id?: string
+          last_watched_at?: string
+          progress_seconds?: number
+          recording_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
