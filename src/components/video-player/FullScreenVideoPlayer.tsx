@@ -130,6 +130,10 @@ export const FullScreenVideoPlayer = ({
           disablekb: 1,
           playsinline: 1,
           origin: window.location.origin,
+          // Hide end screen recommendations and related videos
+          endscreen: 0,
+          // Prevent showing related videos at the end
+          autoplay_on_end: 0,
         },
         events: {
           onReady: (event) => {
