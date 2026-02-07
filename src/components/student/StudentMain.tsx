@@ -278,24 +278,23 @@ const StudentMainContent = () => {
   };
 
   return (
-    // Outer Container: Max width 1600px, flex col, gap 6
+    // Outer Container
     <div className="w-full max-w-[1600px] mx-auto px-4 md:px-6 py-6 flex flex-col gap-6 min-h-screen font-sans">
       
-      {/* HEADER SECTION - Premium Light Design */}
-      {/* rounded-t-lg (slight), rounded-b-none (sharp) */}
-      <header className="w-full bg-white rounded-t-lg rounded-b-none overflow-hidden shadow-sm border border-slate-100 relative z-10 group">
+      {/* HEADER SECTION - Light Purple/Violet Theme */}
+      <header className="w-full rounded-t-lg rounded-b-none overflow-hidden shadow-sm border border-indigo-100/50 relative z-10 group">
         
-        {/* Banner with Premium Light Gradient & Pattern */}
-        <div className="relative bg-gradient-to-br from-indigo-50 via-white to-cyan-50 px-6 py-8 text-slate-900 border-b border-slate-100/50">
+        {/* Banner with Premium Light Violet Gradient */}
+        <div className="relative bg-gradient-to-br from-violet-100 via-indigo-50 to-purple-100 px-6 py-8 text-slate-900">
           
-          {/* Subtle Dot Pattern Overlay */}
-          <div className="absolute inset-0 z-0 opacity-[0.4]" 
-               style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '20px 20px' }}>
+          {/* Dot Pattern Overlay */}
+          <div className="absolute inset-0 z-0 opacity-[0.3]" 
+               style={{ backgroundImage: 'radial-gradient(#8b5cf6 0.5px, transparent 0.5px)', backgroundSize: '12px 12px' }}>
           </div>
 
           {/* Decorative Blur Accent */}
           <div 
-            className="absolute top-0 right-0 w-[300px] h-full bg-indigo-500/5 blur-3xl z-0 pointer-events-none"
+            className="absolute top-0 right-0 w-[400px] h-full bg-indigo-200/20 blur-3xl z-0 pointer-events-none"
             style={{ clipPath: 'polygon(100% 0, 0% 100%, 100% 100%)' }}
           />
           
@@ -307,7 +306,7 @@ const StudentMainContent = () => {
               {availableBatches.length > 1 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="text-slate-400 hover:text-slate-900 hover:bg-slate-100 h-8 w-8 rounded-full transition-all">
+                    <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-900 hover:bg-white/50 h-8 w-8 rounded-full transition-all">
                       <ChevronDown className="h-5 w-5" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -324,8 +323,8 @@ const StudentMainContent = () => {
           </div>
         </div>
 
-        {/* Navigation Tabs - Light Theme */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-6 bg-white/80 backdrop-blur-sm">
+        {/* Navigation Tabs - Glassy effect */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-6 bg-white/70 backdrop-blur-md border-t border-indigo-50">
           <nav className="flex gap-6 overflow-x-auto w-full sm:w-auto no-scrollbar">
             {[
               { id: 'classes', label: 'All Classes' },
@@ -340,19 +339,19 @@ const StudentMainContent = () => {
                 className={cn(
                   "py-4 text-[14px] font-medium transition-colors relative whitespace-nowrap",
                   activeTab === tab.id 
-                    ? "text-indigo-600 font-semibold" 
+                    ? "text-violet-700 font-semibold" 
                     : "text-slate-500 hover:text-slate-900"
                 )}
               >
                 {tab.label}
                 {activeTab === tab.id && (
-                  <div className="absolute bottom-0 left-0 w-full h-[3px] bg-indigo-600 rounded-t-full" />
+                  <div className="absolute bottom-0 left-0 w-full h-[3px] bg-violet-600 rounded-t-full" />
                 )}
               </button>
             ))}
           </nav>
 
-          <button className="hidden sm:flex items-center gap-2 px-4 py-2 my-3 sm:my-0 rounded-lg bg-white border border-slate-200 text-[13px] font-medium text-slate-600 hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50/50 transition-all shadow-sm">
+          <button className="hidden sm:flex items-center gap-2 px-4 py-2 my-3 sm:my-0 rounded-lg bg-white border border-indigo-100 text-[13px] font-medium text-slate-600 hover:text-violet-700 hover:border-violet-200 hover:bg-violet-50/50 transition-all shadow-sm">
             <Share2 className="h-4 w-4" />
             Share Batch
           </button>
