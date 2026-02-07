@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Video, Clock, Calendar, Users, UserCheck, Copy, Loader2 } from 'lucide-react';
+import { Video, Clock, Calendar, Users, UserCheck, Copy, Loader2, Key } from 'lucide-react';
 import { format, isToday, parse, isBefore, isAfter } from 'date-fns';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -25,6 +25,7 @@ interface Schedule {
   start_time: string;
   end_time: string;
   date: string | null;
+  stream_key?: string | null;
 }
 
 interface Teacher {
@@ -80,7 +81,7 @@ export const TeacherJoinClass = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('schedules')
-        .select('id, subject, batch, day_of_week, start_time, end_time, date');
+        .select('id, subject, batch, day_of_week, start_time, end_time, date, stream_key');
       if (error) throw error;
       return data || [];
     }
@@ -201,13 +202,34 @@ export const TeacherJoinClass = () => {
       console.error("Error marking attendance:", e);
     }
 
-    // 2. Fetch Stream Key and Show Modal
+    // 2. Check for existing Stream Key in DB
+    if (cls.stream_key) {
+      setStreamKey(cls.stream_key);
+      setShowStreamDialog(true);
+      toast.info("Resumed session with saved Stream Key.");
+      return;
+    }
+
+    // 3. Generate New Key (if none exists)
     const details = await startStream(cls.batch, cls.subject);
     if (details?.streamKey) {
+      // Save the key to the schedule table
+      const { error } = await supabase
+        .from('schedules')
+        .update({ stream_key: details.streamKey })
+        .eq('id', cls.id);
+
+      if (error) {
+        console.error("Error saving stream key:", error);
+        toast.error("Stream started, but failed to save key to schedule.");
+      } else {
+        // Invalidate queries to update the UI with the new key
+        queryClient.invalidateQueries({ queryKey: ['allSchedulesTeacher'] });
+      }
+
       setStreamKey(details.streamKey);
       setShowStreamDialog(true);
     } else {
-      // If stream fails, allow opening Jitsi anyway? For now, we rely on the dialog flow.
       toast.error("Could not generate stream key, please try again.");
     }
   };
@@ -215,8 +237,7 @@ export const TeacherJoinClass = () => {
   const proceedToMeeting = () => {
     if (!currentClass) return;
     
-    // FIX: Use the standardized room name generator
-    // This ensures consistency with the Student view
+    // Use the standardized room name generator
     const roomName = generateJitsiRoomName(currentClass.batch, currentClass.subject);
     const roomUrl = `https://meet.jit.si/${encodeURIComponent(roomName)}`;
     
@@ -226,6 +247,12 @@ export const TeacherJoinClass = () => {
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(streamKey);
+    toast.success("Stream key copied!");
+  };
+
+  const copyExistingKey = (key: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(key);
     toast.success("Stream key copied!");
   };
 
@@ -288,6 +315,22 @@ export const TeacherJoinClass = () => {
                         <Clock className="h-4 w-4" />
                         {formatTime(cls.start_time)} - {formatTime(cls.end_time)}
                       </p>
+                      
+                      {/* Show Stream Key if Exists */}
+                      {cls.stream_key && (
+                        <div className="mt-3 flex items-center gap-2 p-2 bg-black/5 rounded-md w-fit border border-black/10">
+                          <Key className="h-3 w-3 text-muted-foreground" />
+                          <code className="text-xs font-mono text-foreground">{cls.stream_key}</code>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-5 w-5 ml-1"
+                            onClick={(e) => copyExistingKey(cls.stream_key!, e)}
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <Button 
@@ -304,7 +347,7 @@ export const TeacherJoinClass = () => {
                         className="bg-green-600 hover:bg-green-700"
                       >
                         {isStartingStream ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <Video className="mr-2 h-5 w-5" />}
-                        Start Class
+                        {cls.stream_key ? 'Resume Class' : 'Start Class'}
                       </Button>
                     </div>
                   </div>
@@ -334,8 +377,35 @@ export const TeacherJoinClass = () => {
                         <Clock className="h-4 w-4" />
                         {formatTime(cls.start_time)} - {formatTime(cls.end_time)}
                       </p>
+
+                      {/* Show Stream Key if Exists (e.g. prepared in advance) */}
+                      {cls.stream_key && (
+                        <div className="mt-3 flex items-center gap-2 p-2 bg-muted rounded-md w-fit border">
+                          <Key className="h-3 w-3 text-muted-foreground" />
+                          <code className="text-xs font-mono text-muted-foreground">{cls.stream_key}</code>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-5 w-5 ml-1"
+                            onClick={(e) => copyExistingKey(cls.stream_key!, e)}
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                    <Badge variant="secondary">Upcoming</Badge>
+                    <div className="flex gap-2 items-center">
+                      <Badge variant="secondary">Upcoming</Badge>
+                      {cls.stream_key && (
+                         <Button 
+                         size="sm" 
+                         variant="default"
+                         onClick={() => handleStartClass(cls)}
+                       >
+                         Start Early
+                       </Button>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
