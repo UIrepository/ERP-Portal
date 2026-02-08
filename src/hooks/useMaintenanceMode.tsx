@@ -6,10 +6,6 @@ interface MaintenanceSettings {
   maintenance_message: string | null;
 }
 
-interface VerifiedUser {
-  email: string;
-}
-
 export const useMaintenanceMode = (userEmail: string | undefined) => {
   // Fetch maintenance settings
   const { data: settings, isLoading: settingsLoading } = useQuery({
@@ -18,13 +14,19 @@ export const useMaintenanceMode = (userEmail: string | undefined) => {
       const { data, error } = await supabase
         .from('maintenance_settings')
         .select('is_maintenance_mode, maintenance_message')
-        .limit(1)
-        .single();
+        .maybeSingle(); // <--- CHANGED from .single() to .maybeSingle()
 
-      if (error) throw error;
-      return data as MaintenanceSettings;
+      if (error) {
+        console.error("Error fetching maintenance settings:", error);
+        // Return default values on error to prevent infinite loading
+        return { is_maintenance_mode: false, maintenance_message: null };
+      }
+      
+      // If table is empty, return default
+      return data ?? { is_maintenance_mode: false, maintenance_message: null };
     },
-    staleTime: 30000, // Cache for 30 seconds
+    staleTime: 30000, 
+    retry: 1, // Only retry once to fail fast if there's an issue
   });
 
   // Check if user is verified for maintenance access
@@ -39,27 +41,27 @@ export const useMaintenanceMode = (userEmail: string | undefined) => {
         .eq('email', userEmail)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) return false;
       return !!data;
     },
     enabled: !!userEmail && !!settings?.is_maintenance_mode,
-    staleTime: 60000, // Cache for 1 minute
+    staleTime: 60000, 
   });
 
   const isMaintenanceMode = settings?.is_maintenance_mode ?? false;
   const maintenanceMessage = settings?.maintenance_message ?? '';
   const canAccessDuringMaintenance = isVerified ?? false;
 
-  // User can access if:
-  // 1. Maintenance mode is OFF, OR
-  // 2. Maintenance mode is ON but user is in verified list
   const shouldShowMaintenance = isMaintenanceMode && !canAccessDuringMaintenance;
+
+  // Logic Check: If we are NOT in maintenance mode, we shouldn't wait for 'verifiedLoading'
+  const isLoading = settingsLoading || (isMaintenanceMode && verifiedLoading);
 
   return {
     isMaintenanceMode,
     maintenanceMessage,
     canAccessDuringMaintenance,
     shouldShowMaintenance,
-    isLoading: settingsLoading || (isMaintenanceMode && verifiedLoading),
+    isLoading,
   };
 };
