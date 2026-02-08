@@ -1,9 +1,7 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
-import { toast } from '@/hooks/use-toast';
 
-// Define the shape of the context data
 type AuthContextType = {
   session: Session | null;
   user: User | null;
@@ -23,82 +21,95 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<any | null>(null);
   const [resolvedRole, setResolvedRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Use a ref to track mounting to prevent state updates on unmounted component
+  const mounted = useRef(true);
 
-  // Helper to fetch profile and role data
   const fetchProfileAndRole = async (currentUser: User) => {
     try {
       // 1. Fetch Profile
-      const { data: profileData, error: profileError } = await supabase
+      const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', currentUser.id)
         .single();
 
-      if (profileError) {
-        console.error('Error fetching profile:', profileError);
-      } else {
-        setProfile(profileData);
-      }
+      if (mounted.current) setProfile(profileData);
 
-      // 2. Fetch Resolved Role (using your DB function)
+      // 2. Fetch Resolved Role
       const { data: roleData, error: roleError } = await supabase
         .rpc('get_user_role_from_tables', { check_user_id: currentUser.id });
 
-      if (roleError) {
-        console.error('Error fetching role:', roleError);
-        // Fallback: try to use the role from the profile if RPC fails
-        if (profileData?.role) {
+      if (mounted.current) {
+        if (!roleError) {
+          setResolvedRole(roleData as string);
+        } else if (profileData?.role) {
+          // Fallback to profile role
           setResolvedRole(profileData.role);
         }
-      } else {
-        setResolvedRole(roleData as string);
       }
-
     } catch (error) {
-      console.error('Unexpected auth error:', error);
+      console.error('Error in fetchProfileAndRole:', error);
     } finally {
-      setLoading(false);
+      if (mounted.current) setLoading(false);
     }
   };
 
   useEffect(() => {
-    // 1. Check active session on mount
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfileAndRole(session.user);
-      } else {
-        setLoading(false);
-      }
-    });
+    mounted.current = true;
 
-    // 2. Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    // Get initial session
+    const initAuth = async () => {
+      try {
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        
+        if (mounted.current) {
+          setSession(initialSession);
+          setUser(initialSession?.user ?? null);
+          
+          if (initialSession?.user) {
+            await fetchProfileAndRole(initialSession.user);
+          } else {
+            setLoading(false);
+          }
+        }
+      } catch (error) {
+        console.error("Auth initialization error:", error);
+        if (mounted.current) setLoading(false);
+      }
+    };
+
+    initAuth();
+
+    // Listen for changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      if (!mounted.current) return;
+
+      // Avoid double-fetching if the session is the same as what we just initialized
+      // But ensure we handle SIGN_OUT correctly
       
-      if (session?.user) {
-        // Reset loading to true while we fetch new user data
-        setLoading(true);
-        await fetchProfileAndRole(session.user);
-      } else {
-        // Clear state on sign out
+      setSession(newSession);
+      setUser(newSession?.user ?? null);
+
+      if (event === 'SIGNED_OUT') {
         setProfile(null);
         setResolvedRole(null);
         setLoading(false);
+      } else if (newSession?.user && event !== 'INITIAL_SESSION') {
+        // Only trigger loading/fetch if it's a new login or distinct update
+        setLoading(true);
+        await fetchProfileAndRole(newSession.user);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted.current = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    toast({
-      title: "Signed out",
-      description: "You have been successfully signed out.",
-    });
   };
 
   const value = {
@@ -106,9 +117,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     user,
     profile,
     resolvedRole,
-    loading, // Index.tsx expects 'loading', not 'isLoading'
-    signIn: () => {}, 
-    signUp: () => {}, 
+    loading,
+    signIn: () => {},
+    signUp: () => {},
     signOut
   };
 
