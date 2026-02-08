@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
+import { toast } from '@/hooks/use-toast';
 
 type AuthContextType = {
   session: Session | null;
@@ -22,34 +23,61 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [resolvedRole, setResolvedRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   
-  // Use a ref to track mounting to prevent state updates on unmounted component
   const mounted = useRef(true);
+
+  // Helper: Wrapper to prevent DB hangs from freezing the app
+  const safeDbCall = async (promise: Promise<any>, timeoutMs = 5000) => {
+    let timeoutId: NodeJS.Timeout;
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error('DB_TIMEOUT')), timeoutMs);
+    });
+
+    try {
+      return await Promise.race([promise, timeoutPromise]);
+    } finally {
+      clearTimeout(timeoutId!);
+    }
+  };
 
   const fetchProfileAndRole = async (currentUser: User) => {
     try {
-      // 1. Fetch Profile
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .single();
+      console.log("Fetching profile and role...");
+      
+      // 1. Fetch Profile (with timeout)
+      const { data: profileData, error: profileError } = await safeDbCall(
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', currentUser.id)
+          .maybeSingle() 
+      );
 
-      if (mounted.current) setProfile(profileData);
+      if (profileError) console.error("Profile fetch error:", profileError);
+      if (mounted.current && profileData) setProfile(profileData);
 
-      // 2. Fetch Resolved Role
-      const { data: roleData, error: roleError } = await supabase
-        .rpc('get_user_role_from_tables', { check_user_id: currentUser.id });
+      // 2. Fetch Role (with timeout)
+      const { data: roleData, error: roleError } = await safeDbCall(
+        supabase.rpc('get_user_role_from_tables', { check_user_id: currentUser.id })
+      );
 
       if (mounted.current) {
-        if (!roleError) {
+        if (!roleError && roleData) {
+          console.log("Role fetched via RPC:", roleData);
           setResolvedRole(roleData as string);
         } else if (profileData?.role) {
-          // Fallback to profile role
+          console.log("Role fetched via Profile fallback:", profileData.role);
           setResolvedRole(profileData.role);
+        } else {
+           console.warn("No role could be resolved.");
         }
       }
     } catch (error) {
-      console.error('Error in fetchProfileAndRole:', error);
+      console.error('Error fetching user details (likely RLS recursion or timeout):', error);
+      toast({
+        title: "Connection Slow",
+        description: "We couldn't load all your profile data. Some features may be limited.",
+        variant: "destructive"
+      });
     } finally {
       if (mounted.current) setLoading(false);
     }
@@ -58,9 +86,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     mounted.current = true;
 
-    // Get initial session
     const initAuth = async () => {
       try {
+        // Check for session
         const { data: { session: initialSession } } = await supabase.auth.getSession();
         
         if (mounted.current) {
@@ -74,20 +102,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           }
         }
       } catch (error) {
-        console.error("Auth initialization error:", error);
+        console.error("Auth init error:", error);
         if (mounted.current) setLoading(false);
       }
     };
 
     initAuth();
 
-    // Listen for changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       if (!mounted.current) return;
-
-      // Avoid double-fetching if the session is the same as what we just initialized
-      // But ensure we handle SIGN_OUT correctly
       
+      console.log("Auth change:", event);
       setSession(newSession);
       setUser(newSession?.user ?? null);
 
@@ -96,7 +121,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setResolvedRole(null);
         setLoading(false);
       } else if (newSession?.user && event !== 'INITIAL_SESSION') {
-        // Only trigger loading/fetch if it's a new login or distinct update
+        // Only reload data if it's a new sign-in or distinct event
+        // We set loading true to ensure we don't render dashboard with stale data
         setLoading(true);
         await fetchProfileAndRole(newSession.user);
       }
@@ -118,8 +144,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     profile,
     resolvedRole,
     loading,
-    signIn: () => {},
-    signUp: () => {},
+    signIn: () => {}, 
+    signUp: () => {}, 
     signOut
   };
 
