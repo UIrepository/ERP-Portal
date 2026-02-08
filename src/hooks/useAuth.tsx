@@ -26,9 +26,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const mounted = useRef(true);
 
   // Helper: Wrapper to prevent DB hangs from freezing the app
-  const safeDbCall = async (promise: Promise<any>, timeoutMs = 5000) => {
+  const safeDbCall = async <T,>(promise: PromiseLike<T>, timeoutMs = 5000): Promise<T> => {
     let timeoutId: NodeJS.Timeout;
-    const timeoutPromise = new Promise((_, reject) => {
+    const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => reject(new Error('DB_TIMEOUT')), timeoutMs);
     });
 
