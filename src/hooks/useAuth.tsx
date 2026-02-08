@@ -42,55 +42,71 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const fetchProfileAndRole = async (currentUser: User) => {
     let profileLoaded = false;
     let roleLoaded = false;
-    
+
     try {
-      console.log("Fetching profile and role...");
-      
       // 1. Fetch Profile (with timeout)
       const { data: profileData, error: profileError } = await safeDbCall(
         supabase
           .from('profiles')
           .select('*')
           .eq('user_id', currentUser.id)
-          .maybeSingle() 
+          .maybeSingle(),
+        8000
       );
 
-      if (profileError) console.error("Profile fetch error:", profileError);
+      if (profileError) console.error('Profile fetch error:', profileError);
       if (mounted.current && profileData) {
         setProfile(profileData);
         profileLoaded = true;
+        try {
+          localStorage.setItem('ui_ssp_profile', JSON.stringify(profileData));
+        } catch {
+          // ignore storage issues
+        }
       }
 
       // 2. Fetch Role (with timeout)
       const { data: roleData, error: roleError } = await safeDbCall(
-        supabase.rpc('get_user_role_from_tables', { check_user_id: currentUser.id })
+        supabase.rpc('get_user_role_from_tables', { check_user_id: currentUser.id }),
+        8000
       );
 
       if (mounted.current) {
         if (!roleError && roleData) {
-          console.log("Role fetched via RPC:", roleData);
           setResolvedRole(roleData as string);
           roleLoaded = true;
+          try {
+            localStorage.setItem('ui_ssp_role', String(roleData));
+          } catch {
+            // ignore storage issues
+          }
         } else if (profileData?.role) {
-          console.log("Role fetched via Profile fallback:", profileData.role);
           setResolvedRole(profileData.role);
           roleLoaded = true;
-        } else {
-           console.warn("No role could be resolved.");
+          try {
+            localStorage.setItem('ui_ssp_role', String(profileData.role));
+          } catch {
+            // ignore storage issues
+          }
         }
       }
     } catch (error) {
+      // Don't block UX on timeout; let the UI continue and role can hydrate later.
+      if (error instanceof Error && error.message === 'DB_TIMEOUT') {
+        console.warn('Profile/role fetch timed out; using cached values if available.');
+        return;
+      }
+
       console.error('Error fetching user details:', error);
-      // Only show toast if we completely failed to load essential data
+
+      // Only show toast if we completely failed to load essential data (and it's not a timeout)
       if (!profileLoaded && !roleLoaded) {
         toast({
-          title: "Connection Issue",
-          description: "Please refresh the page to try again.",
-          variant: "destructive"
+          title: 'Connection Issue',
+          description: 'Please refresh the page to try again.',
+          variant: 'destructive',
         });
       }
-    } finally {
-      if (mounted.current) setLoading(false);
     }
   };
 
@@ -99,43 +115,68 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const initAuth = async () => {
       try {
+        // Hydrate cached values immediately to avoid long splash screen
+        try {
+          const cachedProfile = localStorage.getItem('ui_ssp_profile');
+          if (cachedProfile) setProfile(JSON.parse(cachedProfile));
+        } catch {
+          // ignore
+        }
+
+        try {
+          const cachedRole = localStorage.getItem('ui_ssp_role');
+          if (cachedRole) setResolvedRole(cachedRole);
+        } catch {
+          // ignore
+        }
+
         // Check for session
         const { data: { session: initialSession } } = await supabase.auth.getSession();
-        
+
         if (mounted.current) {
           setSession(initialSession);
           setUser(initialSession?.user ?? null);
-          
+
+          // Don't block initial render on profile/role fetch
+          setLoading(false);
+
           if (initialSession?.user) {
-            await fetchProfileAndRole(initialSession.user);
-          } else {
-            setLoading(false);
+            void fetchProfileAndRole(initialSession.user);
           }
         }
       } catch (error) {
-        console.error("Auth init error:", error);
+        console.error('Auth init error:', error);
         if (mounted.current) setLoading(false);
       }
     };
 
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (!mounted.current) return;
-      
-      console.log("Auth change:", event);
+
       setSession(newSession);
       setUser(newSession?.user ?? null);
 
       if (event === 'SIGNED_OUT') {
         setProfile(null);
         setResolvedRole(null);
+        try {
+          localStorage.removeItem('ui_ssp_profile');
+          localStorage.removeItem('ui_ssp_role');
+        } catch {
+          // ignore
+        }
         setLoading(false);
-      } else if (newSession?.user && event !== 'INITIAL_SESSION') {
-        // Only reload data if it's a new sign-in or distinct event
-        // We set loading true to ensure we don't render dashboard with stale data
-        setLoading(true);
-        await fetchProfileAndRole(newSession.user);
+        return;
+      }
+
+      // Don't block UI; refresh profile/role in background
+      setLoading(false);
+      if (newSession?.user && event !== 'INITIAL_SESSION') {
+        setTimeout(() => {
+          void fetchProfileAndRole(newSession.user!);
+        }, 0);
       }
     });
 
