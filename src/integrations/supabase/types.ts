@@ -552,6 +552,36 @@ export type Database = {
         }
         Relationships: []
       }
+      google_groups: {
+        Row: {
+          batch_name: string
+          created_at: string | null
+          group_email: string
+          id: string
+          is_active: boolean | null
+          subject_name: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          batch_name: string
+          created_at?: string | null
+          group_email: string
+          id?: string
+          is_active?: boolean | null
+          subject_name?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          batch_name?: string
+          created_at?: string | null
+          group_email?: string
+          id?: string
+          is_active?: boolean | null
+          subject_name?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       maintenance_settings: {
         Row: {
           id: string
