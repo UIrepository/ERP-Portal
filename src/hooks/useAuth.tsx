@@ -26,7 +26,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const mounted = useRef(true);
 
   // Helper: Wrapper to prevent DB hangs from freezing the app
-  const safeDbCall = async <T,>(promise: PromiseLike<T>, timeoutMs = 5000): Promise<T> => {
+  const safeDbCall = async <T,>(promise: PromiseLike<T>, timeoutMs = 10000): Promise<T> => {
     let timeoutId: NodeJS.Timeout;
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => reject(new Error('DB_TIMEOUT')), timeoutMs);
@@ -40,6 +40,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const fetchProfileAndRole = async (currentUser: User) => {
+    let profileLoaded = false;
+    let roleLoaded = false;
+    
     try {
       console.log("Fetching profile and role...");
       
@@ -53,7 +56,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       );
 
       if (profileError) console.error("Profile fetch error:", profileError);
-      if (mounted.current && profileData) setProfile(profileData);
+      if (mounted.current && profileData) {
+        setProfile(profileData);
+        profileLoaded = true;
+      }
 
       // 2. Fetch Role (with timeout)
       const { data: roleData, error: roleError } = await safeDbCall(
@@ -64,20 +70,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (!roleError && roleData) {
           console.log("Role fetched via RPC:", roleData);
           setResolvedRole(roleData as string);
+          roleLoaded = true;
         } else if (profileData?.role) {
           console.log("Role fetched via Profile fallback:", profileData.role);
           setResolvedRole(profileData.role);
+          roleLoaded = true;
         } else {
            console.warn("No role could be resolved.");
         }
       }
     } catch (error) {
-      console.error('Error fetching user details (likely RLS recursion or timeout):', error);
-      toast({
-        title: "Connection Slow",
-        description: "We couldn't load all your profile data. Some features may be limited.",
-        variant: "destructive"
-      });
+      console.error('Error fetching user details:', error);
+      // Only show toast if we completely failed to load essential data
+      if (!profileLoaded && !roleLoaded) {
+        toast({
+          title: "Connection Issue",
+          description: "Please refresh the page to try again.",
+          variant: "destructive"
+        });
+      }
     } finally {
       if (mounted.current) setLoading(false);
     }
