@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, addMinutes, isWithinInterval, differenceInMinutes } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { generateJitsiRoomName } from '@/lib/jitsiUtils';
-import { useAuth } from '@/hooks/useAuth'; // Ensure this is imported
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
 interface StudentLiveClassProps {
@@ -87,18 +87,21 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
         const activeJitsi = activeClasses?.find(ac => ac.subject === schedule.subject);
         const subjectLink = meetingLinks?.find(l => l.subject === schedule.subject);
         
+        // The default fallback if nothing is in the DB
         const generatedJitsiLink = `https://meet.jit.si/${generateJitsiRoomName(schedule.batch, schedule.subject)}`;
+        
+        // Priority: Active Class > Schedule Link > Static Subject Link
+        // We prioritize activeJitsi.room_url because that is what the teacher sets when merging classes
         const dbLink = activeJitsi?.room_url || schedule.link || subjectLink?.link;
 
         let finalLink = null;
+
         if (dbLink) {
-          if (dbLink.includes('meet.jit.si')) {
-             finalLink = generatedJitsiLink;
-          } else {
-             finalLink = dbLink;
-          }
+           // FIX: We trust the DB link. If it's a merged Jitsi link, we use it directly.
+           // Only use generated link if the DB explicitly gives us an empty string or null (handled by the || check above)
+           finalLink = dbLink;
         } else {
-          finalLink = generatedJitsiLink;
+           finalLink = generatedJitsiLink;
         }
 
         return {
@@ -150,18 +153,23 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
       
       // 2. Define restrictions directly here
       const configParams = [
-        `config.liveStreamingEnabled=false`,       // Disable Stream
-        `config.fileRecordingsEnabled=false`,      // Disable Dropbox/File Recording
-        `config.localRecording.enabled=false`,     // Disable Local Recording
-        `config.prejoinPageEnabled=false`,         // Skip prejoin
-        `config.disableRemoteMute=true`,           // Prevent muting others
-        `config.remoteVideoMenu.disableKick=true`, // Prevent kicking others
-        `config.remoteVideoMenu.disableGrantModerator=true`, // Prevent granting mod rights
-        `userInfo.displayName="${profile?.name || user?.email || 'Student'}"` // Auto-name
+        `config.liveStreamingEnabled=false`,       
+        `config.fileRecordingsEnabled=false`,      
+        `config.localRecording.enabled=false`,     
+        `config.prejoinPageEnabled=false`,         
+        `config.disableRemoteMute=true`,           
+        `config.remoteVideoMenu.disableKick=true`, 
+        `config.remoteVideoMenu.disableGrantModerator=true`, 
+        `userInfo.displayName="${profile?.name || user?.email || 'Student'}"`
       ];
 
-      // 3. Attach config to hash
-      urlObj.hash = configParams.join('&');
+      // 3. Attach config to hash (preserve existing hash params if any)
+      const newHash = configParams.join('&');
+      if (urlObj.hash) {
+        urlObj.hash = `${urlObj.hash}&${newHash}`;
+      } else {
+        urlObj.hash = newHash;
+      }
 
       // 4. Open in new tab
       window.open(urlObj.toString(), '_blank');
@@ -219,7 +227,7 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
                    <span className="text-[13px] font-normal text-slate-900">
                       {formatTimeRange(item.start_time, item.end_time)}
                    </span>
-                   {/* Check if teacher is truly live before allowing join */}
+                   
                    {item.is_jitsi_live ? (
                      <button 
                        onClick={() => handleJoinClass(item)}
