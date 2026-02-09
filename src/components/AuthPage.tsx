@@ -30,6 +30,25 @@ export const AuthPage = () => {
       if (error) throw error;
 
       if (data.session) {
+        // CALL EDGE FUNCTION TO LINK ENROLLMENTS
+        // This ensures the user_id is stamped on any enrollments matching this email
+        try {
+          const { error: linkError } = await supabase.functions.invoke('link-user-enrollments', {
+            body: { 
+              email: data.session.user.email,
+              user_id: data.session.user.id 
+            },
+          });
+
+          if (linkError) {
+            console.error('Error linking enrollments:', linkError);
+          } else {
+            console.log('Enrollments linked successfully');
+          }
+        } catch (linkErr) {
+          console.error('Failed to invoke link-user-enrollments:', linkErr);
+        }
+
         toast({
           title: 'Success',
           description: 'Signed in successfully',
