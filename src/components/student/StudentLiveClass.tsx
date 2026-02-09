@@ -143,15 +143,9 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
     const bufferStart = addMinutes(startTime, -15);
     const bufferEnd = addMinutes(endTime, 15);
     
-    // UPDATED LOGIC: If it's active in Jitsi, treat as Live regardless of time
-    if (schedule.is_jitsi_live) {
-        liveClasses.push(schedule);
-    }
-    // Otherwise check strict time window
-    else if (isWithinInterval(now, { start: bufferStart, end: bufferEnd })) {
+    if (isWithinInterval(now, { start: bufferStart, end: bufferEnd })) {
       liveClasses.push(schedule);
     } 
-    // Otherwise check if upcoming
     else if (now < startTime && differenceInMinutes(startTime, now) < 240) {
       upcomingClasses.push(schedule);
     }
