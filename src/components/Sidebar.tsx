@@ -6,13 +6,7 @@ import { useMemo, useEffect } from 'react';
 import {
   LayoutDashboard,
   Calendar,
-  Clock,
   Video,
-  FileText,
-  Target,
-  Crown,
-  MessageSquare,
-  BookOpen,
   Users,
   Link as LinkIcon,
   BarChart2,
@@ -28,6 +22,7 @@ import {
   Wrench,
   Headphones,
   GitMerge,
+  ExternalLink, // Added icon
 } from 'lucide-react';
 
 import {
@@ -205,6 +200,22 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
           {tabs.map((tab) => {
             const isContactAdminTab = tab.id === 'contact-admin';
             const isSupportTab = tab.id === 'support';
+            
+            // --- NEW: Community opens in new tab ---
+            if (tab.id === 'teacher-community') {
+              return (
+                <Button
+                  key={tab.id}
+                  variant="ghost"
+                  className="w-full justify-start text-slate-600 hover:text-slate-900 hover:bg-slate-100 group"
+                  onClick={() => window.open('/teacher-community', '_blank')}
+                >
+                  <tab.icon className="mr-3 h-4 w-4" />
+                  <span className="flex-1 text-left">{tab.label}</span>
+                  <ExternalLink className="h-3 w-3 text-slate-400 group-hover:text-slate-600 opacity-50" />
+                </Button>
+              );
+            }
 
             if (isSupportTab && onSupportClick) {
                 return (
