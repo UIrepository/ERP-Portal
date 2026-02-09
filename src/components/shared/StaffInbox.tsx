@@ -42,16 +42,45 @@ export const StaffInbox = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
-  // Fetch Contacts (People who have chatted with you)
-  const { data: contacts, isLoading: loadingContacts } = useQuery({
-    queryKey: ['inbox-contacts', profile?.user_id],
+  // Determine if current user is admin or manager
+  const { data: staffRole } = useQuery({
+    queryKey: ['staff-role', profile?.user_id],
     queryFn: async () => {
-      if (!profile?.user_id) return [];
+      if (!profile?.user_id) return null;
+      const [adminRes, managerRes, adminsAll, managersAll] = await Promise.all([
+        supabase.from('admins').select('id').eq('user_id', profile.user_id).maybeSingle(),
+        supabase.from('managers').select('id').eq('user_id', profile.user_id).maybeSingle(),
+        supabase.from('admins').select('user_id').not('user_id', 'is', null),
+        supabase.from('managers').select('user_id').not('user_id', 'is', null),
+      ]);
+      const allStaffIds = new Set([
+        ...(adminsAll.data || []).map(a => a.user_id),
+        ...(managersAll.data || []).map(m => m.user_id),
+      ]);
+      return {
+        isAdmin: !!adminRes.data,
+        isManager: !!managerRes.data,
+        allStaffIds,
+      };
+    },
+    enabled: !!profile?.user_id,
+  });
+
+  // Fetch Contacts — shared inbox for support conversations
+  const { data: contacts, isLoading: loadingContacts } = useQuery({
+    queryKey: ['inbox-contacts', profile?.user_id, staffRole?.isAdmin, staffRole?.isManager],
+    queryFn: async () => {
+      if (!profile?.user_id || !staffRole) return [];
+
+      // Build OR filter: personal messages + shared support messages
+      let orFilter = `sender_id.eq.${profile.user_id},receiver_id.eq.${profile.user_id}`;
+      if (staffRole.isAdmin) orFilter += `,context.eq.support_admin`;
+      if (staffRole.isManager) orFilter += `,context.eq.support_manager`;
 
       const { data: messages, error } = await supabase
         .from('direct_messages')
         .select('*')
-        .or(`sender_id.eq.${profile.user_id},receiver_id.eq.${profile.user_id}`)
+        .or(orFilter)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -62,7 +91,24 @@ export const StaffInbox = () => {
       const contactMap = new Map<string, Contact>();
       
       for (const msg of messages) {
-        const otherId = msg.sender_id === profile.user_id ? msg.receiver_id : msg.sender_id;
+        const msgContext = (msg as Message).context;
+        let otherId: string;
+
+        // For support messages, "other" is always the student (non-staff party)
+        if (msgContext === 'support_admin' || msgContext === 'support_manager') {
+          if (staffRole.allStaffIds.has(msg.sender_id)) {
+            otherId = msg.receiver_id;
+          } else {
+            otherId = msg.sender_id;
+          }
+          // Skip if we ARE the student somehow
+          if (otherId === profile.user_id && staffRole.allStaffIds.has(profile.user_id)) {
+            // Current user is staff, other is also staff — use normal logic
+            otherId = msg.sender_id === profile.user_id ? msg.receiver_id : msg.sender_id;
+          }
+        } else {
+          otherId = msg.sender_id === profile.user_id ? msg.receiver_id : msg.sender_id;
+        }
         
         if (!contactMap.has(otherId)) {
           const { data: userProfile } = await supabase
@@ -77,12 +123,18 @@ export const StaffInbox = () => {
             lastMessage: msg.content || 'Attachment',
             lastMessageTime: msg.created_at || new Date().toISOString(),
             unreadCount: 0,
-            context: (msg as Message).context || 'general',
+            context: msgContext || 'general',
             subject_context: (msg as Message).subject_context || null,
           });
         }
         
-        if (msg.receiver_id === profile.user_id && msg.is_read === false) {
+        // For support messages, count unread if student sent and not read
+        if (msgContext === 'support_admin' || msgContext === 'support_manager') {
+          if (!staffRole.allStaffIds.has(msg.sender_id) && msg.is_read === false) {
+            const contact = contactMap.get(otherId)!;
+            contact.unreadCount += 1;
+          }
+        } else if (msg.receiver_id === profile.user_id && msg.is_read === false) {
            const contact = contactMap.get(otherId)!;
            contact.unreadCount += 1;
         }
@@ -90,7 +142,7 @@ export const StaffInbox = () => {
 
       return Array.from(contactMap.values());
     },
-    enabled: !!profile?.user_id,
+    enabled: !!profile?.user_id && !!staffRole,
     refetchInterval: 5000
   });
 
@@ -107,11 +159,28 @@ export const StaffInbox = () => {
   });
 
   // Fetch Messages for the selected contact
+  const selectedContact = contacts?.find(c => c.user_id === selectedContactId);
   const { data: messages, isLoading: loadingMessages } = useQuery({
-    queryKey: ['dm-messages', profile?.user_id, selectedContactId],
+    queryKey: ['dm-messages', profile?.user_id, selectedContactId, selectedContact?.context],
     queryFn: async () => {
       if (!profile?.user_id || !selectedContactId) return [];
 
+      const ctx = selectedContact?.context;
+      
+      // For support conversations, fetch ALL messages for this student + context
+      // so any admin/manager can see the full conversation
+      if (ctx === 'support_admin' || ctx === 'support_manager') {
+        const { data, error } = await supabase
+          .from('direct_messages')
+          .select('*')
+          .eq('context', ctx)
+          .or(`sender_id.eq.${selectedContactId},receiver_id.eq.${selectedContactId}`)
+          .order('created_at', { ascending: true });
+        if (error) throw error;
+        return data as Message[];
+      }
+
+      // For non-support, keep existing 1:1 logic
       const { data, error } = await supabase
         .from('direct_messages')
         .select('*')
@@ -133,21 +202,38 @@ export const StaffInbox = () => {
 
   useEffect(() => {
     if (selectedContactId && profile?.user_id && messages?.length) {
-        const unreadExists = messages.some(m => m.receiver_id === profile.user_id && !m.is_read);
+        const ctx = selectedContact?.context;
         
-        if (unreadExists) {
-          supabase
-          .from('direct_messages')
-          .update({ is_read: true })
-          .eq('sender_id', selectedContactId)
-          .eq('receiver_id', profile.user_id)
-          .eq('is_read', false)
-          .then(() => {
-              queryClient.invalidateQueries({ queryKey: ['inbox-contacts'] });
-          });
+        // For support conversations, mark all student messages as read for the shared inbox
+        if (ctx === 'support_admin' || ctx === 'support_manager') {
+          const unreadExists = messages.some(m => m.sender_id === selectedContactId && !m.is_read);
+          if (unreadExists) {
+            supabase
+              .from('direct_messages')
+              .update({ is_read: true })
+              .eq('sender_id', selectedContactId)
+              .eq('context', ctx)
+              .eq('is_read', false)
+              .then(() => {
+                queryClient.invalidateQueries({ queryKey: ['inbox-contacts'] });
+              });
+          }
+        } else {
+          const unreadExists = messages.some(m => m.receiver_id === profile.user_id && !m.is_read);
+          if (unreadExists) {
+            supabase
+              .from('direct_messages')
+              .update({ is_read: true })
+              .eq('sender_id', selectedContactId)
+              .eq('receiver_id', profile.user_id)
+              .eq('is_read', false)
+              .then(() => {
+                queryClient.invalidateQueries({ queryKey: ['inbox-contacts'] });
+              });
+          }
         }
     }
-  }, [selectedContactId, messages, profile?.user_id, queryClient]);
+  }, [selectedContactId, messages, profile?.user_id, queryClient, selectedContact?.context]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,9 +241,6 @@ export const StaffInbox = () => {
 
     const tempMsg = newMessage;
     setNewMessage('');
-
-    // Get the context from the selected contact's conversation
-    const selectedContact = contacts?.find(c => c.user_id === selectedContactId);
 
     const { error } = await supabase.from('direct_messages').insert({
       sender_id: profile.user_id,

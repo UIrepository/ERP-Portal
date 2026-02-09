@@ -196,12 +196,27 @@ export const StudentChatbot = () => {
     }
   }, [state.mode, state.subjectContext, state.isOpen, state.selectedRecipient, setRecipient]);
 
-  // Fetch messages
+  // Fetch messages — for support mode, fetch by context so student sees replies from ANY staff
   const { data: messages, isLoading: loadingMessages } = useQuery({
-    queryKey: ['chat-messages', profile?.user_id, state.selectedRecipient?.id],
+    queryKey: ['chat-messages', profile?.user_id, state.selectedRecipient?.id, state.supportRole, state.mode],
     queryFn: async () => {
       if (!profile?.user_id || !state.selectedRecipient?.id) return [];
       
+      // For support conversations, fetch all messages with matching context involving this student
+      // This way the student sees replies from any admin/manager, not just the initially assigned one
+      if (state.mode === 'support' && state.supportRole) {
+        const ctx = state.supportRole === 'admin' ? 'support_admin' : 'support_manager';
+        const { data, error } = await supabase
+          .from('direct_messages')
+          .select('*')
+          .eq('context', ctx)
+          .or(`sender_id.eq.${profile.user_id},receiver_id.eq.${profile.user_id}`)
+          .order('created_at', { ascending: true });
+        if (error) throw error;
+        return data as Message[];
+      }
+
+      // For subject-connect / other modes, keep 1:1 logic
       const { data, error } = await supabase
         .from('direct_messages')
         .select('*')
