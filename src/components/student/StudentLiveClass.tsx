@@ -143,7 +143,8 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
     const bufferStart = addMinutes(startTime, -15);
     const bufferEnd = addMinutes(endTime, 15);
     
-    if (isWithinInterval(now, { start: bufferStart, end: bufferEnd })) {
+    // MODIFIED: Show in Live section if it's active in DB OR within scheduled time window
+    if (schedule.is_jitsi_live || isWithinInterval(now, { start: bufferStart, end: bufferEnd })) {
       liveClasses.push(schedule);
     } 
     else if (now < startTime && differenceInMinutes(startTime, now) < 240) {
@@ -157,28 +158,20 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
     if (!item.meeting_link_url) return;
 
     if (item.meeting_link_url.includes('meet.jit.si')) {
-      // 1. Construct URL object
       const urlObj = new URL(item.meeting_link_url);
-      
-      // 2. Define restrictions directly here
       const configParams = [
-        `config.liveStreamingEnabled=false`,       // Disable Stream
-        `config.fileRecordingsEnabled=false`,      // Disable Dropbox/File Recording
-        `config.localRecording.enabled=false`,     // Disable Local Recording
-        `config.prejoinPageEnabled=false`,         // Skip prejoin
-        `config.disableRemoteMute=true`,           // Prevent muting others
-        `config.remoteVideoMenu.disableKick=true`, // Prevent kicking others
-        `config.remoteVideoMenu.disableGrantModerator=true`, // Prevent granting mod rights
-        `userInfo.displayName="${profile?.name || user?.email || 'Student'}"` // Auto-name
+        `config.liveStreamingEnabled=false`,
+        `config.fileRecordingsEnabled=false`,
+        `config.localRecording.enabled=false`,
+        `config.prejoinPageEnabled=false`,
+        `config.disableRemoteMute=true`,
+        `config.remoteVideoMenu.disableKick=true`,
+        `config.remoteVideoMenu.disableGrantModerator=true`,
+        `userInfo.displayName="${profile?.name || user?.email || 'Student'}"`
       ];
-
-      // 3. Attach config to hash
       urlObj.hash = configParams.join('&');
-
-      // 4. Open in new tab
       window.open(urlObj.toString(), '_blank');
     } else {
-      // Zoom/GMeet
       window.open(item.meeting_link_url, '_blank');
     }
   };
@@ -231,19 +224,14 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
                    <span className="text-[13px] font-normal text-slate-900">
                       {formatTimeRange(item.start_time, item.end_time)}
                    </span>
-                   {/* Check if teacher is truly live before allowing join */}
-                   {item.is_jitsi_live ? (
-                     <button 
-                       onClick={() => handleJoinClass(item)}
-                       className="bg-slate-900 text-white px-4 py-2 text-[12px] font-normal rounded-[4px] hover:bg-slate-800 transition-opacity"
-                     >
-                       Join Class
-                     </button>
-                   ) : (
-                     <button disabled className="bg-slate-100 text-slate-400 px-4 py-2 text-[12px] font-normal rounded-[4px] cursor-not-allowed border border-slate-200">
-                       Waiting for Teacher...
-                     </button>
-                   )}
+                   
+                   {/* Join Button - Enabled if scheduled time is reached, even if not marked active in DB */}
+                   <button 
+                     onClick={() => handleJoinClass(item)}
+                     className="bg-slate-900 text-white px-4 py-2 text-[12px] font-normal rounded-[4px] hover:bg-slate-800 transition-opacity"
+                   >
+                     Join Class
+                   </button>
                 </div>
              </div>
           ))}
