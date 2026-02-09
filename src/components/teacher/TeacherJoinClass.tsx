@@ -95,6 +95,54 @@ export const TeacherJoinClass = () => {
     }
   });
 
+  // Fetch active merges for displaying merged labels
+  const { data: activeMerges = [] } = useQuery({
+    queryKey: ['active-merges-for-teacher-join'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('subject_merges')
+        .select('*')
+        .eq('is_active', true);
+      if (error) return [];
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Helper to get primary pair for consistent Jitsi room naming
+  const getPrimaryPair = useMemo(() => {
+    return (batch: string, subject: string) => {
+      const merge = activeMerges.find((m: any) =>
+        (m.primary_batch === batch && m.primary_subject === subject) ||
+        (m.secondary_batch === batch && m.secondary_subject === subject)
+      );
+      if (!merge) return { batch, subject };
+      const pairs = [
+        { batch: merge.primary_batch, subject: merge.primary_subject },
+        { batch: merge.secondary_batch, subject: merge.secondary_subject }
+      ];
+      return pairs.sort((a, b) => `${a.batch}|${a.subject}`.localeCompare(`${b.batch}|${b.subject}`))[0];
+    };
+  }, [activeMerges]);
+
+  // Helper to get merged label for a class
+  const getMergedLabel = useMemo(() => {
+    return (batch: string, subject: string) => {
+      const merge = activeMerges.find((m: any) =>
+        (m.primary_batch === batch && m.primary_subject === subject) ||
+        (m.secondary_batch === batch && m.secondary_subject === subject)
+      );
+      if (!merge) return null;
+      const otherBatch = merge.primary_batch === batch && merge.primary_subject === subject
+        ? merge.secondary_batch
+        : merge.primary_batch;
+      const otherSubject = merge.primary_batch === batch && merge.primary_subject === subject
+        ? merge.secondary_subject
+        : merge.primary_subject;
+      return `${otherSubject} (${otherBatch})`;
+    };
+  }, [activeMerges]);
+
   // Fetch attendance
   const { data: attendance, isLoading: isLoadingAttendance } = useQuery<Attendance[]>({
     queryKey: ['classAttendance', selectedClassForAttendance?.id],
@@ -208,8 +256,9 @@ export const TeacherJoinClass = () => {
           joined_at: new Date().toISOString()
         }, { onConflict: 'user_id,schedule_id,class_date' });
 
-        // IMPORTANT: Update active_classes for single class too
-        const roomName = generateJitsiRoomName(cls.batch, cls.subject);
+        // IMPORTANT: Update active_classes using primary pair for consistent room naming
+        const primary = getPrimaryPair(cls.batch, cls.subject);
+        const roomName = generateJitsiRoomName(primary.batch, primary.subject);
         await supabase.from('active_classes').upsert({
           batch: cls.batch,
           subject: cls.subject,
@@ -327,7 +376,8 @@ export const TeacherJoinClass = () => {
     if (isMergedSession) {
       window.open(mergedRoomUrl, '_blank');
     } else if (currentClass) {
-      const roomName = generateJitsiRoomName(currentClass.batch, currentClass.subject);
+      const primary = getPrimaryPair(currentClass.batch, currentClass.subject);
+      const roomName = generateJitsiRoomName(primary.batch, primary.subject);
       const roomUrl = `https://meet.jit.si/${encodeURIComponent(roomName)}`;
       window.open(roomUrl, '_blank');
     }
@@ -425,6 +475,12 @@ export const TeacherJoinClass = () => {
                       <div>
                         <h3 className="text-xl font-bold">{cls.subject}</h3>
                         <p className="text-muted-foreground">{cls.batch}</p>
+                        {getMergedLabel(cls.batch, cls.subject) && (
+                          <Badge variant="outline" className="mt-1 text-purple-700 border-purple-300 bg-purple-50">
+                            <Merge className="h-3 w-3 mr-1" />
+                            Merged with {getMergedLabel(cls.batch, cls.subject)}
+                          </Badge>
+                        )}
                         <p className="text-sm mt-2 flex items-center gap-2">
                           <Clock className="h-4 w-4" />
                           {formatTime(cls.start_time)} - {formatTime(cls.end_time)}

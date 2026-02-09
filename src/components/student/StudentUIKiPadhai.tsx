@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useMergedSubjects } from '@/hooks/useMergedSubjects';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -119,26 +119,25 @@ const PremiumContentViewer = ({ content, onBack, onAccess, allContent, onContent
 
 export const StudentUIKiPadhai = ({ batch, subject }: StudentUIKiPadhaiProps) => {
   const { profile } = useAuth();
-  const { orFilter } = useMergedSubjects(batch, subject);
   const [selectedContent, setSelectedContent] = useState<UIKiPadhaiContent | null>(null);
 
-  // Direct query when batch/subject props are provided (context-aware mode)
   const { data: premiumContent, isLoading } = useQuery<UIKiPadhaiContent[]>({
-    queryKey: ['student-ui-ki-padhai', batch, subject, orFilter],
+    queryKey: ['student-ui-ki-padhai', batch, subject],
     queryFn: async (): Promise<UIKiPadhaiContent[]> => {
-        if (!batch || !subject || !orFilter) return [];
+        if (!batch || !subject) return [];
         
         const { data, error } = await supabase
             .from('ui_ki_padhai_content')
             .select('id, title, description, category, link, is_active, created_at, batch, subject')
             .eq('is_active', true)
-            .or(orFilter)
+            .eq('batch', batch)
+            .eq('subject', subject)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
         return (data || []) as UIKiPadhaiContent[];
     },
-    enabled: !!batch && !!subject && !!orFilter
+    enabled: !!batch && !!subject
   });
 
   const handleAccessContent = (content: UIKiPadhaiContent) => {

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useMergedSubjects } from '@/hooks/useMergedSubjects';
+
 import { useAuth } from '@/hooks/useAuth';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ChevronLeft, ChevronRight, Clock, Video } from 'lucide-react';
@@ -103,50 +103,19 @@ export const StudentSchedule = () => {
     }
   }, [selectedBatchFilter, availableBatches]);
 
-  // Fetch active merges to expand enrollment pairs
-  const { data: activeMerges = [] } = useQuery({
-    queryKey: ['active-merges-for-schedule'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('subject_merges')
-        .select('*')
-        .eq('is_active', true);
-      if (error) return [];
-      return data || [];
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-
-  // Expand enrollments with merge data
-  const expandedPairs = useMemo(() => {
+  const enrollmentPairs = useMemo(() => {
     if (!userEnrollments) return [];
-    const pairs = new Set<string>();
-    userEnrollments.forEach(e => {
-      pairs.add(`${e.batch_name}||${e.subject_name}`);
-      // Check if this enrollment is part of any merge
-      activeMerges.forEach((m: any) => {
-        if (m.primary_batch === e.batch_name && m.primary_subject === e.subject_name) {
-          pairs.add(`${m.secondary_batch}||${m.secondary_subject}`);
-        }
-        if (m.secondary_batch === e.batch_name && m.secondary_subject === e.subject_name) {
-          pairs.add(`${m.primary_batch}||${m.primary_subject}`);
-        }
-      });
-    });
-    return Array.from(pairs).map(p => {
-      const [batch, subject] = p.split('||');
-      return { batch, subject };
-    });
-  }, [userEnrollments, activeMerges]);
+    return userEnrollments.map(e => ({ batch: e.batch_name, subject: e.subject_name }));
+  }, [userEnrollments]);
 
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
-    queryKey: ['student-schedule-direct', expandedPairs, selectedBatchFilter],
+    queryKey: ['student-schedule-direct', enrollmentPairs, selectedBatchFilter],
     queryFn: async (): Promise<Schedule[]> => {
-        if (expandedPairs.length === 0) return [];
+        if (enrollmentPairs.length === 0) return [];
         
         const filteredPairs = selectedBatchFilter === 'all'
-            ? expandedPairs
-            : expandedPairs.filter(p => p.batch === selectedBatchFilter);
+            ? enrollmentPairs
+            : enrollmentPairs.filter(p => p.batch === selectedBatchFilter);
         
         if (filteredPairs.length === 0) return [];
         
@@ -163,7 +132,7 @@ export const StudentSchedule = () => {
         if (error) throw error;
         return data || [];
     },
-    enabled: expandedPairs.length > 0
+    enabled: enrollmentPairs.length > 0
   });
 
   const isLoading = isLoadingEnrollments || isLoadingSchedules;

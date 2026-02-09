@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useMergedSubjects } from '@/hooks/useMergedSubjects';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -320,7 +320,6 @@ export const StudentCommunity = () => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const [selectedGroup, setSelectedGroup] = useState<UserEnrollment | null>(null);
-  const { orFilter: communityOrFilter, mergedPairs: communityMergedPairs } = useMergedSubjects(selectedGroup?.batch_name, selectedGroup?.subject_name);
   const [messageText, setMessageText] = useState('');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [replyingTo, setReplyingTo] = useState<CommunityMessage | null>(null);
@@ -357,9 +356,9 @@ export const StudentCommunity = () => {
   }, [selectedGroup]);
 
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery({
-    queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name, communityOrFilter],
+    queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
     queryFn: async (): Promise<CommunityMessage[]> => {
-      if (!selectedGroup || !communityOrFilter) return [];
+      if (!selectedGroup) return [];
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
@@ -367,13 +366,14 @@ export const StudentCommunity = () => {
           profiles (name),
           message_likes ( user_id, reaction_type )
         `)
-        .or(communityOrFilter)
+        .eq('batch', selectedGroup.batch_name)
+        .eq('subject', selectedGroup.subject_name)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
       return (data || []) as CommunityMessage[];
     },
-    enabled: !!selectedGroup && !!communityOrFilter
+    enabled: !!selectedGroup
   });
 
   const messageMap = useMemo(() => {
@@ -397,20 +397,17 @@ export const StudentCommunity = () => {
   }, [groupedMessages]);
 
   useEffect(() => {
-    if (!selectedGroup || !communityMergedPairs.length) return;
+    if (!selectedGroup) return;
     const refresh = () => {
-      queryClient.invalidateQueries({ queryKey: ['community-messages', selectedGroup.batch_name, selectedGroup.subject_name, communityOrFilter] });
+      queryClient.invalidateQueries({ queryKey: ['community-messages', selectedGroup.batch_name, selectedGroup.subject_name] });
     };
-    // Subscribe to changes from ALL merged batches so cross-batch messages appear in real-time
-    const channels = communityMergedPairs.map((pair, i) =>
-      supabase
-        .channel(`community-${pair.batch}-${pair.subject}-${i}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'community_messages', filter: `batch=eq.${pair.batch}` }, refresh)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'message_likes' }, refresh)
-        .subscribe()
-    );
-    return () => { channels.forEach(ch => supabase.removeChannel(ch)); };
-  }, [selectedGroup, communityMergedPairs, communityOrFilter, queryClient]);
+    const channel = supabase
+      .channel(`community-${selectedGroup.batch_name}-${selectedGroup.subject_name}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'community_messages', filter: `batch=eq.${selectedGroup.batch_name}` }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_likes' }, refresh)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [selectedGroup, queryClient]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
