@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useMergedSubjects } from '@/hooks/useMergedSubjects';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
@@ -176,24 +177,24 @@ const NoteViewer = ({ note, onBack, onDownload, allNotes, onNoteSelect }: { note
 export const StudentNotes = ({ batch, subject }: StudentNotesProps) => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
+  const { orFilter } = useMergedSubjects(batch, subject);
   const [selectedNote, setSelectedNote] = useState<NotesContent | null>(null);
 
   const { data: notes, isLoading } = useQuery<NotesContent[]>({
-    queryKey: ['student-notes', batch, subject],
+    queryKey: ['student-notes', batch, subject, orFilter],
     queryFn: async (): Promise<NotesContent[]> => {
-        if (!batch || !subject) return [];
+        if (!batch || !subject || !orFilter) return [];
         
         const { data, error } = await supabase
             .from('notes')
             .select('*')
-            .eq('batch', batch)
-            .eq('subject', subject)
+            .or(orFilter)
             .order('created_at', { ascending: false });
         
         if (error) throw error;
         return (data || []) as NotesContent[];
     },
-    enabled: !!batch && !!subject
+    enabled: !!batch && !!subject && !!orFilter
   });
 
   useEffect(() => {

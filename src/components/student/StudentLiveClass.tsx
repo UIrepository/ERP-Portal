@@ -3,7 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, addMinutes, isWithinInterval, differenceInMinutes } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { generateJitsiRoomName } from '@/lib/jitsiUtils';
-import { useAuth } from '@/hooks/useAuth'; // Ensure this is imported
+import { useAuth } from '@/hooks/useAuth';
+import { useMergedSubjects } from '@/hooks/useMergedSubjects';
 import { toast } from 'sonner';
 
 interface StudentLiveClassProps {
@@ -26,66 +27,63 @@ interface ScheduleWithLink {
 
 export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
   const { profile, user } = useAuth();
+  const { mergedPairs, orFilter } = useMergedSubjects(batch, subject);
   const today = new Date();
   const currentDayOfWeek = today.getDay();
   const todayDateStr = format(today, 'yyyy-MM-dd');
 
   // Fetch schedules logic
   const { data: schedules, isLoading } = useQuery<ScheduleWithLink[]>({
-    queryKey: ['studentLiveClass', batch, subject, todayDateStr],
+    queryKey: ['studentLiveClass', batch, subject, todayDateStr, orFilter],
     queryFn: async () => {
-      if (!batch) return [];
+      if (!batch || !mergedPairs.length) return [];
 
-      // 1. Get Schedules
-      let query = supabase
-        .from('schedules')
-        .select('*')
-        .eq('batch', batch)
-        .or(`day_of_week.eq.${currentDayOfWeek},date.eq.${todayDateStr}`);
-
-      if (subject) {
-        query = query.eq('subject', subject);
+      // 1. Get Schedules for all merged pairs, filtered by today
+      const allSchedules: any[] = [];
+      for (const pair of mergedPairs) {
+        const { data, error } = await supabase
+          .from('schedules')
+          .select('*')
+          .eq('batch', pair.batch)
+          .eq('subject', pair.subject)
+          .or(`day_of_week.eq.${currentDayOfWeek},date.eq.${todayDateStr}`);
+        if (!error && data) allSchedules.push(...data);
       }
 
-      const { data: schedulesData, error } = await query;
-      if (error) throw error;
-
-      // 2. Get Static Meeting Links
-      let linkQuery = supabase
-        .from('meeting_links')
-        .select('*')
-        .eq('batch', batch)
-        .eq('is_active', true);
-      
-      if (subject) {
-        linkQuery = linkQuery.eq('subject', subject);
+      // 2. Get Static Meeting Links for all merged pairs
+      const allMeetingLinks: any[] = [];
+      for (const pair of mergedPairs) {
+        const { data } = await supabase
+          .from('meeting_links')
+          .select('*')
+          .eq('batch', pair.batch)
+          .eq('subject', pair.subject)
+          .eq('is_active', true);
+        if (data) allMeetingLinks.push(...data);
       }
-      const { data: meetingLinks } = await linkQuery;
 
-      // 3. Get Active Classes
-      let activeClassQuery = supabase
-        .from('active_classes')
-        .select('*')
-        .eq('batch', batch)
-        .eq('is_active', true);
-
-      if (subject) {
-        activeClassQuery = activeClassQuery.eq('subject', subject);
+      // 3. Get Active Classes for all merged pairs
+      const allActiveClasses: any[] = [];
+      for (const pair of mergedPairs) {
+        const { data } = await supabase
+          .from('active_classes')
+          .select('*')
+          .eq('batch', pair.batch)
+          .eq('subject', pair.subject)
+          .eq('is_active', true);
+        if (data) allActiveClasses.push(...data);
       }
-      const { data: activeClasses } = await activeClassQuery;
 
-      // 4. Filter Valid Schedules
-      const validSchedules = (schedulesData || []).filter(schedule => {
+      const validSchedules = (allSchedules).filter(schedule => {
         if (schedule.date) {
           return schedule.date === todayDateStr;
         }
         return schedule.day_of_week === currentDayOfWeek;
       });
 
-      // 5. Map Links
       return validSchedules.map(schedule => {
-        const activeJitsi = activeClasses?.find(ac => ac.subject === schedule.subject);
-        const subjectLink = meetingLinks?.find(l => l.subject === schedule.subject);
+        const activeJitsi = allActiveClasses?.find(ac => ac.subject === schedule.subject && ac.batch === schedule.batch);
+        const subjectLink = allMeetingLinks?.find(l => l.subject === schedule.subject && l.batch === schedule.batch);
         
         const generatedJitsiLink = `https://meet.jit.si/${generateJitsiRoomName(schedule.batch, schedule.subject)}`;
         const dbLink = activeJitsi?.room_url || schedule.link || subjectLink?.link;

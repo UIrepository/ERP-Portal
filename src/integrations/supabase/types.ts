@@ -1043,6 +1043,39 @@ export type Database = {
         }
         Relationships: []
       }
+      subject_merges: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          primary_batch: string
+          primary_subject: string
+          secondary_batch: string
+          secondary_subject: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          primary_batch: string
+          primary_subject: string
+          secondary_batch: string
+          secondary_subject: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          primary_batch?: string
+          primary_subject?: string
+          secondary_batch?: string
+          secondary_subject?: string
+        }
+        Relationships: []
+      }
       teachers: {
         Row: {
           assigned_batches: string[] | null
@@ -1272,6 +1305,13 @@ export type Database = {
       get_manager_batches: {
         Args: { check_user_id?: string }
         Returns: string[]
+      }
+      get_merged_pairs: {
+        Args: { p_batch: string; p_subject: string }
+        Returns: {
+          batch: string
+          subject: string
+        }[]
       }
       get_schedules_with_links_filtered_by_enrollment: {
         Args: {

@@ -27,6 +27,7 @@ import {
   Star,
   Wrench,
   Headphones,
+  GitMerge,
 } from 'lucide-react';
 
 import {
@@ -150,6 +151,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
     { id: 'create-announcement', label: 'Create Announcement', icon: Megaphone },
     { id: 'announcement-history', label: 'Announcement History', icon: History },
     { id: 'maintenance', label: 'Maintenance Mode', icon: Wrench },
+    { id: 'subject-merges', label: 'Subject Merges', icon: GitMerge },
   ];
 
   const getTabs = () => {

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useMergedSubjects } from '@/hooks/useMergedSubjects';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -313,12 +314,13 @@ export const StudentCommunity = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
-  const navigate = useNavigate(); // Hook for navigation
+  const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const [selectedGroup, setSelectedGroup] = useState<UserEnrollment | null>(null);
+  const { orFilter: communityOrFilter } = useMergedSubjects(selectedGroup?.batch_name, selectedGroup?.subject_name);
   const [messageText, setMessageText] = useState('');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [replyingTo, setReplyingTo] = useState<CommunityMessage | null>(null);
@@ -355,9 +357,9 @@ export const StudentCommunity = () => {
   }, [selectedGroup]);
 
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery({
-    queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
+    queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name, communityOrFilter],
     queryFn: async (): Promise<CommunityMessage[]> => {
-      if (!selectedGroup) return [];
+      if (!selectedGroup || !communityOrFilter) return [];
       const { data, error } = await supabase
         .from('community_messages')
         .select(`
@@ -365,14 +367,13 @@ export const StudentCommunity = () => {
           profiles (name),
           message_likes ( user_id, reaction_type )
         `)
-        .eq('batch', selectedGroup.batch_name)
-        .eq('subject', selectedGroup.subject_name)
+        .or(communityOrFilter)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
       return (data || []) as CommunityMessage[];
     },
-    enabled: !!selectedGroup
+    enabled: !!selectedGroup && !!communityOrFilter
   });
 
   const messageMap = useMemo(() => {
