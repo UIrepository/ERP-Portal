@@ -1,61 +1,78 @@
 
 
-# Fix Merged Subjects: Same Room, Shared Content
+# Revised Subject Merge System -- Scoped to Live Classes & Recordings Only
 
-## Problem
-When two courses are merged (e.g., Batch A / Physics + Batch B / Physics), students joining a live class still end up in **different Jitsi rooms** because the room name is generated from `schedule.batch + schedule.subject`, which differs for each side. Also, the community chat realtime subscription only listens to one batch, so new messages from the merged batch don't appear in real-time.
+## What Changes
 
-## Solution
+The merge system is being simplified. Instead of merging everything (communities, notes, DPP, schedule, etc.), merging will **only** affect:
 
-### 1. Consistent Jitsi Room Name for Merged Subjects
+1. **Live Classes** -- When two merged subjects have classes at the **same time**, students from both join the **same Jitsi room**. If timings differ, they are treated as separate classes.
+2. **Recordings** -- When a recording is added to one merged subject, it appears in both.
+3. **Teacher View** -- Teacher sees merged subject names (e.g., "Physics (Batch A + Batch B)") in their Join Class page when subjects are merged.
 
-**File: `src/components/student/StudentLiveClass.tsx`**
-
-When generating the Jitsi room name, instead of using `schedule.batch` and `schedule.subject`, use the **first merged pair** (which is always the same for both sides thanks to the `get_merged_pairs` function returning a deterministic set). This ensures all students in a merge group join the same room.
+Everything else stays **completely independent** -- communities, notes, DPP, schedule, UI Ki Padhai all remain unmerged.
 
 ```text
-Before: generateJitsiRoomName(schedule.batch, schedule.subject)
-         Batch A -> room "classabatchaphysics20260209"
-         Batch B -> room "classbatchbphysics20260209"
+MERGED:
+  Live Class (same timing) --> same Jitsi room for both batches
+  Recordings              --> shared across both batches
 
-After:  generateJitsiRoomName(mergedPairs[0].batch, mergedPairs[0].subject)
-         Batch A -> room "classabatchaphysics20260209"  (uses primary pair)
-         Batch B -> room "classabatchaphysics20260209"  (same primary pair!)
+NOT MERGED (stays normal):
+  Community chat           --> separate per batch/subject
+  Notes                    --> separate per batch/subject
+  DPP                      --> separate per batch/subject
+  Schedule view            --> separate per batch/subject
+  UI Ki Padhai             --> separate per batch/subject
 ```
-
-The `get_merged_pairs` RPC always returns the original pair first, then any linked pairs. Since both sides of a merge return the same set (just in different order for the "self" entry), we need a deterministic "primary" -- we'll sort the merged pairs alphabetically and always use the first one as the canonical room name source.
-
-### 2. Fix Community Chat Realtime Subscription
-
-**File: `src/components/student/StudentCommunity.tsx`**
-
-The realtime channel currently only listens to `filter: batch=eq.${selectedGroup.batch_name}`. When a merged student from the other batch posts a message, the subscription doesn't catch it.
-
-Fix: Subscribe to **all merged batches** by creating a channel for each merged pair, or by removing the batch filter and relying on the broader table-level subscription (since the query itself already filters correctly with the OR filter).
-
-The simplest approach: listen to `community_messages` changes without a batch filter on the channel, and let the query refetch handle the filtering. This is safe because the query already uses the `orFilter`.
-
-### 3. Deduplicate Schedules in Live Class View
-
-When merged, the component fetches schedules from both pairs. If both Batch A and Batch B have a Physics class at the same time, students would see **two** class cards. Add deduplication by time slot -- if two schedules overlap in time, keep only one (they're the same merged class).
 
 ---
 
 ## Technical Details
 
-### Files to Modify
+### 1. Remove merge logic from these components (revert to simple queries)
 
-**`src/components/student/StudentLiveClass.tsx`**
-- Add a `getPrimaryPair()` helper that sorts `mergedPairs` alphabetically and returns the first one
-- Use this primary pair for `generateJitsiRoomName()` instead of `schedule.batch/subject`
-- Add deduplication: after collecting all valid schedules from merged pairs, deduplicate by `start_time + end_time` to avoid showing the same class twice
-- Also check `active_classes` across all merged pairs (already done) but use the primary pair's room URL
+**Files to modify:**
 
-**`src/components/student/StudentCommunity.tsx`**
-- Update the realtime subscription `useEffect` to subscribe to changes from all merged batches, not just the selected group's batch
-- Use `communityOrFilter` dependency so the subscription updates when merges change
+- **`src/components/student/StudentCommunity.tsx`** -- Remove `useMergedSubjects` import and usage. Revert the message query to simple `.eq('batch', batch).eq('subject', subject)` instead of `.or(orFilter)`. Revert the realtime subscription to listen to only the selected group's batch (no multi-channel merge logic).
 
-**`src/hooks/useMergedSubjects.ts`**
-- Add a `primaryPair` return value: the alphabetically-first pair, used as the canonical identifier for shared resources like Jitsi rooms
-- This ensures both sides of a merge always resolve to the same "primary" pair
+- **`src/components/student/StudentNotes.tsx`** -- Remove `useMergedSubjects` import and usage. Revert query to `.eq('batch', batch).eq('subject', subject)`.
+
+- **`src/components/student/StudentUIKiPadhai.tsx`** -- Remove `useMergedSubjects` import and usage. Revert query to `.eq('batch', batch).eq('subject', subject)`.
+
+- **`src/components/student/StudentSchedule.tsx`** -- Remove the `activeMerges` query and `expandedPairs` logic. Revert to querying schedules based only on the student's own enrollments.
+
+- **`src/components/student/StudentDPP.tsx`** -- Remove the `activeMerges` query and `expandedEnrollments` logic. Revert to querying DPP content based only on the student's own enrollments.
+
+### 2. Keep merge logic in these components (with improvements)
+
+**`src/components/student/StudentRecordings.tsx`** -- Keep using `useMergedSubjects` and `orFilter` so recordings from a merged subject appear in both.
+
+**`src/components/student/StudentLiveClass.tsx`** -- Keep using `useMergedSubjects`. The current logic already:
+- Fetches schedules from all merged pairs
+- Deduplicates by time slot
+- Uses the `primaryPair` for consistent Jitsi room naming
+This stays as-is.
+
+**`src/components/student/StudentJoinClass.tsx`** -- Add merge-awareness here too. When building the Jitsi room URL in `handleJoinClass`, check if the class's batch+subject has a merge. If so, use the `primaryPair` to generate the room URL so the student lands in the same room as the merged batch.
+
+### 3. Update Teacher Join Class to show merged labels
+
+**`src/components/teacher/TeacherJoinClass.tsx`** -- Fetch active merges. For each class in the teacher's list, check if a merge exists for that batch+subject. If so, display both names, e.g., "Physics (Batch A + Batch B)" instead of just "Physics / Batch A". This is a display-only change -- the teacher already has the manual merge-session feature with checkboxes.
+
+### 4. Summary of file changes
+
+| File | Action |
+|------|--------|
+| `src/components/student/StudentCommunity.tsx` | **Remove** merge logic, revert to simple batch/subject queries |
+| `src/components/student/StudentNotes.tsx` | **Remove** merge logic, revert to simple batch/subject queries |
+| `src/components/student/StudentUIKiPadhai.tsx` | **Remove** merge logic, revert to simple batch/subject queries |
+| `src/components/student/StudentSchedule.tsx` | **Remove** merge logic, revert to enrollment-only queries |
+| `src/components/student/StudentDPP.tsx` | **Remove** merge logic, revert to enrollment-only queries |
+| `src/components/student/StudentRecordings.tsx` | **Keep** merge logic (recordings shared) |
+| `src/components/student/StudentLiveClass.tsx` | **Keep** merge logic (same room for same-time classes) |
+| `src/components/student/StudentJoinClass.tsx` | **Add** merge-aware room URL generation |
+| `src/components/teacher/TeacherJoinClass.tsx` | **Add** merged label display |
+| `src/hooks/useMergedSubjects.ts` | **Keep** as-is (still needed by recordings + live class) |
+
+No database changes needed -- the `subject_merges` table and `get_merged_pairs` function remain unchanged.
 
