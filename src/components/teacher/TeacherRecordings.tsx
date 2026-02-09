@@ -135,9 +135,10 @@ export const TeacherRecordings = () => {
             if (!selectedRecording?.id) return [];
             
             // Fetch doubts
+            // FIX: Changed profiles!inner(name) to profiles(name) to allow fetching doubts even if profile is missing
             const { data: doubtsData, error: doubtsError } = await supabase
                 .from('doubts')
-                .select(`id, question_text, created_at, user_id, profiles!inner(name)`)
+                .select(`id, question_text, created_at, user_id, profiles(name)`)
                 .eq('recording_id', selectedRecording.id)
                 .order('created_at', { ascending: false });
             
@@ -148,9 +149,10 @@ export const TeacherRecordings = () => {
             let answersData: any[] = [];
             
             if (doubtIds.length > 0) {
+                // FIX: Also changed to left join here for consistency
                 const { data: answersResult } = await supabase
                     .from('doubt_answers')
-                    .select(`id, answer_text, created_at, user_id, doubt_id, profiles!inner(name)`)
+                    .select(`id, answer_text, created_at, user_id, doubt_id, profiles(name)`)
                     .in('doubt_id', doubtIds)
                     .order('created_at', { ascending: true });
                 if (answersResult) answersData = answersResult;
@@ -158,13 +160,14 @@ export const TeacherRecordings = () => {
             
             return (doubtsData || []).map((doubt: any): PlayerDoubt => {
                 const answer = answersData.find((a: any) => a.doubt_id === doubt.id);
+                // FIX: Added fallback name 'Instructor' or 'Unknown' if profile name is null
                 return {
                     id: doubt.id,
                     question: doubt.question_text,
-                    askedBy: doubt.profiles?.name || 'A student',
+                    askedBy: doubt.profiles?.name || 'Instructor', 
                     askedAt: new Date(doubt.created_at),
                     answer: answer?.answer_text,
-                    answeredBy: answer?.profiles?.name,
+                    answeredBy: answer?.profiles?.name || 'Instructor',
                     answeredAt: answer ? new Date(answer.created_at) : undefined,
                 };
             });
@@ -187,7 +190,7 @@ export const TeacherRecordings = () => {
         if (rec) setSelectedRecording(rec);
     }, [recordings]);
 
-    // Handle Doubt Submission (Teachers can probably skip this, but keeping for compatibility)
+    // Handle Doubt Submission
     const handleDoubtSubmit = useCallback(async (question: string) => {
         if (!user || !selectedRecording) return;
         const { error } = await supabase.from('doubts').insert({
@@ -200,7 +203,7 @@ export const TeacherRecordings = () => {
         if (error) {
             toast({ title: 'Error', description: error.message, variant: 'destructive' });
         } else {
-            toast({ title: 'Success', description: 'Note/Question posted.' });
+            toast({ title: 'Success', description: 'Message posted.' });
             queryClient.invalidateQueries({ queryKey: ['player-doubts', selectedRecording.id] });
         }
     }, [user, selectedRecording, queryClient]);
