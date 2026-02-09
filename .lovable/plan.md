@@ -1,30 +1,27 @@
 
 
-# Deduplicate Merged Classes in Teacher Join Class View
+# Fix: Show Live Classes in Batch-Level "Join Live Class" Tab
 
 ## Problem
-When two subjects are merged (e.g., "ONLY FOR TEST / TESTING BATCH" and "ONLY FOR TESt / Testing batch 2"), the teacher sees **both** as separate cards in the Join Class page. Since they share the same timing, they should appear as a **single combined card**.
+When a student clicks the "Join Live Class" tab in the main dashboard header (batch-level view), the component receives only `batch` but no `subject`. The current code relies on `useMergedSubjects(batch, undefined)`, which is disabled when subject is missing, causing the schedule query to return empty results. Meanwhile, the same component works fine inside a subject's block view because both `batch` and `subject` are passed.
 
 ## Solution
-After filtering today's classes, deduplicate them: if two classes belong to the same merge group AND have the same time slot, combine them into one card showing both batch names.
+Update `StudentLiveClass.tsx` to handle two modes:
+
+1. **Batch-level mode** (no subject): Fetch all schedules for the batch across all subjects, query active classes and meeting links for the entire batch, and generate proper Jitsi room names per subject (using merge logic where applicable).
+2. **Subject-level mode** (subject provided): Keep the current merge-aware logic unchanged.
 
 ## Technical Details
 
-**File: `src/components/teacher/TeacherJoinClass.tsx`**
+**File: `src/components/student/StudentLiveClass.tsx`**
 
-1. **Add deduplication logic** in the `todaysClasses` useMemo (around line 180-203). After filtering, group classes that:
-   - Are in the same merge group (checked via `activeMerges`)
-   - Have the same `start_time` and `end_time`
+- In the `queryFn`, add a branch for when `subject` is falsy:
+  - Fetch all schedules for the batch (no subject filter) using `.eq('batch', batch)` only
+  - Fetch all active classes and meeting links for the batch (no subject filter)
+  - For each schedule found, determine its Jitsi room name by calling a lightweight merge check per subject, or simply use the schedule's own batch+subject (since the batch-level view is just an overview)
+- When `subject` is provided, keep the existing merge-aware logic exactly as-is
+- The deduplication and live/upcoming classification logic stays the same for both modes
+- No changes to any other files
 
-2. **Keep only one schedule per merged group** but attach metadata about all the batches involved, so the card can display "ONLY FOR TEST (TESTING BATCH + Testing batch 2)".
-
-3. **Update the card rendering** (around line 460-476) to show the combined batch names from the deduplication metadata instead of just `cls.batch`.
-
-4. **When starting a merged class from a single card**, automatically handle all underlying schedules (mark attendance, create active_classes entries for both batch/subject pairs) using the same logic already in `handleStartClass` but extended to cover both sides of the merge.
-
-Concrete changes:
-- Create a new type or extend Schedule with an optional `mergedBatches: string[]` field
-- In `todaysClasses` memo, after filtering, run a dedup pass: for each class, check if another class in the list is its merge partner with identical timing. If so, merge them into one entry with both batch names stored
-- Update the card UI to show combined batches
-- Update `handleStartClass` to also upsert `active_classes` for the merge partner when a merge exists
+This is a contained change to a single branching condition inside the existing query function.
 
