@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { TeacherSchedule } from './TeacherSchedule';
 import { TeacherRecordings } from './TeacherRecordings';
@@ -6,6 +7,9 @@ import { StaffInbox } from '@/components/shared/StaffInbox';
 import { TeacherFeedbackViewer } from './TeacherFeedbackViewer';
 import { TeacherJoinClass } from './TeacherJoinClass';
 import { TeacherCommunity } from './TeacherCommunity'; 
+import { Button } from '@/components/ui/button';
+import { FullScreenVideoPlayer } from '@/components/video-player/FullScreenVideoPlayer';
+import { Lecture } from '@/components/video-player/types';
 
 interface TeacherDashboardProps {
   activeTab: string;
@@ -14,6 +18,16 @@ interface TeacherDashboardProps {
 
 export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardProps) => {
   const { profile, resolvedRole } = useAuth();
+  const [showTutorial, setShowTutorial] = useState(false);
+
+  // Define the tutorial video as a Lecture object for the player
+  const tutorialLecture: Lecture = {
+    id: 'dashboard-tutorial',
+    title: 'How to use the Dashboard',
+    videoUrl: 'https://youtu.be/qxk40T2SLJM',
+    subject: 'Tutorial',
+    duration: '5:00' // Estimated duration
+  };
 
   if (resolvedRole !== 'teacher') {
     return (
@@ -62,10 +76,29 @@ export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardPro
           <p className="text-slate-500 text-sm font-normal font-sans">
             Another day to deal with students.
           </p>
+          
+          {/* Tutorial Button with Inter Regular font (font-sans font-normal) */}
+          <Button 
+            variant="outline"
+            className="w-fit mt-3 bg-white hover:bg-slate-50 text-slate-700 border-blue-200 font-sans font-normal shadow-sm"
+            onClick={() => setShowTutorial(true)}
+          >
+            How to use me?
+          </Button>
         </div>
       </div>
 
       {renderTabContent()}
+
+      {/* Video Player Overlay */}
+      {showTutorial && (
+        <FullScreenVideoPlayer
+          currentLecture={tutorialLecture}
+          lectures={[tutorialLecture]}
+          onClose={() => setShowTutorial(false)}
+          userName={profile?.name}
+        />
+      )}
     </div>
   );
 };
