@@ -5,7 +5,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,7 +12,6 @@ import { format, getDay, startOfWeek, addDays, isSameDay, subDays, parseISO, isW
 import { ChevronLeft, ChevronRight, Clock, Video, Plus, Loader2, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 // --- Interfaces ---
 
@@ -77,201 +75,6 @@ const ScheduleSkeleton = () => (
     </div>
 );
 
-// --- Internal Add Class Component (Merged) ---
-
-function AddClassForm({ 
-  assignedBatches, 
-  assignedSubjects, 
-  onSuccess 
-}: { 
-  assignedBatches: string[], 
-  assignedSubjects: string[], 
-  onSuccess: () => void 
-}) {
-  const isMobile = useIsMobile();
-  const [open, setOpen] = useState(false);
-  const queryClient = useQueryClient();
-
-  const [newClass, setNewClass] = useState({
-    date: format(new Date(), 'yyyy-MM-dd'),
-    start_time: '',
-    end_time: '',
-    subject: '',
-    batch: ''
-  });
-
-  const addClassMutation = useMutation({
-    mutationFn: async () => {
-      if (!newClass.batch || !newClass.subject || !newClass.date || !newClass.start_time || !newClass.end_time) {
-          throw new Error("Please fill in all required fields.");
-      }
-
-      const dateObj = parseISO(newClass.date);
-      const dayOfWeek = getDay(dateObj); // 0 = Sunday
-
-      let cleanSubject = newClass.subject.trim();
-      const batchSuffix = `(${newClass.batch})`;
-      if (cleanSubject.includes(batchSuffix)) {
-          cleanSubject = cleanSubject.replace(batchSuffix, '').trim();
-      }
-
-      const { error } = await supabase.from('schedules').insert({
-          day_of_week: dayOfWeek,
-          date: newClass.date,
-          start_time: newClass.start_time,
-          end_time: newClass.end_time,
-          subject: cleanSubject,
-          batch: newClass.batch,
-          link: null 
-      });
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Class added successfully!");
-      setOpen(false);
-      setNewClass({
-          date: format(new Date(), 'yyyy-MM-dd'),
-          start_time: '',
-          end_time: '',
-          subject: '',
-          batch: ''
-      });
-      queryClient.invalidateQueries({ queryKey: ['teacher-all-schedules'] });
-      onSuccess();
-    },
-    onError: (error) => {
-      toast.error(`Failed to add class: ${error.message}`);
-    }
-  });
-
-  const FormContent = (
-    <div className="grid gap-4 py-4">
-      <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="batch" className="text-right">Batch</Label>
-          <Select 
-              value={newClass.batch} 
-              onValueChange={(val) => setNewClass({...newClass, batch: val})}
-          >
-              <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select batch" />
-              </SelectTrigger>
-              <SelectContent>
-                  {assignedBatches.length > 0 ? (
-                    assignedBatches.map((batch) => (
-                      <SelectItem key={batch} value={batch}>{batch}</SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="none" disabled>No batches assigned</SelectItem>
-                  )}
-              </SelectContent>
-          </Select>
-      </div>
-      <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="subject" className="text-right">Subject</Label>
-          <Select 
-              value={newClass.subject} 
-              onValueChange={(val) => setNewClass({...newClass, subject: val})}
-          >
-              <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select subject" />
-              </SelectTrigger>
-              <SelectContent>
-                  {assignedSubjects.length > 0 ? (
-                    assignedSubjects.map((subj) => (
-                      <SelectItem key={subj} value={subj}>{subj}</SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="none" disabled>No subjects assigned</SelectItem>
-                  )}
-              </SelectContent>
-          </Select>
-      </div>
-      <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="date" className="text-right">Date</Label>
-          <Input
-              id="date"
-              type="date"
-              value={newClass.date}
-              onChange={(e) => setNewClass({...newClass, date: e.target.value})}
-              className="col-span-3"
-          />
-      </div>
-      <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="start" className="text-right">Start</Label>
-          <Input
-              id="start"
-              type="time"
-              value={newClass.start_time}
-              onChange={(e) => setNewClass({...newClass, start_time: e.target.value})}
-              className="col-span-3"
-          />
-      </div>
-      <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="end" className="text-right">End</Label>
-          <Input
-              id="end"
-              type="time"
-              value={newClass.end_time}
-              onChange={(e) => setNewClass({...newClass, end_time: e.target.value})}
-              className="col-span-3"
-          />
-      </div>
-    </div>
-  );
-
-  const FooterContent = (
-    <Button onClick={() => addClassMutation.mutate()} disabled={addClassMutation.isPending} className="bg-indigo-600 hover:bg-indigo-700 w-full sm:w-auto">
-        {addClassMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        Schedule Class
-    </Button>
-  );
-
-  if (isMobile) {
-    return (
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild>
-          <Button size="sm" className="h-8 bg-indigo-600 hover:bg-indigo-700 text-white border-none shadow-none">
-              <Plus className="h-3.5 w-3.5 mr-1.5" />
-              Add Class
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="top">
-          <SheetHeader>
-            <SheetTitle>Add Extra Class</SheetTitle>
-          </SheetHeader>
-          {FormContent}
-          <SheetFooter>
-            {FooterContent}
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
-    );
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" className="h-8 bg-indigo-600 hover:bg-indigo-700 text-white border-none shadow-none">
-            <Plus className="h-3.5 w-3.5 mr-1.5" />
-            Add Class
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Add Extra Class</DialogTitle>
-        </DialogHeader>
-        {FormContent}
-        <DialogFooter>
-          {FooterContent}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// --- Main Component ---
-
 export const TeacherSchedule = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -280,6 +83,16 @@ export const TeacherSchedule = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [displayDate, setDisplayDate] = useState(new Date());
   const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
+  const [isAddClassOpen, setIsAddClassOpen] = useState(false);
+
+  // Form State for Adding Class
+  const [newClass, setNewClass] = useState({
+    date: format(new Date(), 'yyyy-MM-dd'),
+    start_time: '',
+    end_time: '',
+    subject: '',
+    batch: ''
+  });
 
   // --- Real-time Clock ---
   useEffect(() => {
@@ -304,7 +117,7 @@ export const TeacherSchedule = () => {
 
   // --- Data Fetching ---
 
-  // 1. Fetch Teacher Info
+  // 1. Fetch Teacher Info for Batches (used for filter & add class)
   const { data: teacherInfo } = useQuery({
     queryKey: ['teacherInfo', user?.id],
     queryFn: async () => {
@@ -329,13 +142,17 @@ export const TeacherSchedule = () => {
     queryKey: ['teacher-all-schedules', selectedBatchFilter],
     queryFn: async (): Promise<Schedule[]> => {
         let query = supabase.from('schedules').select('*');
+        
+        // Filter by selected batch if not 'all'
         if (selectedBatchFilter !== 'all') {
             query = query.eq('batch', selectedBatchFilter);
         }
+
         const { data, error } = await query
             .order('date', { nullsFirst: false })
             .order('day_of_week')
             .order('start_time');
+            
         if (error) throw error;
         return data || [];
     },
@@ -346,13 +163,62 @@ export const TeacherSchedule = () => {
     queryKey: ['teacher-all-exams', selectedBatchFilter],
     queryFn: async (): Promise<Exam[]> => {
         let query = supabase.from('exams').select('*');
+        
+        // Filter by selected batch if not 'all'
         if (selectedBatchFilter !== 'all') {
             query = query.eq('batch', selectedBatchFilter);
         }
+
         const { data, error } = await query.order('date');
         if (error) throw error;
         return data || [];
     },
+  });
+
+  // --- Mutation: Add Class ---
+  const addClassMutation = useMutation({
+    mutationFn: async () => {
+        if (!newClass.batch || !newClass.subject || !newClass.date || !newClass.start_time || !newClass.end_time) {
+            throw new Error("Please fill in all required fields.");
+        }
+
+        const dateObj = parseISO(newClass.date);
+        const dayOfWeek = getDay(dateObj); // 0 = Sunday
+
+        // SAFETY: Strip suffix if present
+        let cleanSubject = newClass.subject.trim();
+        const batchSuffix = `(${newClass.batch})`;
+        if (cleanSubject.includes(batchSuffix)) {
+            cleanSubject = cleanSubject.replace(batchSuffix, '').trim();
+        }
+
+        const { error } = await supabase.from('schedules').insert({
+            day_of_week: dayOfWeek,
+            date: newClass.date,
+            start_time: newClass.start_time,
+            end_time: newClass.end_time,
+            subject: cleanSubject,
+            batch: newClass.batch,
+            link: null 
+        });
+
+        if (error) throw error;
+    },
+    onSuccess: () => {
+        toast.success("Class added successfully!");
+        setIsAddClassOpen(false);
+        setNewClass({
+            date: format(new Date(), 'yyyy-MM-dd'),
+            start_time: '',
+            end_time: '',
+            subject: '',
+            batch: ''
+        });
+        queryClient.invalidateQueries({ queryKey: ['teacher-all-schedules'] });
+    },
+    onError: (error) => {
+        toast.error(`Failed to add class: ${error.message}`);
+    }
   });
 
   const isLoading = isLoadingSchedules || isLoadingExams;
@@ -360,7 +226,7 @@ export const TeacherSchedule = () => {
   // --- Logic & Helpers ---
 
   const weekDates = useMemo(() => {
-    const start = startOfWeek(displayDate, { weekStartsOn: 1 });
+    const start = startOfWeek(displayDate, { weekStartsOn: 1 }); // Start on Monday
     return Array.from({ length: 7 }).map((_, i) => addDays(start, i));
   }, [displayDate]);
 
@@ -425,12 +291,90 @@ export const TeacherSchedule = () => {
 
         <div className="flex flex-wrap items-center gap-3 bg-gray-50/80 p-1.5 rounded-lg border border-gray-200 shadow-sm w-full md:w-auto">
           
-          {/* Add Class Button (Responsive Drawer/Dialog) */}
-          <AddClassForm 
-            assignedBatches={teacherInfo?.assigned_batches || []} 
-            assignedSubjects={teacherInfo?.assigned_subjects || []}
-            onSuccess={() => queryClient.invalidateQueries({ queryKey: ['teacher-all-schedules'] })}
-          />
+          {/* Add Class Dialog */}
+          <Dialog open={isAddClassOpen} onOpenChange={setIsAddClassOpen}>
+            <DialogTrigger asChild>
+                <Button size="sm" className="h-8 bg-indigo-600 hover:bg-indigo-700 text-white border-none shadow-none">
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    Add Class
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle>Add Extra Class</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="batch" className="text-right">Batch</Label>
+                        <Select 
+                            value={newClass.batch} 
+                            onValueChange={(val) => setNewClass({...newClass, batch: val})}
+                        >
+                            <SelectTrigger className="col-span-3">
+                                <SelectValue placeholder="Select batch" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {teacherInfo?.assigned_batches?.map((batch: string) => (
+                                    <SelectItem key={batch} value={batch}>{batch}</SelectItem>
+                                )) || <SelectItem value="none" disabled>No batches assigned</SelectItem>}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="subject" className="text-right">Subject</Label>
+                        <Select 
+                            value={newClass.subject} 
+                            onValueChange={(val) => setNewClass({...newClass, subject: val})}
+                        >
+                            <SelectTrigger className="col-span-3">
+                                <SelectValue placeholder="Select subject" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {teacherInfo?.assigned_subjects?.map((subj: string) => (
+                                    <SelectItem key={subj} value={subj}>{subj}</SelectItem>
+                                )) || <SelectItem value="none" disabled>No subjects assigned</SelectItem>}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="date" className="text-right">Date</Label>
+                        <Input
+                            id="date"
+                            type="date"
+                            value={newClass.date}
+                            onChange={(e) => setNewClass({...newClass, date: e.target.value})}
+                            className="col-span-3"
+                        />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="start" className="text-right">Start</Label>
+                        <Input
+                            id="start"
+                            type="time"
+                            value={newClass.start_time}
+                            onChange={(e) => setNewClass({...newClass, start_time: e.target.value})}
+                            className="col-span-3"
+                        />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="end" className="text-right">End</Label>
+                        <Input
+                            id="end"
+                            type="time"
+                            value={newClass.end_time}
+                            onChange={(e) => setNewClass({...newClass, end_time: e.target.value})}
+                            className="col-span-3"
+                        />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button onClick={() => addClassMutation.mutate()} disabled={addClassMutation.isPending} className="bg-indigo-600 hover:bg-indigo-700">
+                        {addClassMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Schedule Class
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <div className="h-5 w-px bg-gray-300 mx-1 hidden sm:block"></div>
 
@@ -509,7 +453,7 @@ export const TeacherSchedule = () => {
                     {weekDates.map((date, dayIndex) => {
                         const dayNum = getDay(date);
                         
-                        // Filter classes
+                        // Filter classes for this specific cell (Date + Time)
                         const cellClasses = schedules?.filter(s => {
                             const isTimeMatch = s.start_time === time;
                             const isRecurring = !s.date && s.day_of_week === dayNum;
@@ -517,7 +461,24 @@ export const TeacherSchedule = () => {
                             return isTimeMatch && (isRecurring || isDateSpecific);
                         }) || [];
 
-                        // Filter exams (first slot of the day only)
+                        // Filter exams for this specific cell (Date + ~Time match if possible, otherwise list in day)
+                        // Note: Exams usually have specific dates. If exam time isn't strict, we might just list them if the date matches.
+                        // For this grid, we'll try to match exact time if available in exams logic, 
+                        // but since exams table might not have time field in the same way, 
+                        // we can optionally just list them at the top of the day or if we assume they might match the slot logic if added there.
+                        // Currently, the exam table in context has date but no time column explicitly shown in `TeacherSchedule` interface above (only `date`).
+                        // However, let's render exams that match the date in the first slot or if we add a time check.
+                        // Given the previous code didn't filter exams by time slot strongly (it just listed them in the column), 
+                        // we will render them in the column. BUT since this is a time-grid, we need to place them somewhere.
+                        // Let's assume for now we place them in the column. 
+                        // Better approach for grid: Since we iterate time slots, we only show exams if we can map them to a time.
+                        // If exams don't have time, we might miss them in this strict grid. 
+                        // ADJUSTMENT: We will check if any exam matches this Date. If yes, and this is the FIRST time slot of the day, we show it?
+                        // Or we can just render the classes. The StudentSchedule only renders classes. 
+                        // The user asked to "implement the same calendar design... in teacher dashboard".
+                        // I will render exams in the cell if they match the date, but to avoid duplication across all time slots,
+                        // I'll render them only in the first time slot of that day.
+                        
                         const cellExams = (timeIndex === 0) 
                             ? exams?.filter(e => isSameDay(new Date(e.date), date)) || []
                             : [];
@@ -525,7 +486,7 @@ export const TeacherSchedule = () => {
                         return (
                             <div key={`cell-${dayIndex}-${timeIndex}`} className="p-2 border-r border-b border-gray-200 last:border-r-0 bg-white min-h-[120px] hover:bg-slate-50/30 transition-colors relative">
                                 
-                                {/* EXAMS */}
+                                {/* EXAMS (Only shown in first slot of the day to avoid clutter/duplication if no time is present) */}
                                 {cellExams.map(exam => (
                                     <div 
                                         key={exam.id} 
@@ -556,6 +517,7 @@ export const TeacherSchedule = () => {
                                             isLive ? "border-indigo-200 shadow-md ring-1 ring-indigo-50" : "border-gray-200 hover:border-gray-300"
                                           )}
                                         >
+                                            {/* Accent Left Border */}
                                             <div className={cn("absolute left-0 top-3 bottom-3 w-[3px] rounded-r-sm", getSubjectBorderColor(classInfo.subject))} />
 
                                             <div className="pl-3">
