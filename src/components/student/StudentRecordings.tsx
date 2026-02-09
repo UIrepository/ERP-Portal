@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useMergedSubjects } from '@/hooks/useMergedSubjects';
 import { Input } from '@/components/ui/input';
 import { Play, Search, PlayCircle, Clock } from 'lucide-react';
 import { format } from 'date-fns';
@@ -61,6 +62,7 @@ const RecordingSkeleton = () => (
 export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) => {
     const { user, profile } = useAuth();
     const queryClient = useQueryClient();
+    const { mergedPairs, orFilter } = useMergedSubjects(batch, subject);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRecording, setSelectedRecording] = useState<RecordingContent | null>(null);
     
@@ -71,21 +73,20 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
 
     // Direct query when batch/subject props are provided (context-aware mode)
     const { data: recordings, isLoading } = useQuery<RecordingContent[]>({
-        queryKey: ['student-recordings', batch, subject],
+        queryKey: ['student-recordings', batch, subject, orFilter],
         queryFn: async (): Promise<RecordingContent[]> => {
-            if (!batch || !subject) return [];
+            if (!batch || !subject || !orFilter) return [];
             
             const { data, error } = await supabase
                 .from('recordings')
                 .select('*')
-                .eq('batch', batch)
-                .eq('subject', subject)
+                .or(orFilter)
                 .order('date', { ascending: false }); // Newest first
             
             if (error) throw error;
             return (data || []) as RecordingContent[];
         },
-        enabled: !!batch && !!subject
+        enabled: !!batch && !!subject && !!orFilter
     });
 
     const filteredRecordings = useMemo(() => recordings?.filter(rec =>

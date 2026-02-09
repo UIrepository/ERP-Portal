@@ -14,6 +14,7 @@ import { AdminDirectory } from './AdminDirectory';
 import { AdminScheduleRequests } from './AdminScheduleRequests';
 import { AdminMaintenanceManager } from './AdminMaintenanceManager';
 import { AdminJoinClass } from './AdminJoinClass';
+import { AdminSubjectMerges } from './AdminSubjectMerges';
 
 interface AdminDashboardProps {
   activeTab: string;
@@ -64,6 +65,8 @@ export const AdminDashboard = ({ activeTab, onTabChange }: AdminDashboardProps) 
         return <AdminScheduleRequests />;
       case 'maintenance':
         return <AdminMaintenanceManager />;
+      case 'subject-merges':
+        return <AdminSubjectMerges />;
       default:
         return <EnrollmentAnalytics />;
     }
