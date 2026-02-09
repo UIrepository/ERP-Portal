@@ -134,20 +134,6 @@ export const StudentDPP = () => {
     enabled: !!profile?.user_id
   });
 
-  // Fetch active merges
-  const { data: activeMerges = [] } = useQuery({
-    queryKey: ['active-merges-for-dpp'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('subject_merges')
-        .select('*')
-        .eq('is_active', true);
-      if (error) return [];
-      return data || [];
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-
   const displayedBatches = useMemo(() => {
     if (!userEnrollments) return [];
     return Array.from(new Set(userEnrollments.map(e => e.batch_name))).sort();
@@ -171,39 +157,22 @@ export const StudentDPP = () => {
     }
   }, [selectedBatchFilter]);
 
-  // Expand enrollments with merge data for DPP queries
-  const expandedEnrollments = useMemo(() => {
+  const filteredEnrollments = useMemo(() => {
     if (!userEnrollments) return [];
-    const pairs = new Set<string>();
-    const filteredEnrollments = userEnrollments.filter(e =>
+    return userEnrollments.filter(e =>
       (selectedBatchFilter === 'all' || e.batch_name === selectedBatchFilter) &&
       (selectedSubjectFilter === 'all' || e.subject_name === selectedSubjectFilter)
     );
-    filteredEnrollments.forEach(e => {
-      pairs.add(`${e.batch_name}||${e.subject_name}`);
-      activeMerges.forEach((m: any) => {
-        if (m.primary_batch === e.batch_name && m.primary_subject === e.subject_name) {
-          pairs.add(`${m.secondary_batch}||${m.secondary_subject}`);
-        }
-        if (m.secondary_batch === e.batch_name && m.secondary_subject === e.subject_name) {
-          pairs.add(`${m.primary_batch}||${m.primary_subject}`);
-        }
-      });
-    });
-    return Array.from(pairs).map(p => {
-      const [batch, subject] = p.split('||');
-      return { batch_name: batch, subject_name: subject };
-    });
-  }, [userEnrollments, activeMerges, selectedBatchFilter, selectedSubjectFilter]);
+  }, [userEnrollments, selectedBatchFilter, selectedSubjectFilter]);
 
   const { data: dppContent, isLoading: isLoadingDPPContent } = useQuery<DPPContent[]>({
-    queryKey: ['student-dpp', expandedEnrollments],
+    queryKey: ['student-dpp', filteredEnrollments],
     queryFn: async (): Promise<DPPContent[]> => {
-        if (expandedEnrollments.length === 0) return [];
+        if (filteredEnrollments.length === 0) return [];
 
         let query = supabase.from('dpp_content').select('*').eq('is_active', true);
 
-        const orFilterString = expandedEnrollments
+        const orFilterString = filteredEnrollments
             .map(e => `and(batch.eq.${e.batch_name},subject.eq.${e.subject_name})`)
             .join(',');
         query = query.or(orFilterString);
@@ -218,7 +187,7 @@ export const StudentDPP = () => {
         }
         return (data || []) as DPPContent[];
     },
-    enabled: expandedEnrollments.length > 0
+    enabled: filteredEnrollments.length > 0
   });
 
   useEffect(() => {

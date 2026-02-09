@@ -10,6 +10,7 @@ import { Video, Clock, Calendar, Users } from 'lucide-react';
 import { format, isToday, parse, isBefore, isAfter } from 'date-fns';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { generateJitsiRoomName } from '@/lib/jitsiUtils';
+import { useMergedSubjects } from '@/hooks/useMergedSubjects';
 
 interface Schedule {
   id: string;
@@ -50,6 +51,37 @@ export const StudentJoinClass = () => {
     enabled: !!profile?.user_id
   });
 
+  // Fetch active merges to determine primary pairs for room naming
+  const { data: activeMerges = [] } = useQuery({
+    queryKey: ['active-merges-for-join-class'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('subject_merges')
+        .select('*')
+        .eq('is_active', true);
+      if (error) return [];
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Helper to get primary pair for a batch+subject (for consistent Jitsi room naming)
+  const getPrimaryPair = useMemo(() => {
+    return (batch: string, subject: string) => {
+      const merge = activeMerges.find((m: any) =>
+        (m.primary_batch === batch && m.primary_subject === subject) ||
+        (m.secondary_batch === batch && m.secondary_subject === subject)
+      );
+      if (!merge) return { batch, subject };
+      // Return alphabetically first pair for deterministic room name
+      const pairs = [
+        { batch: merge.primary_batch, subject: merge.primary_subject },
+        { batch: merge.secondary_batch, subject: merge.secondary_subject }
+      ];
+      return pairs.sort((a, b) => `${a.batch}|${a.subject}`.localeCompare(`${b.batch}|${b.subject}`))[0];
+    };
+  }, [activeMerges]);
+
   // Fetch all schedules
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
     queryKey: ['allSchedules'],
@@ -69,17 +101,14 @@ export const StudentJoinClass = () => {
     const today = new Date();
     const todayDayOfWeek = today.getDay();
     
-    // Create a Set of enrolled batch-subject combinations for quick lookup
     const enrolledCombinations = new Set(
       enrollments.map(e => `${e.batch_name}|${e.subject_name}`)
     );
     
     return schedules.filter(schedule => {
-      // Check if student is enrolled in this batch+subject
       const isEnrolled = enrolledCombinations.has(`${schedule.batch}|${schedule.subject}`);
       if (!isEnrolled) return false;
       
-      // Check if this schedule is for today
       if (schedule.date) {
         return isToday(new Date(schedule.date));
       } else {
@@ -117,7 +146,7 @@ export const StudentJoinClass = () => {
   };
 
   const handleJoinClass = async (cls: Schedule) => {
-    // 1. Mark Attendance immediately before redirect
+    // 1. Mark Attendance
     try {
       if (profile?.user_id) {
         const today = format(new Date(), 'yyyy-MM-dd');
@@ -136,19 +165,11 @@ export const StudentJoinClass = () => {
       console.error("Error marking attendance:", error);
     }
 
-    // 2. Redirect to Jitsi in new tab (Bypassing embedded iframe limit)
-    const roomUrl = `https://meet.jit.si/${encodeURIComponent(cls.batch)}/${encodeURIComponent(cls.subject)}`;
+    // 2. Use primary pair for consistent room naming across merged subjects
+    const primary = getPrimaryPair(cls.batch, cls.subject);
+    const roomName = generateJitsiRoomName(primary.batch, primary.subject);
+    const roomUrl = `https://meet.jit.si/${encodeURIComponent(roomName)}`;
     window.open(roomUrl, '_blank');
-    
-    // Legacy state setting (kept to not delete code, but effectively unused now)
-    /*
-    setActiveMeeting({
-      roomName: generateJitsiRoomName(cls.batch, cls.subject),
-      subject: cls.subject,
-      batch: cls.batch,
-      scheduleId: cls.id
-    });
-    */
   };
 
   const isLoading = isLoadingEnrollments || isLoadingSchedules;
