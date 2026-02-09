@@ -22,9 +22,8 @@ import {
   Wrench,
   Headphones,
   GitMerge,
-  ExternalLink,
-  MessageSquare, // Restored
-  BookOpen       // Restored
+  MessageSquare, 
+  BookOpen       
 } from 'lucide-react';
 
 import {
@@ -203,7 +202,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
             const isContactAdminTab = tab.id === 'contact-admin';
             const isSupportTab = tab.id === 'support';
             
-            // Community opens in new tab
+            // Community opens in new tab (Icon removed)
             if (tab.id === 'teacher-community') {
               return (
                 <Button
@@ -214,7 +213,6 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
                 >
                   <tab.icon className="mr-3 h-4 w-4" />
                   <span className="flex-1 text-left">{tab.label}</span>
-                  <ExternalLink className="h-3 w-3 text-slate-400 group-hover:text-slate-600 opacity-50" />
                 </Button>
               );
             }
