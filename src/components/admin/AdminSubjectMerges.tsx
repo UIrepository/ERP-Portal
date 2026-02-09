@@ -20,9 +20,9 @@ interface SubjectMerge {
   created_at: string;
 }
 
-interface AvailableOption {
-  type: string;
-  name: string;
+interface EnrollmentPair {
+  batch_name: string;
+  subject_name: string;
 }
 
 export const AdminSubjectMerges = () => {
@@ -34,18 +34,42 @@ export const AdminSubjectMerges = () => {
   const [secondaryBatch, setSecondaryBatch] = useState('');
   const [secondarySubject, setSecondarySubject] = useState('');
 
-  // Fetch available options (batches and subjects)
-  const { data: options = [] } = useQuery<AvailableOption[]>({
-    queryKey: ['available-options'],
+  // Fetch distinct batch-subject pairs from user_enrollments
+  const { data: enrollments = [] } = useQuery<EnrollmentPair[]>({
+    queryKey: ['enrollment-pairs'],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_all_options');
+      const { data, error } = await supabase
+        .from('user_enrollments')
+        .select('batch_name, subject_name')
+        .order('batch_name');
       if (error) throw error;
-      return data || [];
+      // Deduplicate
+      const seen = new Set<string>();
+      return (data || []).filter(e => {
+        const key = `${e.batch_name}|${e.subject_name}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
     },
   });
 
-  const batches = [...new Set(options.filter(o => o.type === 'batch').map(o => o.name))].sort();
-  const subjects = [...new Set(options.filter(o => o.type === 'subject').map(o => o.name))].sort();
+  const batches = [...new Set(enrollments.map(e => e.batch_name))].sort();
+  const primarySubjects = primaryBatch
+    ? [...new Set(enrollments.filter(e => e.batch_name === primaryBatch).map(e => e.subject_name))].sort()
+    : [];
+  const secondarySubjects = secondaryBatch
+    ? [...new Set(enrollments.filter(e => e.batch_name === secondaryBatch).map(e => e.subject_name))].sort()
+    : [];
+
+  const handlePrimaryBatchChange = (val: string) => {
+    setPrimaryBatch(val);
+    setPrimarySubject('');
+  };
+  const handleSecondaryBatchChange = (val: string) => {
+    setSecondaryBatch(val);
+    setSecondarySubject('');
+  };
 
   // Fetch active merges
   const { data: merges = [], isLoading } = useQuery<SubjectMerge[]>({
@@ -151,7 +175,7 @@ export const AdminSubjectMerges = () => {
             <div className="flex-1 space-y-2 w-full">
               <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Side A</label>
               <div className="flex gap-2">
-                <Select value={primaryBatch} onValueChange={setPrimaryBatch}>
+                <Select value={primaryBatch} onValueChange={handlePrimaryBatchChange}>
                   <SelectTrigger className="flex-1">
                     <SelectValue placeholder="Select Batch" />
                   </SelectTrigger>
@@ -164,7 +188,7 @@ export const AdminSubjectMerges = () => {
                     <SelectValue placeholder="Select Subject" />
                   </SelectTrigger>
                   <SelectContent>
-                    {subjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    {primarySubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -178,7 +202,7 @@ export const AdminSubjectMerges = () => {
             <div className="flex-1 space-y-2 w-full">
               <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Side B</label>
               <div className="flex gap-2">
-                <Select value={secondaryBatch} onValueChange={setSecondaryBatch}>
+                <Select value={secondaryBatch} onValueChange={handleSecondaryBatchChange}>
                   <SelectTrigger className="flex-1">
                     <SelectValue placeholder="Select Batch" />
                   </SelectTrigger>
@@ -191,7 +215,7 @@ export const AdminSubjectMerges = () => {
                     <SelectValue placeholder="Select Subject" />
                   </SelectTrigger>
                   <SelectContent>
-                    {subjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    {secondarySubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
