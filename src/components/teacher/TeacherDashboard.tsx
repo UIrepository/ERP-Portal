@@ -65,7 +65,7 @@ export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardPro
               Welcome back, {profile?.name}! 👋
             </h1>
             <p className="text-purple-100 text-lg font-medium opacity-90 max-w-lg leading-relaxed">
-              Another day to deal with students. 🚀
+              Another day to deal with students. 
             </p>
           </div>
         </div>
