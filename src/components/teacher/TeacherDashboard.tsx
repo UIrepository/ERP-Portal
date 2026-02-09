@@ -48,27 +48,21 @@ export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardPro
   return (
     <div className="p-4 sm:p-6 bg-slate-50 min-h-screen">
       
-      {/* --- COMPACT WELCOME BANNER --- */}
-      <div className="mb-6 relative overflow-hidden rounded-xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 shadow-lg group">
+      {/* --- COMPACT WELCOME BANNER (Lightish Blue Premium Theme) --- */}
+      <div className="mb-6 relative overflow-hidden rounded-xl bg-gradient-to-r from-sky-100 via-blue-50 to-indigo-100 shadow-md border border-blue-100/50 group">
         
-        {/* Subtle Decorative Glow */}
-        <div className="absolute top-0 right-0 -mt-8 -mr-8 w-32 h-32 rounded-full bg-cyan-500/5 blur-2xl group-hover:bg-cyan-500/10 transition-colors duration-700"></div>
-        <div className="absolute bottom-0 left-0 -mb-8 -ml-8 w-24 h-24 rounded-full bg-slate-700/10 blur-xl"></div>
+        {/* Premium Effect Pattern (Subtle Glows) */}
+        <div className="absolute top-0 right-0 -mt-8 -mr-8 w-48 h-48 rounded-full bg-blue-400/10 blur-3xl group-hover:bg-blue-400/20 transition-colors duration-700"></div>
+        <div className="absolute bottom-0 left-0 -mb-8 -ml-8 w-32 h-32 rounded-full bg-cyan-400/10 blur-2xl"></div>
+        
+        {/* Subtle Grid Pattern Overlay */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:24px_24px]"></div>
 
-        <div className="relative z-10 px-5 py-4 flex flex-row items-center justify-between gap-4">
-          <div className="space-y-0.5">
-            <p className="text-cyan-400/90 text-[10px] font-bold uppercase tracking-widest">
-              Teacher Dashboard
-            </p>
-            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+        <div className="relative z-10 px-5 py-5 flex flex-row items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h1 className="text-xl sm:text-2xl font-semibold text-slate-800 tracking-tight font-sans">
               Welcome back, {profile?.name}! 👋
             </h1>
-          </div>
-          
-          <div className="hidden sm:block">
-            <p className="text-slate-400 text-sm font-medium opacity-90">
-              Another day to deal with students. 🚀
-            </p>
           </div>
         </div>
       </div>
