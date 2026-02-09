@@ -27,7 +27,7 @@ interface ScheduleWithLink {
 
 export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
   const { profile, user } = useAuth();
-  const { mergedPairs, orFilter } = useMergedSubjects(batch, subject);
+  const { mergedPairs, orFilter, primaryPair } = useMergedSubjects(batch, subject);
   const today = new Date();
   const currentDayOfWeek = today.getDay();
   const todayDateStr = format(today, 'yyyy-MM-dd');
@@ -81,11 +81,25 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
         return schedule.day_of_week === currentDayOfWeek;
       });
 
-      return validSchedules.map(schedule => {
-        const activeJitsi = allActiveClasses?.find(ac => ac.subject === schedule.subject && ac.batch === schedule.batch);
+      // Deduplicate schedules by time slot (merged batches may have same class)
+      const seen = new Set<string>();
+      const deduped = validSchedules.filter(schedule => {
+        const key = `${schedule.start_time}-${schedule.end_time}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      // Use primaryPair for consistent Jitsi room naming across merged subjects
+      const roomBatch = primaryPair?.batch || batch || '';
+      const roomSubject = primaryPair?.subject || subject || '';
+
+      return deduped.map(schedule => {
+        const activeJitsi = allActiveClasses?.find(ac => ac.subject === schedule.subject && ac.batch === schedule.batch)
+          || allActiveClasses?.find(ac => !!ac); // fallback: any active class in merge group
         const subjectLink = allMeetingLinks?.find(l => l.subject === schedule.subject && l.batch === schedule.batch);
         
-        const generatedJitsiLink = `https://meet.jit.si/${generateJitsiRoomName(schedule.batch, schedule.subject)}`;
+        const generatedJitsiLink = `https://meet.jit.si/${generateJitsiRoomName(roomBatch, roomSubject)}`;
         const dbLink = activeJitsi?.room_url || schedule.link || subjectLink?.link;
 
         let finalLink = null;
