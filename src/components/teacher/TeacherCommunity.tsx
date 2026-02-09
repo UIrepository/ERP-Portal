@@ -18,7 +18,8 @@ import {
   X,
   Ban,
   Lock,
-  Megaphone
+  Megaphone,
+  LayoutDashboard
 } from 'lucide-react';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -70,28 +71,21 @@ interface TeacherGroup {
 }
 
 // --- Helper for Aggressive Parsing/Cleaning ---
-// Recursively strips brackets and quotes until only the raw text remains.
 const cleanList = (raw: any): string[] => {
   if (!raw) return [];
   
   let list: any[] = [];
   
-  // 1. Normalize to array
   if (Array.isArray(raw)) {
     list = raw;
   } else if (typeof raw === 'string') {
     const trimmed = raw.trim();
-    // Try JSON parse first
     try {
       const parsed = JSON.parse(trimmed);
       if (Array.isArray(parsed)) list = parsed;
       else list = [trimmed]; 
     } catch {
-      // If parsing fails, treat as string (will be cleaned loop below)
-      // If it looks like a CSV list inside a string, split it
       if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-          // It's a bracketed string like "['A', 'B']" that failed JSON
-          // We treat it as one item first, then let the loop strip brackets
            list = [trimmed]; 
       } else if (trimmed.includes(',')) {
            list = trimmed.split(',');
@@ -101,25 +95,19 @@ const cleanList = (raw: any): string[] => {
     }
   }
 
-  // 2. Clean each item recursively
   return list.map(item => {
     let s = String(item).trim();
     let changed = true;
-    
-    // Loop until no more brackets or quotes can be stripped
     while (changed) {
         changed = false;
-        // Strip wrapping brackets [ ]
         if (s.startsWith('[') && s.endsWith(']')) {
             s = s.slice(1, -1).trim();
             changed = true;
         }
-        // Strip wrapping double quotes " "
         if (s.startsWith('"') && s.endsWith('"')) {
             s = s.slice(1, -1).trim();
             changed = true;
         }
-        // Strip wrapping single quotes ' '
         if (s.startsWith("'") && s.endsWith("'")) {
             s = s.slice(1, -1).trim();
             changed = true;
@@ -406,24 +394,15 @@ export const TeacherCommunity = () => {
       if (!data) return [];
 
       const groups: TeacherGroup[] = [];
-      // Clean lists: Recursively strips [] and "" while keeping strict case/content
       const batches = cleanList(data.assigned_batches);
       const subjectsRaw = cleanList(data.assigned_subjects);
-
-      // --- CRITICAL FIX: STRIP BATCH NAMES FROM SUBJECTS ---
-      // This regex replaces any text in parentheses at the end of the string.
-      // E.g., "Physics (Batch A)" -> "Physics"
-      // This ensures the subject name strictly matches the community channel name.
       const subjects = subjectsRaw.map(s => s.replace(/\s*\(.*?\)\s*$/g, '').trim());
 
-      // Create a Set to ensure unique combinations of batch+subject
       const seen = new Set<string>();
 
       batches.forEach(batch => {
         subjects.forEach(subject => {
-          // Double check we aren't adding empty subjects
           if (!subject) return;
-          
           const key = `${batch}_${subject}`;
           if (!seen.has(key)) {
             seen.add(key);
@@ -463,8 +442,8 @@ export const TeacherCommunity = () => {
           profiles (name),
           message_likes ( user_id, reaction_type )
         `)
-        .eq('batch', selectedGroup.batch_name) // STRICT MATCH
-        .eq('subject', selectedGroup.subject_name) // STRICT MATCH
+        .eq('batch', selectedGroup.batch_name) 
+        .eq('subject', selectedGroup.subject_name) 
         .order('created_at', { ascending: true });
 
       if (error) throw error;
@@ -607,9 +586,27 @@ export const TeacherCommunity = () => {
       
       {/* GROUP LIST SIDEBAR */}
       <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
-        <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
-          <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Users className="h-5 w-5 text-teal-600" /> Communities</h2>
+        
+        {/* HEADER with Dashboard Link */}
+        <div className="p-4 border-b bg-gray-50 flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+              <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800">
+                <Users className="h-5 w-5 text-teal-600" /> Communities
+              </h2>
+          </div>
+          
+          {/* Back to Dashboard Button */}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="w-full justify-start text-gray-600 hover:text-teal-700 hover:bg-teal-50 border-gray-200"
+            onClick={() => window.location.href = '/'} // Navigate to root/dashboard
+          >
+            <LayoutDashboard className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
         </div>
+
         <ScrollArea className="flex-1">
           <div className="p-2 space-y-1">
             {isLoadingGroups ? <div className="p-6 text-center text-gray-500 flex justify-center"><Loader2 className="animate-spin" /></div> : 
@@ -632,6 +629,13 @@ export const TeacherCommunity = () => {
             <Users className="h-10 w-10 text-teal-200" />
           </div>
           <p className="text-lg font-medium text-gray-600">Select a community to start chatting</p>
+          <Button 
+            variant="ghost" 
+            className="mt-4 text-gray-500 hover:text-teal-600"
+            onClick={() => window.location.href = '/'}
+          >
+             <ArrowLeft className="h-4 w-4 mr-2" /> Return to Dashboard
+          </Button>
         </div>
       )}
 
@@ -653,6 +657,18 @@ export const TeacherCommunity = () => {
                 <p className="text-xs text-gray-500 font-medium mt-0.5">{selectedGroup.batch_name}</p>
               </div>
             </div>
+            
+            {/* Desktop Quick Exit in Chat Header */}
+            {!isMobile && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-gray-400 hover:text-gray-600"
+                  onClick={() => setSelectedGroup(null)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+            )}
           </div>
 
           {/* WATERMARK LAYER */}
