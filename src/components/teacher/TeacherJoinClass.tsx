@@ -2,8 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-// Using Lucide icons to replace FontAwesome while maintaining the look
-import { Clock, Key, Copy, Merge, X, Check, Loader2 } from 'lucide-react'; 
+import { Clock, Key, Copy, Merge, X, Loader2 } from 'lucide-react'; 
 import { format, isToday, parse, isBefore, isAfter } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { generateJitsiRoomName, subjectsMatch } from '@/lib/jitsiUtils';
@@ -11,8 +10,7 @@ import { useYoutubeStream } from '@/hooks/useYoutubeStream';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Button } from '@/components/ui/button'; // Keeping for Dialog actions
+import { Button } from '@/components/ui/button'; 
 import { toast } from 'sonner';
 
 // --- Types ---
@@ -46,17 +44,11 @@ export const TeacherJoinClass = () => {
   const { profile, user } = useAuth();
   const queryClient = useQueryClient();
   const [selectedClassForAttendance, setSelectedClassForAttendance] = useState<Schedule | null>(null);
-
-  // --- Merge State ---
   const [selectedMergeIds, setSelectedMergeIds] = useState<string[]>([]);
-
-  // Stream Key Dialog
   const { startStream, isStartingStream } = useYoutubeStream();
   const [streamKey, setStreamKey] = useState<string>("");
   const [showStreamDialog, setShowStreamDialog] = useState(false);
   const [currentClass, setCurrentClass] = useState<Schedule | null>(null);
-  
-  // Track if we are in a merged session context for the dialog redirection
   const [isMergedSession, setIsMergedSession] = useState(false);
   const [mergedRoomUrl, setMergedRoomUrl] = useState<string>("");
 
@@ -128,10 +120,11 @@ export const TeacherJoinClass = () => {
       const otherBatch = merge.primary_batch === batch && merge.primary_subject === subject
         ? merge.secondary_batch
         : merge.primary_batch;
-      const otherSubject = merge.primary_batch === batch && merge.primary_subject === subject
-        ? merge.secondary_subject
-        : merge.primary_subject;
-      return `${otherSubject} (${otherBatch})`;
+      return `${
+        merge.primary_batch === batch && merge.primary_subject === subject
+          ? merge.secondary_subject
+          : merge.primary_subject
+      } (${otherBatch})`;
     };
   }, [activeMerges]);
 
@@ -267,7 +260,6 @@ export const TeacherJoinClass = () => {
     return format(parsed, 'h:mm a');
   };
 
-  // --- Logic Handlers ---
   const toggleSelection = (id: string) => {
     setSelectedMergeIds(prev => 
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
@@ -415,16 +407,17 @@ export const TeacherJoinClass = () => {
 
   const isLoading = isLoadingTeacher || isLoadingSchedules;
 
-  // --- STYLES (Tailwind mapping of provided CSS) ---
+  // --- STYLES (Adjusted for Full Width & Proper Alignment) ---
   const styles = {
-    wrapper: "max-w-[1040px] mx-auto py-12 px-6 bg-white font-sans text-slate-900",
-    pageHeader: "flex justify-between items-start mb-10",
+    // Removed max-w, extra padding, and background to allow it to fill the Dashboard container naturally
+    wrapper: "w-full font-sans text-slate-900", 
+    pageHeader: "flex justify-between items-start mb-6",
     headerTitle: "text-2xl font-bold tracking-tight text-slate-900",
     headerDate: "text-sm text-slate-600 mt-1",
     btnMerge: "inline-flex items-center gap-2 px-4 py-2.5 rounded text-sm font-medium cursor-pointer bg-slate-100 text-blue-600 border border-slate-300 hover:bg-slate-200 transition-all",
     sectionHeading: "text-xs font-semibold uppercase tracking-wider text-slate-600 mb-4 mt-8 flex items-center gap-2",
     statusIndicator: "w-2 h-2 rounded-full bg-emerald-600",
-    classCard: "grid grid-cols-1 md:grid-cols-[40px_1fr_auto] items-center p-6 border border-slate-200 rounded mb-3 hover:border-slate-300 transition-all bg-white",
+    classCard: "grid grid-cols-1 md:grid-cols-[40px_1fr_auto] items-center p-6 border border-slate-200 rounded-xl mb-3 hover:border-slate-300 transition-all bg-white shadow-sm",
     activeClassCard: "bg-slate-50 border-l-[3px] border-l-emerald-600",
     checkbox: "w-[18px] h-[18px] cursor-pointer accent-slate-900",
     batchLabel: "text-sm text-slate-600 mb-2 block",
@@ -436,7 +429,7 @@ export const TeacherJoinClass = () => {
     btn: "inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded text-sm font-medium cursor-pointer transition-all border border-slate-200 bg-white text-slate-900 hover:bg-slate-50",
     btnPrimary: "inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded text-sm font-medium cursor-pointer transition-all border border-slate-900 bg-slate-900 text-white hover:bg-slate-700",
     btnBlue: "inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded text-sm font-medium cursor-pointer transition-all border border-blue-600 bg-blue-600 text-white hover:bg-blue-700",
-    dataTableContainer: "mt-12 border border-slate-200 rounded overflow-hidden",
+    dataTableContainer: "mt-12 border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white",
     dataTableHeader: "px-6 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center",
     statusBadge: "text-[11px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700"
   };
@@ -588,7 +581,7 @@ export const TeacherJoinClass = () => {
 
       {/* --- NO CLASSES --- */}
       {todaysClasses.length === 0 && (
-        <div className="text-center py-20 bg-slate-50 border border-slate-200 rounded mt-6">
+        <div className="text-center py-20 bg-white border border-slate-200 rounded-xl mt-6">
            <h3 className="text-slate-900 font-semibold">No Classes Today</h3>
            <p className="text-slate-600 text-sm mt-2">You don't have any scheduled classes for today.</p>
         </div>
