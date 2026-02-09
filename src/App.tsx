@@ -9,8 +9,9 @@ import NotFound from "./pages/NotFound";
 import ClassSession from "./pages/ClassSession";
 import { ScreenRecordingProtection } from "@/components/ScreenRecordingProtection";
 
-// Import Student Community Component
+// Import Community Components
 import { StudentCommunity } from "@/components/student/StudentCommunity";
+import { TeacherCommunity } from "@/components/teacher/TeacherCommunity";
 
 const queryClient = new QueryClient();
 
@@ -28,8 +29,9 @@ const App = () => (
               {/* SECURE CLASS SESSION ROUTE */}
               <Route path="/class-session/:enrollmentId" element={<ClassSession />} />
               
-              {/* STUDENT COMMUNITY ROUTE (Opens in new tab) */}
+              {/* COMMUNITY ROUTES (Open in new tabs) */}
               <Route path="/portal/student/community" element={<StudentCommunity />} />
+              <Route path="/teacher-community" element={<TeacherCommunity />} />
               
               {/* Fallback Route */}
               <Route path="*" element={<NotFound />} />
