@@ -22,7 +22,9 @@ import {
   Wrench,
   Headphones,
   GitMerge,
-  ExternalLink, // Added icon
+  ExternalLink,
+  MessageSquare, // Restored
+  BookOpen       // Restored
 } from 'lucide-react';
 
 import {
@@ -201,7 +203,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
             const isContactAdminTab = tab.id === 'contact-admin';
             const isSupportTab = tab.id === 'support';
             
-            // --- NEW: Community opens in new tab ---
+            // Community opens in new tab
             if (tab.id === 'teacher-community') {
               return (
                 <Button
