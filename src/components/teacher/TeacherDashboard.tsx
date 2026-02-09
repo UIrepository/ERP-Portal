@@ -23,7 +23,7 @@ export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardPro
   // Define the tutorial video as a Lecture object for the player
   const tutorialLecture: Lecture = {
     id: 'dashboard-tutorial',
-    title: 'How to use the Dashboard',
+    title: 'How to use the Educator Dashboard',
     videoUrl: 'https://youtu.be/qxk40T2SLJM',
     subject: 'Tutorial',
     duration: '5:00' // Estimated duration
