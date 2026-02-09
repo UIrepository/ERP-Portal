@@ -33,82 +33,81 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
   const todayDateStr = format(today, 'yyyy-MM-dd');
 
   // Fetch schedules logic
+  const isBatchLevel = !subject;
+
   const { data: schedules, isLoading } = useQuery<ScheduleWithLink[]>({
     queryKey: ['studentLiveClass', batch, subject, todayDateStr, orFilter],
     queryFn: async () => {
-      if (!batch || !mergedPairs.length) return [];
+      if (!batch) return [];
 
-      // 1. Get Schedules for all merged pairs, filtered by today
-      const allSchedules: any[] = [];
-      for (const pair of mergedPairs) {
-        const { data, error } = await supabase
-          .from('schedules')
-          .select('*')
-          .eq('batch', pair.batch)
-          .eq('subject', pair.subject)
-          .or(`day_of_week.eq.${currentDayOfWeek},date.eq.${todayDateStr}`);
-        if (!error && data) allSchedules.push(...data);
-      }
+      let allSchedules: any[] = [];
+      let allMeetingLinks: any[] = [];
+      let allActiveClasses: any[] = [];
 
-      // 2. Get Static Meeting Links for all merged pairs
-      const allMeetingLinks: any[] = [];
-      for (const pair of mergedPairs) {
-        const { data } = await supabase
-          .from('meeting_links')
-          .select('*')
-          .eq('batch', pair.batch)
-          .eq('subject', pair.subject)
-          .eq('is_active', true);
-        if (data) allMeetingLinks.push(...data);
-      }
-
-      // 3. Get Active Classes for all merged pairs
-      const allActiveClasses: any[] = [];
-      for (const pair of mergedPairs) {
-        const { data } = await supabase
-          .from('active_classes')
-          .select('*')
-          .eq('batch', pair.batch)
-          .eq('subject', pair.subject)
-          .eq('is_active', true);
-        if (data) allActiveClasses.push(...data);
-      }
-
-      const validSchedules = (allSchedules).filter(schedule => {
-        if (schedule.date) {
-          return schedule.date === todayDateStr;
+      if (isBatchLevel) {
+        // Batch-level mode: fetch ALL schedules/links/active classes for this batch
+        const [schedRes, linksRes, activeRes] = await Promise.all([
+          supabase.from('schedules').select('*').eq('batch', batch)
+            .or(`day_of_week.eq.${currentDayOfWeek},date.eq.${todayDateStr}`),
+          supabase.from('meeting_links').select('*').eq('batch', batch).eq('is_active', true),
+          supabase.from('active_classes').select('*').eq('batch', batch).eq('is_active', true),
+        ]);
+        if (schedRes.data) allSchedules = schedRes.data;
+        if (linksRes.data) allMeetingLinks = linksRes.data;
+        if (activeRes.data) allActiveClasses = activeRes.data;
+      } else {
+        // Subject-level mode: use merged pairs (existing logic)
+        if (!mergedPairs.length) return [];
+        for (const pair of mergedPairs) {
+          const { data, error } = await supabase
+            .from('schedules').select('*')
+            .eq('batch', pair.batch).eq('subject', pair.subject)
+            .or(`day_of_week.eq.${currentDayOfWeek},date.eq.${todayDateStr}`);
+          if (!error && data) allSchedules.push(...data);
         }
+        for (const pair of mergedPairs) {
+          const { data } = await supabase
+            .from('meeting_links').select('*')
+            .eq('batch', pair.batch).eq('subject', pair.subject).eq('is_active', true);
+          if (data) allMeetingLinks.push(...data);
+        }
+        for (const pair of mergedPairs) {
+          const { data } = await supabase
+            .from('active_classes').select('*')
+            .eq('batch', pair.batch).eq('subject', pair.subject).eq('is_active', true);
+          if (data) allActiveClasses.push(...data);
+        }
+      }
+
+      const validSchedules = allSchedules.filter(schedule => {
+        if (schedule.date) return schedule.date === todayDateStr;
         return schedule.day_of_week === currentDayOfWeek;
       });
 
       // Deduplicate schedules by time slot (merged batches may have same class)
       const seen = new Set<string>();
       const deduped = validSchedules.filter(schedule => {
-        const key = `${schedule.start_time}-${schedule.end_time}`;
+        const key = `${schedule.start_time}-${schedule.end_time}-${schedule.subject}`;
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
       });
 
-      // Use primaryPair for consistent Jitsi room naming across merged subjects
-      const roomBatch = primaryPair?.batch || batch || '';
-      const roomSubject = primaryPair?.subject || subject || '';
-
       return deduped.map(schedule => {
         const activeJitsi = allActiveClasses?.find(ac => ac.subject === schedule.subject && ac.batch === schedule.batch)
-          || allActiveClasses?.find(ac => !!ac); // fallback: any active class in merge group
+          || allActiveClasses?.find(ac => ac.subject === schedule.subject);
         const subjectLink = allMeetingLinks?.find(l => l.subject === schedule.subject && l.batch === schedule.batch);
-        
+
+        // For subject-level, use primaryPair for consistent room naming; for batch-level, use schedule's own values
+        const roomBatch = isBatchLevel ? schedule.batch : (primaryPair?.batch || batch || '');
+        const roomSubject = isBatchLevel ? schedule.subject : (primaryPair?.subject || subject || '');
+
         const generatedJitsiLink = `https://meet.jit.si/${generateJitsiRoomName(roomBatch, roomSubject)}`;
         const dbLink = activeJitsi?.room_url || schedule.link || subjectLink?.link;
 
         let finalLink = null;
         if (dbLink) {
-          if (dbLink.includes('meet.jit.si')) {
-             finalLink = generatedJitsiLink;
-          } else {
-             finalLink = dbLink;
-          }
+          finalLink = dbLink.includes('meet.jit.si') ? generatedJitsiLink : dbLink;
         } else {
           finalLink = generatedJitsiLink;
         }
@@ -121,7 +120,7 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
       });
     },
     enabled: !!batch,
-    refetchInterval: 5000 
+    refetchInterval: 5000
   });
 
   const now = new Date();
