@@ -2,13 +2,9 @@ import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Video, Clock, Calendar, Users, UserCheck, Copy, Loader2, Key, CheckSquare, Square, Merge } from 'lucide-react';
+// Using Lucide icons to replace FontAwesome while maintaining the look
+import { Clock, Key, Copy, Merge, X, Check, Loader2 } from 'lucide-react'; 
 import { format, isToday, parse, isBefore, isAfter } from 'date-fns';
-import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { generateJitsiRoomName, subjectsMatch } from '@/lib/jitsiUtils';
 import { useYoutubeStream } from '@/hooks/useYoutubeStream';
@@ -16,8 +12,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button'; // Keeping for Dialog actions
 import { toast } from 'sonner';
 
+// --- Types ---
 interface Schedule {
   id: string;
   subject: string;
@@ -27,7 +25,6 @@ interface Schedule {
   end_time: string;
   date: string | null;
   stream_key?: string | null;
-  // Dedup metadata for merged classes
   mergedBatches?: { batch: string; subject: string; id: string }[];
 }
 
@@ -48,12 +45,6 @@ interface Attendance {
 export const TeacherJoinClass = () => {
   const { profile, user } = useAuth();
   const queryClient = useQueryClient();
-  const [activeMeeting, setActiveMeeting] = useState<{
-    roomName: string;
-    subject: string;
-    batch: string;
-    scheduleId: string;
-  } | null>(null);
   const [selectedClassForAttendance, setSelectedClassForAttendance] = useState<Schedule | null>(null);
 
   // --- Merge State ---
@@ -97,7 +88,7 @@ export const TeacherJoinClass = () => {
     }
   });
 
-  // Fetch active merges for displaying merged labels
+  // Fetch active merges
   const { data: activeMerges = [] } = useQuery({
     queryKey: ['active-merges-for-teacher-join'],
     queryFn: async () => {
@@ -111,7 +102,7 @@ export const TeacherJoinClass = () => {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Helper to get primary pair for consistent Jitsi room naming
+  // Helpers
   const getPrimaryPair = useMemo(() => {
     return (batch: string, subject: string) => {
       const merge = activeMerges.find((m: any) =>
@@ -127,7 +118,6 @@ export const TeacherJoinClass = () => {
     };
   }, [activeMerges]);
 
-  // Helper to get merged label for a class
   const getMergedLabel = useMemo(() => {
     return (batch: string, subject: string) => {
       const merge = activeMerges.find((m: any) =>
@@ -178,7 +168,7 @@ export const TeacherJoinClass = () => {
     return () => { supabase.removeChannel(channel); };
   }, [selectedClassForAttendance, queryClient]);
 
-  // Filter schedules for today, then deduplicate merged classes
+  // Filter schedules
   const todaysClasses = useMemo(() => {
     if (!schedules || !teacher) return [];
     
@@ -203,14 +193,12 @@ export const TeacherJoinClass = () => {
       }
     }).sort((a, b) => a.start_time.localeCompare(b.start_time));
 
-    // Dedup pass: merge classes that are in the same merge group with identical timing
     const deduped: Schedule[] = [];
     const consumed = new Set<string>();
 
     for (const cls of filtered) {
       if (consumed.has(cls.id)) continue;
 
-      // Find merge partner in the list
       const merge = activeMerges.find((m: any) =>
         (m.primary_batch === cls.batch && m.primary_subject === cls.subject) ||
         (m.secondary_batch === cls.batch && m.secondary_subject === cls.subject)
@@ -279,24 +267,21 @@ export const TeacherJoinClass = () => {
     return format(parsed, 'h:mm a');
   };
 
-  // --- Selection Logic ---
+  // --- Logic Handlers ---
   const toggleSelection = (id: string) => {
     setSelectedMergeIds(prev => 
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
   };
 
-  // --- Start Single Class ---
   const handleStartClass = async (cls: Schedule) => {
     setCurrentClass(cls);
     setIsMergedSession(false);
 
-    // Determine all batch/subject pairs to activate (including merge partners)
     const allPairs = cls.mergedBatches
       ? cls.mergedBatches
       : [{ batch: cls.batch, subject: cls.subject, id: cls.id }];
 
-    // 1. Mark Attendance & activate classes for all pairs
     try {
       if (profile?.user_id) {
         const today = format(new Date(), 'yyyy-MM-dd');
@@ -344,11 +329,8 @@ export const TeacherJoinClass = () => {
         .update({ stream_key: details.streamKey })
         .eq('id', cls.id);
 
-      if (error) {
-        console.error("Error saving stream key:", error);
-      } else {
-        queryClient.invalidateQueries({ queryKey: ['allSchedulesTeacher'] });
-      }
+      if (error) { console.error("Error saving stream key:", error); } 
+      else { queryClient.invalidateQueries({ queryKey: ['allSchedulesTeacher'] }); }
 
       setStreamKey(details.streamKey);
       setShowStreamDialog(true);
@@ -357,49 +339,33 @@ export const TeacherJoinClass = () => {
     }
   };
 
-  // --- Start Merged Class ---
   const handleStartMergedClass = async () => {
     if (selectedMergeIds.length < 2) return;
-
     setIsMergedSession(true);
     const selectedSchedules = todaysClasses.filter(s => selectedMergeIds.includes(s.id));
-    
-    // 1. Generate Shared Room Name & URL
-    // We use a timestamp to ensure it's a fresh, unique room for this combined session
     const mergedRoomName = `MergedSession-${profile?.id?.slice(0, 4)}-${Date.now()}`;
     const sharedUrl = `https://meet.jit.si/${encodeURIComponent(mergedRoomName)}`;
     setMergedRoomUrl(sharedUrl);
 
-    const firstClass = selectedSchedules[0]; // Used for stream title primarily
-
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
-
-      // 2. Generate ONE Stream Key for the session
       let activeStreamKey = selectedSchedules.find(s => s.stream_key)?.stream_key;
       
       if (!activeStreamKey) {
           const details = await startStream("Merged Session", selectedSchedules.map(s => s.subject).join(' & '));
-          if (details?.streamKey) {
-            activeStreamKey = details.streamKey;
-          }
+          if (details?.streamKey) { activeStreamKey = details.streamKey; }
       }
-
       setStreamKey(activeStreamKey || "");
 
-      // 3. Update Database for ALL selected classes
       for (const cls of selectedSchedules) {
-        // A. Upsert Active Class (The most important part for redirecting students)
         await supabase.from('active_classes').upsert({
            batch: cls.batch,
            subject: cls.subject,
-           room_url: sharedUrl, // All batches point to SAME URL
+           room_url: sharedUrl,
            teacher_id: profile?.user_id,
            is_active: true,
            started_at: new Date().toISOString()
         });
-
-        // B. Mark Teacher Attendance in all logs
         if (profile?.user_id) {
            await supabase.from('class_attendance').upsert({
             user_id: profile.user_id,
@@ -412,18 +378,13 @@ export const TeacherJoinClass = () => {
             joined_at: new Date().toISOString()
            }, { onConflict: 'user_id,schedule_id,class_date' });
         }
-
-        // C. Save the shared stream key to all schedules
         if (activeStreamKey) {
            await supabase.from('schedules').update({ stream_key: activeStreamKey }).eq('id', cls.id);
         }
       }
-
-      // Refresh UI
       queryClient.invalidateQueries({ queryKey: ['allSchedulesTeacher'] });
       setShowStreamDialog(true);
       toast.success(`Merged session started for ${selectedSchedules.length} classes!`);
-
     } catch (error) {
       console.error("Error starting merged session:", error);
       toast.error("Failed to start merged session.");
@@ -431,9 +392,8 @@ export const TeacherJoinClass = () => {
   };
 
   const proceedToMeeting = () => {
-    if (isMergedSession) {
-      window.open(mergedRoomUrl, '_blank');
-    } else if (currentClass) {
+    if (isMergedSession) { window.open(mergedRoomUrl, '_blank'); } 
+    else if (currentClass) {
       const primary = getPrimaryPair(currentClass.batch, currentClass.subject);
       const roomName = generateJitsiRoomName(primary.batch, primary.subject);
       const roomUrl = `https://meet.jit.si/${encodeURIComponent(roomName)}`;
@@ -455,249 +415,265 @@ export const TeacherJoinClass = () => {
 
   const isLoading = isLoadingTeacher || isLoadingSchedules;
 
-  if (isLoading) {
-    return (
-      <div className="p-6 space-y-6">
-        <Skeleton className="h-8 w-64" />
-        <div className="grid gap-4">
-          <Skeleton className="h-32 w-full" />
-        </div>
-      </div>
-    );
-  }
+  // --- STYLES (Tailwind mapping of provided CSS) ---
+  const styles = {
+    wrapper: "max-w-[1040px] mx-auto py-12 px-6 bg-white font-sans text-slate-900",
+    pageHeader: "flex justify-between items-start mb-10",
+    headerTitle: "text-2xl font-bold tracking-tight text-slate-900",
+    headerDate: "text-sm text-slate-600 mt-1",
+    btnMerge: "inline-flex items-center gap-2 px-4 py-2.5 rounded text-sm font-medium cursor-pointer bg-slate-100 text-blue-600 border border-slate-300 hover:bg-slate-200 transition-all",
+    sectionHeading: "text-xs font-semibold uppercase tracking-wider text-slate-600 mb-4 mt-8 flex items-center gap-2",
+    statusIndicator: "w-2 h-2 rounded-full bg-emerald-600",
+    classCard: "grid grid-cols-1 md:grid-cols-[40px_1fr_auto] items-center p-6 border border-slate-200 rounded mb-3 hover:border-slate-300 transition-all bg-white",
+    activeClassCard: "bg-slate-50 border-l-[3px] border-l-emerald-600",
+    checkbox: "w-[18px] h-[18px] cursor-pointer accent-slate-900",
+    batchLabel: "text-sm text-slate-600 mb-2 block",
+    subjectTitle: "text-base font-semibold text-slate-900",
+    metaContainer: "flex items-center gap-4 text-[13px] text-slate-600 mt-1",
+    mergeTag: "bg-white border border-slate-200 px-2 py-0.5 rounded text-[11px] font-medium text-blue-600",
+    streamKeyPill: "inline-flex items-center gap-2 bg-white px-2.5 py-1 border border-slate-200 rounded mt-3 w-fit",
+    actionsWrapper: "flex gap-2 w-full md:w-auto mt-4 md:mt-0",
+    btn: "inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded text-sm font-medium cursor-pointer transition-all border border-slate-200 bg-white text-slate-900 hover:bg-slate-50",
+    btnPrimary: "inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded text-sm font-medium cursor-pointer transition-all border border-slate-900 bg-slate-900 text-white hover:bg-slate-700",
+    btnBlue: "inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded text-sm font-medium cursor-pointer transition-all border border-blue-600 bg-blue-600 text-white hover:bg-blue-700",
+    dataTableContainer: "mt-12 border border-slate-200 rounded overflow-hidden",
+    dataTableHeader: "px-6 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center",
+    statusBadge: "text-[11px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700"
+  };
 
-  if (!teacher) {
-    return (
-      <div className="p-6">
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Users className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold">No Assignments Found</h3>
-            <p className="text-muted-foreground">You don't have any batch assignments yet.</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
+  if (isLoading) {
+    return <div className={styles.wrapper}><div className="flex items-center justify-center h-64"><Loader2 className="animate-spin h-8 w-8 text-slate-400" /></div></div>;
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-start">
+    <div className={styles.wrapper}>
+      {/* --- HEADER --- */}
+      <header className={styles.pageHeader}>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Join Class</h1>
-          <p className="text-muted-foreground">Today's classes • {format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+          <h1 className={styles.headerTitle}>Class Management</h1>
+          <p className={styles.headerDate}>{format(new Date(), 'EEEE, MMMM dd, yyyy')}</p>
         </div>
-        
-        {/* MERGE BUTTON */}
         {selectedMergeIds.length > 1 && (
-           <Button 
-             onClick={handleStartMergedClass}
-             disabled={isStartingStream}
-             className="bg-purple-600 hover:bg-purple-700 text-white animate-in fade-in slide-in-from-right-5"
-           >
-             <Merge className="mr-2 h-4 w-4" />
-             {isStartingStream ? 'Preparing...' : `Start Merged Session (${selectedMergeIds.length})`}
-           </Button>
+          <button onClick={handleStartMergedClass} className={styles.btnMerge} disabled={isStartingStream}>
+            <Merge className="w-4 h-4" />
+            {isStartingStream ? 'Preparing...' : 'Initiate Merged Session'}
+          </button>
         )}
-      </div>
+      </header>
 
-      {/* Render Lists */}
-      {[{ title: 'Live Now', data: liveClasses, icon: 'live' }, { title: 'Upcoming Today', data: upcomingClasses, icon: 'upcoming' }].map((section) => (
-        section.data.length > 0 && (
-        <div key={section.title} className="space-y-4">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            {section.icon === 'live' ? (
-               <span className="relative flex h-3 w-3">
-                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                 <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-               </span>
-            ) : <Calendar className="h-5 w-5" />}
-            {section.title}
-          </h2>
-          <div className="grid gap-4">
-            {section.data.map((cls) => (
-              <Card key={cls.id} className={`${section.icon === 'live' ? 'border-green-500 bg-green-50 dark:bg-green-950' : ''}`}>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-start gap-4">
-                      {/* CHECKBOX FOR MERGING */}
-                      <div className="pt-1">
-                        <Checkbox 
-                          id={`select-${cls.id}`}
-                          checked={selectedMergeIds.includes(cls.id)}
-                          onCheckedChange={() => toggleSelection(cls.id)}
-                          className="h-5 w-5"
-                        />
-                      </div>
-
-                      <div>
-                        <h3 className="text-xl font-bold">{cls.subject}</h3>
-                        {cls.mergedBatches ? (
-                          <>
-                            <p className="text-muted-foreground">
-                              {cls.mergedBatches.map(m => m.batch).join(' + ')}
-                            </p>
-                            <Badge variant="outline" className="mt-1 text-purple-700 border-purple-300 bg-purple-50">
-                              <Merge className="h-3 w-3 mr-1" />
-                              Merged class
-                            </Badge>
-                          </>
-                        ) : (
-                          <>
-                            <p className="text-muted-foreground">{cls.batch}</p>
-                            {getMergedLabel(cls.batch, cls.subject) && (
-                              <Badge variant="outline" className="mt-1 text-purple-700 border-purple-300 bg-purple-50">
-                                <Merge className="h-3 w-3 mr-1" />
-                                Merged with {getMergedLabel(cls.batch, cls.subject)}
-                              </Badge>
-                            )}
-                          </>
-                        )}
-                        <p className="text-sm mt-2 flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          {formatTime(cls.start_time)} - {formatTime(cls.end_time)}
-                        </p>
-                        {cls.stream_key && (
-                          <div className="mt-3 flex items-center gap-2 p-2 bg-black/5 rounded-md w-fit border border-black/10">
-                            <Key className="h-3 w-3 text-muted-foreground" />
-                            <code className="text-xs font-mono text-foreground max-w-[200px] truncate">{cls.stream_key}</code>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 ml-1" onClick={(e) => copyExistingKey(cls.stream_key!, e)}>
-                              <Copy className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button variant="outline" onClick={() => setSelectedClassForAttendance(cls)}>
-                        <UserCheck className="mr-2 h-4 w-4" />
-                        Attendance
-                      </Button>
-                      <Button 
-                        size="lg" 
-                        onClick={() => handleStartClass(cls)}
-                        disabled={isStartingStream || selectedMergeIds.length > 1} // Disable individual start if merging
-                        className={`${section.icon === 'live' ? 'bg-green-600 hover:bg-green-700' : ''}`}
-                      >
-                        {isStartingStream ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <Video className="mr-2 h-5 w-5" />}
-                        {cls.stream_key ? 'Resume Class' : 'Start Class'}
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+      {/* --- LIVE SESSIONS --- */}
+      {liveClasses.length > 0 && (
+        <>
+          <div className={styles.sectionHeading}>
+            <span className={styles.statusIndicator}></span>
+            Currently Active
           </div>
-        </div>
-        )
-      ))}
+          {liveClasses.map((cls) => {
+            const mergedLabel = getMergedLabel(cls.batch, cls.subject);
+            const isMerged = !!mergedLabel || !!cls.mergedBatches;
+            
+            return (
+              <div key={cls.id} className={`${styles.classCard} ${styles.activeClassCard}`}>
+                <div className="hidden md:block">
+                  <input 
+                    type="checkbox" 
+                    className={styles.checkbox}
+                    checked={selectedMergeIds.includes(cls.id)}
+                    onChange={() => toggleSelection(cls.id)}
+                  />
+                </div>
+                <div className="class-info">
+                  <span className={styles.batchLabel}>
+                    {cls.mergedBatches 
+                      ? cls.mergedBatches.map(m => m.batch).join(' • ') 
+                      : cls.batch
+                    }
+                  </span>
+                  <h3 className={styles.subjectTitle}>{cls.subject}</h3>
+                  <div className={styles.metaContainer}>
+                    <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {formatTime(cls.start_time)} — {formatTime(cls.end_time)}</span>
+                    {isMerged && <span className={styles.mergeTag}>{cls.mergedBatches ? 'Merged Class' : `Merged with ${mergedLabel}`}</span>}
+                  </div>
+                  {cls.stream_key && (
+                    <div className={styles.streamKeyPill}>
+                      <Key className="w-3 h-3 text-slate-600" />
+                      <code className="text-xs text-slate-700 font-mono">{cls.stream_key}</code>
+                      <button onClick={(e) => copyExistingKey(cls.stream_key!, e)} className="hover:text-blue-600">
+                        <Copy className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className={styles.actionsWrapper}>
+                  <button onClick={() => setSelectedClassForAttendance(cls)} className={styles.btn}>Attendance</button>
+                  <button 
+                    onClick={() => handleStartClass(cls)}
+                    disabled={isStartingStream || selectedMergeIds.length > 1}
+                    className={styles.btnBlue}
+                  >
+                    {isStartingStream ? <Loader2 className="animate-spin w-4 h-4"/> : 'Join Session'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </>
+      )}
 
-      {/* Completed Classes (No merge selection typically needed here) */}
+      {/* --- UPCOMING SCHEDULE --- */}
+      {upcomingClasses.length > 0 && (
+        <>
+          <div className={styles.sectionHeading}>
+             Upcoming Schedule
+          </div>
+          {upcomingClasses.map((cls) => {
+            const mergedLabel = getMergedLabel(cls.batch, cls.subject);
+            const isMerged = !!mergedLabel || !!cls.mergedBatches;
+
+            return (
+              <div key={cls.id} className={styles.classCard}>
+                <div className="hidden md:block">
+                  <input 
+                    type="checkbox" 
+                    className={styles.checkbox}
+                    checked={selectedMergeIds.includes(cls.id)}
+                    onChange={() => toggleSelection(cls.id)}
+                  />
+                </div>
+                <div className="class-info">
+                  <span className={styles.batchLabel}>{cls.batch}</span>
+                  <h3 className={styles.subjectTitle}>{cls.subject}</h3>
+                  <div className={styles.metaContainer}>
+                     <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {formatTime(cls.start_time)} — {formatTime(cls.end_time)}</span>
+                     {isMerged && <span className={styles.mergeTag}>{cls.mergedBatches ? 'Merged Class' : `Merged with ${mergedLabel}`}</span>}
+                  </div>
+                </div>
+                <div className={styles.actionsWrapper}>
+                  <button onClick={() => setSelectedClassForAttendance(cls)} className={styles.btn}>Attendance</button>
+                  <button 
+                    onClick={() => handleStartClass(cls)} 
+                    disabled={isStartingStream || selectedMergeIds.length > 1}
+                    className={styles.btnPrimary}
+                  >
+                    Start Class
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </>
+      )}
+
+      {/* --- COMPLETED --- */}
       {completedClasses.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-muted-foreground">Completed</h2>
-          <div className="grid gap-4">
-            {completedClasses.map((cls) => (
-              <Card key={cls.id} className="opacity-60">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold">{cls.subject}</h3>
-                      <p className="text-muted-foreground text-sm">{cls.batch}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" onClick={() => setSelectedClassForAttendance(cls)}>
-                        <UserCheck className="mr-2 h-4 w-4" />
-                        View Attendance
-                      </Button>
-                      <Badge variant="outline">Completed</Badge>
-                    </div>
+        <>
+          <div className={`${styles.sectionHeading} opacity-60`}>Completed</div>
+          {completedClasses.map((cls) => (
+             <div key={cls.id} className={`${styles.classCard} opacity-60 hover:opacity-100`}>
+                <div className="hidden md:block"></div>
+                <div className="class-info">
+                  <span className={styles.batchLabel}>{cls.batch}</span>
+                  <h3 className={styles.subjectTitle}>{cls.subject}</h3>
+                  <div className={styles.metaContainer}>
+                     <span>Completed</span>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                </div>
+                <div className={styles.actionsWrapper}>
+                  <button onClick={() => setSelectedClassForAttendance(cls)} className={styles.btn}>View Attendance</button>
+                </div>
+             </div>
+          ))}
+        </>
+      )}
+
+      {/* --- NO CLASSES --- */}
+      {todaysClasses.length === 0 && (
+        <div className="text-center py-20 bg-slate-50 border border-slate-200 rounded mt-6">
+           <h3 className="text-slate-900 font-semibold">No Classes Today</h3>
+           <p className="text-slate-600 text-sm mt-2">You don't have any scheduled classes for today.</p>
+        </div>
+      )}
+
+      {/* --- ATTENDANCE TABLE --- */}
+      {selectedClassForAttendance && (
+        <div className={styles.dataTableContainer}>
+          <div className={styles.dataTableHeader}>
+            <h2 className="text-sm font-semibold text-slate-900">
+              Active Session Attendance — {selectedClassForAttendance.subject}
+            </h2>
+            <button 
+              onClick={() => setSelectedClassForAttendance(null)} 
+              className="text-slate-400 hover:text-slate-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-white">
+              <TableRow className="border-b border-slate-200 hover:bg-transparent">
+                <TableHead className="text-xs font-semibold text-slate-600 px-6 py-3 h-auto">Participant</TableHead>
+                <TableHead className="text-xs font-semibold text-slate-600 px-6 py-3 h-auto">Role</TableHead>
+                <TableHead className="text-xs font-semibold text-slate-600 px-6 py-3 h-auto">Joined At</TableHead>
+                <TableHead className="text-xs font-semibold text-slate-600 px-6 py-3 h-auto">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoadingAttendance ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-24 text-center">Loading attendance...</TableCell>
+                </TableRow>
+              ) : attendance && attendance.length > 0 ? (
+                attendance.map((r) => (
+                  <TableRow key={r.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <TableCell className="px-6 py-3.5 text-sm font-medium text-slate-900">{r.user_name}</TableCell>
+                    <TableCell className="px-6 py-3.5 text-sm text-slate-600 capitalize">{r.user_role}</TableCell>
+                    <TableCell className="px-6 py-3.5 text-sm text-slate-600">{format(new Date(r.joined_at), 'h:mm a')}</TableCell>
+                    <TableCell className="px-6 py-3.5">
+                      {r.left_at ? (
+                        <span className="text-[13px] text-slate-500">Left ({format(new Date(r.left_at), 'h:mm a')})</span>
+                      ) : (
+                        <span className={styles.statusBadge}>Connected</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-24 text-center text-muted-foreground text-sm">No attendees yet.</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
           </div>
         </div>
       )}
 
-      {/* No Classes Today */}
-      {todaysClasses.length === 0 && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold">No Classes Today</h3>
-            <p className="text-muted-foreground text-center mt-2">
-              You don't have any scheduled classes for today.
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Dialogs */}
+      {/* --- HIDDEN DIALOGS (Existing Logic) --- */}
       <Dialog open={showStreamDialog} onOpenChange={setShowStreamDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md bg-white border-slate-200">
           <DialogHeader>
-            <DialogTitle>Start {isMergedSession ? 'Merged' : ''} Live Stream</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-slate-900">Start {isMergedSession ? 'Merged' : ''} Live Stream</DialogTitle>
+            <DialogDescription className="text-slate-500">
               Copy the key below, then paste it into Jitsi via "Start Live Stream".
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center space-x-2">
             <div className="grid flex-1 gap-2">
               <Label htmlFor="link" className="sr-only">Stream Key</Label>
-              <Input id="link" defaultValue={streamKey} readOnly />
+              <Input id="link" defaultValue={streamKey} readOnly className="bg-slate-50 border-slate-200" />
             </div>
             <Button type="submit" size="sm" className="px-3" onClick={copyToClipboard}>
               <Copy className="h-4 w-4" />
             </Button>
           </div>
           <DialogFooter className="sm:justify-start">
-            <Button type="button" variant="default" onClick={proceedToMeeting} className="w-full bg-blue-600 hover:bg-blue-700">
+            <Button type="button" variant="default" onClick={proceedToMeeting} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
               Go to Class
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {selectedClassForAttendance && (
-        <Card className="mt-6">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <UserCheck className="h-5 w-5" />
-              Attendance - {selectedClassForAttendance.subject} ({selectedClassForAttendance.batch})
-            </CardTitle>
-            <Button variant="ghost" onClick={() => setSelectedClassForAttendance(null)}>Close</Button>
-          </CardHeader>
-          <CardContent>
-             {/* Existing table code... */}
-             {isLoadingAttendance ? <Skeleton className="h-32 w-full" /> : 
-              attendance && attendance.length > 0 ? (
-                <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Joined At</TableHead>
-                        <TableHead>Left At</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {attendance.map((r) => (
-                            <TableRow key={r.id}>
-                                <TableCell>{r.user_name}</TableCell>
-                                <TableCell>{r.user_role}</TableCell>
-                                <TableCell>{format(new Date(r.joined_at), 'h:mm a')}</TableCell>
-                                <TableCell>{r.left_at ? format(new Date(r.left_at), 'h:mm a') : <Badge className="bg-green-500">In Class</Badge>}</TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-              ) : <p className="text-muted-foreground text-center py-4">No attendees yet.</p>
-             }
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 };
