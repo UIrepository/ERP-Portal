@@ -260,6 +260,7 @@ export const TeacherJoinClass = () => {
     return format(parsed, 'h:mm a');
   };
 
+  // NOTE: Toggle selection logic removed from UI as requested, but function kept for type safety
   const toggleSelection = (id: string) => {
     setSelectedMergeIds(prev => 
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
@@ -407,19 +408,19 @@ export const TeacherJoinClass = () => {
 
   const isLoading = isLoadingTeacher || isLoadingSchedules;
 
-  // --- STYLES (Adjusted for Full Width & Proper Alignment) ---
+  // --- STYLES (Fixed Alignment & Removed Checkbox Columns) ---
   const styles = {
-    // Removed max-w, extra padding, and background to allow it to fill the Dashboard container naturally
+    // Width set to full, removed internal horizontal padding to align with header
     wrapper: "w-full font-sans text-slate-900", 
     pageHeader: "flex justify-between items-start mb-6",
     headerTitle: "text-2xl font-bold tracking-tight text-slate-900",
     headerDate: "text-sm text-slate-600 mt-1",
-    btnMerge: "inline-flex items-center gap-2 px-4 py-2.5 rounded text-sm font-medium cursor-pointer bg-slate-100 text-blue-600 border border-slate-300 hover:bg-slate-200 transition-all",
+    btnMerge: "hidden", // Hidden since selection is removed
     sectionHeading: "text-xs font-semibold uppercase tracking-wider text-slate-600 mb-4 mt-8 flex items-center gap-2",
     statusIndicator: "w-2 h-2 rounded-full bg-emerald-600",
-    classCard: "grid grid-cols-1 md:grid-cols-[40px_1fr_auto] items-center p-6 border border-slate-200 rounded-xl mb-3 hover:border-slate-300 transition-all bg-white shadow-sm",
+    // Changed to flex to remove the checkbox column completely
+    classCard: "flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 border border-slate-200 rounded-xl mb-3 hover:border-slate-300 transition-all bg-white shadow-sm",
     activeClassCard: "bg-slate-50 border-l-[3px] border-l-emerald-600",
-    checkbox: "w-[18px] h-[18px] cursor-pointer accent-slate-900",
     batchLabel: "text-sm text-slate-600 mb-2 block",
     subjectTitle: "text-base font-semibold text-slate-900",
     metaContainer: "flex items-center gap-4 text-[13px] text-slate-600 mt-1",
@@ -446,12 +447,6 @@ export const TeacherJoinClass = () => {
           <h1 className={styles.headerTitle}>Class Management</h1>
           <p className={styles.headerDate}>{format(new Date(), 'EEEE, MMMM dd, yyyy')}</p>
         </div>
-        {selectedMergeIds.length > 1 && (
-          <button onClick={handleStartMergedClass} className={styles.btnMerge} disabled={isStartingStream}>
-            <Merge className="w-4 h-4" />
-            {isStartingStream ? 'Preparing...' : 'Initiate Merged Session'}
-          </button>
-        )}
       </header>
 
       {/* --- LIVE SESSIONS --- */}
@@ -467,15 +462,8 @@ export const TeacherJoinClass = () => {
             
             return (
               <div key={cls.id} className={`${styles.classCard} ${styles.activeClassCard}`}>
-                <div className="hidden md:block">
-                  <input 
-                    type="checkbox" 
-                    className={styles.checkbox}
-                    checked={selectedMergeIds.includes(cls.id)}
-                    onChange={() => toggleSelection(cls.id)}
-                  />
-                </div>
-                <div className="class-info">
+                {/* Checkbox removed completely */}
+                <div className="class-info flex-1">
                   <span className={styles.batchLabel}>
                     {cls.mergedBatches 
                       ? cls.mergedBatches.map(m => m.batch).join(' • ') 
@@ -501,7 +489,7 @@ export const TeacherJoinClass = () => {
                   <button onClick={() => setSelectedClassForAttendance(cls)} className={styles.btn}>Attendance</button>
                   <button 
                     onClick={() => handleStartClass(cls)}
-                    disabled={isStartingStream || selectedMergeIds.length > 1}
+                    disabled={isStartingStream}
                     className={styles.btnBlue}
                   >
                     {isStartingStream ? <Loader2 className="animate-spin w-4 h-4"/> : 'Join Session'}
@@ -525,15 +513,7 @@ export const TeacherJoinClass = () => {
 
             return (
               <div key={cls.id} className={styles.classCard}>
-                <div className="hidden md:block">
-                  <input 
-                    type="checkbox" 
-                    className={styles.checkbox}
-                    checked={selectedMergeIds.includes(cls.id)}
-                    onChange={() => toggleSelection(cls.id)}
-                  />
-                </div>
-                <div className="class-info">
+                <div className="class-info flex-1">
                   <span className={styles.batchLabel}>{cls.batch}</span>
                   <h3 className={styles.subjectTitle}>{cls.subject}</h3>
                   <div className={styles.metaContainer}>
@@ -545,7 +525,7 @@ export const TeacherJoinClass = () => {
                   <button onClick={() => setSelectedClassForAttendance(cls)} className={styles.btn}>Attendance</button>
                   <button 
                     onClick={() => handleStartClass(cls)} 
-                    disabled={isStartingStream || selectedMergeIds.length > 1}
+                    disabled={isStartingStream}
                     className={styles.btnPrimary}
                   >
                     Start Class
@@ -563,8 +543,7 @@ export const TeacherJoinClass = () => {
           <div className={`${styles.sectionHeading} opacity-60`}>Completed</div>
           {completedClasses.map((cls) => (
              <div key={cls.id} className={`${styles.classCard} opacity-60 hover:opacity-100`}>
-                <div className="hidden md:block"></div>
-                <div className="class-info">
+                <div className="class-info flex-1">
                   <span className={styles.batchLabel}>{cls.batch}</span>
                   <h3 className={styles.subjectTitle}>{cls.subject}</h3>
                   <div className={styles.metaContainer}>
