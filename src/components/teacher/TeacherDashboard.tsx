@@ -48,22 +48,20 @@ export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardPro
   return (
     <div className="p-4 sm:p-6 bg-slate-50 min-h-screen">
       
-      {/* --- COMPACT WELCOME BANNER (Lightish Blue Premium Theme) --- */}
-      <div className="mb-6 relative overflow-hidden rounded-xl bg-gradient-to-r from-sky-100 via-blue-50 to-indigo-100 shadow-md border border-blue-100/50 group">
+      {/* --- COMPACT WELCOME BANNER (Single Blue Theme) --- */}
+      <div className="mb-6 relative overflow-hidden rounded-xl bg-blue-50 shadow-sm border border-blue-100 group">
         
-        {/* Premium Effect Pattern (Subtle Glows) */}
-        <div className="absolute top-0 right-0 -mt-8 -mr-8 w-48 h-48 rounded-full bg-blue-400/10 blur-3xl group-hover:bg-blue-400/20 transition-colors duration-700"></div>
-        <div className="absolute bottom-0 left-0 -mb-8 -ml-8 w-32 h-32 rounded-full bg-cyan-400/10 blur-2xl"></div>
+        {/* Premium Effect Pattern (Refined Single Color Glows) */}
+        <div className="absolute top-0 right-0 -mt-12 -mr-12 w-64 h-64 rounded-full bg-blue-500/5 blur-3xl group-hover:bg-blue-500/10 transition-colors duration-1000"></div>
+        <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-40 h-40 rounded-full bg-blue-400/5 blur-2xl"></div>
         
-        {/* Subtle Grid Pattern Overlay */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:24px_24px]"></div>
-
-        <div className="relative z-10 px-5 py-5 flex flex-row items-center justify-between gap-4">
-          <div className="space-y-1">
-            <h1 className="text-xl sm:text-2xl font-semibold text-slate-800 tracking-tight font-sans">
-              Welcome back, {profile?.name}! 👋
-            </h1>
-          </div>
+        <div className="relative z-10 px-5 py-5 flex flex-col gap-1">
+          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight font-sans">
+            Welcome back, {profile?.name}! 👋
+          </h1>
+          <p className="text-slate-500 text-sm font-normal font-sans">
+            Another day to deal with students.
+          </p>
         </div>
       </div>
 
