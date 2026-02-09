@@ -27,6 +27,8 @@ interface Schedule {
   end_time: string;
   date: string | null;
   stream_key?: string | null;
+  // Dedup metadata for merged classes
+  mergedBatches?: { batch: string; subject: string; id: string }[];
 }
 
 interface Teacher {
@@ -176,7 +178,7 @@ export const TeacherJoinClass = () => {
     return () => { supabase.removeChannel(channel); };
   }, [selectedClassForAttendance, queryClient]);
 
-  // Filter schedules for today
+  // Filter schedules for today, then deduplicate merged classes
   const todaysClasses = useMemo(() => {
     if (!schedules || !teacher) return [];
     
@@ -185,7 +187,7 @@ export const TeacherJoinClass = () => {
     const assignedBatches = teacher.assigned_batches || [];
     const assignedSubjects = teacher.assigned_subjects || [];
     
-    return schedules.filter(schedule => {
+    const filtered = schedules.filter(schedule => {
       const isAssignedBatch = assignedBatches.includes(schedule.batch);
       if (!isAssignedBatch) return false;
       
@@ -200,7 +202,55 @@ export const TeacherJoinClass = () => {
         return schedule.day_of_week === todayDayOfWeek;
       }
     }).sort((a, b) => a.start_time.localeCompare(b.start_time));
-  }, [schedules, teacher]);
+
+    // Dedup pass: merge classes that are in the same merge group with identical timing
+    const deduped: Schedule[] = [];
+    const consumed = new Set<string>();
+
+    for (const cls of filtered) {
+      if (consumed.has(cls.id)) continue;
+
+      // Find merge partner in the list
+      const merge = activeMerges.find((m: any) =>
+        (m.primary_batch === cls.batch && m.primary_subject === cls.subject) ||
+        (m.secondary_batch === cls.batch && m.secondary_subject === cls.subject)
+      );
+
+      if (merge) {
+        const partnerBatch = merge.primary_batch === cls.batch && merge.primary_subject === cls.subject
+          ? merge.secondary_batch : merge.primary_batch;
+        const partnerSubject = merge.primary_batch === cls.batch && merge.primary_subject === cls.subject
+          ? merge.secondary_subject : merge.primary_subject;
+
+        const partner = filtered.find(s =>
+          !consumed.has(s.id) &&
+          s.id !== cls.id &&
+          s.batch === partnerBatch &&
+          s.subject === partnerSubject &&
+          s.start_time === cls.start_time &&
+          s.end_time === cls.end_time
+        );
+
+        if (partner) {
+          consumed.add(partner.id);
+          deduped.push({
+            ...cls,
+            mergedBatches: [
+              { batch: cls.batch, subject: cls.subject, id: cls.id },
+              { batch: partner.batch, subject: partner.subject, id: partner.id },
+            ],
+          });
+          consumed.add(cls.id);
+          continue;
+        }
+      }
+
+      consumed.add(cls.id);
+      deduped.push(cls);
+    }
+
+    return deduped;
+  }, [schedules, teacher, activeMerges]);
 
   const { liveClasses, upcomingClasses, completedClasses } = useMemo(() => {
     const now = new Date();
@@ -241,32 +291,40 @@ export const TeacherJoinClass = () => {
     setCurrentClass(cls);
     setIsMergedSession(false);
 
-    // 1. Mark Attendance
+    // Determine all batch/subject pairs to activate (including merge partners)
+    const allPairs = cls.mergedBatches
+      ? cls.mergedBatches
+      : [{ batch: cls.batch, subject: cls.subject, id: cls.id }];
+
+    // 1. Mark Attendance & activate classes for all pairs
     try {
       if (profile?.user_id) {
         const today = format(new Date(), 'yyyy-MM-dd');
-        await supabase.from('class_attendance').upsert({
-          user_id: profile.user_id,
-          user_name: profile.name || user?.email || 'Teacher',
-          user_role: 'teacher',
-          schedule_id: cls.id,
-          batch: cls.batch,
-          subject: cls.subject,
-          class_date: today,
-          joined_at: new Date().toISOString()
-        }, { onConflict: 'user_id,schedule_id,class_date' });
-
-        // IMPORTANT: Update active_classes using primary pair for consistent room naming
         const primary = getPrimaryPair(cls.batch, cls.subject);
         const roomName = generateJitsiRoomName(primary.batch, primary.subject);
-        await supabase.from('active_classes').upsert({
-          batch: cls.batch,
-          subject: cls.subject,
-          room_url: `https://meet.jit.si/${encodeURIComponent(roomName)}`,
-          teacher_id: profile.user_id,
-          is_active: true,
-          started_at: new Date().toISOString()
-        }, { onConflict: 'batch, subject' }); // Assumed composite key or unique constraint
+        const roomUrl = `https://meet.jit.si/${encodeURIComponent(roomName)}`;
+
+        for (const pair of allPairs) {
+          await supabase.from('class_attendance').upsert({
+            user_id: profile.user_id,
+            user_name: profile.name || user?.email || 'Teacher',
+            user_role: 'teacher',
+            schedule_id: pair.id,
+            batch: pair.batch,
+            subject: pair.subject,
+            class_date: today,
+            joined_at: new Date().toISOString()
+          }, { onConflict: 'user_id,schedule_id,class_date' });
+
+          await supabase.from('active_classes').upsert({
+            batch: pair.batch,
+            subject: pair.subject,
+            room_url: roomUrl,
+            teacher_id: profile.user_id,
+            is_active: true,
+            started_at: new Date().toISOString()
+          }, { onConflict: 'batch, subject' });
+        }
       }
     } catch (e) {
       console.error("Error marking attendance:", e);
@@ -474,12 +532,26 @@ export const TeacherJoinClass = () => {
 
                       <div>
                         <h3 className="text-xl font-bold">{cls.subject}</h3>
-                        <p className="text-muted-foreground">{cls.batch}</p>
-                        {getMergedLabel(cls.batch, cls.subject) && (
-                          <Badge variant="outline" className="mt-1 text-purple-700 border-purple-300 bg-purple-50">
-                            <Merge className="h-3 w-3 mr-1" />
-                            Merged with {getMergedLabel(cls.batch, cls.subject)}
-                          </Badge>
+                        {cls.mergedBatches ? (
+                          <>
+                            <p className="text-muted-foreground">
+                              {cls.mergedBatches.map(m => m.batch).join(' + ')}
+                            </p>
+                            <Badge variant="outline" className="mt-1 text-purple-700 border-purple-300 bg-purple-50">
+                              <Merge className="h-3 w-3 mr-1" />
+                              Merged class
+                            </Badge>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-muted-foreground">{cls.batch}</p>
+                            {getMergedLabel(cls.batch, cls.subject) && (
+                              <Badge variant="outline" className="mt-1 text-purple-700 border-purple-300 bg-purple-50">
+                                <Merge className="h-3 w-3 mr-1" />
+                                Merged with {getMergedLabel(cls.batch, cls.subject)}
+                              </Badge>
+                            )}
+                          </>
                         )}
                         <p className="text-sm mt-2 flex items-center gap-2">
                           <Clock className="h-4 w-4" />
