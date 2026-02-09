@@ -320,7 +320,7 @@ export const StudentCommunity = () => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const [selectedGroup, setSelectedGroup] = useState<UserEnrollment | null>(null);
-  const { orFilter: communityOrFilter } = useMergedSubjects(selectedGroup?.batch_name, selectedGroup?.subject_name);
+  const { orFilter: communityOrFilter, mergedPairs: communityMergedPairs } = useMergedSubjects(selectedGroup?.batch_name, selectedGroup?.subject_name);
   const [messageText, setMessageText] = useState('');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [replyingTo, setReplyingTo] = useState<CommunityMessage | null>(null);
@@ -397,17 +397,20 @@ export const StudentCommunity = () => {
   }, [groupedMessages]);
 
   useEffect(() => {
-    if (!selectedGroup) return;
+    if (!selectedGroup || !communityMergedPairs.length) return;
     const refresh = () => {
-      queryClient.invalidateQueries({ queryKey: ['community-messages', selectedGroup.batch_name, selectedGroup.subject_name] });
+      queryClient.invalidateQueries({ queryKey: ['community-messages', selectedGroup.batch_name, selectedGroup.subject_name, communityOrFilter] });
     };
-    const channel = supabase
-      .channel(`community-${selectedGroup.batch_name}-${selectedGroup.subject_name}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'community_messages', filter: `batch=eq.${selectedGroup.batch_name}` }, refresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_likes' }, refresh)
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [selectedGroup, queryClient]);
+    // Subscribe to changes from ALL merged batches so cross-batch messages appear in real-time
+    const channels = communityMergedPairs.map((pair, i) =>
+      supabase
+        .channel(`community-${pair.batch}-${pair.subject}-${i}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'community_messages', filter: `batch=eq.${pair.batch}` }, refresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'message_likes' }, refresh)
+        .subscribe()
+    );
+    return () => { channels.forEach(ch => supabase.removeChannel(ch)); };
+  }, [selectedGroup, communityMergedPairs, communityOrFilter, queryClient]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
