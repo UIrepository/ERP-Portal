@@ -48,24 +48,23 @@ export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardPro
   return (
     <div className="p-4 sm:p-6 bg-slate-50 min-h-screen">
       
-      {/* --- WELCOME BANNER (Purplish Patterned CTA Style) --- */}
-      <div className="mb-8 relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 p-8 shadow-xl shadow-purple-200 transition-all hover:shadow-2xl hover:shadow-purple-300/50 group">
+      {/* --- WELCOME BANNER (Student Header Design Style) --- */}
+      <div className="mb-8 relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 shadow-xl transition-all hover:shadow-2xl hover:shadow-slate-900/20 group">
         
-        {/* Background Pattern Effects (CSS Shapes) */}
-        <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 rounded-full bg-white/10 blur-2xl group-hover:scale-110 transition-transform duration-700"></div>
-        <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-32 h-32 rounded-full bg-white/10 blur-2xl group-hover:scale-110 transition-transform duration-700 delay-100"></div>
-        <div className="absolute top-1/2 left-1/4 w-20 h-20 rounded-full bg-indigo-400/20 blur-xl"></div>
-        
-        {/* Decorative Grid Pattern Overlay */}
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_80%)]"></div>
+        {/* Subtle Decorative Glow (Optional, to match the sleek feel) */}
+        <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 rounded-full bg-cyan-500/5 blur-3xl group-hover:bg-cyan-500/10 transition-colors duration-700"></div>
+        <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-32 h-32 rounded-full bg-slate-700/10 blur-2xl"></div>
 
-        <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="space-y-2">
-            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white drop-shadow-sm">
+        <div className="relative z-10 px-6 py-8 sm:px-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <p className="text-cyan-400/90 text-xs font-bold uppercase tracking-widest mb-2">
+              Teacher Dashboard
+            </p>
+            <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight drop-shadow-sm">
               Welcome back, {profile?.name}! 👋
             </h1>
-            <p className="text-purple-100 text-lg font-medium opacity-90 max-w-lg leading-relaxed">
-              Another day to deal with students. 
+            <p className="text-slate-400 text-lg font-medium opacity-90 pt-1">
+              Another day to deal with students. 🚀
             </p>
           </div>
         </div>
