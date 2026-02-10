@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.manage-google-group]
 verify_jwt = false
+
+[functions.sync-google-groups]
+verify_jwt = false
