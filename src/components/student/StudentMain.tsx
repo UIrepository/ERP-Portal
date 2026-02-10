@@ -19,6 +19,8 @@ import {
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { FullScreenVideoPlayer } from '@/components/video-player/FullScreenVideoPlayer';
+import { Lecture } from '@/components/video-player/types';
 
 interface UserEnrollment {
   batch_name: string;
@@ -42,6 +44,7 @@ const StudentMainContent = () => {
   const [activeTab, setActiveTab] = useState<TabType>('classes');
   const [isInitialized, setIsInitialized] = useState(false);
   const { openSupportDrawer } = useChatDrawer();
+  const [showTutorial, setShowTutorial] = useState(false);
   
   const [navigation, setNavigation] = useState<NavigationState>({
     level: 'batch',
@@ -53,6 +56,15 @@ const StudentMainContent = () => {
   // Batch Switcher State
   const [isBatchSheetOpen, setIsBatchSheetOpen] = useState(false);
   const [tempSelectedBatch, setTempSelectedBatch] = useState<string | null>(null);
+
+  // Tutorial Video Configuration
+  const tutorialLecture: Lecture = {
+    id: 'student-tutorial',
+    title: 'How to use the Student Portal',
+    videoUrl: 'https://youtu.be/nePZER6PTjQ',
+    subject: 'Tutorial',
+    duration: '5:00'
+  };
 
   // Fetch user enrollments
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
@@ -322,67 +334,78 @@ const StudentMainContent = () => {
               </h1>
             </div>
 
-            {/* SWITCH BATCH BUTTON */}
-            {availableBatches.length > 1 && (
-                <Sheet open={isBatchSheetOpen} onOpenChange={setIsBatchSheetOpen}>
-                  <SheetTrigger asChild>
-                    <Button 
-                      variant="outline" 
-                      className="bg-white/80 backdrop-blur-sm border-indigo-200 text-indigo-700 hover:bg-white hover:text-indigo-800 shadow-sm gap-2 font-medium"
-                    >
-                      Switch Batch
-                      <ArrowRightLeft className="h-4 w-4 opacity-70" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="right" className="w-full sm:w-[400px] flex flex-col p-0 z-[100]">
-                     <div className="p-6 border-b border-slate-100 mt-6 sm:mt-0">
-                        <h2 className="text-xl font-bold text-slate-900">Switch</h2>
-                        <p className="text-sm text-slate-500 mt-1">Select the batch you want to switch to.</p>
-                     </div>
-                     
-                     <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                        {availableBatches.map((b) => (
-                            <div 
-                                key={b}
-                                onClick={() => setTempSelectedBatch(b)}
-                                className={cn(
-                                    "p-4 rounded-xl border cursor-pointer transition-all flex items-center justify-between",
-                                    tempSelectedBatch === b 
-                                        ? "border-indigo-600 bg-indigo-50/50 shadow-sm ring-1 ring-indigo-600/20" 
-                                        : "border-slate-200 hover:border-indigo-200 hover:bg-slate-50"
-                                )}
-                            >
-                                <span className={cn(
-                                    "font-medium text-sm sm:text-base", 
-                                    tempSelectedBatch === b ? "text-indigo-900" : "text-slate-700"
-                                )}>
-                                    {b}
-                                </span>
-                                <div className={cn(
-                                    "w-5 h-5 rounded-full border flex items-center justify-center transition-colors",
-                                    tempSelectedBatch === b 
-                                        ? "border-indigo-600 bg-indigo-600" 
-                                        : "border-slate-300"
-                                )}>
-                                    {tempSelectedBatch === b && (
-                                        <div className="w-2 h-2 bg-white rounded-full" />
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                     </div>
+            <div className="flex items-center gap-3">
+              {/* Tutorial Button */}
+              <Button 
+                variant="outline"
+                className="bg-white/80 backdrop-blur-sm border-indigo-200 text-indigo-700 hover:bg-white hover:text-indigo-800 shadow-sm gap-2 font-sans font-normal"
+                onClick={() => setShowTutorial(true)}
+              >
+                How to use me?
+              </Button>
 
-                     <div className="p-6 border-t border-slate-100 bg-white">
-                        <Button 
-                            onClick={confirmBatchSwitch}
-                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white h-12 rounded-xl text-base font-semibold shadow-lg shadow-indigo-200 active:scale-[0.98] transition-all"
-                        >
-                            Switch Batch
-                        </Button>
-                     </div>
-                  </SheetContent>
-                </Sheet>
-              )}
+              {/* SWITCH BATCH BUTTON */}
+              {availableBatches.length > 1 && (
+                  <Sheet open={isBatchSheetOpen} onOpenChange={setIsBatchSheetOpen}>
+                    <SheetTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        className="bg-white/80 backdrop-blur-sm border-indigo-200 text-indigo-700 hover:bg-white hover:text-indigo-800 shadow-sm gap-2 font-medium"
+                      >
+                        Switch Batch
+                        <ArrowRightLeft className="h-4 w-4 opacity-70" />
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="right" className="w-full sm:w-[400px] flex flex-col p-0 z-[100]">
+                      <div className="p-6 border-b border-slate-100 mt-6 sm:mt-0">
+                          <h2 className="text-xl font-bold text-slate-900">Switch</h2>
+                          <p className="text-sm text-slate-500 mt-1">Select the batch you want to switch to.</p>
+                      </div>
+                      
+                      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                          {availableBatches.map((b) => (
+                              <div 
+                                  key={b}
+                                  onClick={() => setTempSelectedBatch(b)}
+                                  className={cn(
+                                      "p-4 rounded-xl border cursor-pointer transition-all flex items-center justify-between",
+                                      tempSelectedBatch === b 
+                                          ? "border-indigo-600 bg-indigo-50/50 shadow-sm ring-1 ring-indigo-600/20" 
+                                          : "border-slate-200 hover:border-indigo-200 hover:bg-slate-50"
+                                  )}
+                              >
+                                  <span className={cn(
+                                      "font-medium text-sm sm:text-base", 
+                                      tempSelectedBatch === b ? "text-indigo-900" : "text-slate-700"
+                                  )}>
+                                      {b}
+                                  </span>
+                                  <div className={cn(
+                                      "w-5 h-5 rounded-full border flex items-center justify-center transition-colors",
+                                      tempSelectedBatch === b 
+                                          ? "border-indigo-600 bg-indigo-600" 
+                                          : "border-slate-300"
+                                  )}>
+                                      {tempSelectedBatch === b && (
+                                          <div className="w-2 h-2 bg-white rounded-full" />
+                                      )}
+                                  </div>
+                              </div>
+                          ))}
+                      </div>
+
+                      <div className="p-6 border-t border-slate-100 bg-white">
+                          <Button 
+                              onClick={confirmBatchSwitch}
+                              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white h-12 rounded-xl text-base font-semibold shadow-lg shadow-indigo-200 active:scale-[0.98] transition-all"
+                          >
+                              Switch Batch
+                          </Button>
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+                )}
+            </div>
           </div>
         </div>
 
@@ -433,6 +456,16 @@ const StudentMainContent = () => {
       <div className="w-full bg-white rounded-t-none rounded-b-lg shadow-sm border border-slate-100 p-6 md:p-8 h-auto min-h-[400px]">
         {renderTabContent()}
       </div>
+
+      {/* Video Player Overlay */}
+      {showTutorial && (
+        <FullScreenVideoPlayer
+          currentLecture={tutorialLecture}
+          lectures={[tutorialLecture]}
+          onClose={() => setShowTutorial(false)}
+          userName={profile?.name}
+        />
+      )}
     </div>
   );
 };
