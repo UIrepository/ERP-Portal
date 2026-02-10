@@ -2,10 +2,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-import { useAuth } from '@/hooks/useAuth';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, ChevronRight, Clock, Video } from 'lucide-react';
-import { format, getDay, startOfWeek, addDays, isSameDay, subDays, parse, isWithinInterval } from 'date-fns';
+import { ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { format, getDay, startOfWeek, addDays, isSameDay, subDays, isWithinInterval } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -19,11 +18,6 @@ interface Schedule {
   end_time: string;
   link?: string;
   date?: string; 
-}
-
-interface UserEnrollment {
-    batch_name: string;
-    subject_name: string;
 }
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -68,7 +62,6 @@ const ScheduleSkeleton = () => (
 );
 
 export const StudentSchedule = () => {
-  const { profile } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
   const [displayDate, setDisplayDate] = useState(new Date());
@@ -79,66 +72,56 @@ export const StudentSchedule = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
-    queryKey: ['userEnrollments', profile?.user_id],
-    queryFn: async () => {
-        if (!profile?.user_id) return [];
-        const { data, error } = await supabase
-            .from('user_enrollments')
-            .select('batch_name, subject_name')
-            .eq('user_id', profile.user_id);
-        if (error) return [];
-        return data || [];
+  // Fetch ALL schedules (read-only timetable for students)
+  const { data: schedules, isLoading } = useQuery<Schedule[]>({
+    queryKey: ['student-schedule-all', selectedBatchFilter],
+    queryFn: async (): Promise<Schedule[]> => {
+      let query = supabase
+        .from('schedules')
+        .select('*')
+        .order('date', { nullsFirst: false })
+        .order('day_of_week')
+        .order('start_time');
+
+      if (selectedBatchFilter !== 'all') {
+        query = query.eq('batch', selectedBatchFilter);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
     },
-    enabled: !!profile?.user_id
   });
 
+  // Derive available batches from fetched schedule data
   const availableBatches = useMemo(() => {
-    return Array.from(new Set(userEnrollments?.map(e => e.batch_name) || [])).sort();
-  }, [userEnrollments]);
+    if (!schedules) return [];
+    return Array.from(new Set(schedules.map(s => s.batch))).sort();
+  }, [schedules]);
+
+  // Note: we fetch all schedules first, then the batch filter is applied at query level
+  // So we need a separate query for batch list (fetch all once)
+  const { data: allSchedulesForBatches } = useQuery<string[]>({
+    queryKey: ['student-schedule-batch-list'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('schedules')
+        .select('batch');
+      if (error) return [];
+      return Array.from(new Set((data || []).map((s: any) => s.batch))).sort();
+    },
+  });
+
+  const batchList = allSchedulesForBatches || availableBatches;
 
   useEffect(() => {
-    if (selectedBatchFilter !== 'all' && !availableBatches.includes(selectedBatchFilter)) {
-        setSelectedBatchFilter('all');
+    if (selectedBatchFilter !== 'all' && batchList.length > 0 && !batchList.includes(selectedBatchFilter)) {
+      setSelectedBatchFilter('all');
     }
-  }, [selectedBatchFilter, availableBatches]);
-
-  const enrollmentPairs = useMemo(() => {
-    if (!userEnrollments) return [];
-    return userEnrollments.map(e => ({ batch: e.batch_name, subject: e.subject_name }));
-  }, [userEnrollments]);
-
-  const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
-    queryKey: ['student-schedule-direct', enrollmentPairs, selectedBatchFilter],
-    queryFn: async (): Promise<Schedule[]> => {
-        if (enrollmentPairs.length === 0) return [];
-        
-        const filteredPairs = selectedBatchFilter === 'all'
-            ? enrollmentPairs
-            : enrollmentPairs.filter(p => p.batch === selectedBatchFilter);
-        
-        if (filteredPairs.length === 0) return [];
-        
-        const orFilter = filteredPairs
-            .map(p => `and(batch.eq.${p.batch},subject.eq.${p.subject})`)
-            .join(',');
-        
-        const { data, error } = await supabase
-            .from('schedules')
-            .select('*')
-            .or(orFilter)
-            .order('date', { nullsFirst: false }).order('day_of_week').order('start_time');
-        
-        if (error) throw error;
-        return data || [];
-    },
-    enabled: enrollmentPairs.length > 0
-  });
-
-  const isLoading = isLoadingEnrollments || isLoadingSchedules;
+  }, [selectedBatchFilter, batchList]);
 
   const weekDates = useMemo(() => {
-    const start = startOfWeek(displayDate, { weekStartsOn: 1 }); // Start on Monday
+    const start = startOfWeek(displayDate, { weekStartsOn: 1 });
     return Array.from({ length: 7 }).map((_, i) => addDays(start, i));
   }, [displayDate]);
 
@@ -185,19 +168,13 @@ export const StudentSchedule = () => {
   };
 
   const isClassLive = (schedule: Schedule, classDate: Date) => {
-    // Basic date check first
     if (!isSameDay(classDate, currentTime)) return false;
-
-    // Time parsing
     const [startH, startM] = schedule.start_time.split(':').map(Number);
     const [endH, endM] = schedule.end_time.split(':').map(Number);
-    
     const startTime = new Date(currentTime);
     startTime.setHours(startH, startM, 0);
-    
     const endTime = new Date(currentTime);
     endTime.setHours(endH, endM, 0);
-
     return isWithinInterval(currentTime, { start: startTime, end: endTime });
   };
 
@@ -222,7 +199,7 @@ export const StudentSchedule = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Batches</SelectItem>
-              {availableBatches.map((batch) => (
+              {batchList.map((batch) => (
                 <SelectItem key={batch} value={batch}>{batch}</SelectItem>
               ))}
             </SelectContent>
@@ -290,7 +267,6 @@ export const StudentSchedule = () => {
                     {weekDates.map((date, dayIndex) => {
                         const dayNum = getDay(date);
                         
-                        // Filter classes for this specific cell (Date + Time)
                         const cellClasses = schedules?.filter(s => {
                             const isTimeMatch = s.start_time === time;
                             const isRecurring = !s.date && s.day_of_week === dayNum;
@@ -329,29 +305,12 @@ export const StudentSchedule = () => {
                                                 
                                                 <div className="flex items-center justify-between text-[10px] text-slate-500 mb-2">
                                                     <span>{classInfo.batch}</span>
-                                                    {/* Updated End Time Block */}
                                                     <span className="bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-[2px] text-[9px] font-medium text-slate-600">
                                                         Upto {formatTime(classInfo.end_time)}
                                                     </span>
                                                 </div>
 
-                                                {/* Live Join Button */}
-                                                {classInfo.link && (
-                                                    <Button 
-                                                        size="sm" 
-                                                        variant={isLive ? "default" : "outline"}
-                                                        className={cn(
-                                                            "w-full h-7 text-[10px] font-medium",
-                                                            isLive ? "bg-indigo-600 hover:bg-indigo-700 text-white" : "text-slate-600 border-slate-200 hover:bg-slate-50"
-                                                        )}
-                                                        asChild
-                                                    >
-                                                        <a href={classInfo.link} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5">
-                                                            {isLive ? <Video className="h-3 w-3" /> : null}
-                                                            {isLive ? "Join Live" : "Join Class"}
-                                                        </a>
-                                                    </Button>
-                                                )}
+                                                {/* Join buttons removed — read-only timetable */}
                                             </div>
                                         </div>
                                     );
