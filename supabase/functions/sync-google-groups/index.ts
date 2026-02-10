@@ -191,7 +191,7 @@ Deno.serve(async (req) => {
             if (addRes.status === 'added') stats.members_added++;
             else stats.members_existed++;
           } catch (err) {
-            stats.errors.push(`batch-member: ${email} → ${groupEmail}: ${err.message}`);
+            stats.errors.push(`batch-member: ${email} → ${groupEmail}: ${(err as Error).message}`);
           }
           await delay(100); // Rate limit
         }
@@ -199,7 +199,7 @@ Deno.serve(async (req) => {
         stats.batches_processed++;
         console.log(`✅ Batch group done: ${groupEmail} (${batchMembers[batchName].size} members)`);
       } catch (err) {
-        stats.errors.push(`batch-group: ${batchName}: ${err.message}`);
+        stats.errors.push(`batch-group: ${batchName}: ${(err as Error).message}`);
         console.error(`❌ Batch group failed: ${batchName}`, err);
       }
     }
@@ -246,7 +246,7 @@ Deno.serve(async (req) => {
             if (addRes.status === 'added') stats.members_added++;
             else stats.members_existed++;
           } catch (err) {
-            stats.errors.push(`subject-member: ${email} → ${groupEmail}: ${err.message}`);
+            stats.errors.push(`subject-member: ${email} → ${groupEmail}: ${(err as Error).message}`);
           }
           await delay(100);
         }
@@ -254,7 +254,7 @@ Deno.serve(async (req) => {
         stats.subjects_processed++;
         console.log(`✅ Subject group done: ${groupEmail} (${subjectMembers[key].size} members)`);
       } catch (err) {
-        stats.errors.push(`subject-group: ${batchName}/${subjectName}: ${err.message}`);
+        stats.errors.push(`subject-group: ${batchName}/${subjectName}: ${(err as Error).message}`);
         console.error(`❌ Subject group failed: ${batchName}/${subjectName}`, err);
       }
     }

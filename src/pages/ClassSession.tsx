@@ -31,13 +31,36 @@ const ClassSession = () => {
           throw new Error("Access Denied. This secure link belongs to another user.");
         }
 
-        // 2. Double Check: Is the class actually active? (Prevents backdoor entry)
-        const { data: activeClass } = await (supabase.from('active_classes') as any)
-           .select('room_url')
-           .eq('batch', enrollment.batch_name)
-           .eq('subject', enrollment.subject_name)
-           .eq('is_active', true)
-           .single();
+        // 2. Check if this batch+subject is part of a merge group
+        const { data: merges } = await supabase
+          .from('subject_merges')
+          .select('primary_batch, primary_subject, secondary_batch, secondary_subject')
+          .eq('is_active', true)
+          .or(`and(primary_batch.eq."${enrollment.batch_name}",primary_subject.eq."${enrollment.subject_name}"),and(secondary_batch.eq."${enrollment.batch_name}",secondary_subject.eq."${enrollment.subject_name}")`);
+
+        // Build list of all batch+subject pairs to check for active class
+        const pairsToCheck = [
+          { batch: enrollment.batch_name, subject: enrollment.subject_name }
+        ];
+        if (merges?.length) {
+          const m = merges[0];
+          pairsToCheck.push(
+            { batch: m.primary_batch, subject: m.primary_subject },
+            { batch: m.secondary_batch, subject: m.secondary_subject }
+          );
+        }
+
+        // 3. Double Check: Is the class actually active? Check ALL merged pairs
+        let activeClass: { room_url: string } | null = null;
+        for (const pair of pairsToCheck) {
+          const { data } = await (supabase.from('active_classes') as any)
+            .select('room_url')
+            .eq('batch', pair.batch)
+            .eq('subject', pair.subject)
+            .eq('is_active', true)
+            .maybeSingle();
+          if (data) { activeClass = data; break; }
+        }
 
         if (!activeClass) {
              throw new Error("Class is not live yet. Please wait on the dashboard.");
