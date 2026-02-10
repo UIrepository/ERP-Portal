@@ -258,7 +258,7 @@ const StudentMainContent = () => {
       case 'live':
         return (
           <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-             <StudentLiveClass batch={navigation.batch} />
+             <StudentLiveClass batch={navigation.batch} enrolledSubjects={subjectsForBatch} />
           </div>
         );
       case 'announcements':

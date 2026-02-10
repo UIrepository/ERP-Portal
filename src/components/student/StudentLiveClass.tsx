@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 interface StudentLiveClassProps {
   batch: string | null;
   subject?: string | null;
+  enrolledSubjects?: string[];
 }
 
 interface ScheduleWithLink {
@@ -25,7 +26,7 @@ interface ScheduleWithLink {
   is_jitsi_live?: boolean;
 }
 
-export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
+export const StudentLiveClass = ({ batch, subject, enrolledSubjects }: StudentLiveClassProps) => {
   const { profile, user } = useAuth();
   const { mergedPairs, orFilter, primaryPair } = useMergedSubjects(batch, subject);
   const today = new Date();
@@ -45,12 +46,18 @@ export const StudentLiveClass = ({ batch, subject }: StudentLiveClassProps) => {
       let allActiveClasses: any[] = [];
 
       if (isBatchLevel) {
-        // Batch-level mode: fetch ALL schedules/links/active classes for this batch
+        // Batch-level mode: fetch schedules/links/active classes filtered by enrolled subjects
+        const subjectsFilter = enrolledSubjects && enrolledSubjects.length > 0 ? enrolledSubjects : [];
+        if (subjectsFilter.length === 0) return [];
+        
         const [schedRes, linksRes, activeRes] = await Promise.all([
           supabase.from('schedules').select('*').eq('batch', batch)
+            .in('subject', subjectsFilter)
             .or(`day_of_week.eq.${currentDayOfWeek},date.eq.${todayDateStr}`),
-          supabase.from('meeting_links').select('*').eq('batch', batch).eq('is_active', true),
-          supabase.from('active_classes').select('*').eq('batch', batch).eq('is_active', true),
+          supabase.from('meeting_links').select('*').eq('batch', batch)
+            .in('subject', subjectsFilter).eq('is_active', true),
+          supabase.from('active_classes').select('*').eq('batch', batch)
+            .in('subject', subjectsFilter).eq('is_active', true),
         ]);
         if (schedRes.data) allSchedules = schedRes.data;
         if (linksRes.data) allMeetingLinks = linksRes.data;
