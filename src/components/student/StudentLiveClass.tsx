@@ -7,6 +7,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { useMergedSubjects } from '@/hooks/useMergedSubjects';
 import { toast } from 'sonner';
 
+interface MergeRow {
+  primary_batch: string;
+  primary_subject: string;
+  secondary_batch: string;
+  secondary_subject: string;
+}
+
 interface StudentLiveClassProps {
   batch: string | null;
   subject?: string | null;
@@ -32,6 +39,34 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects }: StudentLi
   const today = new Date();
   const currentDayOfWeek = today.getDay();
   const todayDateStr = format(today, 'yyyy-MM-dd');
+
+  // Fetch all active merges so we can resolve primary pairs for ANY schedule
+  const { data: activeMerges = [] } = useQuery<MergeRow[]>({
+    queryKey: ['active-merges-for-student-live'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('subject_merges').select('primary_batch, primary_subject, secondary_batch, secondary_subject')
+        .eq('is_active', true);
+      return (data as MergeRow[]) || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Helper: resolve any batch+subject to its deterministic primary pair
+  const getPrimaryPair = (b: string, s: string) => {
+    const merge = activeMerges.find(m =>
+      (m.primary_batch === b && m.primary_subject === s) ||
+      (m.secondary_batch === b && m.secondary_subject === s)
+    );
+    if (!merge) return { batch: b, subject: s };
+    const pairs = [
+      { batch: merge.primary_batch, subject: merge.primary_subject },
+      { batch: merge.secondary_batch, subject: merge.secondary_subject }
+    ];
+    return pairs.sort((a, bb) =>
+      `${a.batch}|${a.subject}`.localeCompare(`${bb.batch}|${bb.subject}`)
+    )[0];
+  };
 
   // Fetch schedules logic
   const isBatchLevel = !subject;
@@ -105,9 +140,10 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects }: StudentLi
           || allActiveClasses?.find(ac => ac.subject === schedule.subject);
         const subjectLink = allMeetingLinks?.find(l => l.subject === schedule.subject && l.batch === schedule.batch);
 
-        // For subject-level, use primaryPair for consistent room naming; for batch-level, use schedule's own values
-        const roomBatch = isBatchLevel ? schedule.batch : (primaryPair?.batch || batch || '');
-        const roomSubject = isBatchLevel ? schedule.subject : (primaryPair?.subject || subject || '');
+        // Always resolve primary pair for consistent room naming (fixes merged batch students landing in different rooms)
+        const primary = getPrimaryPair(schedule.batch, schedule.subject);
+        const roomBatch = primary.batch;
+        const roomSubject = primary.subject;
 
         const generatedJitsiLink = `https://meet.jit.si/${generateJitsiRoomName(roomBatch, roomSubject)}`;
         const dbLink = activeJitsi?.room_url || schedule.link || subjectLink?.link;
