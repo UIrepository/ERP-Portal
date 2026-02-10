@@ -1,57 +1,72 @@
 
 
-# Fix: Email Notifications Not Sending (Vault Permission Issue)
+# Fix: Students Seeing Non-Enrolled Subjects
 
-## Root Cause
-The `notify_via_google_group` function tries to read the Resend API key from `vault.decrypted_secrets`, but the `postgres` role (which owns the SECURITY DEFINER function) does not have permission to decrypt vault secrets. This causes a silent failure -- the function hits the `RESEND_API_KEY not found` warning and skips sending.
+## Problem
+Students enrolled in specific subjects within a batch are seeing ALL subjects in that batch. The root cause is in the **`StudentLiveClass`** component and certain **RLS policies** that filter by batch only, not by the batch+subject enrollment pair.
 
-The Postgres error log confirms: `permission denied for function _crypto_aead_det_decrypt`
+## Root Cause Analysis
 
-## Fix
+### 1. StudentLiveClass (Batch-Level Mode) -- Code Bug
+In `StudentLiveClass.tsx` (lines 47-54), when rendering at the batch level (no subject selected), it fetches ALL schedules, meeting links, and active classes for the entire batch:
+```js
+supabase.from('schedules').select('*').eq('batch', batch)
+```
+This shows classes for subjects the student is NOT enrolled in.
 
-Since the Vault decryption is not accessible from trigger functions in this Supabase setup, we'll use an alternative approach: store the API key in a **private config table** that only the `postgres` role can read.
+### 2. RLS Policies -- Overly Permissive
+The `schedules` table has a policy `Students can view schedules for their enrolled batches` that only checks batch membership, not subject enrollment. Similarly, the `active_classes` and `meeting_links` tables have no subject-level enrollment checks.
 
-### Step 1: Create a private config table
-Create a simple `app_secrets` table in a private schema to store key-value pairs. Only the `postgres` role (used by SECURITY DEFINER functions) will have access -- no RLS policies for public access.
+## Fix Plan
 
+### Step 1: Fix StudentLiveClass Batch-Level Query
+Pass `enrolledSubjects` (already available in `StudentMain`) to `StudentLiveClass`, then filter queries to only include enrolled subjects using `.in('subject', enrolledSubjects)`.
+
+**File:** `src/components/student/StudentLiveClass.tsx`
+- Add `enrolledSubjects` prop
+- In batch-level mode, add `.in('subject', enrolledSubjects)` to the schedules, meeting_links, and active_classes queries
+- This ensures only enrolled subjects appear in the "Join Live Class" tab
+
+### Step 2: Pass enrolledSubjects from StudentMain
+**File:** `src/components/student/StudentMain.tsx`
+- Pass `enrolledSubjects={subjectsForBatch}` to `StudentLiveClass` (the array is already computed at line 132)
+
+### Step 3: Tighten RLS Policy on Schedules
+Drop the overly permissive batch-only policy and ensure the subject-level policy remains:
+- **Drop:** `Students can view schedules for their enrolled batches` (checks batch only)
+- **Keep:** `Students can view schedules for their enrollments` (checks batch AND subject)
+
+### Step 4: Fix Legacy Components Using profile.batch/subjects
+Three components still use the old `profile.batch` / `profile.subjects` fields instead of `user_enrollments`:
+- `StudentChatTeacher.tsx` -- uses `profile.batch` and `profile.subjects` for filtering
+- `StudentChatFounder.tsx` -- uses `profile.batch` for metadata
+- `StudentExtraClasses.tsx` -- uses `profile.batch` and `profile.subjects` for display
+
+These should be updated to fetch from `user_enrollments` for accuracy, or at minimum receive the correct data as props.
+
+## Technical Details
+
+### Database Migration (Step 3)
 ```sql
-CREATE TABLE IF NOT EXISTS private.app_secrets (
-  key TEXT PRIMARY KEY,
-  value TEXT NOT NULL
-);
+-- Drop overly permissive batch-only policy
+DROP POLICY IF EXISTS "Students can view schedules for their enrolled batches" ON schedules;
 
--- Restrict access to postgres only
-REVOKE ALL ON private.app_secrets FROM public, anon, authenticated;
+-- The existing policy "Students can view schedules for their enrollments" 
+-- already checks both batch AND subject via user_enrollments, so it stays.
 ```
 
-### Step 2: Insert the Resend API key
-```sql
-INSERT INTO private.app_secrets (key, value)
-VALUES ('RESEND_API_KEY', 'YOUR_ACTUAL_KEY_HERE');
-```
-(You'll need to run this manually in the SQL Editor with your actual key.)
+### Code Changes Summary
+| File | Change |
+|---|---|
+| `StudentLiveClass.tsx` | Add `enrolledSubjects` prop, filter batch-level queries by enrolled subjects |
+| `StudentMain.tsx` | Pass `enrolledSubjects={subjectsForBatch}` to `StudentLiveClass` |
+| `StudentChatTeacher.tsx` | Replace `profile.batch`/`profile.subjects` with `user_enrollments` query |
+| `StudentChatFounder.tsx` | Replace `profile.batch` with batch from enrollments |
+| `StudentExtraClasses.tsx` | Replace `profile.batch`/`profile.subjects` with enrollments data |
 
-### Step 3: Update all 3 functions that read from vault
-Update `notify_via_google_group` and `handle_priority_chat_notification` to read from `private.app_secrets` instead of `vault.decrypted_secrets`:
+### What stays unchanged
+- `StudentMain.tsx` subject card grid -- already correctly uses `user_enrollments`
+- `StudentSchedule.tsx` -- already correctly uses `user_enrollments` enrollment pairs with batch+subject OR filter
+- `StudentRecordings.tsx` -- only called at subject level with explicit batch+subject props
+- `StudentAnnouncements.tsx` -- receives `enrolledSubjects` prop and filters correctly
 
-```sql
--- Replace this:
-SELECT decrypted_secret INTO v_resend_key
-FROM vault.decrypted_secrets WHERE name = 'RESEND_API_KEY' LIMIT 1;
-
--- With this:
-SELECT value INTO v_resend_key
-FROM private.app_secrets WHERE key = 'RESEND_API_KEY' LIMIT 1;
-```
-
-### Step 4: Clean up vault entry (optional)
-Remove the vault entry since it's not usable:
-```sql
-DELETE FROM vault.secrets WHERE name = 'RESEND_API_KEY';
-```
-
-## After This
-- All trigger functions will successfully read the API key from the private config table
-- Announcements, recordings, notes, and schedule changes will send emails via Google Group relay
-- Priority chat messages will send direct emails
-- The key is secured by schema-level access control (only `postgres` role can read `private.app_secrets`)
