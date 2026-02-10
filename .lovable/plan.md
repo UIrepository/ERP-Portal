@@ -1,143 +1,130 @@
 
 
-# Fix: Merged Subject Students Landing in Wrong Jitsi Room
+# Email System Overhaul
 
-## Root Cause
+## Overview
+Complete restructure of the email notification system to stop BCC abuse, switch to plain text, add class reminders, fix recording email timing, and add community email notifications for teachers/admin.
 
-There are **two bugs** causing students in merged batches (e.g., "Qualifier" + "Foundation Quiz 1") to end up in different Jitsi rooms:
+## Changes
 
-### Bug 1: StudentLiveClass batch-level mode skips primary pair resolution (MAIN ISSUE)
+### 1. Database Migration
 
-In `StudentLiveClass.tsx` lines 108-110, when in batch-level mode, the code uses the schedule's own `batch` and `subject` directly instead of resolving the primary pair:
+**A. Add `reminder_time` column to `schedules` table**
+- New column: `reminder_time TIME` that defaults to `start_time - 15 minutes`
+- Add a trigger to auto-calculate `reminder_time` whenever `start_time` changes (so admins don't need to manually set it)
+- Add `reminder_sent_date DATE` to track which date's reminder was already sent (prevents duplicates)
+
+**B. Create `allstudents@unknowniitians.com` Google Group entry**
+- Insert a row into `google_groups` with `batch_name = '__ALL__'`, `subject_name = NULL`, `group_email = 'allstudents@unknowniitians.com'`
+
+**C. Update `manage-google-group` edge function**
+- When adding a student to batch + subject groups, also add them to `allstudents@unknowniitians.com`
+- Update `sync-google-groups` to also backfill the all-students group
+
+**D. Rewrite `notify_via_google_group()` trigger function**
+- Convert ALL email content from HTML to plain text (no HTML tags, no emojis)
+- Professional, clean plain-text emails like: subject line as clear description, body with relevant details only
+- Remove the recording section from this trigger entirely (recordings will be handled by cron)
+- Keep: announcements (to batch -all group or allstudents group), schedule changes, notes
+
+**E. Rewrite `handle_priority_chat_notification()` trigger function**
+- Remove ALL BCC logic
+- Instead, send to the subject's Google Group (same as other notifications)
+- Plain text format, no HTML, no emojis
+
+**F. Create `send-class-reminders` edge function**
+- Runs via pg_cron every minute
+- Queries schedules where `reminder_time` matches current time (within a 1-minute window) and `reminder_sent_date != today`
+- For each match: sends plain-text email to the subject Google Group AND to the teacher's email (looked up from `teachers` table by matching batch + subject)
+- Marks `reminder_sent_date = today` to prevent re-sending
+
+**G. Create `send-recording-emails` edge function**  
+- Runs via pg_cron every 5 minutes
+- Checks for recordings inserted today where the corresponding schedule's `end_time` has passed
+- Uses a `recording_email_sent BOOLEAN DEFAULT false` column on `recordings` to prevent duplicates
+- Sends plain-text email to the subject Google Group
+
+**H. Announcement "All Batches + All Subjects" trigger**
+- When announcement has `target_batch IS NULL` and `target_subject IS NULL`, send to `allstudents@unknowniitians.com` (single email) instead of looping through all batch groups
+
+### 2. Frontend Changes
+
+**A. Community "Send Email Notification" button (TeacherCommunity + AdminCommunity)**
+- Add a `Mail` icon button in the message input area
+- When clicked, show a confirmation AlertDialog:
+  - Title: "Send Email Notification"
+  - Description: "This action cannot be undone. An email will be sent to all students in [Subject] - [Batch]. Proceed only if this message is important."
+  - Two buttons: "Cancel" and "Send Email"
+- On confirmation: call an edge function `send-community-email` that sends the message content as plain text to the subject's Google Group
+- The email is sent independently of the chat message (it's a separate action)
+
+**B. Create `send-community-email` edge function**
+- Accepts: `batch`, `subject`, `message_content`, `sender_name`
+- Looks up the subject Google Group email from `google_groups` table
+- Sends a professional plain-text email via Resend
+
+### 3. Plain Text Email Format (all emails)
+
+All emails will use this professional format -- no HTML, no emojis, no styling:
 
 ```
-// Current (BROKEN):
-const roomBatch = isBatchLevel ? schedule.batch : (primaryPair?.batch || batch || '');
-const roomSubject = isBatchLevel ? schedule.subject : (primaryPair?.subject || subject || '');
+Subject: Unknown IITians - Class Reminder: Mathematics 1
+
+Dear Student,
+
+Your Mathematics 1 class is starting in 15 minutes.
+
+Batch: Foundation Quiz 1
+Time: 3:00 PM - 4:00 PM
+
+Please join the class on time through your dashboard.
+
+Regards,
+Unknown IITians Academic Team
 ```
 
-This means:
-- A "Qualifier" student generates room: `classqualifier{subject}{date}`
-- A "Foundation Quiz 1" student generates room: `classfoundationquiz1{subject}{date}`
-- They land in **different rooms** even though their subjects are merged.
+Resend supports plain text via the `text` field instead of `html` field, which avoids spam filters.
 
-The batch-level mode needs to fetch active merges and resolve primary pairs per-schedule, just like `StudentJoinClass` does.
+### 4. pg_cron Jobs
 
-### Bug 2: ClassSession page ignores merges entirely
-
-`ClassSession.tsx` (the secure redirect page) looks up `active_classes` using the student's own `batch_name` and `subject_name`. If the teacher started the class under the primary pair's batch (e.g., "Foundation Quiz 1"), a student enrolled in "Qualifier" won't find a matching `active_classes` row, causing "Class is not live yet" errors.
-
-Additionally, when redirecting, it uses the `room_url` from the database, but if that somehow fails it has no fallback primary pair resolution.
-
-### Bug 3: Build errors in sync-google-groups (pre-existing)
-
-Four TypeScript errors where `err` is typed as `unknown` but `.message` is accessed directly. These are unrelated but block builds.
-
-## Fix Plan
-
-### Step 1: Fix StudentLiveClass -- resolve primary pair in batch-level mode
-
-**File:** `src/components/student/StudentLiveClass.tsx`
-
-- Fetch `subject_merges` (active) just like `StudentJoinClass` does
-- Create a `getPrimaryPair` helper (same pattern as in `StudentJoinClass`)
-- Replace lines 108-110: always use `getPrimaryPair(schedule.batch, schedule.subject)` for room name generation, regardless of batch-level or subject-level mode
-
-### Step 2: Fix ClassSession -- check merged pairs for active_classes lookup
-
-**File:** `src/pages/ClassSession.tsx`
-
-- After fetching the enrollment, query `subject_merges` to find all pairs in the merge group
-- Check `active_classes` for ANY pair in the merge group (not just the student's own batch+subject)
-- Use the `room_url` from whichever active class is found
-
-### Step 3: Fix build errors in sync-google-groups
-
-**File:** `supabase/functions/sync-google-groups/index.ts`
-
-- Cast `err` to `(err as Error).message` at lines 194, 202, 249, 257
+Two cron jobs:
+- `check-class-reminders`: runs every minute, calls the `send-class-reminders` edge function
+- `check-recording-emails`: runs every 5 minutes, calls the `send-recording-emails` edge function
 
 ## Technical Details
 
-### StudentLiveClass.tsx changes
+### Files to create:
+- `supabase/functions/send-class-reminders/index.ts` -- cron-triggered, checks schedules and sends reminders
+- `supabase/functions/send-recording-emails/index.ts` -- cron-triggered, checks recordings after class end
+- `supabase/functions/send-community-email/index.ts` -- called from frontend for community email notifications
 
-```ts
-// Add query for active merges (same as StudentJoinClass)
-const { data: activeMerges = [] } = useQuery({
-  queryKey: ['active-merges-for-student-live'],
-  queryFn: async () => {
-    const { data } = await supabase
-      .from('subject_merges').select('*').eq('is_active', true);
-    return data || [];
-  },
-  staleTime: 5 * 60 * 1000,
-});
+### Files to modify:
+- `supabase/functions/manage-google-group/index.ts` -- add student to allstudents group
+- `supabase/functions/sync-google-groups/index.ts` -- backfill allstudents group
+- `src/components/teacher/TeacherCommunity.tsx` -- add "send email notification" button with confirmation
+- `src/components/admin/AdminCommunity.tsx` -- add "send email notification" button with confirmation
 
-// Add getPrimaryPair helper
-const getPrimaryPair = (batch, subject) => {
-  const merge = activeMerges.find(m =>
-    (m.primary_batch === batch && m.primary_subject === subject) ||
-    (m.secondary_batch === batch && m.secondary_subject === subject)
-  );
-  if (!merge) return { batch, subject };
-  const pairs = [
-    { batch: merge.primary_batch, subject: merge.primary_subject },
-    { batch: merge.secondary_batch, subject: merge.secondary_subject }
-  ];
-  return pairs.sort((a, b) =>
-    `${a.batch}|${a.subject}`.localeCompare(`${b.batch}|${b.subject}`)
-  )[0];
-};
+### Database migration:
+- Add `reminder_time TIME`, `reminder_sent_date DATE` to `schedules`
+- Add `recording_email_sent BOOLEAN DEFAULT false` to `recordings`
+- Auto-set trigger for `reminder_time = start_time - interval '15 minutes'`
+- Rewrite `notify_via_google_group()` -- plain text, remove recordings section, use allstudents group for global announcements
+- Rewrite `handle_priority_chat_notification()` -- switch from BCC to Google Group, plain text
+- Drop `trg_google_group_recording` trigger (recordings handled by cron now)
+- Insert allstudents group row into `google_groups`
+- Create pg_cron jobs for reminders and recording emails
 
-// Replace lines 108-110 with:
-const primary = getPrimaryPair(schedule.batch, schedule.subject);
-const roomBatch = primary.batch;
-const roomSubject = primary.subject;
-```
+### Summary table
 
-### ClassSession.tsx changes
-
-After fetching enrollment, also fetch merge info:
-
-```ts
-// Check if this batch+subject is part of a merge
-const { data: merges } = await supabase
-  .from('subject_merges')
-  .select('*')
-  .eq('is_active', true)
-  .or(`and(primary_batch.eq."${enrollment.batch_name}",primary_subject.eq."${enrollment.subject_name}"),and(secondary_batch.eq."${enrollment.batch_name}",secondary_subject.eq."${enrollment.subject_name}")`);
-
-// Build list of all batch+subject pairs to check
-const pairsToCheck = [
-  { batch: enrollment.batch_name, subject: enrollment.subject_name }
-];
-if (merges?.length) {
-  const m = merges[0];
-  pairsToCheck.push(
-    { batch: m.primary_batch, subject: m.primary_subject },
-    { batch: m.secondary_batch, subject: m.secondary_subject }
-  );
-}
-
-// Check active_classes for ANY pair in the merge group
-let activeClass = null;
-for (const pair of pairsToCheck) {
-  const { data } = await supabase.from('active_classes')
-    .select('room_url').eq('batch', pair.batch)
-    .eq('subject', pair.subject).eq('is_active', true).maybeSingle();
-  if (data) { activeClass = data; break; }
-}
-```
-
-### sync-google-groups fix
-
-Replace `err.message` with `(err as Error).message` at lines 194, 202, 249, 257.
-
-## Summary
-
-| File | Change | Impact |
-|---|---|---|
-| `StudentLiveClass.tsx` | Resolve primary pair for ALL schedules (not just subject-level) | Students in merged batches always get the same Jitsi room |
-| `ClassSession.tsx` | Check all merged pairs when looking up active_classes | Secure redirect works for merged batch students |
-| `sync-google-groups/index.ts` | Fix `err` type casting | Unblocks builds |
+| Change | Purpose |
+|---|---|
+| Remove all BCC logic | Stop burning Resend daily limit |
+| All emails to plain text | Avoid Gmail spam filters |
+| No emojis in subject lines | Professional appearance |
+| `reminder_time` column on schedules | Configurable reminder timing |
+| Cron for class reminders | Send reminder + teacher email 15 min before class |
+| Cron for recording emails | Only send after class `end_time` passes |
+| `allstudents@unknowniitians.com` group | Single group for all-batch announcements |
+| Community "Send Email" button | Teacher/admin can email students from community chat |
+| Confirmation dialog | Prevents accidental email sends |
 
