@@ -123,8 +123,8 @@ export const JitsiMeeting = ({
   const [showFallbackPrompt, setShowFallbackPrompt] = useState(false);
   const [lastStreamKey, setLastStreamKey] = useState<string | null>(null);
 
-  // Use the new Custom Hook for YouTube logic
-  const { startStream, isStreaming, isStartingStream } = useYoutubeStream();
+  // Hook for YouTube logic
+  const { startStream, stopStream, isStreaming, isStartingStream } = useYoutubeStream();
 
   // Auth & Logic Refs
   const { profile, resolvedRole } = useAuth();
@@ -135,6 +135,9 @@ export const JitsiMeeting = ({
   const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasRecordedAttendanceRef = useRef(false);
   const isIntentionalHangupRef = useRef(false);
+  
+  // Ref for the 3-minute safety timer
+  const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const propsRef = useRef({ displayName, userEmail, subject, batch, scheduleId, onClose, resolvedRole, profile, userRole });
   const isHost = userRole === 'teacher' || userRole === 'admin' || userRole === 'manager';
@@ -214,11 +217,7 @@ export const JitsiMeeting = ({
   // --- STREAMING LOGIC WRAPPER ---
   const handleGoLive = async () => {
     const currentProps = propsRef.current;
-
-    if (!isHost) {
-        toast.error("Only teachers can start the live stream.");
-        return;
-    }
+    if (!isHost) { toast.error("Only teachers can start the live stream."); return; }
 
     const streamDetails = await startStream(currentProps.batch, currentProps.subject);
 
@@ -235,8 +234,6 @@ export const JitsiMeeting = ({
             
             toast.success("Command sent. Waiting for YouTube...");
 
-            // FIXED: Removed auto-copy to clipboard in timeout (prevents NotAllowedError)
-            // Just show the notification where to find it.
             setTimeout(() => {
                 toast.info("If streaming didn't start automatically:", {
                     description: "Click the '...' button in the bottom bar -> 'Start Live Stream', and paste the key.",
@@ -256,6 +253,11 @@ export const JitsiMeeting = ({
             toast.error("Failed to send command to Jitsi player.");
         }
     }
+  };
+
+  const handleEndStream = async () => {
+      // Manual stop by user
+      await stopStream();
   };
 
   // --- Core Player Logic: Embeds Jitsi ---
@@ -295,7 +297,6 @@ export const JitsiMeeting = ({
     const sanitizedRoomName = getSanitizedRoomName();
     const currentProps = propsRef.current;
     
-    // --- PERMISSION & ROLE CONFIGURATION ---
     const TEACHER_TOOLBAR = [
         'microphone', 'camera', 'desktop', 'chat', 'raisehand', 
         'participants-pane', 'tileview', 'fullscreen', 'videoquality', 
@@ -321,26 +322,13 @@ export const JitsiMeeting = ({
         startWithVideoMuted: false,
         disableDeepLinking: true,
         disableInviteFunctions: true,
-        
         liveStreamingEnabled: true,
-        
-        // --- STABILITY FIXES FOR 5-MIN TIMEOUT (UPDATED) ---
-        // We REMOVE 'relay' policy to allow all connection types (Stable)
-        p2p: { 
-            enabled: false, 
-            useStunTurn: true
-            // Removed: iceTransportPolicy: 'relay' (This was causing the drop!)
-        },
-        disable1On1Mode: true, // Force JVB
-        
-        // Connection & Stream Stability
+        p2p: { enabled: false, useStunTurn: true },
+        disable1On1Mode: true,
         enableLayerSuspension: true,
-        disableSuspendVideo: true, // Keep video alive when tab is backgrounded
-        
-        // Prevent idle detection
+        disableSuspendVideo: true,
         enableNoisyMicDetection: false,
         enableNoAudioDetection: false,
-        
         lobby: { autoKnock: true, enableChat: true },
         hideLobbyButton: true,
         enableInsecureRoomNameWarning: false,
@@ -375,11 +363,37 @@ export const JitsiMeeting = ({
           setConnectionError(false);
           isInitializingRef.current = false;
           recordAttendance();
+
+          // RECONNECTION SUCCESS: Cancel the auto-stop timer
+          if (autoStopTimerRef.current) {
+              console.log("Reconnected! Auto-stop timer cancelled.");
+              clearTimeout(autoStopTimerRef.current);
+              autoStopTimerRef.current = null;
+              toast.dismiss("autostop-warning");
+              toast.success("Reconnected to session.");
+          }
         },
         videoConferenceLeft: () => {
             updateAttendanceOnLeave();
-            if (!isIntentionalHangupRef.current) {
-                toast.warning("Connection dropped. Please refresh if not reconnected.");
+            
+            // DISCONNECTION DETECTED: Start safety timer if streaming
+            if (!isIntentionalHangupRef.current && isStreaming) {
+                console.log("Disconnected while streaming. Starting 3-minute safety timer.");
+                toast.warning("Stream disconnected! Reconnect within 3 mins or stream will end.", {
+                    id: "autostop-warning",
+                    duration: 180000 // 3 mins
+                });
+
+                // Clear any existing timer just in case
+                if (autoStopTimerRef.current) clearTimeout(autoStopTimerRef.current);
+
+                autoStopTimerRef.current = setTimeout(() => {
+                    console.log("3 minutes passed. Stopping stream now.");
+                    stopStream();
+                    toast.error("Stream auto-stopped due to inactivity.");
+                }, 3 * 60 * 1000); // 3 Minutes
+            } else if (!isIntentionalHangupRef.current) {
+                toast.warning("Connection dropped. Please refresh.");
             }
         },
         recordingStatusChanged: (payload: any) => {
@@ -407,14 +421,17 @@ export const JitsiMeeting = ({
       setLoadingState(false);
       isInitializingRef.current = false;
     }
-  }, [getSanitizedRoomName, recordAttendance, updateAttendanceOnLeave, setLoadingState, isHost]);
+  }, [getSanitizedRoomName, recordAttendance, updateAttendanceOnLeave, setLoadingState, isHost, isStreaming, stopStream]);
 
   useEffect(() => {
     if (!hasJoined) return;
     if (!isInitializingRef.current && !apiRef.current) initializeJitsi();
     return () => {
+      // Cleanup on unmount
       if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
       if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current);
+      if (autoStopTimerRef.current) clearTimeout(autoStopTimerRef.current); // Stop timer on unmount
+      
       if (apiRef.current) { updateAttendanceOnLeave(); try { apiRef.current.dispose(); } catch (e) {} apiRef.current = null; }
       isInitializingRef.current = false;
     };
@@ -453,21 +470,23 @@ export const JitsiMeeting = ({
               <p className="text-gray-400 text-xs">{batch}</p>
             </div>
             
-            {/* GO LIVE BUTTON - Only for Host */}
+            {/* STREAMING BUTTON (Go Live / End Stream) */}
             {hasJoined && !isLoading && isHost && (
                 <Button 
-                    variant={isStreaming ? "default" : "outline"} 
+                    variant={isStreaming ? "destructive" : "outline"} 
                     size="sm"
-                    onClick={handleGoLive} 
-                    disabled={isStartingStream || isStreaming}
-                    className={`h-8 ${isStreaming ? 'bg-red-600 hover:bg-red-700 border-red-500 text-white' : 'border-red-500/50 text-red-500 hover:bg-red-500/10'}`}
+                    onClick={isStreaming ? handleEndStream : handleGoLive} 
+                    disabled={isStartingStream}
+                    className={`h-8 ${isStreaming 
+                        ? 'bg-red-600 hover:bg-red-700 border-red-500 text-white' 
+                        : 'border-red-500/50 text-red-500 hover:bg-red-500/10'}`}
                 >
                     {isStartingStream ? (
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     ) : (
                         <Youtube className="h-4 w-4 mr-2" />
                     )}
-                    {isStreaming ? "Live" : "Go Live"}
+                    {isStreaming ? "End Stream" : "Go Live"}
                 </Button>
             )}
         </div>
