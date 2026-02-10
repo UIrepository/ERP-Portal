@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, MonitorUp, X, RefreshCw, ExternalLink, AlertTriangle, Play, Lock, Youtube, Loader2, Copy } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, MonitorUp, X, RefreshCw, ExternalLink, AlertTriangle, Play, Lock, Youtube, Loader2, Copy, Square } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { format } from 'date-fns';
@@ -136,7 +136,7 @@ export const JitsiMeeting = ({
   const hasRecordedAttendanceRef = useRef(false);
   const isIntentionalHangupRef = useRef(false);
   
-  // Ref for the 3-minute safety timer
+  // Ref for the 10-minute safety timer
   const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const propsRef = useRef({ displayName, userEmail, subject, batch, scheduleId, onClose, resolvedRole, profile, userRole });
@@ -173,6 +173,7 @@ export const JitsiMeeting = ({
   }, [getSanitizedRoomName]);
 
   const recordAttendance = useCallback(async () => {
+    // ... existing attendance logic ...
     const currentProps = propsRef.current;
     if (hasRecordedAttendanceRef.current) return;
     if (!currentProps.profile?.user_id) return;
@@ -255,8 +256,8 @@ export const JitsiMeeting = ({
     }
   };
 
-  const handleEndStream = async () => {
-      // Manual stop by user
+  const handleStopStream = async () => {
+      // Manual stop by user (Red Button)
       await stopStream();
   };
 
@@ -370,7 +371,7 @@ export const JitsiMeeting = ({
               clearTimeout(autoStopTimerRef.current);
               autoStopTimerRef.current = null;
               toast.dismiss("autostop-warning");
-              toast.success("Reconnected to session.");
+              toast.success("Reconnected. Recording continues.");
           }
         },
         videoConferenceLeft: () => {
@@ -378,20 +379,23 @@ export const JitsiMeeting = ({
             
             // DISCONNECTION DETECTED: Start safety timer if streaming
             if (!isIntentionalHangupRef.current && isStreaming) {
-                console.log("Disconnected while streaming. Starting 3-minute safety timer.");
-                toast.warning("Stream disconnected! Reconnect within 3 mins or stream will end.", {
+                console.log("Disconnected while streaming. Starting 10-minute safety timer.");
+                
+                // Show a persistent warning toast
+                toast.warning("Stream disconnected! Reconnect within 10 mins or recording will end.", {
                     id: "autostop-warning",
-                    duration: 180000 // 3 mins
+                    duration: 600000 // Show for 10 mins
                 });
 
                 // Clear any existing timer just in case
                 if (autoStopTimerRef.current) clearTimeout(autoStopTimerRef.current);
 
+                // --- CHANGED TO 10 MINUTES (600,000 ms) ---
                 autoStopTimerRef.current = setTimeout(() => {
-                    console.log("3 minutes passed. Stopping stream now.");
+                    console.log("10 minutes passed. Stopping stream now.");
                     stopStream();
                     toast.error("Stream auto-stopped due to inactivity.");
-                }, 3 * 60 * 1000); // 3 Minutes
+                }, 10 * 60 * 1000); 
             } else if (!isIntentionalHangupRef.current) {
                 toast.warning("Connection dropped. Please refresh.");
             }
@@ -470,23 +474,26 @@ export const JitsiMeeting = ({
               <p className="text-gray-400 text-xs">{batch}</p>
             </div>
             
-            {/* STREAMING BUTTON (Go Live / End Stream) */}
+            {/* STREAMING BUTTON (Go Live / STOP REC) */}
             {hasJoined && !isLoading && isHost && (
                 <Button 
                     variant={isStreaming ? "destructive" : "outline"} 
                     size="sm"
-                    onClick={isStreaming ? handleEndStream : handleGoLive} 
+                    onClick={isStreaming ? handleStopStream : handleGoLive} 
                     disabled={isStartingStream}
-                    className={`h-8 ${isStreaming 
-                        ? 'bg-red-600 hover:bg-red-700 border-red-500 text-white' 
+                    className={`h-8 font-bold ${isStreaming 
+                        ? 'bg-red-600 hover:bg-red-700 border-red-500 text-white animate-pulse' 
                         : 'border-red-500/50 text-red-500 hover:bg-red-500/10'}`}
                 >
                     {isStartingStream ? (
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : isStreaming ? (
+                        <Square className="h-4 w-4 mr-2 fill-current" />
                     ) : (
                         <Youtube className="h-4 w-4 mr-2" />
                     )}
-                    {isStreaming ? "End Stream" : "Go Live"}
+                    {/* BUTTON TEXT CHANGED TO STOP REC */}
+                    {isStreaming ? "STOP REC" : "Go Live"}
                 </Button>
             )}
         </div>
