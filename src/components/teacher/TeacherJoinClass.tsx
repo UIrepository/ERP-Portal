@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Clock, Key, Copy, Merge, X, Loader2 } from 'lucide-react'; 
+import { Clock, Key, Copy, Merge, X, Loader2, Square } from 'lucide-react'; 
 import { format, isToday, parse, isBefore, isAfter } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { generateJitsiRoomName, subjectsMatch } from '@/lib/jitsiUtils';
@@ -260,13 +260,6 @@ export const TeacherJoinClass = () => {
     return format(parsed, 'h:mm a');
   };
 
-  // NOTE: Toggle selection logic removed from UI as requested, but function kept for type safety
-  const toggleSelection = (id: string) => {
-    setSelectedMergeIds(prev => 
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
-    );
-  };
-
   const handleStartClass = async (cls: Schedule) => {
     setCurrentClass(cls);
     setIsMergedSession(false);
@@ -332,55 +325,50 @@ export const TeacherJoinClass = () => {
     }
   };
 
-  const handleStartMergedClass = async () => {
-    if (selectedMergeIds.length < 2) return;
-    setIsMergedSession(true);
-    const selectedSchedules = todaysClasses.filter(s => selectedMergeIds.includes(s.id));
-    const mergedRoomName = `MergedSession-${profile?.id?.slice(0, 4)}-${Date.now()}`;
-    const sharedUrl = `https://meet.jit.si/${encodeURIComponent(mergedRoomName)}`;
-    setMergedRoomUrl(sharedUrl);
+  // --- NEW STOP RECORDING FUNCTION ---
+  const handleStopRecording = async (cls: Schedule) => {
+    if (!confirm(`Are you sure you want to stop the recording for ${cls.subject}? This will end the YouTube stream.`)) return;
+
+    const toastId = toast.loading("Stopping Recording...");
 
     try {
-      const today = format(new Date(), 'yyyy-MM-dd');
-      let activeStreamKey = selectedSchedules.find(s => s.stream_key)?.stream_key;
-      
-      if (!activeStreamKey) {
-          const details = await startStream("Merged Session", selectedSchedules.map(s => s.subject).join(' & '));
-          if (details?.streamKey) { activeStreamKey = details.streamKey; }
-      }
-      setStreamKey(activeStreamKey || "");
+        // 1. Look up the most recent recording for this batch/subject in the last 12 hours
+        const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+        
+        const { data: recordings, error: recError } = await supabase
+            .from('recordings')
+            .select('embed_link')
+            .eq('batch', cls.batch)
+            .eq('subject', cls.subject)
+            .gte('date', twelveHoursAgo)
+            .order('date', { ascending: false })
+            .limit(1);
 
-      for (const cls of selectedSchedules) {
-        await supabase.from('active_classes').upsert({
-           batch: cls.batch,
-           subject: cls.subject,
-           room_url: sharedUrl,
-           teacher_id: profile?.user_id,
-           is_active: true,
-           started_at: new Date().toISOString()
+        if (recError || !recordings || recordings.length === 0) {
+            throw new Error("No active recording found for this class.");
+        }
+
+        const embedLink = recordings[0].embed_link;
+        const videoId = embedLink.split('/').pop();
+
+        if (!videoId) throw new Error("Could not parse Video ID.");
+
+        // 2. Call the Edge Function
+        const { error: funcError } = await supabase.functions.invoke('stop-youtube-stream', {
+            body: { broadcastId: videoId }
         });
-        if (profile?.user_id) {
-           await supabase.from('class_attendance').upsert({
-            user_id: profile.user_id,
-            user_name: profile.name || 'Teacher',
-            user_role: 'teacher',
-            schedule_id: cls.id,
-            batch: cls.batch,
-            subject: cls.subject,
-            class_date: today,
-            joined_at: new Date().toISOString()
-           }, { onConflict: 'user_id,schedule_id,class_date' });
-        }
-        if (activeStreamKey) {
-           await supabase.from('schedules').update({ stream_key: activeStreamKey }).eq('id', cls.id);
-        }
-      }
-      queryClient.invalidateQueries({ queryKey: ['allSchedulesTeacher'] });
-      setShowStreamDialog(true);
-      toast.success(`Merged session started for ${selectedSchedules.length} classes!`);
-    } catch (error) {
-      console.error("Error starting merged session:", error);
-      toast.error("Failed to start merged session.");
+
+        if (funcError) throw funcError;
+
+        // 3. Clear the stream_key from schedule
+        await supabase.from('schedules').update({ stream_key: null }).eq('id', cls.id);
+
+        toast.success("Recording Stopped Successfully", { id: toastId });
+        queryClient.invalidateQueries({ queryKey: ['allSchedulesTeacher'] });
+
+    } catch (error: any) {
+        console.error("Stop Error:", error);
+        toast.error(error.message || "Failed to stop recording.", { id: toastId });
     }
   };
 
@@ -408,17 +396,14 @@ export const TeacherJoinClass = () => {
 
   const isLoading = isLoadingTeacher || isLoadingSchedules;
 
-  // --- STYLES (Fixed Alignment & Removed Checkbox Columns) ---
+  // --- STYLES ---
   const styles = {
-    // Width set to full, removed internal horizontal padding to align with header
     wrapper: "w-full font-sans text-slate-900", 
     pageHeader: "flex justify-between items-start mb-6",
     headerTitle: "text-2xl font-bold tracking-tight text-slate-900",
     headerDate: "text-sm text-slate-600 mt-1",
-    btnMerge: "hidden", // Hidden since selection is removed
     sectionHeading: "text-xs font-semibold uppercase tracking-wider text-slate-600 mb-4 mt-8 flex items-center gap-2",
     statusIndicator: "w-2 h-2 rounded-full bg-emerald-600",
-    // Changed to flex to remove the checkbox column completely
     classCard: "flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 border border-slate-200 rounded-xl mb-3 hover:border-slate-300 transition-all bg-white shadow-sm",
     activeClassCard: "bg-slate-50 border-l-[3px] border-l-emerald-600",
     batchLabel: "text-sm text-slate-600 mb-2 block",
@@ -462,7 +447,6 @@ export const TeacherJoinClass = () => {
             
             return (
               <div key={cls.id} className={`${styles.classCard} ${styles.activeClassCard}`}>
-                {/* Checkbox removed completely */}
                 <div className="class-info flex-1">
                   <span className={styles.batchLabel}>
                     {cls.mergedBatches 
@@ -486,6 +470,16 @@ export const TeacherJoinClass = () => {
                   )}
                 </div>
                 <div className={styles.actionsWrapper}>
+                  {/* --- NEW STOP RECORDING BUTTON --- */}
+                  <button 
+                    onClick={() => handleStopRecording(cls)}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded text-sm font-bold cursor-pointer transition-all border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:border-red-300 animate-pulse"
+                    title="Stop Streaming (Emergency)"
+                  >
+                    <Square className="w-4 h-4 fill-current" />
+                    STOP REC
+                  </button>
+
                   <button onClick={() => setSelectedClassForAttendance(cls)} className={styles.btn}>Attendance</button>
                   <button 
                     onClick={() => handleStartClass(cls)}
@@ -621,7 +615,7 @@ export const TeacherJoinClass = () => {
         </div>
       )}
 
-      {/* --- HIDDEN DIALOGS (Existing Logic) --- */}
+      {/* --- DIALOGS --- */}
       <Dialog open={showStreamDialog} onOpenChange={setShowStreamDialog}>
         <DialogContent className="sm:max-w-md bg-white border-slate-200">
           <DialogHeader>
