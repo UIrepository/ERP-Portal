@@ -34,6 +34,7 @@ interface Schedule {
   end_time: string;
   date: string | null;
   stream_key?: string | null;
+  broadcast_id?: string | null;
   mergedBatches?: { batch: string; subject: string; id: string }[];
 }
 
@@ -85,7 +86,7 @@ export const TeacherJoinClass = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('schedules')
-        .select('id, subject, batch, day_of_week, start_time, end_time, date, stream_key');
+        .select('id, subject, batch, day_of_week, start_time, end_time, date, stream_key, broadcast_id');
       if (error) throw error;
       return data || [];
     }
@@ -323,7 +324,7 @@ export const TeacherJoinClass = () => {
     if (details?.streamKey) {
       const { error } = await supabase
         .from('schedules')
-        .update({ stream_key: details.streamKey })
+        .update({ stream_key: details.streamKey, broadcast_id: details.broadcastId })
         .eq('id', cls.id);
 
       if (error) { console.error("Error saving stream key:", error); } 
@@ -342,30 +343,17 @@ export const TeacherJoinClass = () => {
     const toastId = toast.loading("Stopping Recording...");
 
     try {
-        // 1. Look up the most recent recording for this batch/subject in the last 12 hours
-        const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
-        
-        const { data: recordings, error: recError } = await supabase
-            .from('recordings')
-            .select('embed_link')
-            .eq('batch', cls.batch)
-            .eq('subject', cls.subject)
-            .gte('date', twelveHoursAgo)
-            .order('date', { ascending: false })
-            .limit(1);
+        // 1. Get broadcast ID directly from the schedule
+        const broadcastId = cls.broadcast_id;
 
-        if (recError || !recordings || recordings.length === 0) {
-            throw new Error("No active recording found for this class.");
+        if (!broadcastId) {
+            toast.error("No broadcast ID found for this class.", { id: toastId });
+            return;
         }
-
-        const embedLink = recordings[0].embed_link;
-        const videoId = embedLink.split('/').pop();
-
-        if (!videoId) throw new Error("Could not parse Video ID.");
 
         // 2. Call the Edge Function
         const { data, error: funcError } = await supabase.functions.invoke('stop-youtube-stream', {
-            body: { broadcastId: videoId }
+            body: { broadcastId }
         });
 
         if (funcError) {
@@ -380,8 +368,8 @@ export const TeacherJoinClass = () => {
         console.error("Stop Error:", error);
         toast.error(error.message || "Failed to stop recording.", { id: toastId });
     } finally {
-        // ALWAYS clear stream_key so button doesn't get stuck
-        await supabase.from('schedules').update({ stream_key: null }).eq('id', cls.id);
+        // ALWAYS clear stream_key and broadcast_id so button doesn't get stuck
+        await supabase.from('schedules').update({ stream_key: null, broadcast_id: null }).eq('id', cls.id);
         queryClient.invalidateQueries({ queryKey: ['allSchedulesTeacher'] });
         setIsStopping(false);
     }

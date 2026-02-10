@@ -974,6 +974,7 @@ export type Database = {
       schedules: {
         Row: {
           batch: string
+          broadcast_id: string | null
           created_at: string
           date: string | null
           day_of_week: number
@@ -989,6 +990,7 @@ export type Database = {
         }
         Insert: {
           batch: string
+          broadcast_id?: string | null
           created_at?: string
           date?: string | null
           day_of_week: number
@@ -1004,6 +1006,7 @@ export type Database = {
         }
         Update: {
           batch?: string
+          broadcast_id?: string | null
           created_at?: string
           date?: string | null
           day_of_week?: number
@@ -1356,6 +1359,7 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: {
           batch: string
+          broadcast_id: string | null
           created_at: string
           date: string | null
           day_of_week: number
