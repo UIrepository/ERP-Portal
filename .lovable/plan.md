@@ -1,37 +1,42 @@
 
 
-# Remove Hardcoded Resend API Key and Standardize Sender Email
+# Fix Duplicate Email Notifications
 
 ## Problem
-Four database trigger functions currently have the Resend API key **hardcoded** directly in the SQL code, which is a security risk. They also use inconsistent sender emails.
+When an announcement or recording is created, **two separate triggers** fire and send emails to the same students:
+1. `handle_email_notification` -- sends directly to each student via BCC
+2. `notify_via_google_group` -- sends to the Google Group, which relays to the same students
 
-## Affected Functions (all have hardcoded `re_NohT67im_...`)
-1. `notify_via_google_group()` -- sender: `notifications@hq.unknowniitians.com` (correct)
-2. `handle_email_notification()` -- sender: `support@unknowniitians.live` (wrong)
-3. `handle_general_notifications()` -- sender: `support@unknowniitians.live` (wrong)
-4. `handle_priority_chat_notification()` -- sender: `support@unknowniitians.live` (wrong)
+This means students get **2 copies** of every announcement and recording email.
 
-## What Will Change
+## Recommended Fix
 
-### For all 4 functions:
-- **Remove hardcoded API key** -- replace with a vault lookup: `SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'RESEND_API_KEY' LIMIT 1`
-- **Standardize sender** to `Unknown IITians <notifications@hq.unknowniitians.com>`
+Since Google Groups is the preferred relay system (better for managing large lists, avoids Resend daily limits), **disable the direct-email triggers** and keep only the Google Group path.
 
-### Prerequisite
-- Store the Resend API key in Supabase Vault (not just edge function secrets) by running:
-  ```sql
-  SELECT vault.create_secret('re_YOUR_KEY_HERE', 'RESEND_API_KEY');
-  ```
-  This makes it accessible from database functions.
+### Step 1: Drop redundant triggers
+Remove these triggers that cause duplicates:
+- `on_announcement_created` on `notifications` (direct email) -- Google Group trigger handles it
+- `on_recording_created` on `recordings` (direct email) -- Google Group trigger handles it
+- `on_notes_created` on `notes` (direct email) -- needs a Google Group trigger added instead
 
-## Technical Steps
+### Step 2: Add Google Group trigger for `notes`
+Currently `notes` only has the direct-email trigger. Add a `notify_via_google_group` trigger for `notes` so it uses the relay system too. The `notify_via_google_group` function already handles the `notes` table (it checks `TG_TABLE_NAME`).
 
-1. **Insert the Resend API key into Supabase Vault** via a SQL migration so database functions can access it
-2. **Migrate all 4 functions** with updated SQL that:
-   - Reads the key from `vault.decrypted_secrets` at runtime
-   - Uses `notifications@hq.unknowniitians.com` as the sender
-   - Raises a warning (but does not crash) if the key is missing
+### Step 3: Clean up orphaned function
+Drop `handle_general_notifications` -- it has no trigger and overlaps with the other two functions.
+
+### Step 4: Optionally drop `handle_email_notification`
+Once all tables use the Google Group relay, this function becomes unused and can be removed.
 
 ## After This
-Proceed with the Google Groups full sync automation plan (creating `sync-google-groups` edge function and backfilling all existing enrollments).
+- Announcements: 1 email via Google Group relay
+- Recordings: 1 email via Google Group relay
+- Notes: 1 email via Google Group relay (new)
+- Schedule changes: 1 email via Google Group relay (already correct)
+- Priority chat messages: 1 email direct (no Google Group equivalent needed -- this targets students by batch/subject directly)
+
+## What stays unchanged
+- `handle_priority_chat_notification` on `community_messages` -- this is the only trigger for priority messages, no duplication
+- `set_notification_creator_name` on `notifications` -- this just sets metadata, not an email trigger
+- All sender emails remain `notifications@hq.unknowniitians.com`
 
