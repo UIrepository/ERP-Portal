@@ -1,72 +1,47 @@
 
 
-# Fix: Students Seeing Non-Enrolled Subjects
+# Show All Schedules to Students (Read-Only View)
 
 ## Problem
-Students enrolled in specific subjects within a batch are seeing ALL subjects in that batch. The root cause is in the **`StudentLiveClass`** component and certain **RLS policies** that filter by batch only, not by the batch+subject enrollment pair.
+Currently, the `StudentSchedule` component only shows schedules for the student's enrolled batch+subject pairs. The user wants students to see **all** scheduled classes across all batches and subjects as a read-only timetable.
 
-## Root Cause Analysis
+## Changes
 
-### 1. StudentLiveClass (Batch-Level Mode) -- Code Bug
-In `StudentLiveClass.tsx` (lines 47-54), when rendering at the batch level (no subject selected), it fetches ALL schedules, meeting links, and active classes for the entire batch:
-```js
-supabase.from('schedules').select('*').eq('batch', batch)
-```
-This shows classes for subjects the student is NOT enrolled in.
+### File: `src/components/student/StudentSchedule.tsx`
 
-### 2. RLS Policies -- Overly Permissive
-The `schedules` table has a policy `Students can view schedules for their enrolled batches` that only checks batch membership, not subject enrollment. Similarly, the `active_classes` and `meeting_links` tables have no subject-level enrollment checks.
+1. **Replace enrollment-filtered query with a full fetch** -- Remove the `enrollmentPairs` dependency and the `.or(orFilter)` logic. Instead, fetch all schedules directly:
+   ```ts
+   supabase.from('schedules').select('*')
+     .order('day_of_week').order('start_time')
+   ```
 
-## Fix Plan
+2. **Remove enrollment-related code** -- Remove the `userEnrollments` query, `enrollmentPairs` memo, and `availableBatches` memo since they're no longer needed for filtering.
 
-### Step 1: Fix StudentLiveClass Batch-Level Query
-Pass `enrolledSubjects` (already available in `StudentMain`) to `StudentLiveClass`, then filter queries to only include enrolled subjects using `.in('subject', enrolledSubjects)`.
+3. **Replace batch filter with a dynamic batch filter from all schedules** -- Instead of filtering by enrolled batches, derive available batches from the fetched schedules data itself so students can still filter the view by batch if desired.
 
-**File:** `src/components/student/StudentLiveClass.tsx`
-- Add `enrolledSubjects` prop
-- In batch-level mode, add `.in('subject', enrolledSubjects)` to the schedules, meeting_links, and active_classes queries
-- This ensures only enrolled subjects appear in the "Join Live Class" tab
+4. **Remove the join link** -- Since students should only see timings (not access classes they aren't enrolled in), hide the "Join Class" / "Join Live" button from the schedule grid. This keeps it as a read-only timetable.
 
-### Step 2: Pass enrolledSubjects from StudentMain
-**File:** `src/components/student/StudentMain.tsx`
-- Pass `enrolledSubjects={subjectsForBatch}` to `StudentLiveClass` (the array is already computed at line 132)
+### Database: Add an RLS policy for public schedule viewing
+The existing RLS on `schedules` restricts students to their enrolled batch+subject. We need to add a new SELECT policy that allows all authenticated students to read all schedule rows (for the schedule view only):
 
-### Step 3: Tighten RLS Policy on Schedules
-Drop the overly permissive batch-only policy and ensure the subject-level policy remains:
-- **Drop:** `Students can view schedules for their enrolled batches` (checks batch only)
-- **Keep:** `Students can view schedules for their enrollments` (checks batch AND subject)
-
-### Step 4: Fix Legacy Components Using profile.batch/subjects
-Three components still use the old `profile.batch` / `profile.subjects` fields instead of `user_enrollments`:
-- `StudentChatTeacher.tsx` -- uses `profile.batch` and `profile.subjects` for filtering
-- `StudentChatFounder.tsx` -- uses `profile.batch` for metadata
-- `StudentExtraClasses.tsx` -- uses `profile.batch` and `profile.subjects` for display
-
-These should be updated to fetch from `user_enrollments` for accuracy, or at minimum receive the correct data as props.
-
-## Technical Details
-
-### Database Migration (Step 3)
 ```sql
--- Drop overly permissive batch-only policy
-DROP POLICY IF EXISTS "Students can view schedules for their enrolled batches" ON schedules;
-
--- The existing policy "Students can view schedules for their enrollments" 
--- already checks both batch AND subject via user_enrollments, so it stays.
+CREATE POLICY "Students can view all schedules"
+ON public.schedules
+FOR SELECT
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE profiles.user_id = auth.uid()
+    AND profiles.role::text = 'student'
+  )
+);
 ```
 
-### Code Changes Summary
-| File | Change |
+## Summary
+| Area | Change |
 |---|---|
-| `StudentLiveClass.tsx` | Add `enrolledSubjects` prop, filter batch-level queries by enrolled subjects |
-| `StudentMain.tsx` | Pass `enrolledSubjects={subjectsForBatch}` to `StudentLiveClass` |
-| `StudentChatTeacher.tsx` | Replace `profile.batch`/`profile.subjects` with `user_enrollments` query |
-| `StudentChatFounder.tsx` | Replace `profile.batch` with batch from enrollments |
-| `StudentExtraClasses.tsx` | Replace `profile.batch`/`profile.subjects` with enrollments data |
+| `StudentSchedule.tsx` | Fetch all schedules without enrollment filter, derive batch list from data, hide join buttons |
+| Database (RLS) | Add policy allowing all students to SELECT from schedules |
 
-### What stays unchanged
-- `StudentMain.tsx` subject card grid -- already correctly uses `user_enrollments`
-- `StudentSchedule.tsx` -- already correctly uses `user_enrollments` enrollment pairs with batch+subject OR filter
-- `StudentRecordings.tsx` -- only called at subject level with explicit batch+subject props
-- `StudentAnnouncements.tsx` -- receives `enrolledSubjects` prop and filters correctly
-
+This gives students a complete view of the institute's timetable while keeping actual class access (join links, live classes, recordings, etc.) restricted to their enrolled subjects.
