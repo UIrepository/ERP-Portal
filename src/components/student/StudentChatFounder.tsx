@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -25,6 +25,24 @@ export const StudentChatFounder = () => {
   const [message, setMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+
+  // Fetch enrolled batches from user_enrollments
+  const { data: enrollments } = useQuery({
+    queryKey: ['chatFounderEnrollments', profile?.user_id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('user_enrollments')
+        .select('batch_name')
+        .eq('user_id', profile!.user_id);
+      return data || [];
+    },
+    enabled: !!profile?.user_id
+  });
+
+  const enrolledBatches = useMemo(() =>
+    Array.from(new Set(enrollments?.map(e => e.batch_name) || [])),
+    [enrollments]
+  );
 
   const { data: chatMessages } = useQuery({
     queryKey: ['student-founder-chat'],
@@ -62,7 +80,7 @@ export const StudentChatFounder = () => {
       message: message.trim(),
       student_id: profile?.user_id,
       student_name: profile?.name,
-      student_batch: profile?.batch,
+      student_batch: enrolledBatches[0] || 'N/A',
       is_from_student: true,
     });
   };
@@ -80,7 +98,7 @@ export const StudentChatFounder = () => {
         </h2>
         <div className="flex gap-2">
           <Badge variant="outline">Direct Support</Badge>
-          <Badge variant="outline">Batch: {profile?.batch}</Badge>
+          <Badge variant="outline">Batch: {enrolledBatches.join(', ') || 'N/A'}</Badge>
         </div>
       </div>
 

@@ -1,3 +1,6 @@
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,13 +12,28 @@ import { Plus, Calendar } from 'lucide-react';
 export const StudentExtraClasses = () => {
   const { profile } = useAuth();
 
+  const { data: enrollments } = useQuery({
+    queryKey: ['extraClassEnrollments', profile?.user_id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('user_enrollments')
+        .select('batch_name, subject_name')
+        .eq('user_id', profile!.user_id);
+      return data || [];
+    },
+    enabled: !!profile?.user_id
+  });
+
+  const batches = useMemo(() => Array.from(new Set(enrollments?.map(e => e.batch_name) || [])), [enrollments]);
+  const subjects = useMemo(() => Array.from(new Set(enrollments?.map(e => e.subject_name) || [])).sort(), [enrollments]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Extra Classes</h2>
         <div className="flex gap-2">
-          <Badge variant="outline">Batch: {profile?.batch?.[0] || 'N/A'}</Badge>
-          <Badge variant="outline">Subjects: {profile?.subjects?.join(', ') || 'N/A'}</Badge>
+          <Badge variant="outline">Batch: {batches.join(', ') || 'N/A'}</Badge>
+          <Badge variant="outline">Subjects: {subjects.join(', ') || 'N/A'}</Badge>
         </div>
       </div>
 

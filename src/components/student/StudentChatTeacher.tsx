@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -29,37 +29,52 @@ export const StudentChatTeacher = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
-  const { data: teachers } = useQuery({
-    queryKey: ['batch-teachers'],
+  // Fetch enrolled subjects from user_enrollments
+  const { data: enrollments } = useQuery({
+    queryKey: ['chatTeacherEnrollments', profile?.user_id],
     queryFn: async () => {
       const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', 'teacher' as any)
-        .eq('batch', profile?.batch as any)
-        .contains('subjects', profile?.subjects || []);
+        .from('user_enrollments')
+        .select('batch_name, subject_name')
+        .eq('user_id', profile!.user_id);
       return data || [];
     },
-    enabled: !!profile?.batch && !!profile?.subjects
+    enabled: !!profile?.user_id
   });
 
+  const enrolledSubjects = useMemo(() => 
+    Array.from(new Set(enrollments?.map(e => e.subject_name) || [])).sort(),
+    [enrollments]
+  );
+
+  const enrolledBatches = useMemo(() =>
+    Array.from(new Set(enrollments?.map(e => e.batch_name) || [])),
+    [enrollments]
+  );
+
+  // Get the batch for the selected subject
+  const batchForSubject = useMemo(() => {
+    if (!selectedSubject || !enrollments) return null;
+    return enrollments.find(e => e.subject_name === selectedSubject)?.batch_name || null;
+  }, [selectedSubject, enrollments]);
+
   const { data: chatMessages } = useQuery({
-    queryKey: ['student-teacher-chat', selectedSubject],
+    queryKey: ['student-teacher-chat', selectedSubject, batchForSubject],
     queryFn: async (): Promise<ChatMessage[]> => {
-      if (!selectedSubject) return [];
+      if (!selectedSubject || !batchForSubject) return [];
       
       const { data, error } = await (supabase as any)
         .from('chat_messages')
         .select('*')
         .eq('subject', selectedSubject)
-        .eq('batch', profile?.batch)
+        .eq('batch', batchForSubject)
         .or(`sender_id.eq.${profile?.user_id},receiver_role.eq.student`)
         .order('created_at', { ascending: true });
       
       if (error) throw error;
       return (data || []) as ChatMessage[];
     },
-    enabled: !!selectedSubject && !!profile?.batch
+    enabled: !!selectedSubject && !!batchForSubject
   });
 
   const sendMessageMutation = useMutation({
@@ -84,7 +99,7 @@ export const StudentChatTeacher = () => {
       sender_id: profile?.user_id,
       receiver_role: 'teacher',
       subject: selectedSubject,
-      batch: profile?.batch,
+      batch: batchForSubject,
       sender_name: profile?.name,
     });
   };
@@ -98,8 +113,8 @@ export const StudentChatTeacher = () => {
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">💬 Chat with Teacher</h2>
         <div className="flex gap-2">
-          <Badge variant="outline">Batch: {profile?.batch}</Badge>
-          <Badge variant="outline">Subjects: {profile?.subjects?.join(', ')}</Badge>
+          <Badge variant="outline">Batch: {enrolledBatches.join(', ') || 'N/A'}</Badge>
+          <Badge variant="outline">Subjects: {enrolledSubjects.join(', ') || 'N/A'}</Badge>
         </div>
       </div>
 
@@ -113,7 +128,7 @@ export const StudentChatTeacher = () => {
               <SelectValue placeholder="Choose a subject to chat about" />
             </SelectTrigger>
             <SelectContent>
-              {profile?.subjects?.map((subject) => (
+              {enrolledSubjects.map((subject) => (
                 <SelectItem key={subject} value={subject}>{subject}</SelectItem>
               ))}
             </SelectContent>
