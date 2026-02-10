@@ -879,6 +879,7 @@ export type Database = {
           date: string
           embed_link: string
           id: string
+          recording_email_sent: boolean | null
           subject: string
           topic: string
           updated_at: string
@@ -889,6 +890,7 @@ export type Database = {
           date: string
           embed_link: string
           id?: string
+          recording_email_sent?: boolean | null
           subject: string
           topic: string
           updated_at?: string
@@ -899,6 +901,7 @@ export type Database = {
           date?: string
           embed_link?: string
           id?: string
+          recording_email_sent?: boolean | null
           subject?: string
           topic?: string
           updated_at?: string
@@ -977,6 +980,8 @@ export type Database = {
           end_time: string
           id: string
           link: string | null
+          reminder_sent_date: string | null
+          reminder_time: string | null
           start_time: string
           stream_key: string | null
           subject: string
@@ -990,6 +995,8 @@ export type Database = {
           end_time: string
           id?: string
           link?: string | null
+          reminder_sent_date?: string | null
+          reminder_time?: string | null
           start_time: string
           stream_key?: string | null
           subject: string
@@ -1003,6 +1010,8 @@ export type Database = {
           end_time?: string
           id?: string
           link?: string | null
+          reminder_sent_date?: string | null
+          reminder_time?: string | null
           start_time?: string
           stream_key?: string | null
           subject?: string
@@ -1353,6 +1362,8 @@ export type Database = {
           end_time: string
           id: string
           link: string | null
+          reminder_sent_date: string | null
+          reminder_time: string | null
           start_time: string
           stream_key: string | null
           subject: string

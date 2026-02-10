@@ -19,7 +19,8 @@ import {
   Ban,
   Lock,
   Megaphone,
-  LayoutDashboard
+  LayoutDashboard,
+  Mail
 } from 'lucide-react';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -370,7 +371,8 @@ export const TeacherCommunity = () => {
   const [replyingTo, setReplyingTo] = useState<CommunityMessage | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null); 
-  
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(new Date());
 
@@ -565,6 +567,28 @@ export const TeacherCommunity = () => {
         image: selectedImage,
         replyId: currentReplyId
     });
+  };
+
+  const handleSendEmail = async () => {
+    if (!messageText.trim() || !selectedGroup) return;
+    setIsSendingEmail(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-community-email', {
+        body: {
+          batch: selectedGroup.batch_name,
+          subject: selectedGroup.subject_name,
+          message_content: messageText,
+          sender_name: profile?.name || 'Teacher',
+        },
+      });
+      if (error) throw error;
+      toast({ title: "Email sent", description: `Email notification sent to ${selectedGroup.subject_name} - ${selectedGroup.batch_name} students.` });
+    } catch (err: any) {
+      toast({ title: "Failed to send email", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSendingEmail(false);
+      setShowEmailDialog(false);
+    }
   };
 
   const handleDateSelect = (date: Date | undefined) => {
@@ -778,6 +802,16 @@ export const TeacherCommunity = () => {
                 className="flex-1 border-none shadow-none focus-visible:ring-0 bg-transparent min-h-[40px] py-2 text-[15px] placeholder:text-gray-400" 
                 disabled={isUploading || sendMessageMutation.isPending} 
               />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-10 w-10 text-gray-400 hover:bg-white hover:text-blue-600 rounded-lg shrink-0" 
+                onClick={() => setShowEmailDialog(true)}
+                disabled={!messageText.trim()}
+                title="Send as email notification"
+              >
+                <Mail className="h-5 w-5" />
+              </Button>
               <Button onClick={handleSend} disabled={(!messageText.trim() && !selectedImage) || isUploading} className="h-10 w-10 rounded-lg bg-teal-700 hover:bg-teal-800 text-white shrink-0 p-0 flex items-center justify-center shadow-sm transition-all hover:scale-105">{isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5 ml-0.5" />}</Button>
             </div>
           </div>
@@ -795,6 +829,25 @@ export const TeacherCommunity = () => {
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction onClick={() => deleteId && deleteMessageMutation.mutate(deleteId)} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
             </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Email Notification Dialog */}
+      <AlertDialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send Email Notification</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. An email will be sent to all students in {selectedGroup?.subject_name} - {selectedGroup?.batch_name}. Proceed only if this message is important.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSendingEmail}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleSendEmail} disabled={isSendingEmail} className="bg-blue-600 hover:bg-blue-700">
+              {isSendingEmail ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Mail className="h-4 w-4 mr-2" />}
+              Send Email
+            </AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

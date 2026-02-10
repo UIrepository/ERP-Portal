@@ -11,3 +11,12 @@ verify_jwt = false
 
 [functions.sync-google-groups]
 verify_jwt = false
+
+[functions.send-class-reminders]
+verify_jwt = false
+
+[functions.send-recording-emails]
+verify_jwt = false
+
+[functions.send-community-email]
+verify_jwt = false

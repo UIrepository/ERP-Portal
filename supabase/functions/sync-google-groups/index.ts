@@ -137,6 +137,12 @@ Deno.serve(async (req) => {
       subjectMembers[subjectKey].add(e.email);
     }
 
+    // Collect ALL unique emails for allstudents group
+    const allStudentEmails = new Set<string>();
+    for (const e of enrollments) {
+      allStudentEmails.add(e.email);
+    }
+
     const stats = {
       batches_processed: 0,
       subjects_processed: 0,
@@ -146,6 +152,47 @@ Deno.serve(async (req) => {
       members_existed: 0,
       errors: [] as string[],
     };
+
+    // 2.5. Process ALL STUDENTS group (allstudents@domain)
+    const allStudentsEmail = `allstudents@${domain}`;
+    try {
+      const createRes = await ensureGoogleGroup(accessToken, allStudentsEmail, 'All Students');
+      if (createRes.status === 'created') stats.groups_created++;
+      else stats.groups_existed++;
+      await delay(200);
+
+      // Ensure DB entry exists
+      const { data: allGroup } = await supabase
+        .from('google_groups')
+        .select('id')
+        .eq('batch_name', '__ALL__')
+        .is('subject_name', null)
+        .maybeSingle();
+
+      if (!allGroup) {
+        await supabase.from('google_groups').insert({
+          batch_name: '__ALL__',
+          subject_name: null,
+          group_email: allStudentsEmail,
+          is_active: true,
+        });
+      }
+
+      for (const email of allStudentEmails) {
+        try {
+          const addRes = await addMemberToGroup(accessToken, allStudentsEmail, email);
+          if (addRes.status === 'added') stats.members_added++;
+          else stats.members_existed++;
+        } catch (err) {
+          stats.errors.push(`allstudents-member: ${email}: ${(err as Error).message}`);
+        }
+        await delay(100);
+      }
+      console.log(`✅ All students group done: ${allStudentsEmail} (${allStudentEmails.size} members)`);
+    } catch (err) {
+      stats.errors.push(`allstudents-group: ${(err as Error).message}`);
+      console.error('❌ All students group failed:', err);
+    }
 
     // 3. Process BATCH groups (batchname-all@domain)
     for (const batchName of Object.keys(batchMembers)) {
