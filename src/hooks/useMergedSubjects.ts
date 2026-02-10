@@ -33,8 +33,9 @@ export const useMergedSubjects = (batch?: string, subject?: string) => {
   });
 
   // Build an OR filter string for Supabase queries
+  // UPDATED: Added quotes around values to handle spaces in batch names (e.g. "Class 12")
   const orFilter = mergedPairs.length > 0
-    ? mergedPairs.map(p => `and(batch.eq.${p.batch},subject.eq.${p.subject})`).join(',')
+    ? mergedPairs.map(p => `and(batch.eq."${p.batch}",subject.eq."${p.subject}")`).join(',')
     : null;
 
   // Deterministic primary pair: sort alphabetically so both sides of a merge resolve to the same one
