@@ -359,32 +359,30 @@ export const TeacherJoinClass = () => {
         }
 
         const embedLink = recordings[0].embed_link;
-        // Extracts ID from embed links like "https://www.youtube.com/embed/VIDEO_ID"
         const videoId = embedLink.split('/').pop();
 
         if (!videoId) throw new Error("Could not parse Video ID.");
 
         // 2. Call the Edge Function
-        // We use a cleaner invocation style to avoid "2xx non error" type issues
         const { data, error: funcError } = await supabase.functions.invoke('stop-youtube-stream', {
             body: { broadcastId: videoId }
         });
 
         if (funcError) {
           console.error("Edge Function Error:", funcError);
-          throw new Error(funcError.message || "Failed to stop stream.");
+          // Don't throw — we still want to clear stream_key below
+          toast.error("YouTube stop failed, but clearing local state.", { id: toastId });
+        } else {
+          toast.success("Recording Stopped Successfully", { id: toastId });
         }
-
-        // 3. Clear the stream_key from schedule so button disappears
-        await supabase.from('schedules').update({ stream_key: null }).eq('id', cls.id);
-
-        toast.success("Recording Stopped Successfully", { id: toastId });
-        queryClient.invalidateQueries({ queryKey: ['allSchedulesTeacher'] });
 
     } catch (error: any) {
         console.error("Stop Error:", error);
         toast.error(error.message || "Failed to stop recording.", { id: toastId });
     } finally {
+        // ALWAYS clear stream_key so button doesn't get stuck
+        await supabase.from('schedules').update({ stream_key: null }).eq('id', cls.id);
+        queryClient.invalidateQueries({ queryKey: ['allSchedulesTeacher'] });
         setIsStopping(false);
     }
   };
