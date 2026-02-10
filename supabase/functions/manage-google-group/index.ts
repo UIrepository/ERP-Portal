@@ -180,6 +180,16 @@ Deno.serve(async (req) => {
     const subjectAddRes = await addMember(accessToken, actualSubjectEmail, student_email);
     results.push({ group: actualSubjectEmail, action: 'add_member', status: subjectAddRes.status });
 
+    // === ALL STUDENTS GROUP ===
+    const allStudentsEmail = `allstudents@${domain}`;
+    try {
+      const allStudentsAddRes = await addMember(accessToken, allStudentsEmail, student_email);
+      results.push({ group: allStudentsEmail, action: 'add_member', status: allStudentsAddRes.status });
+    } catch (err) {
+      console.error(`Failed to add ${student_email} to ${allStudentsEmail}:`, err);
+      results.push({ group: allStudentsEmail, action: 'add_member', status: `error: ${(err as Error).message}` });
+    }
+
     console.log('All results:', JSON.stringify(results));
 
     return new Response(JSON.stringify({ success: true, results }), {
