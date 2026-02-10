@@ -8,6 +8,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { generateJitsiRoomName, subjectsMatch } from '@/lib/jitsiUtils';
 import { useYoutubeStream } from '@/hooks/useYoutubeStream';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button'; 
@@ -44,13 +55,13 @@ export const TeacherJoinClass = () => {
   const { profile, user } = useAuth();
   const queryClient = useQueryClient();
   const [selectedClassForAttendance, setSelectedClassForAttendance] = useState<Schedule | null>(null);
-  const [selectedMergeIds, setSelectedMergeIds] = useState<string[]>([]);
   const { startStream, isStartingStream } = useYoutubeStream();
   const [streamKey, setStreamKey] = useState<string>("");
   const [showStreamDialog, setShowStreamDialog] = useState(false);
   const [currentClass, setCurrentClass] = useState<Schedule | null>(null);
   const [isMergedSession, setIsMergedSession] = useState(false);
   const [mergedRoomUrl, setMergedRoomUrl] = useState<string>("");
+  const [isStopping, setIsStopping] = useState(false);
 
   // Fetch teacher's assignments
   const { data: teacher, isLoading: isLoadingTeacher } = useQuery<Teacher | null>({
@@ -325,10 +336,9 @@ export const TeacherJoinClass = () => {
     }
   };
 
-  // --- NEW STOP RECORDING FUNCTION ---
+  // --- UPDATED STOP RECORDING FUNCTION ---
   const handleStopRecording = async (cls: Schedule) => {
-    if (!confirm(`Are you sure you want to stop the recording for ${cls.subject}? This will end the YouTube stream.`)) return;
-
+    setIsStopping(true);
     const toastId = toast.loading("Stopping Recording...");
 
     try {
@@ -349,18 +359,23 @@ export const TeacherJoinClass = () => {
         }
 
         const embedLink = recordings[0].embed_link;
+        // Extracts ID from embed links like "https://www.youtube.com/embed/VIDEO_ID"
         const videoId = embedLink.split('/').pop();
 
         if (!videoId) throw new Error("Could not parse Video ID.");
 
         // 2. Call the Edge Function
-        const { error: funcError } = await supabase.functions.invoke('stop-youtube-stream', {
+        // We use a cleaner invocation style to avoid "2xx non error" type issues
+        const { data, error: funcError } = await supabase.functions.invoke('stop-youtube-stream', {
             body: { broadcastId: videoId }
         });
 
-        if (funcError) throw funcError;
+        if (funcError) {
+          console.error("Edge Function Error:", funcError);
+          throw new Error(funcError.message || "Failed to stop stream.");
+        }
 
-        // 3. Clear the stream_key from schedule
+        // 3. Clear the stream_key from schedule so button disappears
         await supabase.from('schedules').update({ stream_key: null }).eq('id', cls.id);
 
         toast.success("Recording Stopped Successfully", { id: toastId });
@@ -369,6 +384,8 @@ export const TeacherJoinClass = () => {
     } catch (error: any) {
         console.error("Stop Error:", error);
         toast.error(error.message || "Failed to stop recording.", { id: toastId });
+    } finally {
+        setIsStopping(false);
     }
   };
 
@@ -444,6 +461,7 @@ export const TeacherJoinClass = () => {
           {liveClasses.map((cls) => {
             const mergedLabel = getMergedLabel(cls.batch, cls.subject);
             const isMerged = !!mergedLabel || !!cls.mergedBatches;
+            const hasActiveStream = !!cls.stream_key; // CHECK IF STREAM IS ACTIVE
             
             return (
               <div key={cls.id} className={`${styles.classCard} ${styles.activeClassCard}`}>
@@ -470,15 +488,36 @@ export const TeacherJoinClass = () => {
                   )}
                 </div>
                 <div className={styles.actionsWrapper}>
-                  {/* --- NEW STOP RECORDING BUTTON --- */}
-                  <button 
-                    onClick={() => handleStopRecording(cls)}
-                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded text-sm font-bold cursor-pointer transition-all border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:border-red-300 animate-pulse"
-                    title="Stop Streaming (Emergency)"
-                  >
-                    <Square className="w-4 h-4 fill-current" />
-                    STOP REC
-                  </button>
+                  {/* --- NEW STOP RECORDING BUTTON (WITH CONFIRMATION & ACTIVE CHECK) --- */}
+                  {hasActiveStream && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <button 
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded text-sm font-bold cursor-pointer transition-all border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:border-red-300 animate-pulse"
+                          title="Stop Streaming (Emergency)"
+                        >
+                          {isStopping ? <Loader2 className="w-4 h-4 animate-spin"/> : <Square className="w-4 h-4 fill-current" />}
+                          STOP REC
+                        </button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Stop Recording?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to stop the live stream for <strong>{cls.subject}</strong>?
+                            <br/><br/>
+                            This will end the broadcast on YouTube. You should only do this if the class is finished or the stream is stuck.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => handleStopRecording(cls)} className="bg-red-600 hover:bg-red-700 text-white">
+                            Yes, Stop Stream
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
 
                   <button onClick={() => setSelectedClassForAttendance(cls)} className={styles.btn}>Attendance</button>
                   <button 
