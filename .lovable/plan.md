@@ -1,47 +1,80 @@
 
 
-# Fix: Stop Recording Button Error
-
-## Problem
-When clicking "STOP REC", the `stop-youtube-stream` edge function fails with a 400 error. The YouTube API returns **403 "Invalid transition"** because the broadcast isn't in the right state (it may not be fully "live" yet, or may have already ended).
+# Fix: Stop Recording Not Actually Stopping YouTube Stream
 
 ## Root Cause
-The YouTube `liveBroadcasts/transition` API only allows transitioning to "complete" when the broadcast is in the **"live"** state. If the broadcast is still in "testing", "ready", or already "complete", YouTube rejects it.
+
+The stop function extracts the broadcast ID from the `recordings` table by looking up the most recent recording for the batch/subject. But:
+
+1. **Multiple recordings** exist for the same batch/subject on the same day (e.g., Statistics 1 has multiple entries). The query may pick the wrong one.
+2. **The broadcast ID (`videoId`) is never persisted to the database.** It's only stored in `broadcastIdRef` (React ref), which is lost on page refresh.
+3. **9+ schedules currently have stale `stream_key` values** that were never cleared, indicating the stop flow has been broken for a while.
 
 ## Solution
 
-### 1. Update `stop-youtube-stream` edge function
+### 1. Add `broadcast_id` column to `schedules` table
 
-Before attempting the transition, **check the broadcast's current status** using the YouTube API. Then handle each case:
+Store the YouTube broadcast ID directly alongside the `stream_key` when a stream is created. This way, the stop function always has the correct ID regardless of what's in the recordings table.
 
-- **Status is "live"**: Proceed with the transition to "complete" (current behavior).
-- **Status is "complete"**: Already stopped -- return success immediately.
-- **Status is "testing" or "ready"**: The stream never went fully live. Delete the broadcast instead (cleanup) and return success.
-- **Any other error**: Return a descriptive error but still allow the frontend to clear the stream state.
+**Database migration:**
+```sql
+ALTER TABLE public.schedules ADD COLUMN IF NOT EXISTS broadcast_id text;
+```
 
-Also update the CORS headers to include the full set of Supabase client headers.
+### 2. Update `handleStartClass` in `TeacherJoinClass.tsx`
 
-### 2. Update frontend error handling in `TeacherJoinClass.tsx`
+When saving the `stream_key` to the schedule, also save the `broadcast_id`:
 
-Even if the edge function fails (e.g., YouTube is unreachable), still clear the `stream_key` from the schedule so the button doesn't get stuck. Move the `stream_key` cleanup to a `finally` block or execute it regardless of the YouTube API result.
+```typescript
+await supabase
+  .from('schedules')
+  .update({ stream_key: details.streamKey, broadcast_id: details.broadcastId })
+  .eq('id', cls.id);
+```
+
+### 3. Update `handleStopRecording` in `TeacherJoinClass.tsx`
+
+Instead of looking up recordings to find the broadcast ID, read it directly from the schedule's `broadcast_id` column:
+
+```typescript
+const handleStopRecording = async (cls: Schedule) => {
+  const broadcastId = cls.broadcast_id; // Direct from schedule
+  if (!broadcastId) {
+    toast.error("No broadcast ID found.");
+    // Still clear stream_key
+    await supabase.from('schedules').update({ stream_key: null, broadcast_id: null }).eq('id', cls.id);
+    return;
+  }
+  // Call edge function with broadcastId...
+  // In finally: clear both stream_key AND broadcast_id
+};
+```
+
+### 4. Update Schedule type and query
+
+- Add `broadcast_id` to the `Schedule` interface
+- Add `broadcast_id` to the schedules query select
+- Clear `broadcast_id` alongside `stream_key` in the finally block
+
+### 5. Clean up stale stream keys
+
+Run a one-time SQL to clear the 9+ stale stream keys currently stuck in the schedules table:
+
+```sql
+UPDATE schedules SET stream_key = NULL WHERE stream_key IS NOT NULL;
+```
 
 ## Files to modify
 
 | File | Change |
 |---|---|
-| `supabase/functions/stop-youtube-stream/index.ts` | Check broadcast status before transitioning; handle "complete", "testing", "ready" states gracefully; update CORS headers |
-| `src/components/teacher/TeacherJoinClass.tsx` | Always clear `stream_key` after attempting stop, even on error |
+| Database migration | Add `broadcast_id` column to `schedules` |
+| `src/components/teacher/TeacherJoinClass.tsx` | Save `broadcast_id` on start, read it on stop, clear both on stop |
 
-## Technical Details
+## Summary of flow after fix
 
-**Edge function changes** (`stop-youtube-stream/index.ts`):
-- After getting the access token, call `GET liveBroadcasts/list?id={broadcastId}&part=status` to check current status
-- If `lifeCycleStatus === 'live'`: do the transition to "complete"
-- If `lifeCycleStatus === 'complete'`: skip transition, return success
-- If `lifeCycleStatus` is "created", "ready", or "testing": delete the broadcast via `DELETE liveBroadcasts?id={broadcastId}` and return success
-- Always return 200 with a descriptive message so the frontend can proceed
-
-**Frontend changes** (`TeacherJoinClass.tsx`):
-- Move the `stream_key` cleanup (`supabase.from('schedules').update({ stream_key: null })`) to always execute after the edge function call, regardless of success or failure
-- This prevents the "STOP REC" button from getting stuck
+1. **Start**: Create YouTube broadcast, save both `stream_key` and `broadcast_id` to the schedule row
+2. **Stop**: Read `broadcast_id` directly from the schedule, call edge function with it, clear both fields
+3. No more dependency on the recordings table for finding the broadcast ID
+4. No more in-memory-only refs that break on page refresh
 
