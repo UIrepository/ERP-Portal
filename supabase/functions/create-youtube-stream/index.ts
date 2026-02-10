@@ -53,9 +53,9 @@ serve(async (req) => {
         }, 
         contentDetails: { 
           enableAutoStart: true, 
-          enableAutoStop: true,
+          enableAutoStop: false, // <--- CHANGED: Must be FALSE to allow reconnection
           recordFromStart: true,
-          latencyPreference: 'low' // Added for faster startup
+          latencyPreference: 'low'
         }
       }),
     });
