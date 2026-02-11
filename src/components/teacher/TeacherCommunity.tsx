@@ -570,7 +570,14 @@ export const TeacherCommunity = () => {
   };
 
   const handleSendEmail = async () => {
-    if (!messageText.trim() || !selectedGroup) return;
+    if (!messageText.trim()) {
+      toast({ title: "Type a message first", variant: "destructive" });
+      return;
+    }
+    if (!selectedGroup) {
+      toast({ title: "Select a group first", variant: "destructive" });
+      return;
+    }
     setIsSendingEmail(true);
     try {
       const { data, error } = await supabase.functions.invoke('send-community-email', {
@@ -805,7 +812,7 @@ export const TeacherCommunity = () => {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="h-10 w-10 text-gray-400 hover:bg-white hover:text-blue-600 rounded-lg shrink-0" 
+                className="h-10 w-10 bg-red-500 hover:bg-red-600 text-white rounded-lg shrink-0 disabled:bg-red-300" 
                 onClick={() => setShowEmailDialog(true)}
                 disabled={!messageText.trim()}
                 title="Send as email notification"
