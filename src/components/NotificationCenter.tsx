@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -12,7 +12,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 export const NotificationCenter = () => {
   const { profile } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  // Track IDs of notifications the student has swiped/removed
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
 
   const { data: rawNotifications = [] } = useQuery({
@@ -33,7 +32,7 @@ export const NotificationCenter = () => {
           .from('community_messages')
           .select('*, profiles(name)')
           .in('batch', myBatches)
-          .order('created_at', { ascending: false })
+          .order('created_at', { ascending: false }) // Strict backend sort
           .limit(20);
 
         communityMsgs = (commData || [])
@@ -54,7 +53,7 @@ export const NotificationCenter = () => {
         .from('direct_messages')
         .select('*, profiles:sender_id(name)')
         .eq('receiver_id', profile.user_id)
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: false }) // Strict backend sort
         .limit(20);
 
       const directMsgs = (dmData || []).map(msg => ({
@@ -65,16 +64,15 @@ export const NotificationCenter = () => {
         created_at: msg.created_at
       }));
 
-      // Merge and ensure most recent are at the top
+      // Merge and enforce latest on top via timestamp
       return [...communityMsgs, ...directMsgs].sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
     },
     enabled: !!profile?.user_id,
-    refetchInterval: 5000,
+    refetchInterval: 3000, // Faster polling to capture recent chats
   });
 
-  // Filter out notifications the user has removed
   const activeNotifications = rawNotifications.filter(n => !dismissedIds.includes(n.id));
   const count = activeNotifications.length;
 
@@ -88,8 +86,8 @@ export const NotificationCenter = () => {
         <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
           <Bell className="h-5 w-5" />
           {count > 0 && (
-            <span className="absolute top-1.5 right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-2 ring-background">
-              {count}
+            <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white ring-2 ring-background shadow-sm">
+              {count > 9 ? '9+' : count}
             </span>
           )}
         </Button>
@@ -97,11 +95,11 @@ export const NotificationCenter = () => {
       
       <PopoverContent className="w-80 md:w-96 p-0 mr-4 font-sans border-border/40 shadow-xl" align="end">
         <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/40 backdrop-blur-sm">
-          <h4 className="font-semibold text-sm">Latest Messages</h4>
+          <h4 className="font-semibold text-sm">Notifications</h4>
           {count > 0 && (
             <button 
               onClick={() => setDismissedIds(rawNotifications.map(n => n.id))}
-              className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground hover:text-primary"
+              className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground hover:text-red-500 transition-colors"
             >
               Clear All
             </button>
@@ -111,7 +109,7 @@ export const NotificationCenter = () => {
         <ScrollArea className="h-[400px]">
           {activeNotifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-[200px] text-muted-foreground/50 p-8 text-center">
-              <p className="text-sm font-medium">No new notifications</p>
+              <p className="text-sm font-medium">All caught up!</p>
             </div>
           ) : (
             <div className="overflow-hidden">
@@ -123,7 +121,7 @@ export const NotificationCenter = () => {
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ x: 100, opacity: 0 }}
                     transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                    className="relative border-b border-border/30 bg-background"
+                    className="relative border-b border-border/30 bg-background hover:bg-muted/10"
                   >
                     <div className="flex gap-3 p-4 group">
                       <div className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${notif.type === 'dm' ? 'bg-blue-500' : 'bg-teal-500'}`} />
@@ -143,13 +141,13 @@ export const NotificationCenter = () => {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="absolute right-2 top-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute right-2 top-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-100 hover:text-red-600"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleDismiss(notif.id);
                         }}
                       >
-                        <X className="h-4 w-4" />
+                        <X className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </motion.div>
