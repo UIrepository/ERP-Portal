@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Bell, X } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -15,13 +15,13 @@ export const NotificationCenter = () => {
   const { profile } = useAuth();
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = useState(false);
-  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
 
-  const { data: rawNotifications = [] } = useQuery({
+  const { data: notifications = [] } = useQuery({
     queryKey: ['virtual-notifications', profile?.user_id],
     queryFn: async () => {
       if (!profile?.user_id) return [];
 
+      // Fetch Enrollments
       const { data: enrollments } = await supabase
         .from('user_enrollments')
         .select('batch_name, subject_name')
@@ -31,6 +31,7 @@ export const NotificationCenter = () => {
       let communityMsgs: any[] = [];
       
       if (myBatches.length > 0) {
+        // Fetch Community Messages
         const { data: commData } = await supabase
           .from('community_messages')
           .select('*, profiles(name)')
@@ -52,6 +53,7 @@ export const NotificationCenter = () => {
           }));
       }
 
+      // Fetch Direct Messages
       const { data: dmData } = await supabase
         .from('direct_messages')
         .select('*, profiles:sender_id(name)')
@@ -67,6 +69,7 @@ export const NotificationCenter = () => {
         created_at: msg.created_at
       }));
 
+      // Sort by most recent at the top
       return [...communityMsgs, ...directMsgs].sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
@@ -75,54 +78,34 @@ export const NotificationCenter = () => {
     refetchInterval: 3000,
   });
 
-  const activeNotifications = rawNotifications.filter(n => !dismissedIds.includes(n.id));
-  const count = activeNotifications.length;
-
-  const handleDismiss = (id: string) => {
-    setDismissedIds(prev => [...prev, id]);
-  };
+  const count = notifications.length;
 
   const NotificationList = () => (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/40 backdrop-blur-sm shrink-0">
         <h4 className="font-semibold text-sm">Notifications</h4>
-        {count > 0 && (
-          <button 
-            onClick={() => setDismissedIds(rawNotifications.map(n => n.id))}
-            className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground hover:text-red-500 transition-colors"
-          >
-            Clear All
-          </button>
-        )}
       </div>
 
       <ScrollArea className={`${isMobile ? 'h-[60vh]' : 'h-[400px]'}`}>
-        {activeNotifications.length === 0 ? (
+        {notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-[200px] text-muted-foreground/50 p-8 text-center">
             <p className="text-sm font-medium">All caught up!</p>
           </div>
         ) : (
           <div className="overflow-hidden">
             <AnimatePresence initial={false}>
-              {activeNotifications.map((notif) => (
+              {notifications.map((notif) => (
                 <motion.div
                   key={notif.id}
                   layout
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ x: isMobile ? -300 : 100, opacity: 0 }}
-                  drag="x"
-                  dragConstraints={{ left: -100, right: 0 }}
-                  dragElastic={0.7}
-                  onDragEnd={(_, info) => {
-                    if (info.offset.x < -60) handleDismiss(notif.id);
-                  }}
-                  className="relative border-b border-border/30 bg-background touch-pan-y"
+                  className="relative border-b border-border/30 bg-background"
                 >
                   <div className="flex gap-3 p-4 group select-none">
                     <div className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${notif.type === 'dm' ? 'bg-blue-500' : 'bg-teal-500'}`} />
                     
-                    <div className="flex-1 space-y-1 pr-6">
+                    <div className="flex-1 space-y-1">
                       <p className="text-sm font-semibold text-foreground leading-none">
                         {notif.title}
                       </p>
@@ -133,17 +116,6 @@ export const NotificationCenter = () => {
                         {formatDistanceToNow(new Date(notif.created_at), { addSuffix: true })}
                       </p>
                     </div>
-
-                    {!isMobile && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-2 top-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-100 hover:text-red-600"
-                        onClick={() => handleDismiss(notif.id)}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
                   </div>
                 </motion.div>
               ))}
