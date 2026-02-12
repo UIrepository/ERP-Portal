@@ -1,62 +1,33 @@
 
 
-# Fix: Community Email Button - Unresponsive and Invisible
+# Fix: STOP REC Button Disappears After Class End Time
 
-## Problems Identified
-
-1. **Button is nearly invisible**: The email button uses `variant="ghost"` with `text-gray-400` styling, making it blend into the background. Users can't find it.
-2. **Silent failure when no text**: The `handleSendEmail` function silently returns (`return;`) when `messageText` is empty or `selectedGroup` is null, with no user feedback.
-3. **Button disabled without visual cue**: When `disabled={!messageText.trim()}`, the button becomes completely unclickable with no indication to the user why.
+## Problem
+When a class passes its scheduled end time, it moves from "Currently Active" to "Completed". The completed section only shows a "View Attendance" button -- no STOP REC. If the teacher is still streaming, they lose the ability to stop the recording.
 
 ## Solution
+Modify the classification logic so that **any class with an active `stream_key` stays in the "live" category**, regardless of whether the scheduled end time has passed.
 
-### 1. Make the email button red and prominent (`TeacherCommunity.tsx`, line ~805-814)
+## File to modify
+`src/components/teacher/TeacherJoinClass.tsx`
 
-Change the button from ghost/gray to a visible red style:
-- Replace `variant="ghost"` with explicit red styling
-- Change `text-gray-400` to a red color scheme (`bg-red-500 hover:bg-red-600 text-white`)
-- Keep the `disabled` logic but add a tooltip or visual distinction
+## Changes
 
-### 2. Add user feedback for edge cases
+**Lines 254-265** -- Update the classification in the `useMemo` block:
 
-- When the button is clicked without text, show a toast message instead of silently returning
-- Add better error logging to help debug if the edge function fails
-
-## Files to modify
-
-| File | Change |
-|---|---|
-| `src/components/teacher/TeacherCommunity.tsx` | Restyle email button to red; add toast feedback for empty message edge case |
-
-## Specific Changes
-
-**Line 805-814** - Email button styling:
-```tsx
-<Button 
-  variant="ghost" 
-  size="icon" 
-  className="h-10 w-10 bg-red-500 hover:bg-red-600 text-white rounded-lg shrink-0" 
-  onClick={() => setShowEmailDialog(true)}
-  disabled={!messageText.trim()}
-  title="Send as email notification"
->
-  <Mail className="h-5 w-5" />
-</Button>
+Current logic:
+```
+if (isBefore(now, startTime))       -> upcoming
+else if (isAfter(now, endTime))     -> completed
+else                                -> live
 ```
 
-**Line 572-573** - Add feedback for empty message:
-```tsx
-const handleSendEmail = async () => {
-  if (!messageText.trim()) {
-    toast({ title: "Type a message first", variant: "destructive" });
-    return;
-  }
-  if (!selectedGroup) {
-    toast({ title: "Select a group first", variant: "destructive" });
-    return;
-  }
-  // ... rest of logic
-};
+New logic:
+```
+if (cls.stream_key)                 -> live (always, stream is active)
+else if (isBefore(now, startTime))  -> upcoming
+else if (isAfter(now, endTime))     -> completed
+else                                -> live
 ```
 
-Note: The edge function itself and the "only one teacher" issue -- the function code looks correct and uses the service role key. If only one teacher (pulzur.in@gmail.com) can send, it's likely because only that teacher has text typed when clicking the button, or the button click isn't registering due to the invisible styling. Making it red and adding feedback should resolve this.
+This single change ensures that as long as the teacher has an active stream (stream_key is set), the class card stays visible in the "Currently Active" section with all its buttons (Join, STOP REC, Attendance) -- even if the scheduled time window has ended. Once the teacher clicks STOP REC (which clears stream_key), the card will naturally move to "Completed" on the next re-render.
