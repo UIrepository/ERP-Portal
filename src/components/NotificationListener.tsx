@@ -1,67 +1,97 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { toast } from "sonner"; 
+import { toast } from "sonner";
 
 export const NotificationListener = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
+  
+  // We use a ref to hold enrollments so we can access them inside the callback 
+  // without re-subscribing constantly
+  const enrollmentsRef = useRef<any[]>([]);
+
+  // 1. Fetch Enrollments ONCE for filtering
+  useEffect(() => {
+    if (!profile?.user_id) return;
+    const fetchEnrollments = async () => {
+      const { data } = await supabase
+        .from('user_enrollments')
+        .select('batch_name, subject_name')
+        .eq('user_id', profile.user_id);
+      if (data) enrollmentsRef.current = data;
+    };
+    fetchEnrollments();
+  }, [profile?.user_id]);
 
   useEffect(() => {
     if (!profile?.user_id) return;
 
-    // Listen for NEW notifications specifically for this user
-    const channel = supabase
-      .channel('realtime-notifications')
+    // 2. Listen to DIRECT MESSAGES (Simple)
+    const dmChannel = supabase
+      .channel('dm-listener')
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'notifications',
-          // ⚠️ IMPORTANT: This must match the column name in your DB
-          filter: `target_user_id=eq.${profile.user_id}`
+          table: 'direct_messages',
+          filter: `receiver_id=eq.${profile.user_id}`
+        },
+        () => {
+          playNotificationSound();
+          toast.info("New Direct Message");
+          queryClient.invalidateQueries({ queryKey: ['virtual-notifications'] });
+        }
+      )
+      .subscribe();
+
+    // 3. Listen to COMMUNITY MESSAGES (Filter in Client)
+    const commChannel = supabase
+      .channel('community-listener')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'community_messages'
         },
         (payload) => {
-          const newNotif = payload.new as any;
+          const newMsg = payload.new as any;
           
-          // 1. Play Sound
-          try {
-            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-            audio.volume = 0.5;
-            audio.play().catch((e) => console.log("Audio play failed", e));
-          } catch (e) {
-            console.error("Audio error", e);
-          }
-          
-          // 2. Show Toast
-          toast.info(newNotif.title || "New Notification", {
-            description: newNotif.message,
-            duration: 5000,
-            action: {
-              label: "Mark Read",
-              onClick: async () => {
-                await supabase
-                  .from('notifications')
-                  .update({ is_active: false } as any)
-                  .eq('id', newNotif.id);
-                // Refresh the bell icon count immediately
-                queryClient.invalidateQueries({ queryKey: ['notifications'] });
-              }
-            }
-          });
+          // A. Ignore my own messages
+          if (newMsg.user_id === profile.user_id) return;
 
-          // 3. Refresh Bell Icon Count (Refetch the query in NotificationCenter)
-          queryClient.invalidateQueries({ queryKey: ['notifications'] });
+          // B. STRICT FILTER: Check if this msg belongs to one of my batches/subjects
+          const isRelevant = enrollmentsRef.current.some(
+            e => e.batch_name === newMsg.batch && e.subject_name === newMsg.subject
+          );
+
+          if (isRelevant) {
+            playNotificationSound();
+            toast.info(`New message in ${newMsg.subject}`);
+            queryClient.invalidateQueries({ queryKey: ['virtual-notifications'] });
+          }
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(dmChannel);
+      supabase.removeChannel(commChannel);
     };
   }, [profile?.user_id, queryClient]);
+
+  const playNotificationSound = () => {
+    try {
+      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+      audio.volume = 0.5;
+      audio.play().catch(e => console.error("Audio play failed", e));
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   return null;
 };
