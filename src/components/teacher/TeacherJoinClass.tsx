@@ -219,9 +219,7 @@ export const TeacherJoinClass = () => {
           !consumed.has(s.id) &&
           s.id !== cls.id &&
           s.batch === partnerBatch &&
-          s.subject === partnerSubject &&
-          s.start_time === cls.start_time &&
-          s.end_time === cls.end_time
+          s.subject === partnerSubject
         );
 
         if (partner) {
@@ -322,7 +320,8 @@ export const TeacherJoinClass = () => {
         return;
     }
 
-    const details = await startStream(cls.batch, cls.subject);
+    const primary = getPrimaryPair(cls.batch, cls.subject);
+    const details = await startStream(cls.batch, cls.subject, primary.batch, primary.subject);
     if (details?.streamKey) {
       const { error } = await supabase
         .from('schedules')

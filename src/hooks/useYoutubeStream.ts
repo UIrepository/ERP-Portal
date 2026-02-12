@@ -13,7 +13,7 @@ export const useYoutubeStream = () => {
   /**
    * Creates a YouTube Broadcast via Edge Function and saves the link to the database.
    */
-  const startStream = async (batch: string, subject: string) => {
+  const startStream = async (batch: string, subject: string, primaryBatch?: string, primarySubject?: string) => {
     if (isStartingStream || isStreaming) return null;
 
     setIsStartingStream(true);
@@ -38,11 +38,13 @@ export const useYoutubeStream = () => {
       // SAVE THE ID FOR STOPPING LATER
       broadcastIdRef.current = streamData.videoId;
 
-      // 2. Save Recording Link to DB Immediately
+      // 2. Save Recording Link to DB using primary pair (avoids duplicates for merged classes)
+      const recBatch = primaryBatch || batch;
+      const recSubject = primarySubject || subject;
       const { error: dbError } = await supabase.from('recordings').insert({
-        batch: batch,
-        subject: subject,
-        topic: `${subject} Class - ${format(new Date(), 'MMM dd, yyyy')}`,
+        batch: recBatch,
+        subject: recSubject,
+        topic: `${recSubject} Class - ${format(new Date(), 'MMM dd, yyyy')}`,
         date: new Date().toISOString(),
         embed_link: streamData.embedLink 
       });

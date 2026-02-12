@@ -41,7 +41,7 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects }: StudentLi
   const todayDateStr = format(today, 'yyyy-MM-dd');
 
   // Fetch all active merges so we can resolve primary pairs for ANY schedule
-  const { data: activeMerges = [] } = useQuery<MergeRow[]>({
+  const { data: activeMerges = [], isLoading: isMergesLoading } = useQuery<MergeRow[]>({
     queryKey: ['active-merges-for-student-live'],
     queryFn: async () => {
       const { data } = await supabase
@@ -235,7 +235,7 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects }: StudentLi
     return `${formatSingle(start)} — ${formatSingle(end)}`;
   };
 
-  if (isLoading) {
+  if (isLoading || isMergesLoading) {
     return <Skeleton className="h-64 w-full rounded-[4px]" />;
   }
 

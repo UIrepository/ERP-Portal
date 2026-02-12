@@ -52,7 +52,7 @@ export const StudentJoinClass = () => {
   });
 
   // Fetch active merges to determine primary pairs for room naming
-  const { data: activeMerges = [] } = useQuery({
+  const { data: activeMerges = [], isLoading: isMergesLoading } = useQuery({
     queryKey: ['active-merges-for-join-class'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -172,7 +172,7 @@ export const StudentJoinClass = () => {
     window.open(roomUrl, '_blank');
   };
 
-  const isLoading = isLoadingEnrollments || isLoadingSchedules;
+  const isLoading = isLoadingEnrollments || isLoadingSchedules || isMergesLoading;
 
   if (isLoading) {
     return (
