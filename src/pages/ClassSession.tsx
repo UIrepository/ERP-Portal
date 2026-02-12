@@ -3,6 +3,7 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2, ShieldAlert } from 'lucide-react';
+import { generateJitsiRoomName } from '@/lib/jitsiUtils';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 
@@ -81,9 +82,20 @@ const ClassSession = () => {
             attendanceMarked.current = true;
         }
 
-        // 4. REDIRECT to the Public Jitsi URL (Bypasses 5-min timer)
-        // Set name automatically
-        const finalUrl = `${(activeClass as any).room_url}#userInfo.displayName="${encodeURIComponent(profile.name || 'Student')}"`;
+        // 4. REDIRECT — Recompute room URL from primary pair for consistency
+        const allPairs = [{ batch: enrollment.batch_name, subject: enrollment.subject_name }];
+        if (merges?.length) {
+          allPairs.push(
+            { batch: merges[0].primary_batch, subject: merges[0].primary_subject },
+            { batch: merges[0].secondary_batch, subject: merges[0].secondary_subject }
+          );
+        }
+        // Deduplicate pairs
+        const uniquePairs = allPairs.filter((p, i, arr) => arr.findIndex(x => x.batch === p.batch && x.subject === p.subject) === i);
+        const sorted = uniquePairs.sort((a, b) => `${a.batch}|${a.subject}`.localeCompare(`${b.batch}|${b.subject}`));
+        const primaryPair = sorted[0];
+        const roomName = generateJitsiRoomName(primaryPair.batch, primaryPair.subject);
+        const finalUrl = `https://meet.jit.si/${roomName}#userInfo.displayName="${encodeURIComponent(profile.name || 'Student')}"`;
         window.location.href = finalUrl;
 
       } catch (err: any) {

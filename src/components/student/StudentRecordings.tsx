@@ -84,7 +84,14 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                 .order('date', { ascending: false }); // Newest first
             
             if (error) throw error;
-            return (data || []) as RecordingContent[];
+            // Deduplicate by embed_link (safety net for merged class duplicate recordings)
+            const uniqueByLink = new Map<string, any>();
+            (data || []).forEach(rec => {
+              if (!uniqueByLink.has(rec.embed_link)) {
+                uniqueByLink.set(rec.embed_link, rec);
+              }
+            });
+            return Array.from(uniqueByLink.values()) as RecordingContent[];
         },
         enabled: !!batch && !!subject && !!orFilter
     });
