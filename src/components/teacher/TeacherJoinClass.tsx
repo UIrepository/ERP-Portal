@@ -255,7 +255,9 @@ export const TeacherJoinClass = () => {
       const startTime = parse(cls.start_time, 'HH:mm:ss', now);
       const endTime = parse(cls.end_time, 'HH:mm:ss', now);
       
-      if (isBefore(now, startTime)) {
+      if (cls.stream_key) {
+        live.push(cls);
+      } else if (isBefore(now, startTime)) {
         upcoming.push(cls);
       } else if (isAfter(now, endTime)) {
         completed.push(cls);
