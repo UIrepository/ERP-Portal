@@ -14,6 +14,8 @@ import {
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from './Sidebar';
 import { useChatDrawer } from '@/hooks/useChatDrawer';
+import { NotificationCenter } from './NotificationCenter'; // <--- ADDED
+import { NotificationListener } from './NotificationListener'; // <--- ADDED
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -36,7 +38,14 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-background">
+    // Added 'font-sans' here to enforce Inter font family throughout the app
+    <div className="flex flex-col h-screen overflow-hidden bg-background font-sans">
+      
+      {/* 1. Mount the Notification Listener 
+        This is invisible but plays the sound and shows the toast popup 
+      */}
+      <NotificationListener />
+
       {/* Full-width Header */}
       <header className="border-b bg-card shrink-0 z-30 w-full">
         <div className="flex h-16 items-center justify-between px-4 sm:px-6">
@@ -70,7 +79,13 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
             <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-12 w-auto" />
           </div>
           
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3 md:space-x-4">
+            
+            {/* 2. Notification Bell Icon 
+               Placed right before the profile dropdown 
+            */}
+            <NotificationCenter />
+            
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
