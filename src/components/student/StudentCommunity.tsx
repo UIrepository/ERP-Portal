@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useSearchParams, useNavigate } from 'react-router-dom'; // 🟢 Added useSearchParams
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +26,6 @@ import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -315,6 +315,8 @@ export const StudentCommunity = () => {
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams(); // 🟢 Get URL params
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -343,11 +345,29 @@ export const StudentCommunity = () => {
     enabled: !!profile?.user_id
   });
 
+  // 🟢 UPDATED: Handle Selection & Deep Linking (Params)
   useEffect(() => {
-    if (!isMobile && !selectedGroup && enrollments.length > 0) {
+    if (isLoadingEnrollments || enrollments.length === 0) return;
+
+    // 1. Check URL for specific batch/subject (Deep Linking)
+    const batchParam = searchParams.get('batch');
+    const subjectParam = searchParams.get('subject');
+
+    if (batchParam && subjectParam) {
+      const targetGroup = enrollments.find(e => 
+        e.batch_name === batchParam && e.subject_name === subjectParam
+      );
+      if (targetGroup) {
+        setSelectedGroup(targetGroup);
+        return; // Found it, stop here
+      }
+    }
+
+    // 2. Fallback: If no URL params & nothing selected, pick the first one (Desktop only)
+    if (!isMobile && !selectedGroup) {
       setSelectedGroup(enrollments[0]);
     }
-  }, [enrollments, selectedGroup, isMobile]);
+  }, [enrollments, searchParams, isMobile, isLoadingEnrollments, selectedGroup]);
 
   useEffect(() => {
     setMessageText('');
@@ -435,7 +455,7 @@ export const StudentCommunity = () => {
         batch: selectedGroup.batch_name,
         subject: selectedGroup.subject_name,
         reply_to_id: replyId,
-        is_priority: false // Students cannot send priority
+        is_priority: false 
       };
       const { error } = await supabase.from('community_messages').insert(insertData as any);
       if (error) throw error;
@@ -511,7 +531,7 @@ export const StudentCommunity = () => {
       {/* GROUP LIST SIDEBAR */}
       <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
         
-        {/* BACK TO SSP BUTTON */}
+        {/* BACK TO DASHBOARD BUTTON */}
         <div className="p-4 border-b bg-gray-50 flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="mr-1 text-gray-500 hover:text-gray-900 hover:bg-gray-200">
             <ArrowLeft className="h-5 w-5" />
