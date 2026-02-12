@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { toast } from "sonner"; // Using Sonner for cleaner toasts
+import { toast } from "sonner"; 
 
 export const NotificationListener = () => {
   const { profile } = useAuth();
@@ -11,6 +11,7 @@ export const NotificationListener = () => {
   useEffect(() => {
     if (!profile?.user_id) return;
 
+    // Listen for NEW notifications specifically for this user
     const channel = supabase
       .channel('realtime-notifications')
       .on(
@@ -19,19 +20,23 @@ export const NotificationListener = () => {
           event: 'INSERT',
           schema: 'public',
           table: 'notifications',
+          // ⚠️ IMPORTANT: This must match the column name in your DB
           filter: `target_user_id=eq.${profile.user_id}`
         },
         (payload) => {
           const newNotif = payload.new as any;
           
-          // 1. Play Sound (Subtle "Ding")
-          // Ensure this file exists in /public or use a remote URL
-          const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-          audio.volume = 0.4;
-          audio.play().catch(() => {});
+          // 1. Play Sound
+          try {
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+            audio.volume = 0.5;
+            audio.play().catch((e) => console.log("Audio play failed", e));
+          } catch (e) {
+            console.error("Audio error", e);
+          }
           
           // 2. Show Toast
-          toast.info(newNotif.title, {
+          toast.info(newNotif.title || "New Notification", {
             description: newNotif.message,
             duration: 5000,
             action: {
@@ -41,12 +46,13 @@ export const NotificationListener = () => {
                   .from('notifications')
                   .update({ is_active: false } as any)
                   .eq('id', newNotif.id);
+                // Refresh the bell icon count immediately
                 queryClient.invalidateQueries({ queryKey: ['notifications'] });
               }
             }
           });
 
-          // 3. Refresh Bell Icon Count
+          // 3. Refresh Bell Icon Count (Refetch the query in NotificationCenter)
           queryClient.invalidateQueries({ queryKey: ['notifications'] });
         }
       )
