@@ -7,20 +7,19 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatDistanceToNow } from 'date-fns';
-import { useNavigate } from 'react-router-dom'; // 🟢 Added useNavigate
+import { useNavigate } from 'react-router-dom';
 
 export const NotificationCenter = () => {
   const { profile } = useAuth();
-  const navigate = useNavigate(); // 🟢 Hook for navigation
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
 
-  // Fetch "Virtual" Notifications from Chat Tables
   const { data: notifications = [] } = useQuery({
     queryKey: ['virtual-notifications', profile?.user_id],
     queryFn: async () => {
       if (!profile?.user_id) return [];
 
-      // A. Get My Enrollments (to filter community messages)
+      // A. Get My Enrollments
       const { data: enrollments } = await supabase
         .from('user_enrollments')
         .select('batch_name, subject_name')
@@ -28,29 +27,34 @@ export const NotificationCenter = () => {
 
       const myBatches = enrollments?.map(e => e.batch_name) || [];
 
-      // B. Fetch Community Messages (Filtered by Batch first)
-      const { data: commData } = await supabase
-        .from('community_messages')
-        .select('*, profiles(name)')
-        .in('batch', myBatches)
-        .order('created_at', { ascending: false })
-        .limit(20);
+      // A2. Safety Check: If no batches, don't query community messages
+      let communityMsgs: any[] = [];
+      
+      if (myBatches.length > 0) {
+        // B. Fetch Community Messages
+        const { data: commData } = await supabase
+          .from('community_messages')
+          .select('*, profiles(name)')
+          .in('batch', myBatches) // Filter by my batches
+          .order('created_at', { ascending: false })
+          .limit(20);
 
-      // Strict Client-Side Filter: Subject must also match
-      const communityMsgs = (commData || [])
-        .filter(msg => 
-            msg.user_id !== profile.user_id && // Don't notify me of my own messages
-            enrollments?.some(e => e.batch_name === msg.batch && e.subject_name === msg.subject)
-        )
-        .map(msg => ({
-          id: msg.id,
-          type: 'community',
-          title: `New in ${msg.subject}`,
-          message: `${msg.profiles?.name || 'User'}: ${msg.content || 'Sent an image'}`,
-          // 🟢 Deep Link Construction
-          link: `/student/community?batch=${encodeURIComponent(msg.batch)}&subject=${encodeURIComponent(msg.subject)}`,
-          created_at: msg.created_at
-        }));
+        // Strict Client-Side Filter & Formatting
+        communityMsgs = (commData || [])
+          .filter(msg => 
+              msg.user_id !== profile.user_id && // Don't show my own messages
+              enrollments?.some(e => e.batch_name === msg.batch && e.subject_name === msg.subject)
+          )
+          .map(msg => ({
+            id: msg.id,
+            type: 'community',
+            title: `New in ${msg.subject}`,
+            message: `${msg.profiles?.name || 'User'}: ${msg.content || 'Sent an image'}`,
+            // 🟢 UPDATED: Just the normal page link, no deep link params
+            link: '/student/community', 
+            created_at: msg.created_at
+          }));
+      }
 
       // C. Fetch Direct Messages (Sent to me)
       const { data: dmData } = await supabase
@@ -65,18 +69,18 @@ export const NotificationCenter = () => {
         type: 'dm',
         title: `Message from ${msg.profiles?.name || 'Unknown'}`,
         message: msg.content || 'Sent an attachment',
-        // 🟢 Deep Link to DM
+        // 🟢 UPDATED: Direct link to the specific chat
         link: `/student/messages?chatId=${msg.sender_id}`, 
         created_at: msg.created_at
       }));
 
-      // D. Merge & Sort by newest
+      // D. Merge & Sort
       return [...communityMsgs, ...directMsgs].sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
     },
     enabled: !!profile?.user_id,
-    refetchInterval: 30000, // Poll every 30s to keep it somewhat fresh
+    refetchInterval: 5000, // Poll every 5s to ensure messages appear quickly
   });
 
   const count = notifications.length;
@@ -110,10 +114,10 @@ export const NotificationCenter = () => {
                   className="flex gap-3 p-4 hover:bg-muted/30 transition-colors cursor-pointer"
                   onClick={() => {
                     setIsOpen(false);
-                    navigate(notif.link); // 🟢 Instant Navigation
+                    navigate(notif.link); // Navigate without full reload
                   }}
                 >
-                  <div className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${notif.type === 'dm' ? 'bg-blue-500' : 'bg-green-500'}`} />
+                  <div className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${notif.type === 'dm' ? 'bg-blue-500' : 'bg-teal-500'}`} />
                   
                   <div className="flex-1 space-y-1">
                     <p className="text-sm font-semibold text-foreground leading-none">
