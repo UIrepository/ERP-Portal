@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -22,23 +22,51 @@ export const NotificationCenter = () => {
     queryKey: ['notifications', profile?.user_id],
     queryFn: async () => {
       if (!profile?.user_id) return [];
+      
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
-        .eq('target_user_id', profile.user_id)
+        .eq('target_user_id', profile.user_id) // Matches Listener
         .eq('is_active', true) // Only show unread
         .order('created_at', { ascending: false })
         .limit(20);
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching notifications:", error);
+        throw error;
+      }
       return data;
     },
     enabled: !!profile?.user_id,
-    // Refresh automatically every 1 minute
-    refetchInterval: 60000, 
   });
 
-  // 2. Mark Single Notification as Read
+  // 2. Realtime Listener for Badge Count (Updates count even if Listener is unmounted)
+  useEffect(() => {
+    if (!profile?.user_id) return;
+
+    const channel = supabase
+      .channel('notification-badge-updater')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen for INSERT (new) and UPDATE (read status)
+          schema: 'public',
+          table: 'notifications',
+          filter: `target_user_id=eq.${profile.user_id}`
+        },
+        () => {
+          // Whenever a notification is added or marked read, refresh the list
+          queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.user_id, queryClient]);
+
+  // 3. Mark Single Notification as Read
   const markAsReadMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
@@ -52,7 +80,7 @@ export const NotificationCenter = () => {
     },
   });
 
-  // 3. Mark ALL as Read
+  // 4. Mark ALL as Read
   const markAllReadMutation = useMutation({
     mutationFn: async () => {
       if (!profile?.user_id) return;
@@ -82,7 +110,7 @@ export const NotificationCenter = () => {
         </Button>
       </PopoverTrigger>
       
-      <PopoverContent className="w-96 p-0 mr-4 font-sans border-border/40 shadow-xl" align="end">
+      <PopoverContent className="w-80 md:w-96 p-0 mr-4 font-sans border-border/40 shadow-xl" align="end">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/40 backdrop-blur-sm">
           <div className="flex items-center gap-2">
@@ -119,12 +147,14 @@ export const NotificationCenter = () => {
             </div>
           ) : (
             <div className="divide-y divide-border/30">
-              {notifications.map((notif) => (
+              {notifications.map((notif: any) => (
                 <div 
                   key={notif.id} 
-                  className="flex gap-3 p-4 hover:bg-muted/30 transition-colors group relative"
+                  className="flex gap-3 p-4 hover:bg-muted/30 transition-colors group relative cursor-pointer"
+                  onClick={() => notif.link ? window.location.href = notif.link : null}
                 >
-                  <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                  {/* Status Indicator */}
+                  <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
                   
                   <div className="flex-1 space-y-1">
                     <p className="text-sm font-semibold text-foreground leading-none">
@@ -138,11 +168,15 @@ export const NotificationCenter = () => {
                     </p>
                   </div>
 
+                  {/* Individual Mark Read Button */}
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-green-600 hover:bg-green-50 absolute top-3 right-3"
-                    onClick={() => markAsReadMutation.mutate(notif.id)}
+                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-green-600 hover:bg-green-50 absolute top-2 right-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      markAsReadMutation.mutate(notif.id);
+                    }}
                     title="Mark as read"
                   >
                     <Check className="h-3.5 w-3.5" />
