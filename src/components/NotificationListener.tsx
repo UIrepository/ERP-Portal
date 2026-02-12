@@ -3,17 +3,16 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom"; // 🟢 Added useNavigate
+import { useNavigate } from "react-router-dom";
 
 export const NotificationListener = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
-  const navigate = useNavigate(); 
+  const navigate = useNavigate();
   
-  // Store enrollments in ref to access inside realtime callback without stale closures
   const enrollmentsRef = useRef<any[]>([]);
 
-  // 1. Fetch Enrollments Once
+  // 1. Fetch Enrollments
   useEffect(() => {
     if (!profile?.user_id) return;
     const fetchEnrollments = async () => {
@@ -29,7 +28,7 @@ export const NotificationListener = () => {
   useEffect(() => {
     if (!profile?.user_id) return;
 
-    // 2. Listen for Direct Messages
+    // 2. Direct Messages Listener
     const dmChannel = supabase
       .channel('dm-listener')
       .on('postgres_changes', { 
@@ -42,17 +41,18 @@ export const NotificationListener = () => {
         const newMsg = payload.new as any;
         playNotificationSound();
         toast.info("New Direct Message", {
-          description: "Click to view",
+          description: "Click to view chat",
           action: {
-            label: "View",
-            onClick: () => navigate(`/student/messages?chatId=${newMsg.sender_id}`) // 🟢 Deep Link
+            label: "Open Chat",
+            // 🟢 Opens the specific chat
+            onClick: () => navigate(`/student/messages?chatId=${newMsg.sender_id}`) 
           }
         });
         queryClient.invalidateQueries({ queryKey: ['virtual-notifications'] });
       })
       .subscribe();
 
-    // 3. Listen for Community Messages
+    // 3. Community Messages Listener
     const commChannel = supabase
       .channel('community-listener')
       .on('postgres_changes', { 
@@ -63,10 +63,8 @@ export const NotificationListener = () => {
       (payload) => {
         const newMsg = payload.new as any;
         
-        // Ignore my own messages
         if (newMsg.user_id === profile.user_id) return;
 
-        // Strict Check: Is this message for one of my batches?
         const isRelevant = enrollmentsRef.current.some(
           e => e.batch_name === newMsg.batch && e.subject_name === newMsg.subject
         );
@@ -77,8 +75,8 @@ export const NotificationListener = () => {
             description: newMsg.content ? (newMsg.content.length > 40 ? newMsg.content.substring(0,40)+'...' : newMsg.content) : "Sent an attachment",
             action: {
               label: "View",
-              // 🟢 Deep Link to specific batch
-              onClick: () => navigate(`/student/community?batch=${encodeURIComponent(newMsg.batch)}&subject=${encodeURIComponent(newMsg.subject)}`) 
+              // 🟢 Just opens the Community page (Normal Link)
+              onClick: () => navigate('/student/community') 
             }
           });
           queryClient.invalidateQueries({ queryKey: ['virtual-notifications'] });
