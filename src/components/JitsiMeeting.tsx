@@ -302,13 +302,14 @@ export const JitsiMeeting = ({
         'microphone', 'camera', 'desktop', 'chat', 'raisehand', 
         'participants-pane', 'tileview', 'fullscreen', 'videoquality', 
         'filmstrip', 'settings', 'hangup', 'overflowmenu', 'sharedvideo',
-        'livestreaming', 'recording', 'mute-everyone', 'security', 'stats'
+        'livestreaming', 'recording', 'mute-everyone', 'security', 'stats', 'whiteboard'
     ];
 
+    // STRICT STUDENT TOOLBAR - Removed 'overflowmenu' completely to hide "Three Dots" menu
+    // Added 'settings' to main bar so they can still change audio/video devices
     const STUDENT_TOOLBAR = [
-        'microphone', 'camera', 'desktop', 'chat', 'raisehand', 
-        'participants-pane', 'tileview', 'fullscreen', 'videoquality', 
-        'filmstrip', 'settings', 'hangup', 'overflowmenu'
+        'microphone', 'camera', 'chat', 'raisehand', 
+        'tileview', 'fullscreen', 'settings', 'hangup'
     ];
 
     const options = {
@@ -323,7 +324,31 @@ export const JitsiMeeting = ({
         startWithVideoMuted: false,
         disableDeepLinking: true,
         disableInviteFunctions: true,
-        liveStreamingEnabled: true,
+        // STRICT TOOLBAR CONTROL
+        toolbarButtons: isHost ? TEACHER_TOOLBAR : STUDENT_TOOLBAR,
+        liveStreamingEnabled: isHost,
+        fileRecordingsEnabled: isHost, 
+        recordingService: {
+            enabled: isHost,
+            sharingEnabled: isHost,
+            hideStorageWarning: !isHost
+        },
+        dropbox: {
+            enabled: false
+        },
+        localRecording: {
+            enabled: false
+        },
+        whiteboard: {
+            enabled: isHost, // Disabled for students
+            collabServerBaseUrl: isHost ? undefined : '' // Break connection for students
+        },
+        // SETTINGS CONTROL: Explicitly remove 'moderator' tab for students
+        settings: {
+            tabs: isHost 
+                ? ['devices', 'profile', 'calendar', 'sounds', 'more', 'moderator'] 
+                : ['devices', 'profile', 'sounds']
+        },
         p2p: { enabled: false, useStunTurn: true },
         disable1On1Mode: true,
         enableLayerSuspension: true,
@@ -338,9 +363,6 @@ export const JitsiMeeting = ({
         enableClosePage: false, 
         notifications: [],
         startAudioOnly: false,
-        whiteboard: {
-            enabled: isHost // Only enabled for host
-        },
       },
       interfaceConfigOverwrite: {
         TOOLBAR_BUTTONS: isHost ? TEACHER_TOOLBAR : STUDENT_TOOLBAR,
