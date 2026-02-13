@@ -366,6 +366,10 @@ export const JitsiMeeting = ({
       },
       interfaceConfigOverwrite: {
         TOOLBAR_BUTTONS: isHost ? TEACHER_TOOLBAR : STUDENT_TOOLBAR,
+        // ADDED STRICT SETTINGS CONTROL HERE AS WELL
+        SETTINGS_SECTIONS: isHost 
+            ? ['devices', 'language', 'moderator', 'profile', 'calendar', 'sounds', 'more']
+            : ['devices', 'language', 'profile', 'sounds'],
         SHOW_JITSI_WATERMARK: false,
         SHOW_WATERMARK_FOR_GUESTS: false,
         DEFAULT_REMOTE_DISPLAY_NAME: 'Participant',
