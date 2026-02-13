@@ -206,12 +206,16 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects }: StudentLi
       const configParams = [
         `config.liveStreamingEnabled=false`,       // Disable Stream
         `config.fileRecordingsEnabled=false`,      // Disable Dropbox/File Recording
+        `config.recordingService.enabled=false`,   // Disable backend recording service
+        `config.dropbox.enabled=false`,            // Disable Dropbox
         `config.localRecording.enabled=false`,     // Disable Local Recording
+        `config.whiteboard.enabled=false`,         // Disable Whiteboard 
+        `config.whiteboard.collabServerBaseUrl=''`,// Break whiteboard server connection
+        `config.settings.tabs=["devices","profile","sounds"]`, // STRICTLY LIMIT SETTINGS TABS
         `config.prejoinPageEnabled=false`,         // Skip prejoin
         `config.disableRemoteMute=true`,           // Prevent muting others
         `config.remoteVideoMenu.disableKick=true`, // Prevent kicking others
         `config.remoteVideoMenu.disableGrantModerator=true`, // Prevent granting mod rights
-        `config.whiteboard.enabled=false`,         // Disable Whiteboard for students
         `userInfo.displayName="${profile?.name || user?.email || 'Student'}"` // Auto-name
       ];
 
