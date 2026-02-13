@@ -211,6 +211,7 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects }: StudentLi
         `config.disableRemoteMute=true`,           // Prevent muting others
         `config.remoteVideoMenu.disableKick=true`, // Prevent kicking others
         `config.remoteVideoMenu.disableGrantModerator=true`, // Prevent granting mod rights
+        `config.whiteboard.enabled=false`,         // Disable Whiteboard for students
         `userInfo.displayName="${profile?.name || user?.email || 'Student'}"` // Auto-name
       ];
 
