@@ -302,7 +302,7 @@ export const JitsiMeeting = ({
         'microphone', 'camera', 'desktop', 'chat', 'raisehand', 
         'participants-pane', 'tileview', 'fullscreen', 'videoquality', 
         'filmstrip', 'settings', 'hangup', 'overflowmenu', 'sharedvideo',
-        'livestreaming', 'recording', 'mute-everyone', 'security', 'stats', 'whiteboard'
+        'livestreaming', 'recording', 'mute-everyone', 'security', 'stats'
     ];
 
     const STUDENT_TOOLBAR = [
@@ -323,21 +323,7 @@ export const JitsiMeeting = ({
         startWithVideoMuted: false,
         disableDeepLinking: true,
         disableInviteFunctions: true,
-        // Strict button control via configOverwrite (modern Jitsi)
-        toolbarButtons: isHost ? TEACHER_TOOLBAR : STUDENT_TOOLBAR,
-        liveStreamingEnabled: isHost,
-        fileRecordingsEnabled: isHost, 
-        recordingService: {
-            enabled: isHost,
-            sharingEnabled: isHost,
-            hideStorageWarning: !isHost
-        },
-        dropbox: {
-            enabled: false
-        },
-        localRecording: {
-            enabled: false
-        },
+        liveStreamingEnabled: true,
         p2p: { enabled: false, useStunTurn: true },
         disable1On1Mode: true,
         enableLayerSuspension: true,
@@ -357,7 +343,6 @@ export const JitsiMeeting = ({
         },
       },
       interfaceConfigOverwrite: {
-        // Fallback for older servers, but configOverwrite.toolbarButtons is preferred
         TOOLBAR_BUTTONS: isHost ? TEACHER_TOOLBAR : STUDENT_TOOLBAR,
         SHOW_JITSI_WATERMARK: false,
         SHOW_WATERMARK_FOR_GUESTS: false,
