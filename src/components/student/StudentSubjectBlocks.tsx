@@ -81,7 +81,7 @@ export const StudentSubjectBlocks = ({
       label: 'Lectures',
       stats: [
         isLoading ? 'Loading...' : `${stats?.videos} Videos`, 
-        isLoading ? '...' : `${stats?.exercises} Exercises`
+        'Past Classes'
       ], 
     },
     {
@@ -90,6 +90,14 @@ export const StudentSubjectBlocks = ({
       stats: [
         isLoading ? 'Loading...' : `${stats?.notes} Notes`, 
         'Assignments'
+      ],
+    },
+    {
+      id: 'dpps',
+      label: 'DPPs',
+      stats: [
+        isLoading ? 'Loading...' : `${stats?.exercises} DPPs`, 
+        'Daily Practice'
       ],
     },
     {
@@ -135,7 +143,7 @@ export const StudentSubjectBlocks = ({
       <div className="max-w-[1200px] mx-auto mt-8 px-4 md:px-6">
         <div className="bg-white rounded-md border border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-8">
           
-          {/* Subject Title - Updated for wrapping and sizing */}
+          {/* Subject Title */}
           <h2 className="text-xl md:text-2xl font-bold text-[#1e293b] mb-8 tracking-tight whitespace-normal break-words leading-tight">
             {subject}
           </h2>
