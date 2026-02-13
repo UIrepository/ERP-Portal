@@ -7,6 +7,7 @@ import { StudentAnnouncements } from './StudentAnnouncements';
 import { StudentCommunity } from './StudentCommunity';
 import { StudentConnect } from './StudentConnect';
 import { StudentLiveClass } from './StudentLiveClass';
+import { StudentDPP } from './StudentDPP';
 
 interface StudentBlockContentProps {
   blockId: string;
@@ -19,6 +20,7 @@ const blockLabels: Record<string, string> = {
   'live-class': 'Live Class',
   recordings: 'Lectures',
   notes: 'Notes',
+  dpps: 'DPPs',
   'ui-ki-padhai': 'UI Ki Padhai',
   announcements: 'Announcements',
   community: 'Community',
@@ -39,6 +41,8 @@ export const StudentBlockContent = ({
         return <StudentRecordings batch={batch} subject={subject} />;
       case 'notes':
         return <StudentNotes batch={batch} subject={subject} />;
+      case 'dpps':
+        return <StudentDPP batch={batch} subject={subject} />;
       case 'ui-ki-padhai':
         return <StudentUIKiPadhai batch={batch} subject={subject} />;
       case 'announcements':
