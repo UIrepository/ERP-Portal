@@ -1,8 +1,9 @@
+
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { LogOut, PanelLeft } from 'lucide-react';
+import { LogOut, PanelLeft, Menu } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,8 +15,8 @@ import {
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from './Sidebar';
 import { useChatDrawer } from '@/hooks/useChatDrawer';
-import { NotificationCenter } from './NotificationCenter'; // <--- ADDED
-import { NotificationListener } from './NotificationListener'; // <--- ADDED
+import { NotificationCenter } from './NotificationCenter';
+import { NotificationListener } from './NotificationListener';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -49,12 +50,12 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
       {/* Full-width Header */}
       <header className="border-b bg-card shrink-0 z-30 w-full">
         <div className="flex h-16 items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-4">
-            {/* Mobile Sidebar Toggle */}
+          <div className="flex items-center gap-3">
+            {/* Mobile Sidebar Toggle - Updated to Big Hamburger Menu */}
             <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
               <SheetTrigger asChild className="md:hidden">
-                <Button size="icon" variant="outline">
-                  <PanelLeft className="h-5 w-5" />
+                <Button size="icon" variant="ghost" className="-ml-2 h-12 w-12 hover:bg-slate-100">
+                  <Menu className="h-8 w-8 text-slate-700" />
                   <span className="sr-only">Toggle Menu</span>
                 </Button>
               </SheetTrigger>
@@ -76,7 +77,17 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
               </SheetContent>
             </Sheet>
             
-            <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-12 w-auto" />
+            {/* Responsive Logo: 'logoofficial' on mobile (icon), 'imagelogo' on desktop (text) */}
+            <img 
+              src="/logoofficial.png" 
+              alt="Logo" 
+              className="h-10 w-auto md:hidden" 
+            />
+            <img 
+              src="/imagelogo.png" 
+              alt="Unknown IITians" 
+              className="hidden md:block h-12 w-auto" 
+            />
           </div>
           
           <div className="flex items-center space-x-3 md:space-x-4">
