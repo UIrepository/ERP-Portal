@@ -338,6 +338,9 @@ export const JitsiMeeting = ({
         enableClosePage: false, 
         notifications: [],
         startAudioOnly: false,
+        whiteboard: {
+            enabled: isHost // Only enabled for host
+        },
       },
       interfaceConfigOverwrite: {
         TOOLBAR_BUTTONS: isHost ? TEACHER_TOOLBAR : STUDENT_TOOLBAR,
