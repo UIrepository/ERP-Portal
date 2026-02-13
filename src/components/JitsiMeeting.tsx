@@ -323,7 +323,8 @@ export const JitsiMeeting = ({
         startWithVideoMuted: false,
         disableDeepLinking: true,
         disableInviteFunctions: true,
-        liveStreamingEnabled: true,
+        liveStreamingEnabled: isHost, // Changed to isHost
+        fileRecordingsEnabled: isHost, // Added to disable recording for students
         p2p: { enabled: false, useStunTurn: true },
         disable1On1Mode: true,
         enableLayerSuspension: true,
