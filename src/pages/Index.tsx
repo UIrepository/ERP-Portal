@@ -1,5 +1,4 @@
-// src/pages/Index.tsx
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useMaintenanceMode } from '@/hooks/useMaintenanceMode';
 import { AuthPage } from '@/components/AuthPage';
@@ -12,10 +11,15 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { MaintenancePage } from '@/components/MaintenancePage';
 import { ChatDrawerProvider } from '@/hooks/useChatDrawer';
 import { StudentChatbot } from '@/components/student/StudentChatbot';
+import { useParams, useNavigate } from 'react-router-dom';
 
 const Index = () => {
   const { user, loading, profile, resolvedRole } = useAuth();
   const { shouldShowMaintenance, maintenanceMessage, isLoading: maintenanceLoading } = useMaintenanceMode(user?.email ?? undefined);
+  
+  // Read current tab from URL
+  const { tab } = useParams<{ tab: string }>();
+  const navigate = useNavigate();
 
   const getInitialTab = () => {
     switch (resolvedRole) {
@@ -27,11 +31,21 @@ const Index = () => {
     }
   };
 
-  const [activeTab, setActiveTab] = useState(getInitialTab());
+  // Active tab is either the URL param or the default for the role
+  const activeTab = tab || getInitialTab();
 
+  // Function to update URL when Sidebar tab is clicked
+  const handleTabChange = (newTab: string) => {
+    navigate(`/${newTab}`);
+  };
+
+  // Redirect root "/" to the default tab (e.g., /dashboard)
   useEffect(() => {
-    setActiveTab(getInitialTab());
-  }, [resolvedRole]);
+    if (!loading && user && !tab && resolvedRole) {
+      const defaultTab = getInitialTab();
+      navigate(`/${defaultTab}`, { replace: true });
+    }
+  }, [loading, user, tab, resolvedRole, navigate]);
 
   if (loading || maintenanceLoading) {
     return <LoadingSpinner />;
@@ -49,13 +63,13 @@ const Index = () => {
   const renderDashboard = () => {
     switch (resolvedRole) {
       case 'student':
-        return <StudentDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
+        return <StudentDashboard activeTab={activeTab} onTabChange={handleTabChange} />;
       case 'teacher':
-        return <TeacherDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
+        return <TeacherDashboard activeTab={activeTab} onTabChange={handleTabChange} />;
       case 'manager':
-        return <ManagerDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
+        return <ManagerDashboard activeTab={activeTab} onTabChange={handleTabChange} />;
       case 'admin':
-        return <AdminDashboard activeTab={activeTab} onTabChange={setActiveTab} />;
+        return <AdminDashboard activeTab={activeTab} onTabChange={handleTabChange} />;
       default:
         return (
           <div className="p-6 text-center">
@@ -69,7 +83,7 @@ const Index = () => {
   if (resolvedRole === 'student') {
     return (
       <ChatDrawerProvider>
-        <Layout activeTab={activeTab} onTabChange={setActiveTab}>
+        <Layout activeTab={activeTab} onTabChange={handleTabChange}>
           {renderDashboard()}
         </Layout>
         <StudentChatbot />
@@ -78,7 +92,7 @@ const Index = () => {
   }
 
   return (
-    <Layout activeTab={activeTab} onTabChange={setActiveTab}>
+    <Layout activeTab={activeTab} onTabChange={handleTabChange}>
       {renderDashboard()}
     </Layout>
   );
