@@ -24,6 +24,7 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
+              {/* Root Route - Index will redirect to default tab */}
               <Route path="/" element={<Index />} />
               
               {/* SECURE CLASS SESSION ROUTE */}
@@ -32,6 +33,10 @@ const App = () => (
               {/* COMMUNITY ROUTES (Open in new tabs) */}
               <Route path="/portal/student/community" element={<StudentCommunity />} />
               <Route path="/teacher-community" element={<TeacherCommunity />} />
+              
+              {/* Dynamic Dashboard Tabs (e.g., /schedule, /exams) */}
+              {/* Placed after specific routes to avoid conflicts */}
+              <Route path="/:tab" element={<Index />} />
               
               {/* Fallback Route */}
               <Route path="*" element={<NotFound />} />
