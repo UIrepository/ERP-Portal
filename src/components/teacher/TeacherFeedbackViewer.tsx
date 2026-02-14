@@ -3,8 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Loader2, Star, Calendar, User, MessageSquare } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Loader2, Star, Calendar, User, MessageSquare, Quote } from 'lucide-react';
 import { format } from 'date-fns';
 
 // Helper to parse batch/subject arrays
@@ -74,98 +74,91 @@ export const TeacherFeedbackViewer = () => {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between border-b pb-4 mb-6">
+    <div className="space-y-6 max-w-5xl mx-auto">
+      <div className="flex items-center justify-between border-b pb-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-800">Student Feedback</h2>
-          <p className="text-sm text-muted-foreground mt-1">Review performance feedback from your assigned batches</p>
+          <p className="text-sm text-muted-foreground">Recent reviews from your classes</p>
         </div>
-        <Badge variant="secondary" className="px-3 py-1">
+        <Badge variant="secondary" className="px-3 py-1 text-sm">
           {feedbacks.length} Reviews
         </Badge>
       </div>
 
       {feedbacks.length === 0 ? (
-        <div className="text-center py-20 bg-slate-50 rounded-md border border-dashed border-slate-300">
-          <MessageSquare className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-slate-900">No feedback yet</h3>
-          <p className="text-muted-foreground">Feedback collected from students will appear here.</p>
+        <div className="text-center py-16 bg-slate-50 rounded-md border border-dashed border-slate-300">
+          <MessageSquare className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+          <p className="text-muted-foreground">No feedback received yet.</p>
         </div>
       ) : (
         <div className="flex flex-col space-y-4">
           {feedbacks.map((feedback) => (
             <Card key={feedback.id} className="rounded-md border-slate-200 shadow-sm hover:shadow-md transition-all bg-white overflow-hidden">
-              <CardContent className="p-5">
-                
-                {/* Header Row: Info (Left) vs Rating (Right) */}
-                <div className="flex justify-between items-start mb-4">
-                  {/* Left: Subject & Batch */}
-                  <div className="space-y-1.5">
-                    <h3 className="font-bold text-lg text-slate-800 leading-none">{feedback.subject}</h3>
-                    <div className="flex items-center gap-2">
-                       <Badge variant="outline" className="rounded-sm font-normal text-slate-600 bg-slate-50 border-slate-200">
-                         {feedback.batch}
-                       </Badge>
-                       <span className="text-xs text-slate-400 flex items-center">
-                         <Calendar className="h-3 w-3 mr-1"/>
-                         {format(new Date(feedback.created_at), 'MMM d, yyyy')}
-                       </span>
+              <CardContent className="p-0">
+                <div className="flex flex-col md:flex-row">
+                  
+                  {/* Left Side: Info & Ratings */}
+                  <div className="md:w-64 bg-slate-50/50 p-4 border-r border-slate-100 flex flex-col justify-between shrink-0">
+                    <div>
+                      <h3 className="font-semibold text-slate-800 truncate mb-1" title={feedback.subject}>
+                        {feedback.subject}
+                      </h3>
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        <Badge variant="outline" className="bg-white text-xs font-normal text-slate-600 rounded-sm">
+                          {feedback.batch}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center text-xs text-slate-500 gap-1.5 mb-4">
+                        <Calendar className="h-3.5 w-3.5" />
+                        {format(new Date(feedback.created_at), 'MMM d, yyyy')}
+                      </div>
+                    </div>
+
+                    {/* Compact Ratings Grid */}
+                    <div className="space-y-2 text-sm">
+                       <div className="flex items-center justify-between">
+                          <span className="text-slate-500 text-xs">Overall</span>
+                          <div className="flex items-center bg-yellow-100 px-1.5 py-0.5 rounded-sm">
+                             <Star className="h-3 w-3 fill-yellow-600 text-yellow-600 mr-1" />
+                             <span className="font-bold text-yellow-800 text-xs">{feedback.teacher_quality}/5</span>
+                          </div>
+                       </div>
+                       <div className="h-px bg-slate-200 w-full my-1" />
+                       <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-500">Clarity</span>
+                          <span className="font-medium text-slate-700">{feedback.concept_clarity}/5</span>
+                       </div>
+                       <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-500">Materials</span>
+                          <span className="font-medium text-slate-700">{feedback.dpp_quality}/5</span>
+                       </div>
                     </div>
                   </div>
 
-                  {/* Right: Big Rating Block */}
-                  <div className="flex items-center gap-3">
-                     <div className="text-right hidden sm:block">
-                        <div className="text-[10px] uppercase font-bold text-slate-400">Overall Rating</div>
-                        <div className="text-xs text-slate-500 font-medium">Student Experience</div>
-                     </div>
-                     <div className="bg-yellow-50 border border-yellow-100 rounded-md px-3 py-2 flex flex-col items-center justify-center min-w-[70px]">
-                        <div className="flex items-center text-yellow-700 font-bold text-xl leading-none mb-1">
-                           {feedback.teacher_quality}<span className="text-sm text-yellow-600/70 font-normal">/5</span>
-                        </div>
-                        <div className="flex">
-                           {[...Array(5)].map((_, i) => (
-                             <Star 
-                               key={i} 
-                               className={`h-2.5 w-2.5 ${i < Math.round(feedback.teacher_quality) ? 'fill-yellow-500 text-yellow-500' : 'fill-slate-200 text-slate-200'}`} 
-                             />
-                           ))}
-                        </div>
-                     </div>
+                  {/* Right Side: Comments */}
+                  <div className="flex-1 p-5 flex flex-col min-h-[140px]">
+                    <div className="flex-1 relative">
+                       <Quote className="h-8 w-8 text-slate-100 absolute -top-2 -left-2 -z-0" />
+                       <ScrollArea className="h-full max-h-[150px] relative z-10">
+                         {feedback.comments ? (
+                           <p className="text-slate-700 leading-relaxed whitespace-pre-wrap text-sm pt-1 pl-1">
+                             {feedback.comments}
+                           </p>
+                         ) : (
+                           <p className="text-slate-400 italic text-sm pt-1 pl-1">No written comments provided.</p>
+                         )}
+                       </ScrollArea>
+                    </div>
+                    
+                    <div className="mt-4 pt-3 border-t border-slate-50 flex justify-end">
+                       <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                          <User className="h-3 w-3" />
+                          <span>Submitted by {feedback.submitted_by ? 'Student' : 'Anonymous'}</span>
+                       </div>
+                    </div>
                   </div>
+
                 </div>
-
-                {/* Middle: Comment Section */}
-                <div className="bg-slate-50/60 p-4 rounded-md border border-slate-100 mb-5 relative">
-                   <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                      {feedback.comments || <span className="text-slate-400 italic">No detailed comments provided by the student.</span>}
-                   </p>
-                </div>
-
-                {/* Footer: Granular Metrics & User Info */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2 border-t border-slate-50">
-                   
-                   {/* Metrics (Progress Bars) */}
-                   <div className="flex flex-wrap gap-x-6 gap-y-2">
-                      <div className="flex items-center gap-2 min-w-[140px]">
-                         <span className="text-xs font-medium text-slate-500 w-20">Clarity</span>
-                         <Progress value={(feedback.concept_clarity / 5) * 100} className="h-1.5 w-16 bg-slate-100" />
-                         <span className="text-xs font-bold text-slate-700">{feedback.concept_clarity}</span>
-                      </div>
-                      <div className="flex items-center gap-2 min-w-[140px]">
-                         <span className="text-xs font-medium text-slate-500 w-20">Materials</span>
-                         <Progress value={(feedback.dpp_quality / 5) * 100} className="h-1.5 w-16 bg-slate-100" />
-                         <span className="text-xs font-bold text-slate-700">{feedback.dpp_quality}</span>
-                      </div>
-                   </div>
-
-                   {/* Submitted By */}
-                   <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-white px-2 py-1 rounded-full border border-slate-100 shadow-sm self-start sm:self-auto">
-                      <User className="h-3 w-3" />
-                      <span>Submitted by {feedback.submitted_by ? 'Student' : 'Anonymous'}</span>
-                   </div>
-                </div>
-
               </CardContent>
             </Card>
           ))}
