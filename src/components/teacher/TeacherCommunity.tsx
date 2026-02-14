@@ -398,22 +398,44 @@ export const TeacherCommunity = () => {
       const groups: TeacherGroup[] = [];
       const batches = cleanList(data.assigned_batches);
       const subjectsRaw = cleanList(data.assigned_subjects);
-      const subjects = subjectsRaw.map(s => s.replace(/\s*\(.*?\)\s*$/g, '').trim());
-
+      
       const seen = new Set<string>();
 
-      batches.forEach(batch => {
-        subjects.forEach(subject => {
-          if (!subject) return;
-          const key = `${batch}_${subject}`;
+      // Revised logic: Handle specific "Subject (Batch)" mappings if present,
+      // otherwise fall back to Cartesian product for general subjects.
+      subjectsRaw.forEach(rawSubject => {
+        // Regex to check if subject ends with (Batch Name)
+        const match = rawSubject.match(/^(.*?)\s*\((.+)\)\s*$/);
+        const cleanSubject = match ? match[1].trim() : rawSubject.trim();
+        const specificBatch = match ? match[2].trim() : null;
+
+        if (!cleanSubject) return;
+
+        if (specificBatch && batches.includes(specificBatch)) {
+          // Case 1: Specific Batch found in subject string (e.g., "Math (Batch A)")
+          // AND the teacher has access to that batch.
+          const key = `${specificBatch}_${cleanSubject}`;
           if (!seen.has(key)) {
             seen.add(key);
             groups.push({
-                batch_name: batch,
-                subject_name: subject
+                batch_name: specificBatch,
+                subject_name: cleanSubject
             });
           }
-        });
+        } else {
+          // Case 2: General subject (e.g., "Math") OR specific batch not found in assigned list.
+          // Apply this subject to ALL assigned batches (Cartesian product).
+          batches.forEach(batch => {
+            const key = `${batch}_${cleanSubject}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              groups.push({
+                  batch_name: batch,
+                  subject_name: cleanSubject
+              });
+            }
+          });
+        }
       });
 
       return groups;
