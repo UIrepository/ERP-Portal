@@ -70,7 +70,7 @@ export const NotificationCenter = () => {
       // Fetch unread Direct Messages (last 20)
       const { data: dms, error: dmError } = await supabase
         .from('direct_messages')
-        .select(`id, content, created_at, sender_id, profiles!sender_id(name)`)
+        .select('id, content, created_at, sender_id')
         .eq('receiver_id', profile.user_id)
         .eq('is_read', false)
         .order('created_at', { ascending: false })
@@ -78,12 +78,19 @@ export const NotificationCenter = () => {
       
       if (dmError) throw dmError;
 
+      // Fetch sender names separately since there's no FK relationship
+      const senderIds = [...new Set((dms || []).map(dm => dm.sender_id))];
+      const { data: senderProfiles } = senderIds.length > 0
+        ? await supabase.from('profiles').select('user_id, name').in('user_id', senderIds)
+        : { data: [] };
+      const senderMap = new Map((senderProfiles || []).map(p => [p.user_id, p.name]));
+
       return (dms || []).map(dm => ({
         id: `dm-${dm.id}`,
-        title: dm.profiles?.name || 'New Message',
+        title: senderMap.get(dm.sender_id) || 'New Message',
         message: dm.content,
         created_at: dm.created_at,
-        read: false, // In DB it's false, but we handle local read state separately for UI
+        read: false,
         type: 'message' as const
       }));
     },
