@@ -93,7 +93,7 @@ export const TeacherJoinClass = () => {
   });
 
   // Fetch active merges
-  const { data: activeMerges = [] } = useQuery({
+  const { data: activeMerges = [], isLoading: isLoadingMerges } = useQuery({
     queryKey: ['active-merges-for-teacher-join'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -226,6 +226,8 @@ export const TeacherJoinClass = () => {
           consumed.add(partner.id);
           deduped.push({
             ...cls,
+            stream_key: cls.stream_key || partner.stream_key,
+            broadcast_id: cls.broadcast_id || partner.broadcast_id,
             mergedBatches: [
               { batch: cls.batch, subject: cls.subject, id: cls.id },
               { batch: partner.batch, subject: partner.subject, id: partner.id },
@@ -323,10 +325,14 @@ export const TeacherJoinClass = () => {
     const primary = getPrimaryPair(cls.batch, cls.subject);
     const details = await startStream(cls.batch, cls.subject, primary.batch, primary.subject);
     if (details?.streamKey) {
+      const allIds = cls.mergedBatches
+        ? cls.mergedBatches.map(m => m.id)
+        : [cls.id];
+
       const { error } = await supabase
         .from('schedules')
         .update({ stream_key: details.streamKey, broadcast_id: details.broadcastId })
-        .eq('id', cls.id);
+        .in('id', allIds);
 
       if (error) { console.error("Error saving stream key:", error); } 
       else { queryClient.invalidateQueries({ queryKey: ['allSchedulesTeacher'] }); }
@@ -369,8 +375,11 @@ export const TeacherJoinClass = () => {
         console.error("Stop Error:", error);
         toast.error(error.message || "Failed to stop recording.", { id: toastId });
     } finally {
-        // ALWAYS clear stream_key and broadcast_id so button doesn't get stuck
-        await supabase.from('schedules').update({ stream_key: null, broadcast_id: null }).eq('id', cls.id);
+        // ALWAYS clear stream_key and broadcast_id from ALL merged schedules
+        const allIds = cls.mergedBatches
+          ? cls.mergedBatches.map(m => m.id)
+          : [cls.id];
+        await supabase.from('schedules').update({ stream_key: null, broadcast_id: null }).in('id', allIds);
         queryClient.invalidateQueries({ queryKey: ['allSchedulesTeacher'] });
         setIsStopping(false);
     }
@@ -398,7 +407,7 @@ export const TeacherJoinClass = () => {
     toast.success("Stream key copied!");
   };
 
-  const isLoading = isLoadingTeacher || isLoadingSchedules;
+  const isLoading = isLoadingTeacher || isLoadingSchedules || isLoadingMerges;
 
   // --- STYLES ---
   const styles = {
