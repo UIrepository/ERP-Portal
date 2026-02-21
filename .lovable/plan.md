@@ -1,125 +1,81 @@
 
+# Fix: Duplicate Live Streams and Blank Lectures for Merged Classes
 
-# Fix: Merged Class Isolation and Duplicate Recordings
+## Root Causes Identified
 
-## Problems Found (from real database data)
+There are **3 bugs** working together to cause this:
 
-### Problem 1: Duplicate Recordings
-On Feb 12, "Statistics 1" (which is merged between "Foundation Quiz 1" and "Qualifier January 2026") has TWO separate recordings with different YouTube broadcast IDs:
-- 13:10 - Foundation Quiz 1 batch (embed: 04c3OxEnBD4)
-- 13:34 - Qualifier January 2026 batch (embed: kXO5t3XY4tY)
+### Bug 1: No loading guard for merge data (teacher side)
+The `activeMerges` query has no loading state check. If the teacher loads the page before merge data arrives, `activeMerges` is an empty array. The dedup logic finds no merges, so **two separate class cards appear**. The teacher clicks "Start Class" on both, creating two YouTube broadcasts and two recordings.
 
-**Root cause**: The teacher's schedule deduplication only merges cards when both schedules have IDENTICAL `start_time` AND `end_time`. If the times differ at all, two separate cards appear and the teacher starts two separate YouTube broadcasts. Additionally, `useYoutubeStream.startStream()` always inserts recordings using whatever batch/subject is passed to it, rather than using the primary pair.
+### Bug 2: Stream key saved to only ONE schedule
+When a merged class starts (line 329), `stream_key` and `broadcast_id` are only written to `cls.id` (the first schedule in the deduped pair). The partner schedule never gets it. If the partner happens to be enumerated first on a data refetch, the card appears without a stream key, and the teacher could accidentally start a second stream.
 
-### Problem 2: Students Landing in Isolated Meetings
-**Root cause**: When `activeMerges` data hasn't loaded yet (cache miss, slow network), `getPrimaryPair()` returns the student's own batch/subject instead of the canonical primary pair. This generates a different Jitsi room name, isolating them from the actual class.
+### Bug 3: Stop recording only clears ONE schedule
+`handleStopRecording` (line 373) only clears `stream_key` from `cls.id`. The partner's stream_key (if it had one from Bug 2) would remain, causing ghost state.
 
----
+## Changes
 
-## Solution
+### File: `src/components/teacher/TeacherJoinClass.tsx`
 
-### 1. Use primary pair for recording insertion (`useYoutubeStream.ts`)
+**Change 1 -- Add merge loading guard**
+- Destructure `isLoading` from the `activeMerges` query (rename to `isLoadingMerges`)
+- Include it in the loading check on line 401: `const isLoading = isLoadingTeacher || isLoadingSchedules || isLoadingMerges;`
+- This prevents the page from rendering before merge data is available, eliminating the race condition that shows two cards
 
-Change `startStream` to accept an optional `primaryBatch` and `primarySubject` parameter. When provided (for merged classes), use those for the recording insert instead of the raw batch/subject. This ensures only ONE recording is created under the canonical primary pair.
+**Change 2 -- Save stream key to ALL merged schedule IDs**
+In `handleStartClass` (lines 325-332), after getting the stream details, write `stream_key` and `broadcast_id` to every schedule ID in the merged group, not just `cls.id`:
 
-```typescript
-const startStream = async (batch: string, subject: string, primaryBatch?: string, primarySubject?: string) => {
-  // ... create YouTube broadcast ...
-  
-  // Use primary pair for recording
-  const recBatch = primaryBatch || batch;
-  const recSubject = primarySubject || subject;
-  
-  await supabase.from('recordings').insert({
-    batch: recBatch,
-    subject: recSubject,
-    topic: `${recSubject} Class - ${format(new Date(), 'MMM dd, yyyy')}`,
-    date: new Date().toISOString(),
-    embed_link: streamData.embedLink
-  });
-};
+```
+const allIds = cls.mergedBatches
+  ? cls.mergedBatches.map(m => m.id)
+  : [cls.id];
+
+await supabase
+  .from('schedules')
+  .update({ stream_key: details.streamKey, broadcast_id: details.broadcastId })
+  .in('id', allIds);
 ```
 
-### 2. Fix teacher dedup to match by subject merge, not just time (`TeacherJoinClass.tsx`)
+**Change 3 -- Clear stream key from ALL merged schedule IDs on stop**
+In `handleStopRecording` (line 373), clear from all IDs:
 
-Currently the dedup requires `s.start_time === cls.start_time && s.end_time === cls.end_time` for merged cards. Remove this strict time check -- if two schedules are in a merge group and on the same day, they should ALWAYS be deduped into one card regardless of time differences.
+```
+const allIds = cls.mergedBatches
+  ? cls.mergedBatches.map(m => m.id)
+  : [cls.id];
 
-```typescript
-// BEFORE: requires identical times
-const partner = filtered.find(s =>
-  !consumed.has(s.id) && s.id !== cls.id &&
-  s.batch === partnerBatch && s.subject === partnerSubject &&
-  s.start_time === cls.start_time && s.end_time === cls.end_time  // <-- too strict
-);
-
-// AFTER: merge partners always dedup (same day is enough)
-const partner = filtered.find(s =>
-  !consumed.has(s.id) && s.id !== cls.id &&
-  s.batch === partnerBatch && s.subject === partnerSubject
-);
+await supabase
+  .from('schedules')
+  .update({ stream_key: null, broadcast_id: null })
+  .in('id', allIds);
 ```
 
-### 3. Pass primary pair when starting stream (`TeacherJoinClass.tsx`)
+**Change 4 -- Check ALL merged schedules for existing stream key before starting**
+Currently line 316 only checks `cls.stream_key`. For merged cards, also check if the partner already has a stream running:
 
-In `handleStartClass`, compute the primary pair and pass it to `startStream` so the recording is saved under the canonical batch/subject:
-
-```typescript
-const primary = getPrimaryPair(cls.batch, cls.subject);
-const details = await startStream(cls.batch, cls.subject, primary.batch, primary.subject);
+```
+const existingKey = cls.stream_key
+  || cls.mergedBatches?.find(m => /* lookup from schedules */)?.stream_key;
 ```
 
-### 4. Guard against stale merge data in student join flows
+Since the deduped card spreads `cls` (the first schedule), we need to also check the partner. The simplest approach: when building the deduped card, propagate any non-null `stream_key` from the partner to the merged card.
 
-In `StudentLiveClass.tsx`, `StudentJoinClass.tsx`, and `ClassSession.tsx`, add a safety check: if `activeMerges` is still loading, show a loading state instead of proceeding with a potentially wrong room name. Also in `ClassSession.tsx`, instead of using the raw `room_url` from `active_classes`, recompute the room URL using the primary pair for consistency:
+In the dedup logic (around line 225-236), when creating the merged card, if the partner has a `stream_key` but `cls` doesn't, use the partner's:
 
-```typescript
-// ClassSession.tsx - AFTER finding activeClass
-const allPairs = [{ batch: enrollment.batch_name, subject: enrollment.subject_name }];
-if (merges?.length) {
-  allPairs.push(
-    { batch: merges[0].primary_batch, subject: merges[0].primary_subject },
-    { batch: merges[0].secondary_batch, subject: merges[0].secondary_subject }
-  );
-}
-const sorted = allPairs.sort((a, b) => `${a.batch}|${a.subject}`.localeCompare(`${b.batch}|${b.subject}`));
-const primary = sorted[0];
-const roomName = generateJitsiRoomName(primary.batch, primary.subject);
-const finalUrl = `https://meet.jit.si/${roomName}#userInfo.displayName=...`;
 ```
-
-### 5. Deduplicate recordings in the query (`StudentRecordings.tsx`)
-
-As a safety net, deduplicate recordings by `embed_link` so even if duplicate entries exist in the DB, students only see each unique video once:
-
-```typescript
-// After fetching, deduplicate by embed_link
-const uniqueByLink = new Map();
-(data || []).forEach(rec => {
-  if (!uniqueByLink.has(rec.embed_link)) {
-    uniqueByLink.set(rec.embed_link, rec);
-  }
+deduped.push({
+  ...cls,
+  stream_key: cls.stream_key || partner.stream_key,
+  broadcast_id: cls.broadcast_id || partner.broadcast_id,
+  mergedBatches: [...]
 });
-return Array.from(uniqueByLink.values());
 ```
-
----
-
-## Files to Modify
-
-| File | Change |
-|---|---|
-| `src/hooks/useYoutubeStream.ts` | Accept optional primaryBatch/primarySubject params for recording insert |
-| `src/components/teacher/TeacherJoinClass.tsx` | Remove strict time-match in dedup; pass primary pair to startStream |
-| `src/components/student/StudentRecordings.tsx` | Deduplicate recordings by embed_link |
-| `src/pages/ClassSession.tsx` | Recompute room URL from primary pair instead of using raw room_url |
-| `src/components/student/StudentJoinClass.tsx` | Guard against loading merges state |
-| `src/components/student/StudentLiveClass.tsx` | Guard against loading merges state |
 
 ## Summary
 
-After this fix:
-- Teacher always sees ONE card per merged class (regardless of schedule time mismatches)
-- Only ONE YouTube broadcast and ONE recording is created per merged class
-- Recording is stored under the canonical primary pair
-- Students always compute the same Jitsi room name, even if merge data loads slowly
-- Duplicate recordings are filtered out as a safety net in the student view
+These 4 changes ensure:
+- Teacher never sees two cards for merged subjects (loading guard)
+- Stream key is written to and cleared from ALL schedules in a merge group
+- An existing stream on either schedule prevents a second stream from starting
+- Only ONE YouTube broadcast and ONE recording is ever created per merged class
