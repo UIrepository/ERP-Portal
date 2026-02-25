@@ -131,18 +131,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
 
         // Check for session
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        const { data: { session: initialSession } } = await safeDbCall(
+          supabase.auth.getSession(),
+          6000
+        );
 
         if (mounted.current) {
           setSession(initialSession);
           setUser(initialSession?.user ?? null);
 
-          // Don't block initial render on profile/role fetch
-          setLoading(false);
-
           if (initialSession?.user) {
-            void fetchProfileAndRole(initialSession.user);
+            await fetchProfileAndRole(initialSession.user);
           }
+          setLoading(false);
         }
       } catch (error) {
         console.error('Auth init error:', error);
@@ -171,12 +172,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      // Don't block UI; refresh profile/role in background
-      setLoading(false);
       if (newSession?.user && event !== 'INITIAL_SESSION') {
-        setTimeout(() => {
-          void fetchProfileAndRole(newSession.user!);
-        }, 0);
+        fetchProfileAndRole(newSession.user!).finally(() => {
+          if (mounted.current) setLoading(false);
+        });
+      } else {
+        setLoading(false);
       }
     });
 

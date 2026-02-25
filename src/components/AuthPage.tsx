@@ -6,13 +6,12 @@ import { toast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
-import { useNavigate } from 'react-router-dom';
+
 
 export const AuthPage = () => {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   // signIn and signUp are not directly used but kept for AuthContext compatibility
-  const { signIn, signUp } = useAuth(); 
-  const navigate = useNavigate();
+  const { signIn, signUp } = useAuth();
 
   const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
     setIsGoogleLoading(true);
@@ -53,7 +52,6 @@ export const AuthPage = () => {
           title: 'Success',
           description: 'Signed in successfully',
         });
-        navigate('/');
       }
     } catch (error) {
       console.error('Login error:', error);
