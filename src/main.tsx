@@ -8,7 +8,7 @@ import './index.css'
 inject()
 
 createRoot(document.getElementById("root")!).render(
-  <GoogleOAuthProvider clientId="561606523690-f4a0387bv89guvm5922v725gdtinch1n.apps.googleusercontent.com">
+  <GoogleOAuthProvider clientId="30618354424-bvvml6gfui5fmtnn6fdh6nbf51fb3tcr.apps.googleusercontent.com">
     <App />
     <SpeedInsights />
   </GoogleOAuthProvider>
