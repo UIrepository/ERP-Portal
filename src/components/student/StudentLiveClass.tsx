@@ -378,8 +378,8 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects }: StudentLi
            <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mb-3">
               <span className="text-lg opacity-40">☕</span>
            </div>
-           <h3 className="text-sm font-semibold text-slate-900">No classes scheduled</h3>
-           <p className="text-xs text-slate-500 mt-1">There are no live or upcoming sessions for today.</p>
+            <h3 className="text-sm font-semibold text-slate-900">No classes today</h3>
+            <p className="text-xs text-slate-500 mt-1">There are no scheduled sessions for today.</p>
         </div>
       )}
     </div>
