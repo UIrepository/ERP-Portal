@@ -171,6 +171,7 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects }: StudentLi
   // Logic to separate "Live Now" from "Upcoming"
   const liveClasses: ScheduleWithLink[] = [];
   const upcomingClasses: ScheduleWithLink[] = [];
+  const completedClasses: ScheduleWithLink[] = [];
 
   schedules?.forEach(schedule => {
     const [startHour, startMin] = schedule.start_time.split(':').map(Number);
@@ -184,12 +185,22 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects }: StudentLi
     
     const bufferStart = addMinutes(startTime, -15);
     const bufferEnd = addMinutes(endTime, 15);
-    
-    if (isWithinInterval(now, { start: bufferStart, end: bufferEnd })) {
+
+    // If teacher is still live, always show as Live Now
+    if (schedule.is_jitsi_live) {
       liveClasses.push(schedule);
-    } 
+    }
+    // Within schedule window (not live but in buffer)
+    else if (isWithinInterval(now, { start: bufferStart, end: bufferEnd })) {
+      liveClasses.push(schedule);
+    }
+    // Upcoming (hasn't started yet, within 4 hours)
     else if (now < startTime && differenceInMinutes(startTime, now) < 240) {
       upcomingClasses.push(schedule);
+    }
+    // Completed (start time has passed, not live anymore)
+    else if (now > startTime) {
+      completedClasses.push(schedule);
     }
   });
 
