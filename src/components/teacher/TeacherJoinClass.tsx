@@ -106,39 +106,66 @@ export const TeacherJoinClass = () => {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Build N-way merge groups using union-find
+  const mergeGroups = useMemo(() => {
+    const parent = new Map<string, string>();
+    const find = (key: string): string => {
+      if (!parent.has(key)) parent.set(key, key);
+      if (parent.get(key) !== key) parent.set(key, find(parent.get(key)!));
+      return parent.get(key)!;
+    };
+    const union = (a: string, b: string) => {
+      const ra = find(a), rb = find(b);
+      if (ra !== rb) parent.set(ra, rb);
+    };
+
+    for (const m of activeMerges) {
+      const keyA = `${m.primary_batch}|${m.primary_subject}`;
+      const keyB = `${m.secondary_batch}|${m.secondary_subject}`;
+      union(keyA, keyB);
+    }
+
+    // Group all batch|subject keys by their root
+    const groups = new Map<string, Set<string>>();
+    for (const m of activeMerges) {
+      const keyA = `${m.primary_batch}|${m.primary_subject}`;
+      const keyB = `${m.secondary_batch}|${m.secondary_subject}`;
+      for (const k of [keyA, keyB]) {
+        const root = find(k);
+        if (!groups.has(root)) groups.set(root, new Set());
+        groups.get(root)!.add(k);
+      }
+    }
+    return { find, groups };
+  }, [activeMerges]);
+
   // Helpers
   const getPrimaryPair = useMemo(() => {
     return (batch: string, subject: string) => {
-      const merge = activeMerges.find((m: any) =>
-        (m.primary_batch === batch && m.primary_subject === subject) ||
-        (m.secondary_batch === batch && m.secondary_subject === subject)
-      );
-      if (!merge) return { batch, subject };
-      const pairs = [
-        { batch: merge.primary_batch, subject: merge.primary_subject },
-        { batch: merge.secondary_batch, subject: merge.secondary_subject }
-      ];
-      return pairs.sort((a, b) => `${a.batch}|${a.subject}`.localeCompare(`${b.batch}|${b.subject}`))[0];
+      const key = `${batch}|${subject}`;
+      const root = mergeGroups.find(key);
+      const group = mergeGroups.groups.get(root);
+      if (!group || group.size <= 1) return { batch, subject };
+      // Sort all members alphabetically to get deterministic primary
+      const sorted = [...group].sort();
+      const [b, s] = sorted[0].split('|');
+      return { batch: b, subject: s };
     };
-  }, [activeMerges]);
+  }, [mergeGroups]);
 
   const getMergedLabel = useMemo(() => {
     return (batch: string, subject: string) => {
-      const merge = activeMerges.find((m: any) =>
-        (m.primary_batch === batch && m.primary_subject === subject) ||
-        (m.secondary_batch === batch && m.secondary_subject === subject)
-      );
-      if (!merge) return null;
-      const otherBatch = merge.primary_batch === batch && merge.primary_subject === subject
-        ? merge.secondary_batch
-        : merge.primary_batch;
-      return `${
-        merge.primary_batch === batch && merge.primary_subject === subject
-          ? merge.secondary_subject
-          : merge.primary_subject
-      } (${otherBatch})`;
+      const key = `${batch}|${subject}`;
+      const root = mergeGroups.find(key);
+      const group = mergeGroups.groups.get(root);
+      if (!group || group.size <= 1) return null;
+      const others = [...group].filter(k => k !== key);
+      return others.map(k => {
+        const [b, s] = k.split('|');
+        return `${s} (${b})`;
+      }).join(', ');
     };
-  }, [activeMerges]);
+  }, [mergeGroups]);
 
   // Fetch attendance
   const { data: attendance, isLoading: isLoadingAttendance } = useQuery<Attendance[]>({
@@ -198,42 +225,41 @@ export const TeacherJoinClass = () => {
       }
     }).sort((a, b) => a.start_time.localeCompare(b.start_time));
 
+    // N-way merge group dedup: group all schedules by their merge group root
     const deduped: Schedule[] = [];
     const consumed = new Set<string>();
 
     for (const cls of filtered) {
       if (consumed.has(cls.id)) continue;
 
-      const merge = activeMerges.find((m: any) =>
-        (m.primary_batch === cls.batch && m.primary_subject === cls.subject) ||
-        (m.secondary_batch === cls.batch && m.secondary_subject === cls.subject)
-      );
+      const key = `${cls.batch}|${cls.subject}`;
+      const root = mergeGroups.find(key);
+      const group = mergeGroups.groups.get(root);
 
-      if (merge) {
-        const partnerBatch = merge.primary_batch === cls.batch && merge.primary_subject === cls.subject
-          ? merge.secondary_batch : merge.primary_batch;
-        const partnerSubject = merge.primary_batch === cls.batch && merge.primary_subject === cls.subject
-          ? merge.secondary_subject : merge.primary_subject;
-
-        const partner = filtered.find(s =>
-          !consumed.has(s.id) &&
-          s.id !== cls.id &&
-          s.batch === partnerBatch &&
-          s.subject === partnerSubject
+      if (group && group.size > 1) {
+        // Find ALL partner schedules in this merge group
+        const groupMembers = filtered.filter(s =>
+          !consumed.has(s.id) && group.has(`${s.batch}|${s.subject}`)
         );
 
-        if (partner) {
-          consumed.add(partner.id);
+        if (groupMembers.length > 0) {
+          // Mark all as consumed
+          groupMembers.forEach(m => consumed.add(m.id));
+
+          // Pick stream_key/broadcast_id from any member that has one
+          const withStream = groupMembers.find(m => m.stream_key);
+          const withBroadcast = groupMembers.find(m => m.broadcast_id);
+
           deduped.push({
-            ...cls,
-            stream_key: cls.stream_key || partner.stream_key,
-            broadcast_id: cls.broadcast_id || partner.broadcast_id,
-            mergedBatches: [
-              { batch: cls.batch, subject: cls.subject, id: cls.id },
-              { batch: partner.batch, subject: partner.subject, id: partner.id },
-            ],
+            ...groupMembers[0],
+            stream_key: withStream?.stream_key || null,
+            broadcast_id: withBroadcast?.broadcast_id || null,
+            mergedBatches: groupMembers.map(m => ({
+              batch: m.batch,
+              subject: m.subject,
+              id: m.id,
+            })),
           });
-          consumed.add(cls.id);
           continue;
         }
       }
@@ -243,7 +269,7 @@ export const TeacherJoinClass = () => {
     }
 
     return deduped;
-  }, [schedules, teacher, activeMerges]);
+  }, [schedules, teacher, mergeGroups]);
 
   const { liveClasses, upcomingClasses, completedClasses } = useMemo(() => {
     const now = new Date();

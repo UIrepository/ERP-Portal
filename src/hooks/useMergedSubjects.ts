@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 interface MergedPair {
   batch: string;
   subject: string;
+  merged_at: string | null;
 }
 
 /**
@@ -14,7 +15,7 @@ export const useMergedSubjects = (batch?: string, subject?: string) => {
   const { data: mergedPairs = [], isLoading } = useQuery<MergedPair[]>({
     queryKey: ['merged-subjects', batch, subject],
     queryFn: async () => {
-      if (!batch || !subject) return [{ batch: batch || '', subject: subject || '' }];
+      if (!batch || !subject) return [{ batch: batch || '', subject: subject || '', merged_at: null }];
 
       const { data, error } = await supabase.rpc('get_merged_pairs', {
         p_batch: batch,
@@ -23,10 +24,10 @@ export const useMergedSubjects = (batch?: string, subject?: string) => {
 
       if (error) {
         console.error('Error fetching merged pairs:', error);
-        return [{ batch, subject }];
+        return [{ batch, subject, merged_at: null }];
       }
 
-      return (data as MergedPair[]) || [{ batch, subject }];
+      return (data as MergedPair[]) || [{ batch, subject, merged_at: null }];
     },
     enabled: !!batch && !!subject,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
@@ -41,7 +42,7 @@ export const useMergedSubjects = (batch?: string, subject?: string) => {
   // Deterministic primary pair: sort alphabetically so both sides of a merge resolve to the same one
   const primaryPair = mergedPairs.length > 0
     ? [...mergedPairs].sort((a, b) => `${a.batch}|${a.subject}`.localeCompare(`${b.batch}|${b.subject}`))[0]
-    : (batch && subject ? { batch, subject } : null);
+    : (batch && subject ? { batch, subject, merged_at: null } : null);
 
   return { mergedPairs, orFilter, primaryPair, isLoading };
 };
