@@ -53,7 +53,7 @@ export const useYoutubeStream = () => {
         batch: p.batch,
         subject: p.subject,
         topic: `${p.subject} Class - ${format(new Date(), 'MMM dd, yyyy')}`,
-        date: new Date().toISOString(),
+        date: format(new Date(), 'yyyy-MM-dd'),
         embed_link: streamData.embedLink,
       }));
 
