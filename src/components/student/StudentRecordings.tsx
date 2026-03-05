@@ -96,9 +96,23 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
         enabled: !!batch && !!subject && !!orFilter
     });
 
-    const filteredRecordings = useMemo(() => recordings?.filter(rec =>
+    // Filter recordings: own-batch always visible, partner-batch only after merged_at date
+    const mergeFilteredRecordings = useMemo(() => {
+        if (!recordings) return [];
+        return recordings.filter(rec => {
+            // Own batch/subject — always show
+            if (rec.batch === batch && rec.subject === subject) return true;
+            // Partner batch — find the merged_at date
+            const pair = mergedPairs.find(p => p.batch === rec.batch && p.subject === rec.subject);
+            if (!pair || !pair.merged_at) return true; // no merge info = show
+            // Only show if recording date >= merge date
+            return rec.date >= pair.merged_at.slice(0, 10);
+        });
+    }, [recordings, batch, subject, mergedPairs]);
+
+    const filteredRecordings = useMemo(() => mergeFilteredRecordings.filter(rec =>
         rec.topic.toLowerCase().includes(searchTerm.toLowerCase())
-    ) || [], [recordings, searchTerm]);
+    ), [mergeFilteredRecordings, searchTerm]);
 
     // Transform database recording to player Lecture format
     const recordingToLecture = useCallback((rec: RecordingContent, index: number): Lecture => ({
