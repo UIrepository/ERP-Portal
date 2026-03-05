@@ -344,6 +344,34 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects }: StudentLi
                 </div>
              </div>
           ))}
+
+          {/* Render Completed Classes */}
+          {completedClasses.map((item) => (
+             <div key={item.id} className="bg-slate-50 border border-slate-200 rounded-[4px] p-6 flex flex-col justify-between min-h-[180px] opacity-70">
+                <div className="mb-5">
+                   <div className="flex items-center gap-1.5 mb-3">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-green-600">
+                        Completed
+                      </span>
+                   </div>
+                   <h2 className="text-[16px] font-semibold text-slate-600 mb-1 leading-tight">
+                      {item.subject}
+                   </h2>
+                   <p className="text-[13px] font-normal text-slate-400">
+                      {item.batch}
+                   </p>
+                </div>
+                <div className="flex items-center justify-between mt-auto">
+                   <span className="text-[13px] font-normal text-slate-500">
+                      {formatTimeRange(item.start_time, item.end_time)}
+                   </span>
+                   <span className="text-[12px] font-normal text-slate-400 bg-slate-100 px-2.5 py-1 border border-slate-200 rounded-[4px]">
+                     Class Over
+                   </span>
+                </div>
+             </div>
+          ))}
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-12 border border-dashed border-slate-200 rounded-[4px] bg-slate-50/50">
