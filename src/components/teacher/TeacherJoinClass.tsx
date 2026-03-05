@@ -225,42 +225,41 @@ export const TeacherJoinClass = () => {
       }
     }).sort((a, b) => a.start_time.localeCompare(b.start_time));
 
+    // N-way merge group dedup: group all schedules by their merge group root
     const deduped: Schedule[] = [];
     const consumed = new Set<string>();
 
     for (const cls of filtered) {
       if (consumed.has(cls.id)) continue;
 
-      const merge = activeMerges.find((m: any) =>
-        (m.primary_batch === cls.batch && m.primary_subject === cls.subject) ||
-        (m.secondary_batch === cls.batch && m.secondary_subject === cls.subject)
-      );
+      const key = `${cls.batch}|${cls.subject}`;
+      const root = mergeGroups.find(key);
+      const group = mergeGroups.groups.get(root);
 
-      if (merge) {
-        const partnerBatch = merge.primary_batch === cls.batch && merge.primary_subject === cls.subject
-          ? merge.secondary_batch : merge.primary_batch;
-        const partnerSubject = merge.primary_batch === cls.batch && merge.primary_subject === cls.subject
-          ? merge.secondary_subject : merge.primary_subject;
-
-        const partner = filtered.find(s =>
-          !consumed.has(s.id) &&
-          s.id !== cls.id &&
-          s.batch === partnerBatch &&
-          s.subject === partnerSubject
+      if (group && group.size > 1) {
+        // Find ALL partner schedules in this merge group
+        const groupMembers = filtered.filter(s =>
+          !consumed.has(s.id) && group.has(`${s.batch}|${s.subject}`)
         );
 
-        if (partner) {
-          consumed.add(partner.id);
+        if (groupMembers.length > 0) {
+          // Mark all as consumed
+          groupMembers.forEach(m => consumed.add(m.id));
+
+          // Pick stream_key/broadcast_id from any member that has one
+          const withStream = groupMembers.find(m => m.stream_key);
+          const withBroadcast = groupMembers.find(m => m.broadcast_id);
+
           deduped.push({
-            ...cls,
-            stream_key: cls.stream_key || partner.stream_key,
-            broadcast_id: cls.broadcast_id || partner.broadcast_id,
-            mergedBatches: [
-              { batch: cls.batch, subject: cls.subject, id: cls.id },
-              { batch: partner.batch, subject: partner.subject, id: partner.id },
-            ],
+            ...groupMembers[0],
+            stream_key: withStream?.stream_key || null,
+            broadcast_id: withBroadcast?.broadcast_id || null,
+            mergedBatches: groupMembers.map(m => ({
+              batch: m.batch,
+              subject: m.subject,
+              id: m.id,
+            })),
           });
-          consumed.add(cls.id);
           continue;
         }
       }
