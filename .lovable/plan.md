@@ -1,81 +1,107 @@
 
-# Fix: Duplicate Live Streams and Blank Lectures for Merged Classes
 
-## Root Causes Identified
+# Fix: Merged Batch Recordings -- Multi-way Merges, Duplicate Streams, and Pre-merge Isolation
 
-There are **3 bugs** working together to cause this:
+## Problems Identified
 
-### Bug 1: No loading guard for merge data (teacher side)
-The `activeMerges` query has no loading state check. If the teacher loads the page before merge data arrives, `activeMerges` is an empty array. The dedup logic finds no merges, so **two separate class cards appear**. The teacher clicks "Start Class" on both, creating two YouTube broadcasts and two recordings.
+### Problem A: N-way merges create duplicate streams (Teacher side)
+The current teacher dedup logic handles **pairwise** merges only. For Mathematics 1, there are **4 batches** merged together via 3 merge records all sharing the same primary. The dedup loop finds one partner, consumes it, but leaves the remaining 2 schedules as separate cards. The teacher can click "Start Class" on each, creating 3 separate YouTube streams and 3 recordings.
 
-### Bug 2: Stream key saved to only ONE schedule
-When a merged class starts (line 329), `stream_key` and `broadcast_id` are only written to `cls.id` (the first schedule in the deduped pair). The partner schedule never gets it. If the partner happens to be enumerated first on a data refetch, the card appears without a stream key, and the teacher could accidentally start a second stream.
+### Problem B: `get_merged_pairs` DB function misses transitive partners (Student side)
+When a student from "Crash Course DS Qualifier" calls `get_merged_pairs`, it only returns itself + "Foundation Quiz 1" (the direct partner). It does NOT return "Qualifier January 2026" or "Crash Course Quiz 1" which are also in the same merge group via transitive connection. This means that student doesn't see all recordings.
 
-### Bug 3: Stop recording only clears ONE schedule
-`handleStopRecording` (line 373) only clears `stream_key` from `cls.id`. The partner's stream_key (if it had one from Bug 2) would remain, causing ghost state.
+### Problem C: Pre-merge recordings leak into newly merged combinations
+When batches are merged today, the OR filter pulls ALL historical recordings from partner batches. Students in a newly merged batch suddenly see recordings from before they were even merged. Need to filter: only show partner recordings created **after** the merge date.
 
-## Changes
+### Problem D: Build error in `send-class-reminders`
+The `npm:resend@2.0.0` import needs a deno.json or to use the esm.sh pattern.
 
-### File: `src/components/teacher/TeacherJoinClass.tsx`
+---
 
-**Change 1 -- Add merge loading guard**
-- Destructure `isLoading` from the `activeMerges` query (rename to `isLoadingMerges`)
-- Include it in the loading check on line 401: `const isLoading = isLoadingTeacher || isLoadingSchedules || isLoadingMerges;`
-- This prevents the page from rendering before merge data is available, eliminating the race condition that shows two cards
+## Plan
 
-**Change 2 -- Save stream key to ALL merged schedule IDs**
-In `handleStartClass` (lines 325-332), after getting the stream details, write `stream_key` and `broadcast_id` to every schedule ID in the merged group, not just `cls.id`:
+### 1. Update `get_merged_pairs` DB function (Migration)
 
-```
-const allIds = cls.mergedBatches
-  ? cls.mergedBatches.map(m => m.id)
-  : [cls.id];
+Replace the current function with one that computes transitive closure AND returns `merged_at` timestamp:
 
-await supabase
-  .from('schedules')
-  .update({ stream_key: details.streamKey, broadcast_id: details.broadcastId })
-  .in('id', allIds);
-```
-
-**Change 3 -- Clear stream key from ALL merged schedule IDs on stop**
-In `handleStopRecording` (line 373), clear from all IDs:
-
-```
-const allIds = cls.mergedBatches
-  ? cls.mergedBatches.map(m => m.id)
-  : [cls.id];
-
-await supabase
-  .from('schedules')
-  .update({ stream_key: null, broadcast_id: null })
-  .in('id', allIds);
-```
-
-**Change 4 -- Check ALL merged schedules for existing stream key before starting**
-Currently line 316 only checks `cls.stream_key`. For merged cards, also check if the partner already has a stream running:
-
-```
-const existingKey = cls.stream_key
-  || cls.mergedBatches?.find(m => /* lookup from schedules */)?.stream_key;
-```
-
-Since the deduped card spreads `cls` (the first schedule), we need to also check the partner. The simplest approach: when building the deduped card, propagate any non-null `stream_key` from the partner to the merged card.
-
-In the dedup logic (around line 225-236), when creating the merged card, if the partner has a `stream_key` but `cls` doesn't, use the partner's:
-
-```
-deduped.push({
-  ...cls,
-  stream_key: cls.stream_key || partner.stream_key,
-  broadcast_id: cls.broadcast_id || partner.broadcast_id,
-  mergedBatches: [...]
-});
+```sql
+CREATE OR REPLACE FUNCTION public.get_merged_pairs(p_batch text, p_subject text)
+RETURNS TABLE(batch text, subject text, merged_at timestamptz)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'public'
+AS $$
+BEGIN
+  -- Return self with NULL merged_at (always show own recordings)
+  RETURN QUERY SELECT p_batch, p_subject, NULL::timestamptz;
+  
+  -- Recursive CTE: find all transitive merge partners
+  RETURN QUERY
+  WITH RECURSIVE merge_group AS (
+    -- Direct partners of the input
+    SELECT sm.primary_batch AS b, sm.primary_subject AS s, sm.created_at AS ma
+    FROM subject_merges sm
+    WHERE sm.is_active AND sm.secondary_batch = p_batch AND sm.secondary_subject = p_subject
+    UNION
+    SELECT sm.secondary_batch, sm.secondary_subject, sm.created_at
+    FROM subject_merges sm
+    WHERE sm.is_active AND sm.primary_batch = p_batch AND sm.primary_subject = p_subject
+    UNION
+    -- Transitive: partners of partners
+    SELECT sm.secondary_batch, sm.secondary_subject, sm.created_at
+    FROM subject_merges sm
+    JOIN merge_group mg ON sm.primary_batch = mg.b AND sm.primary_subject = mg.s
+    WHERE sm.is_active
+    UNION
+    SELECT sm.primary_batch, sm.primary_subject, sm.created_at
+    FROM subject_merges sm
+    JOIN merge_group mg ON sm.secondary_batch = mg.b AND sm.secondary_subject = mg.s
+    WHERE sm.is_active
+  )
+  SELECT mg.b, mg.s, mg.ma FROM merge_group mg
+  WHERE NOT (mg.b = p_batch AND mg.s = p_subject);
+END;
+$$;
 ```
 
-## Summary
+This returns each partner with its `merged_at` date. The self-pair has `merged_at = NULL`.
 
-These 4 changes ensure:
-- Teacher never sees two cards for merged subjects (loading guard)
-- Stream key is written to and cleared from ALL schedules in a merge group
-- An existing stream on either schedule prevents a second stream from starting
-- Only ONE YouTube broadcast and ONE recording is ever created per merged class
+### 2. Update `useMergedSubjects` hook
+
+- Update the `MergedPair` interface to include `merged_at: string | null`
+- Pass `merged_at` through in the return value
+- Keep `orFilter` and `primaryPair` logic unchanged
+
+### 3. Update `StudentRecordings` -- Filter by merge date
+
+After fetching recordings with the OR filter (which gets recordings from all merged pairs):
+- For each recording, check if it belongs to the student's OWN batch/subject -- always keep it
+- For recordings from PARTNER batches, check the `merged_at` date from `mergedPairs` -- only keep if recording `date >= merged_at`
+- This ensures pre-merge recordings from partner batches are excluded
+- Lecture numbering is already dynamic (`filteredRecordings.length - index`) so it auto-adjusts
+
+### 4. Update `TeacherJoinClass` -- N-way merge group dedup
+
+Replace the pairwise dedup logic with a **group-based** approach:
+- Build a map of merge groups from `activeMerges` using union-find / transitive closure
+- For each group, find ALL schedules that belong to it
+- Create ONE deduped card per group with all batch/subject pairs in `mergedBatches`
+- Propagate `stream_key`/`broadcast_id` from any schedule in the group
+
+### 5. Fix `send-class-reminders` build error
+
+Change `import { Resend } from 'npm:resend@2.0.0'` to use esm.sh:
+```typescript
+import { Resend } from 'https://esm.sh/resend@2.0.0';
+```
+
+---
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| **Migration** | Replace `get_merged_pairs` function with transitive closure + `merged_at` |
+| `src/hooks/useMergedSubjects.ts` | Add `merged_at` to `MergedPair` interface |
+| `src/components/student/StudentRecordings.tsx` | Filter partner recordings by merge date |
+| `src/components/teacher/TeacherJoinClass.tsx` | N-way merge group dedup logic |
+| `supabase/functions/send-class-reminders/index.ts` | Fix resend import |
+
