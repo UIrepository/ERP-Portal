@@ -106,39 +106,66 @@ export const TeacherJoinClass = () => {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Build N-way merge groups using union-find
+  const mergeGroups = useMemo(() => {
+    const parent = new Map<string, string>();
+    const find = (key: string): string => {
+      if (!parent.has(key)) parent.set(key, key);
+      if (parent.get(key) !== key) parent.set(key, find(parent.get(key)!));
+      return parent.get(key)!;
+    };
+    const union = (a: string, b: string) => {
+      const ra = find(a), rb = find(b);
+      if (ra !== rb) parent.set(ra, rb);
+    };
+
+    for (const m of activeMerges) {
+      const keyA = `${m.primary_batch}|${m.primary_subject}`;
+      const keyB = `${m.secondary_batch}|${m.secondary_subject}`;
+      union(keyA, keyB);
+    }
+
+    // Group all batch|subject keys by their root
+    const groups = new Map<string, Set<string>>();
+    for (const m of activeMerges) {
+      const keyA = `${m.primary_batch}|${m.primary_subject}`;
+      const keyB = `${m.secondary_batch}|${m.secondary_subject}`;
+      for (const k of [keyA, keyB]) {
+        const root = find(k);
+        if (!groups.has(root)) groups.set(root, new Set());
+        groups.get(root)!.add(k);
+      }
+    }
+    return { find, groups };
+  }, [activeMerges]);
+
   // Helpers
   const getPrimaryPair = useMemo(() => {
     return (batch: string, subject: string) => {
-      const merge = activeMerges.find((m: any) =>
-        (m.primary_batch === batch && m.primary_subject === subject) ||
-        (m.secondary_batch === batch && m.secondary_subject === subject)
-      );
-      if (!merge) return { batch, subject };
-      const pairs = [
-        { batch: merge.primary_batch, subject: merge.primary_subject },
-        { batch: merge.secondary_batch, subject: merge.secondary_subject }
-      ];
-      return pairs.sort((a, b) => `${a.batch}|${a.subject}`.localeCompare(`${b.batch}|${b.subject}`))[0];
+      const key = `${batch}|${subject}`;
+      const root = mergeGroups.find(key);
+      const group = mergeGroups.groups.get(root);
+      if (!group || group.size <= 1) return { batch, subject };
+      // Sort all members alphabetically to get deterministic primary
+      const sorted = [...group].sort();
+      const [b, s] = sorted[0].split('|');
+      return { batch: b, subject: s };
     };
-  }, [activeMerges]);
+  }, [mergeGroups]);
 
   const getMergedLabel = useMemo(() => {
     return (batch: string, subject: string) => {
-      const merge = activeMerges.find((m: any) =>
-        (m.primary_batch === batch && m.primary_subject === subject) ||
-        (m.secondary_batch === batch && m.secondary_subject === subject)
-      );
-      if (!merge) return null;
-      const otherBatch = merge.primary_batch === batch && merge.primary_subject === subject
-        ? merge.secondary_batch
-        : merge.primary_batch;
-      return `${
-        merge.primary_batch === batch && merge.primary_subject === subject
-          ? merge.secondary_subject
-          : merge.primary_subject
-      } (${otherBatch})`;
+      const key = `${batch}|${subject}`;
+      const root = mergeGroups.find(key);
+      const group = mergeGroups.groups.get(root);
+      if (!group || group.size <= 1) return null;
+      const others = [...group].filter(k => k !== key);
+      return others.map(k => {
+        const [b, s] = k.split('|');
+        return `${s} (${b})`;
+      }).join(', ');
     };
-  }, [activeMerges]);
+  }, [mergeGroups]);
 
   // Fetch attendance
   const { data: attendance, isLoading: isLoadingAttendance } = useQuery<Attendance[]>({
