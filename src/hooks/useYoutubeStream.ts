@@ -13,7 +13,13 @@ export const useYoutubeStream = () => {
   /**
    * Creates a YouTube Broadcast via Edge Function and saves the link to the database.
    */
-  const startStream = async (batch: string, subject: string, primaryBatch?: string, primarySubject?: string) => {
+  const startStream = async (
+    batch: string, 
+    subject: string, 
+    primaryBatch?: string, 
+    primarySubject?: string,
+    allMergedPairs?: Array<{ batch: string; subject: string }>
+  ) => {
     if (isStartingStream || isStreaming) return null;
 
     setIsStartingStream(true);
@@ -38,16 +44,20 @@ export const useYoutubeStream = () => {
       // SAVE THE ID FOR STOPPING LATER
       broadcastIdRef.current = streamData.videoId;
 
-      // 2. Save Recording Link to DB using primary pair (avoids duplicates for merged classes)
-      const recBatch = primaryBatch || batch;
-      const recSubject = primarySubject || subject;
-      const { error: dbError } = await supabase.from('recordings').insert({
-        batch: recBatch,
-        subject: recSubject,
-        topic: `${recSubject} Class - ${format(new Date(), 'MMM dd, yyyy')}`,
+      // 2. Save Recording Link to DB for ALL merged pairs (so each batch retains access after demerge)
+      const pairs = allMergedPairs && allMergedPairs.length > 0
+        ? allMergedPairs
+        : [{ batch: primaryBatch || batch, subject: primarySubject || subject }];
+
+      const recordingRows = pairs.map(p => ({
+        batch: p.batch,
+        subject: p.subject,
+        topic: `${p.subject} Class - ${format(new Date(), 'MMM dd, yyyy')}`,
         date: new Date().toISOString(),
-        embed_link: streamData.embedLink 
-      });
+        embed_link: streamData.embedLink,
+      }));
+
+      const { error: dbError } = await supabase.from('recordings').insert(recordingRows);
 
       if (dbError) {
         console.error("Failed to save recording link:", dbError);
