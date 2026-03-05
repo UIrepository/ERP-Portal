@@ -1322,6 +1322,7 @@ export type Database = {
         Args: { p_batch: string; p_subject: string }
         Returns: {
           batch: string
+          merged_at: string
           subject: string
         }[]
       }
