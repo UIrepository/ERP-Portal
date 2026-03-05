@@ -349,7 +349,10 @@ export const TeacherJoinClass = () => {
     }
 
     const primary = getPrimaryPair(cls.batch, cls.subject);
-    const details = await startStream(cls.batch, cls.subject, primary.batch, primary.subject);
+    const mergedPairs = cls.mergedBatches
+      ? cls.mergedBatches.map(m => ({ batch: m.batch, subject: m.subject }))
+      : [{ batch: cls.batch, subject: cls.subject }];
+    const details = await startStream(cls.batch, cls.subject, primary.batch, primary.subject, mergedPairs);
     if (details?.streamKey) {
       const allIds = cls.mergedBatches
         ? cls.mergedBatches.map(m => m.id)
