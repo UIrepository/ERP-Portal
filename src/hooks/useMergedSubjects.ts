@@ -27,7 +27,7 @@ export const useMergedSubjects = (batch?: string, subject?: string) => {
         return [{ batch, subject, merged_at: null }];
       }
 
-      return (data as MergedPair[]) || [{ batch, subject }];
+      return (data as MergedPair[]) || [{ batch, subject, merged_at: null }];
     },
     enabled: !!batch && !!subject,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
