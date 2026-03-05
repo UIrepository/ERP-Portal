@@ -42,7 +42,7 @@ export const useMergedSubjects = (batch?: string, subject?: string) => {
   // Deterministic primary pair: sort alphabetically so both sides of a merge resolve to the same one
   const primaryPair = mergedPairs.length > 0
     ? [...mergedPairs].sort((a, b) => `${a.batch}|${a.subject}`.localeCompare(`${b.batch}|${b.subject}`))[0]
-    : (batch && subject ? { batch, subject } : null);
+    : (batch && subject ? { batch, subject, merged_at: null } : null);
 
   return { mergedPairs, orFilter, primaryPair, isLoading };
 };

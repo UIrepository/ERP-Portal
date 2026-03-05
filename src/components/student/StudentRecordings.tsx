@@ -63,6 +63,7 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
     const { user, profile } = useAuth();
     const queryClient = useQueryClient();
     const { mergedPairs, orFilter } = useMergedSubjects(batch, subject);
+    // mergedPairs now includes merged_at timestamp for filtering pre-merge recordings
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRecording, setSelectedRecording] = useState<RecordingContent | null>(null);
     
