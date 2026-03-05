@@ -24,7 +24,7 @@ export const useMergedSubjects = (batch?: string, subject?: string) => {
 
       if (error) {
         console.error('Error fetching merged pairs:', error);
-        return [{ batch, subject }];
+        return [{ batch, subject, merged_at: null }];
       }
 
       return (data as MergedPair[]) || [{ batch, subject }];
