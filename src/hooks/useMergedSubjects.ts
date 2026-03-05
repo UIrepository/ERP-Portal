@@ -15,7 +15,7 @@ export const useMergedSubjects = (batch?: string, subject?: string) => {
   const { data: mergedPairs = [], isLoading } = useQuery<MergedPair[]>({
     queryKey: ['merged-subjects', batch, subject],
     queryFn: async () => {
-      if (!batch || !subject) return [{ batch: batch || '', subject: subject || '' }];
+      if (!batch || !subject) return [{ batch: batch || '', subject: subject || '', merged_at: null }];
 
       const { data, error } = await supabase.rpc('get_merged_pairs', {
         p_batch: batch,
