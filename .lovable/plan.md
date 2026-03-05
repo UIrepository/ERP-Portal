@@ -1,95 +1,81 @@
 
+# Fix: Duplicate Live Streams and Blank Lectures for Merged Classes
 
-# Feature: Show Completed Classes for Today
+## Root Causes Identified
 
-## Problem
+There are **3 bugs** working together to cause this:
 
-Currently, the classification logic (lines 175-194) only shows classes that are either "Live Now" (within start-15min to end+15min buffer) or "Upcoming" (within 4 hours). Once a class ends and passes the buffer, it disappears entirely. Students lose visibility of what classes were held today.
+### Bug 1: No loading guard for merge data (teacher side)
+The `activeMerges` query has no loading state check. If the teacher loads the page before merge data arrives, `activeMerges` is an empty array. The dedup logic finds no merges, so **two separate class cards appear**. The teacher clicks "Start Class" on both, creating two YouTube broadcasts and two recordings.
 
-## Desired Behavior
+### Bug 2: Stream key saved to only ONE schedule
+When a merged class starts (line 329), `stream_key` and `broadcast_id` are only written to `cls.id` (the first schedule in the deduped pair). The partner schedule never gets it. If the partner happens to be enumerated first on a data refetch, the card appears without a stream key, and the teacher could accidentally start a second stream.
 
-- If a class's `active_classes` entry is still active (`is_jitsi_live = true`), keep showing it as "Live Now" regardless of scheduled end time (teacher is still in class).
-- If the scheduled end time has passed AND `is_jitsi_live = false`, show it as "Completed" -- a greyed-out card with no join button.
-- Upcoming and Live classes remain as-is.
+### Bug 3: Stop recording only clears ONE schedule
+`handleStopRecording` (line 373) only clears `stream_key` from `cls.id`. The partner's stream_key (if it had one from Bug 2) would remain, causing ghost state.
 
 ## Changes
 
-### File: `src/components/student/StudentLiveClass.tsx`
+### File: `src/components/teacher/TeacherJoinClass.tsx`
 
-**Add a third category: `completedClasses`** in the classification logic (lines 171-194):
+**Change 1 -- Add merge loading guard**
+- Destructure `isLoading` from the `activeMerges` query (rename to `isLoadingMerges`)
+- Include it in the loading check on line 401: `const isLoading = isLoadingTeacher || isLoadingSchedules || isLoadingMerges;`
+- This prevents the page from rendering before merge data is available, eliminating the race condition that shows two cards
 
-```typescript
-const liveClasses: ScheduleWithLink[] = [];
-const upcomingClasses: ScheduleWithLink[] = [];
-const completedClasses: ScheduleWithLink[] = [];
+**Change 2 -- Save stream key to ALL merged schedule IDs**
+In `handleStartClass` (lines 325-332), after getting the stream details, write `stream_key` and `broadcast_id` to every schedule ID in the merged group, not just `cls.id`:
 
-schedules?.forEach(schedule => {
-  const [startHour, startMin] = schedule.start_time.split(':').map(Number);
-  const [endHour, endMin] = schedule.end_time.split(':').map(Number);
-  
-  const startTime = new Date(today);
-  startTime.setHours(startHour, startMin, 0, 0);
-  
-  const endTime = new Date(today);
-  endTime.setHours(endHour, endMin, 0, 0);
-  
-  const bufferStart = addMinutes(startTime, -15);
-  const bufferEnd = addMinutes(endTime, 15);
+```
+const allIds = cls.mergedBatches
+  ? cls.mergedBatches.map(m => m.id)
+  : [cls.id];
 
-  // If teacher is still live, always show as Live Now
-  if (schedule.is_jitsi_live) {
-    liveClasses.push(schedule);
-  }
-  // Within schedule window (not live but in buffer)
-  else if (isWithinInterval(now, { start: bufferStart, end: bufferEnd })) {
-    liveClasses.push(schedule);
-  }
-  // Upcoming (hasn't started yet, within 4 hours)
-  else if (now < startTime && differenceInMinutes(startTime, now) < 240) {
-    upcomingClasses.push(schedule);
-  }
-  // Completed (start time has passed, not live anymore)
-  else if (now > startTime && !schedule.is_jitsi_live) {
-    completedClasses.push(schedule);
-  }
+await supabase
+  .from('schedules')
+  .update({ stream_key: details.streamKey, broadcast_id: details.broadcastId })
+  .in('id', allIds);
+```
+
+**Change 3 -- Clear stream key from ALL merged schedule IDs on stop**
+In `handleStopRecording` (line 373), clear from all IDs:
+
+```
+const allIds = cls.mergedBatches
+  ? cls.mergedBatches.map(m => m.id)
+  : [cls.id];
+
+await supabase
+  .from('schedules')
+  .update({ stream_key: null, broadcast_id: null })
+  .in('id', allIds);
+```
+
+**Change 4 -- Check ALL merged schedules for existing stream key before starting**
+Currently line 316 only checks `cls.stream_key`. For merged cards, also check if the partner already has a stream running:
+
+```
+const existingKey = cls.stream_key
+  || cls.mergedBatches?.find(m => /* lookup from schedules */)?.stream_key;
+```
+
+Since the deduped card spreads `cls` (the first schedule), we need to also check the partner. The simplest approach: when building the deduped card, propagate any non-null `stream_key` from the partner to the merged card.
+
+In the dedup logic (around line 225-236), when creating the merged card, if the partner has a `stream_key` but `cls` doesn't, use the partner's:
+
+```
+deduped.push({
+  ...cls,
+  stream_key: cls.stream_key || partner.stream_key,
+  broadcast_id: cls.broadcast_id || partner.broadcast_id,
+  mergedBatches: [...]
 });
 ```
 
-**Update `allClasses`** to include completed:
-```typescript
-const allClasses = [...liveClasses, ...upcomingClasses, ...completedClasses];
-```
-
-**Add completed class card rendering** after the upcoming classes section -- a muted card showing subject, batch, time, and a "Class Completed" badge. No join button.
-
-```tsx
-{completedClasses.map((item) => (
-  <div key={item.id} className="bg-slate-50 border border-slate-200 rounded-[4px] p-6 flex flex-col justify-between min-h-[180px] opacity-70">
-    <div className="mb-5">
-      <div className="flex items-center gap-1.5 mb-3">
-        <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-green-600">
-          Completed
-        </span>
-      </div>
-      <h2 className="text-[16px] font-semibold text-slate-600 mb-1">{item.subject}</h2>
-      <p className="text-[13px] text-slate-400">{item.batch}</p>
-    </div>
-    <div className="flex items-center justify-between mt-auto">
-      <span className="text-[13px] text-slate-500">{formatTimeRange(...)}</span>
-      <span className="text-[12px] text-slate-400 bg-slate-100 px-2.5 py-1 border border-slate-200 rounded-[4px]">
-        Class Over
-      </span>
-    </div>
-  </div>
-))}
-```
-
-**Update page title** from "Live Class Sessions" to "Today's Classes" since it now shows all classes for the day.
-
 ## Summary
 
-| File | Change |
-|------|--------|
-| `src/components/student/StudentLiveClass.tsx` | Add `completedClasses` category, prioritize `is_jitsi_live` for live status, render completed cards, rename title |
-
+These 4 changes ensure:
+- Teacher never sees two cards for merged subjects (loading guard)
+- Stream key is written to and cleared from ALL schedules in a merge group
+- An existing stream on either schedule prevents a second stream from starting
+- Only ONE YouTube broadcast and ONE recording is ever created per merged class

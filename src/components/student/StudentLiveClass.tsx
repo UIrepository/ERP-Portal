@@ -171,6 +171,7 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects }: StudentLi
   // Logic to separate "Live Now" from "Upcoming"
   const liveClasses: ScheduleWithLink[] = [];
   const upcomingClasses: ScheduleWithLink[] = [];
+  const completedClasses: ScheduleWithLink[] = [];
 
   schedules?.forEach(schedule => {
     const [startHour, startMin] = schedule.start_time.split(':').map(Number);
@@ -184,12 +185,22 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects }: StudentLi
     
     const bufferStart = addMinutes(startTime, -15);
     const bufferEnd = addMinutes(endTime, 15);
-    
-    if (isWithinInterval(now, { start: bufferStart, end: bufferEnd })) {
+
+    // If teacher is still live, always show as Live Now
+    if (schedule.is_jitsi_live) {
       liveClasses.push(schedule);
-    } 
+    }
+    // Within schedule window (not live but in buffer)
+    else if (isWithinInterval(now, { start: bufferStart, end: bufferEnd })) {
+      liveClasses.push(schedule);
+    }
+    // Upcoming (hasn't started yet, within 4 hours)
     else if (now < startTime && differenceInMinutes(startTime, now) < 240) {
       upcomingClasses.push(schedule);
+    }
+    // Completed (start time has passed, not live anymore)
+    else if (now > startTime) {
+      completedClasses.push(schedule);
     }
   });
 
@@ -245,13 +256,13 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects }: StudentLi
     return <Skeleton className="h-64 w-full rounded-[4px]" />;
   }
 
-  const allClasses = [...liveClasses, ...upcomingClasses];
+  const allClasses = [...liveClasses, ...upcomingClasses, ...completedClasses];
 
   return (
     <div className="w-full font-sans antialiased text-slate-900 p-4 md:p-6">
       <div className="mb-6">
         <h1 className="text-[18px] font-semibold tracking-tight text-slate-900">
-           Live Class Sessions
+           Today's Classes
         </h1>
       </div>
 
@@ -333,14 +344,42 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects }: StudentLi
                 </div>
              </div>
           ))}
+
+          {/* Render Completed Classes */}
+          {completedClasses.map((item) => (
+             <div key={item.id} className="bg-slate-50 border border-slate-200 rounded-[4px] p-6 flex flex-col justify-between min-h-[180px] opacity-70">
+                <div className="mb-5">
+                   <div className="flex items-center gap-1.5 mb-3">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-green-600">
+                        Completed
+                      </span>
+                   </div>
+                   <h2 className="text-[16px] font-semibold text-slate-600 mb-1 leading-tight">
+                      {item.subject}
+                   </h2>
+                   <p className="text-[13px] font-normal text-slate-400">
+                      {item.batch}
+                   </p>
+                </div>
+                <div className="flex items-center justify-between mt-auto">
+                   <span className="text-[13px] font-normal text-slate-500">
+                      {formatTimeRange(item.start_time, item.end_time)}
+                   </span>
+                   <span className="text-[12px] font-normal text-slate-400 bg-slate-100 px-2.5 py-1 border border-slate-200 rounded-[4px]">
+                     Class Over
+                   </span>
+                </div>
+             </div>
+          ))}
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-12 border border-dashed border-slate-200 rounded-[4px] bg-slate-50/50">
            <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mb-3">
               <span className="text-lg opacity-40">☕</span>
            </div>
-           <h3 className="text-sm font-semibold text-slate-900">No classes scheduled</h3>
-           <p className="text-xs text-slate-500 mt-1">There are no live or upcoming sessions for today.</p>
+            <h3 className="text-sm font-semibold text-slate-900">No classes today</h3>
+            <p className="text-xs text-slate-500 mt-1">There are no scheduled sessions for today.</p>
         </div>
       )}
     </div>
