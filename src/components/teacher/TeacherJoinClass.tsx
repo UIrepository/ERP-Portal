@@ -269,7 +269,7 @@ export const TeacherJoinClass = () => {
     }
 
     return deduped;
-  }, [schedules, teacher, activeMerges]);
+  }, [schedules, teacher, mergeGroups]);
 
   const { liveClasses, upcomingClasses, completedClasses } = useMemo(() => {
     const now = new Date();
