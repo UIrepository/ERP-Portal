@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 interface MergedPair {
   batch: string;
   subject: string;
+  merged_at: string | null;
 }
 
 /**
