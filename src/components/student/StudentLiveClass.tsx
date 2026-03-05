@@ -256,7 +256,7 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects }: StudentLi
     return <Skeleton className="h-64 w-full rounded-[4px]" />;
   }
 
-  const allClasses = [...liveClasses, ...upcomingClasses];
+  const allClasses = [...liveClasses, ...upcomingClasses, ...completedClasses];
 
   return (
     <div className="w-full font-sans antialiased text-slate-900 p-4 md:p-6">
