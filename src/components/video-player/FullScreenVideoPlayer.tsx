@@ -161,8 +161,16 @@ export const FullScreenVideoPlayer = ({
           onStateChange: (event) => {
             if (event.data === 1) { // PLAYING
               setIsPlaying(true);
+              bufferingStuckRef.current = { time: 0, count: 0 };
             } else if (event.data === 2) { // PAUSED
               setIsPlaying(false);
+            } else if (event.data === -1 && youtubePlayerRef.current) {
+              // UNSTARTED after being initialized — try recovery
+              const ct = youtubePlayerRef.current.getCurrentTime();
+              if (ct > 0) {
+                youtubePlayerRef.current.seekTo(ct + 2, true);
+                youtubePlayerRef.current.playVideo();
+              }
             }
           },
         },
