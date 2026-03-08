@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { SignJWT, importPKCS8 } from 'https://deno.land/x/jose@v5.2.0/index.ts';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://erp-portal-lyart.vercel.app',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
@@ -188,10 +188,10 @@ Deno.serve(async (req) => {
         }
         await delay(100);
       }
-      console.log(`✅ All students group done: ${allStudentsEmail} (${allStudentEmails.size} members)`);
+      console.log(`All students group done: ${allStudentsEmail} (${allStudentEmails.size} members)`);
     } catch (err) {
       stats.errors.push(`allstudents-group: ${(err as Error).message}`);
-      console.error('❌ All students group failed:', err);
+      console.error('All students group failed:', err);
     }
 
     // 3. Process BATCH groups (batchname-all@domain)
@@ -238,16 +238,16 @@ Deno.serve(async (req) => {
             if (addRes.status === 'added') stats.members_added++;
             else stats.members_existed++;
           } catch (err) {
-            stats.errors.push(`batch-member: ${email} → ${groupEmail}: ${(err as Error).message}`);
+            stats.errors.push(`batch-member: ${email} -> ${groupEmail}: ${(err as Error).message}`);
           }
           await delay(100); // Rate limit
         }
 
         stats.batches_processed++;
-        console.log(`✅ Batch group done: ${groupEmail} (${batchMembers[batchName].size} members)`);
+        console.log(`Batch group done: ${groupEmail} (${batchMembers[batchName].size} members)`);
       } catch (err) {
         stats.errors.push(`batch-group: ${batchName}: ${(err as Error).message}`);
-        console.error(`❌ Batch group failed: ${batchName}`, err);
+        console.error(`Batch group failed: ${batchName}`, err);
       }
     }
 
@@ -293,16 +293,16 @@ Deno.serve(async (req) => {
             if (addRes.status === 'added') stats.members_added++;
             else stats.members_existed++;
           } catch (err) {
-            stats.errors.push(`subject-member: ${email} → ${groupEmail}: ${(err as Error).message}`);
+            stats.errors.push(`subject-member: ${email} -> ${groupEmail}: ${(err as Error).message}`);
           }
           await delay(100);
         }
 
         stats.subjects_processed++;
-        console.log(`✅ Subject group done: ${groupEmail} (${subjectMembers[key].size} members)`);
+        console.log(`Subject group done: ${groupEmail} (${subjectMembers[key].size} members)`);
       } catch (err) {
         stats.errors.push(`subject-group: ${batchName}/${subjectName}: ${(err as Error).message}`);
-        console.error(`❌ Subject group failed: ${batchName}/${subjectName}`, err);
+        console.error(`Subject group failed: ${batchName}/${subjectName}`, err);
       }
     }
 
