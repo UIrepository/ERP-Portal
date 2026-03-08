@@ -191,11 +191,25 @@ export const FullScreenVideoPlayer = ({
       if (seekingRef.current) return;
       
       if (youtubePlayerRef.current && typeof youtubePlayerRef.current.getCurrentTime === 'function') {
-        if (youtubePlayerRef.current.getPlayerState && youtubePlayerRef.current.getPlayerState() === 3) {
+        const state = youtubePlayerRef.current.getPlayerState?.();
+        const time = youtubePlayerRef.current.getCurrentTime();
+
+        // Stuck-in-buffering detection: if buffering at the same position for ~3s, skip ahead
+        if (state === 3) {
+          if (Math.abs(time - bufferingStuckRef.current.time) < 0.5) {
+            bufferingStuckRef.current.count++;
+            if (bufferingStuckRef.current.count >= 12) { // ~3 seconds (12 × 250ms)
+              youtubePlayerRef.current.seekTo(time + 2, true);
+              youtubePlayerRef.current.playVideo();
+              bufferingStuckRef.current = { time: 0, count: 0 };
+            }
+          } else {
+            bufferingStuckRef.current = { time, count: 1 };
+          }
           return;
         }
 
-        const time = youtubePlayerRef.current.getCurrentTime();
+        bufferingStuckRef.current = { time: 0, count: 0 };
         setCurrentTime(time);
         const loaded = youtubePlayerRef.current.getVideoLoadedFraction();
         const dur = youtubePlayerRef.current.getDuration();
