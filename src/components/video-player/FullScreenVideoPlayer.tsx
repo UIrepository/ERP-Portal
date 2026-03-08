@@ -32,7 +32,8 @@ export const FullScreenVideoPlayer = ({
   // Sidebar state
   const [activeSidebar, setActiveSidebar] = useState<SidebarTab>(null);
   const youtubeInitialized = useRef(false);
-  const [showVignette, setShowVignette] = useState(true); // Show vignette at start
+  const bufferingStuckRef = useRef({ time: 0, count: 0 });
+  const [showVignette, setShowVignette] = useState(true);
   const isMobile = useIsMobile();
   
   // Video player hook
@@ -160,8 +161,16 @@ export const FullScreenVideoPlayer = ({
           onStateChange: (event) => {
             if (event.data === 1) { // PLAYING
               setIsPlaying(true);
+              bufferingStuckRef.current = { time: 0, count: 0 };
             } else if (event.data === 2) { // PAUSED
               setIsPlaying(false);
+            } else if (event.data === -1 && youtubePlayerRef.current) {
+              // UNSTARTED after being initialized — try recovery
+              const ct = youtubePlayerRef.current.getCurrentTime();
+              if (ct > 0) {
+                youtubePlayerRef.current.seekTo(ct + 2, true);
+                youtubePlayerRef.current.playVideo();
+              }
             }
           },
         },
@@ -182,11 +191,25 @@ export const FullScreenVideoPlayer = ({
       if (seekingRef.current) return;
       
       if (youtubePlayerRef.current && typeof youtubePlayerRef.current.getCurrentTime === 'function') {
-        if (youtubePlayerRef.current.getPlayerState && youtubePlayerRef.current.getPlayerState() === 3) {
+        const state = youtubePlayerRef.current.getPlayerState?.();
+        const time = youtubePlayerRef.current.getCurrentTime();
+
+        // Stuck-in-buffering detection: if buffering at the same position for ~3s, skip ahead
+        if (state === 3) {
+          if (Math.abs(time - bufferingStuckRef.current.time) < 0.5) {
+            bufferingStuckRef.current.count++;
+            if (bufferingStuckRef.current.count >= 12) { // ~3 seconds (12 × 250ms)
+              youtubePlayerRef.current.seekTo(time + 2, true);
+              youtubePlayerRef.current.playVideo();
+              bufferingStuckRef.current = { time: 0, count: 0 };
+            }
+          } else {
+            bufferingStuckRef.current = { time, count: 1 };
+          }
           return;
         }
 
-        const time = youtubePlayerRef.current.getCurrentTime();
+        bufferingStuckRef.current = { time: 0, count: 0 };
         setCurrentTime(time);
         const loaded = youtubePlayerRef.current.getVideoLoadedFraction();
         const dur = youtubePlayerRef.current.getDuration();
