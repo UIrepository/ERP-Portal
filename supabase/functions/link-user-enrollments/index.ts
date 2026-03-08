@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://erp-portal-lyart.vercel.app',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
@@ -12,6 +12,31 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Verify the caller's identity matches the email being linked
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    // Verify the JWT and get the authenticated user
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { email, user_id } = await req.json();
     console.log('Linking enrollments for:', { email, user_id });
 
@@ -25,10 +50,17 @@ Deno.serve(async (req) => {
       );
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
+    // Authorization: ensure the authenticated user can only link their own enrollments
+    if (user.id !== user_id || user.email?.toLowerCase() !== email.toLowerCase().trim()) {
+      console.error('Authorization mismatch:', { 
+        authUserId: user.id, requestUserId: user_id,
+        authEmail: user.email, requestEmail: email 
+      });
+      return new Response(
+        JSON.stringify({ error: 'You can only link your own enrollments' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Update all enrollments matching this email to add user_id
     // Only update records where user_id is currently null
