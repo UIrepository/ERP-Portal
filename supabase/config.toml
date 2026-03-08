@@ -4,19 +4,19 @@ project_id = "lcfzfdjeidinenxcucvj"
 verify_jwt = false
 
 [functions.link-user-enrollments]
-verify_jwt = false
+verify_jwt = true
 
 [functions.manage-google-group]
-verify_jwt = false
+verify_jwt = true
 
 [functions.sync-google-groups]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-class-reminders]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-recording-emails]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-community-email]
-verify_jwt = false
+verify_jwt = true
