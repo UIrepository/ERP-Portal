@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://erp-portal-lyart.vercel.app',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
@@ -53,7 +53,7 @@ serve(async (req) => {
         }, 
         contentDetails: { 
           enableAutoStart: true, 
-          enableAutoStop: false, // <--- CHANGED: Must be FALSE to allow reconnection
+          enableAutoStop: false, // Must be FALSE to allow reconnection
           recordFromStart: true,
           latencyPreference: 'low'
         }
