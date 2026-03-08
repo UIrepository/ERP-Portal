@@ -32,7 +32,8 @@ export const FullScreenVideoPlayer = ({
   // Sidebar state
   const [activeSidebar, setActiveSidebar] = useState<SidebarTab>(null);
   const youtubeInitialized = useRef(false);
-  const [showVignette, setShowVignette] = useState(true); // Show vignette at start
+  const bufferingStuckRef = useRef({ time: 0, count: 0 });
+  const [showVignette, setShowVignette] = useState(true);
   const isMobile = useIsMobile();
   
   // Video player hook
