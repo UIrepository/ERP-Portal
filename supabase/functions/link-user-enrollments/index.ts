@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://erp-portal-lyart.vercel.app',
+  'Access-Control-Allow-Origin': 'https://ssp.unknowniitians.com',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
