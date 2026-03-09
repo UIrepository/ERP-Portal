@@ -38,7 +38,7 @@ interface NavigationState {
 }
 
 const StudentMainContent = () => {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>('classes');
