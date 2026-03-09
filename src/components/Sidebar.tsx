@@ -72,18 +72,20 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
       window.open(whatsappLink, '_blank');
   };
 
+  const sidebarUserId = user?.id || profile?.user_id;
+
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
-    queryKey: ['sidebarUserEnrollments', profile?.user_id],
+    queryKey: ['sidebarUserEnrollments', sidebarUserId],
     queryFn: async () => {
-        if (!profile?.user_id) return [];
+        if (!sidebarUserId) return [];
         const { data, error } = await supabase
             .from('user_enrollments')
             .select('batch_name, subject_name')
-            .eq('user_id', profile.user_id);
+            .eq('user_id', sidebarUserId);
         if (error) return [];
         return data || [];
     },
-    enabled: !!profile?.user_id && resolvedRole === 'student'
+    enabled: !!sidebarUserId && resolvedRole === 'student'
   });
 
   const availableBatches = useMemo(() => {
