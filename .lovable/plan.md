@@ -1,59 +1,81 @@
 
+# Fix: Duplicate Live Streams and Blank Lectures for Merged Classes
 
-# Fix Security Vulnerabilities: DELETE Access, Sensitive Columns, GraphQL
+## Root Causes Identified
 
-## Problems Identified
+There are **3 bugs** working together to cause this:
 
-1. **DELETE grants are open** on ALL public tables for both `anon` and `authenticated` roles. Even though RLS denies most deletes, the raw grants exist and some tables have permissive policies that could be exploited.
-2. **Anon can attempt DELETE** on all tables (grant-level).
-3. **Sensitive columns** (`role`, `premium_access`) on `profiles` are readable by students.
-4. **GraphQL introspection** exposes 390 types.
-5. **maintenance_settings readable by students** — this is intentional (needed for the maintenance mode feature to work on the frontend). Will mark as accepted.
+### Bug 1: No loading guard for merge data (teacher side)
+The `activeMerges` query has no loading state check. If the teacher loads the page before merge data arrives, `activeMerges` is an empty array. The dedup logic finds no merges, so **two separate class cards appear**. The teacher clicks "Start Class" on both, creating two YouTube broadcasts and two recordings.
 
-## Solution
+### Bug 2: Stream key saved to only ONE schedule
+When a merged class starts (line 329), `stream_key` and `broadcast_id` are only written to `cls.id` (the first schedule in the deduped pair). The partner schedule never gets it. If the partner happens to be enumerated first on a data refetch, the card appears without a stream key, and the teacher could accidentally start a second stream.
 
-### 1. Revoke DELETE from `anon` on all public tables
-Anon users should never delete anything.
+### Bug 3: Stop recording only clears ONE schedule
+`handleStopRecording` (line 373) only clears `stream_key` from `cls.id`. The partner's stream_key (if it had one from Bug 2) would remain, causing ghost state.
 
-```sql
-REVOKE DELETE ON ALL TABLES IN SCHEMA public FROM anon;
+## Changes
+
+### File: `src/components/teacher/TeacherJoinClass.tsx`
+
+**Change 1 -- Add merge loading guard**
+- Destructure `isLoading` from the `activeMerges` query (rename to `isLoadingMerges`)
+- Include it in the loading check on line 401: `const isLoading = isLoadingTeacher || isLoadingSchedules || isLoadingMerges;`
+- This prevents the page from rendering before merge data is available, eliminating the race condition that shows two cards
+
+**Change 2 -- Save stream key to ALL merged schedule IDs**
+In `handleStartClass` (lines 325-332), after getting the stream details, write `stream_key` and `broadcast_id` to every schedule ID in the merged group, not just `cls.id`:
+
+```
+const allIds = cls.mergedBatches
+  ? cls.mergedBatches.map(m => m.id)
+  : [cls.id];
+
+await supabase
+  .from('schedules')
+  .update({ stream_key: details.streamKey, broadcast_id: details.broadcastId })
+  .in('id', allIds);
 ```
 
-### 2. Add explicit DELETE-deny policies for tables missing them
-These 10 tables have no DELETE or ALL policy, so while RLS denies by default, we add explicit admin-only DELETE policies for defense-in-depth:
-- `activity_logs`, `analytics_events`, `chat_messages`, `class_attendance`, `direct_messages`, `feedback`, `schedules`, `student_activities`, `user_sessions`, `video_progress`
+**Change 3 -- Clear stream key from ALL merged schedule IDs on stop**
+In `handleStopRecording` (line 373), clear from all IDs:
 
-```sql
-CREATE POLICY "Only admins can delete" ON public.<table>
-  FOR DELETE TO authenticated
-  USING (is_admin());
+```
+const allIds = cls.mergedBatches
+  ? cls.mergedBatches.map(m => m.id)
+  : [cls.id];
+
+await supabase
+  .from('schedules')
+  .update({ stream_key: null, broadcast_id: null })
+  .in('id', allIds);
 ```
 
-### 3. Tighten existing DELETE policies to `authenticated` only
-Several tables have DELETE policies targeting `{public}` (includes anon). Change to `TO authenticated`:
-- `profiles` — "Authenticated users can delete their own profile"
-- `community_messages` — "Users can delete their own community messages"
-- `doubts` — "Users can only delete their own doubts"
-- `doubt_answers` — "Users can only delete their own answers"
-- `message_likes` — duplicate delete policies, consolidate
+**Change 4 -- Check ALL merged schedules for existing stream key before starting**
+Currently line 316 only checks `cls.stream_key`. For merged cards, also check if the partner already has a stream running:
 
-### 4. Restrict sensitive profile columns
-Create a security definer function that returns only non-sensitive profile data, and update the student SELECT policy to use a view or restrict column access. Since creating a view requires significant refactoring, the pragmatic fix is to accept that `role` and `premium_access` are used by the frontend for routing (they're not truly secret — a student knowing their own role is expected).
-
-### 5. Disable GraphQL introspection for anon
-```sql
-REVOKE ALL ON SCHEMA graphql FROM anon;
--- Or revoke usage on the graphql_public schema
+```
+const existingKey = cls.stream_key
+  || cls.mergedBatches?.find(m => /* lookup from schedules */)?.stream_key;
 ```
 
-## Migration Summary
-One migration with:
-- REVOKE DELETE from anon on all tables
-- Drop and recreate DELETE policies with `TO authenticated` 
-- Add admin-only DELETE policies for 10 unprotected tables
-- Restrict GraphQL access
+Since the deduped card spreads `cls` (the first schedule), we need to also check the partner. The simplest approach: when building the deduped card, propagate any non-null `stream_key` from the partner to the merged card.
 
-## Notes
-- `maintenance_settings` being readable by students is **by design** — the app checks maintenance mode on load.
-- `profiles.role` and `profiles.premium_access` are readable by the user for their own row — this is required for the frontend to function (routing, UI display). This is not a real vulnerability since users can only see their own profile.
+In the dedup logic (around line 225-236), when creating the merged card, if the partner has a `stream_key` but `cls` doesn't, use the partner's:
 
+```
+deduped.push({
+  ...cls,
+  stream_key: cls.stream_key || partner.stream_key,
+  broadcast_id: cls.broadcast_id || partner.broadcast_id,
+  mergedBatches: [...]
+});
+```
+
+## Summary
+
+These 4 changes ensure:
+- Teacher never sees two cards for merged subjects (loading guard)
+- Stream key is written to and cleared from ALL schedules in a merge group
+- An existing stream on either schedule prevents a second stream from starting
+- Only ONE YouTube broadcast and ONE recording is ever created per merged class
