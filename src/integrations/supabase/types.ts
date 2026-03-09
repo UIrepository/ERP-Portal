@@ -1350,6 +1350,13 @@ export type Database = {
       check_is_admin_or_manager: { Args: never; Returns: boolean }
       check_user_role_sync: { Args: never; Returns: Json }
       delete_expired_chat_images: { Args: never; Returns: undefined }
+      get_admin_for_support: {
+        Args: never
+        Returns: {
+          name: string
+          user_id: string
+        }[]
+      }
       get_all_options: {
         Args: never
         Returns: {
