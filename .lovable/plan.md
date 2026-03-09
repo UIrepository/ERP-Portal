@@ -1,101 +1,81 @@
 
+# Fix: Duplicate Live Streams and Blank Lectures for Merged Classes
 
-# Full Security Audit: All Vulnerable Tables
+## Root Causes Identified
 
-## CRITICAL Findings
+There are **3 bugs** working together to cause this:
 
-### 1. Privilege Escalation on `profiles` (CRITICAL)
-The UPDATE policy "Users can update their own profile except role" checks only `auth.uid() = user_id` but does NOT restrict which columns can be changed. Any student can run:
-```sql
-UPDATE profiles SET role = 'super_admin' WHERE user_id = auth.uid();
+### Bug 1: No loading guard for merge data (teacher side)
+The `activeMerges` query has no loading state check. If the teacher loads the page before merge data arrives, `activeMerges` is an empty array. The dedup logic finds no merges, so **two separate class cards appear**. The teacher clicks "Start Class" on both, creating two YouTube broadcasts and two recordings.
+
+### Bug 2: Stream key saved to only ONE schedule
+When a merged class starts (line 329), `stream_key` and `broadcast_id` are only written to `cls.id` (the first schedule in the deduped pair). The partner schedule never gets it. If the partner happens to be enumerated first on a data refetch, the card appears without a stream key, and the teacher could accidentally start a second stream.
+
+### Bug 3: Stop recording only clears ONE schedule
+`handleStopRecording` (line 373) only clears `stream_key` from `cls.id`. The partner's stream_key (if it had one from Bug 2) would remain, causing ghost state.
+
+## Changes
+
+### File: `src/components/teacher/TeacherJoinClass.tsx`
+
+**Change 1 -- Add merge loading guard**
+- Destructure `isLoading` from the `activeMerges` query (rename to `isLoadingMerges`)
+- Include it in the loading check on line 401: `const isLoading = isLoadingTeacher || isLoadingSchedules || isLoadingMerges;`
+- This prevents the page from rendering before merge data is available, eliminating the race condition that shows two cards
+
+**Change 2 -- Save stream key to ALL merged schedule IDs**
+In `handleStartClass` (lines 325-332), after getting the stream details, write `stream_key` and `broadcast_id` to every schedule ID in the merged group, not just `cls.id`:
+
 ```
-This grants them full admin access to everything. There IS a trigger `prevent_role_change_by_non_admin` but it checks `current_setting('is_superuser.role')` which is unreliable.
+const allIds = cls.mergedBatches
+  ? cls.mergedBatches.map(m => m.id)
+  : [cls.id];
 
-**Fix:** Replace the UPDATE policy with one that uses a BEFORE UPDATE trigger that hard-blocks role/premium_access changes unless the caller is an admin.
+await supabase
+  .from('schedules')
+  .update({ stream_key: details.streamKey, broadcast_id: details.broadcastId })
+  .in('id', allIds);
+```
 
-### 2. `profile_basics` Table — No RLS at All
-This table has `user_id`, `email`, `name` with zero RLS policies. If RLS is enabled, nobody can read it. If RLS is NOT enabled, everyone (even anonymous) can read all user data.
+**Change 3 -- Clear stream key from ALL merged schedule IDs on stop**
+In `handleStopRecording` (line 373), clear from all IDs:
 
-**Fix:** Either enable RLS + add proper policies, or drop the table if unused.
+```
+const allIds = cls.mergedBatches
+  ? cls.mergedBatches.map(m => m.id)
+  : [cls.id];
 
-### 3. `active_classes` — Room URLs Exposed to Everyone
-SELECT policy uses `USING (true)`, meaning any authenticated user sees all active class `room_url` values, even classes they're not enrolled in.
+await supabase
+  .from('schedules')
+  .update({ stream_key: null, broadcast_id: null })
+  .in('id', allIds);
+```
 
-**Fix:** Restrict SELECT to enrolled students (via `user_enrollments`) + staff.
+**Change 4 -- Check ALL merged schedules for existing stream key before starting**
+Currently line 316 only checks `cls.stream_key`. For merged cards, also check if the partner already has a stream running:
 
-### 4. `doubts` and `doubt_answers` — All Users See Everything
-Both tables have SELECT policies with `USING (auth.role() = 'authenticated')`. Any logged-in user can read ALL doubts and answers across all batches/subjects.
+```
+const existingKey = cls.stream_key
+  || cls.mergedBatches?.find(m => /* lookup from schedules */)?.stream_key;
+```
 
-**Fix:** Scope SELECT to users enrolled in the doubt's batch+subject, plus staff.
+Since the deduped card spreads `cls` (the first schedule), we need to also check the partner. The simplest approach: when building the deduped card, propagate any non-null `stream_key` from the partner to the merged card.
 
-### 5. `message_likes` — All Likes Visible to Everyone
-SELECT `USING (true)` exposes all like data. Low-risk but unnecessary exposure.
+In the dedup logic (around line 225-236), when creating the merged card, if the partner has a `stream_key` but `cls` doesn't, use the partner's:
 
-**Fix:** Scope to users who can see the parent community message.
+```
+deduped.push({
+  ...cls,
+  stream_key: cls.stream_key || partner.stream_key,
+  broadcast_id: cls.broadcast_id || partner.broadcast_id,
+  mergedBatches: [...]
+});
+```
 
-## MODERATE Findings
+## Summary
 
-### 6. `meeting_links` — Active Links Visible to All
-SELECT `USING (is_active = true)` lets any authenticated user see meeting join links for any batch/subject.
-
-**Fix:** Scope to enrolled students + staff.
-
-### 7. `schedules` — Overly Broad Student Access
-Policy "Students can view all schedules" uses `profiles.role = 'student'` to let students see ALL schedules across ALL batches. There are also enrollment-scoped policies, creating redundancy where the broadest one wins.
-
-**Fix:** Drop the overly broad policy. The enrollment-scoped policy already exists.
-
-## Already Secure (No Changes Needed)
-- `direct_messages` — Properly scoped: sender or receiver only
-- `community_messages` — Properly scoped: enrollment-based + staff
-- `payments` — Properly scoped: own payments + admins (service role policy is fine)
-- `notes`, `recordings`, `dpp_content`, `feedback` — All properly enrollment-scoped
-
-## Implementation Plan
-
-### Migration SQL
-
-**Step 1: Fix privilege escalation on profiles**
-- Create a robust BEFORE UPDATE trigger that prevents non-admins from changing `role`, `premium_access`, or `bank_details`
-- Keep the existing UPDATE policy but add the trigger as a safety net
-
-**Step 2: Secure `profile_basics`**
-- Enable RLS on `profile_basics`
-- Add policy: users can only see their own row, staff can see all
-
-**Step 3: Lock down `active_classes`**
-- Drop the open SELECT policy
-- Add enrollment-scoped SELECT for students, staff can see all
-
-**Step 4: Lock down `doubts` and `doubt_answers`**
-- Drop the open SELECT policies
-- Add enrollment-scoped SELECT (match doubt's batch+subject to user_enrollments)
-- Keep staff access
-
-**Step 5: Lock down `meeting_links`**
-- Drop the open active-links SELECT policy
-- Add enrollment-scoped SELECT for students, staff can see all
-
-**Step 6: Remove overly broad schedule policy**
-- Drop "Students can view all schedules" (the enrollment-scoped policy already covers legitimate access)
-- Drop "Students can view schedules for their batch" (same — too broad, no subject check)
-
-**Step 7: Lock down `message_likes`**
-- Replace open SELECT with enrollment-scoped check (likes on messages the user can see)
-
-### Frontend Changes
-None required — all queries already filter by batch/subject. The RLS changes only prevent malicious direct API access.
-
-### Summary
-
-| Table | Issue | Severity |
-|-------|-------|----------|
-| `profiles` | Users can change own role to super_admin | CRITICAL |
-| `profile_basics` | No RLS at all | CRITICAL |
-| `active_classes` | Room URLs exposed to all | HIGH |
-| `doubts` | All doubts visible to everyone | HIGH |
-| `doubt_answers` | All answers visible to everyone | HIGH |
-| `meeting_links` | Join links exposed to all | MODERATE |
-| `schedules` | Overly broad student access | MODERATE |
-| `message_likes` | All likes visible | LOW |
-
+These 4 changes ensure:
+- Teacher never sees two cards for merged subjects (loading guard)
+- Stream key is written to and cleared from ALL schedules in a merge group
+- An existing stream on either schedule prevents a second stream from starting
+- Only ONE YouTube broadcast and ONE recording is ever created per merged class
