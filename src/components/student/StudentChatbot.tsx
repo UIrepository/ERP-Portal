@@ -68,27 +68,9 @@ export const StudentChatbot = () => {
 
   // Fetch admin for support using RPC
   const fetchAdmin = async () => {
-    // Use a simple RPC - admins don't have batch assignment, so we just need any admin
-    const { data, error } = await supabase.rpc('get_manager_for_batch', { p_batch: '__any__' });
-    // Fallback: try to get any admin via a dedicated approach
-    // Since we don't have a get_admin RPC, let's create a workaround:
-    // We know get_available_support_staff confirms admins exist, so we use get_user_role_from_tables
-    // Actually, for admin support chat we need admin's user_id. Let's use a direct approach
-    // that still works because the student sends a DM to the admin user_id obtained from
-    // a security definer function.
-    
-    // We'll add a simple admin lookup. For now, use the existing is_admin pattern.
-    // The simplest secure approach: create inline. But we already have the RPC infrastructure.
-    // Let's just query - students can't SELECT admins anymore, so we need an RPC.
-    // We'll reuse the staff availability check approach but need the actual ID.
-    // For a clean solution, let's call a new RPC. But to avoid another migration,
-    // let me use a workaround: the student can send to any admin they discover via DMs they already have.
-    
-    // Actually the cleanest fix: just do another migration for get_admin_for_support.
-    // But let's check - the "Admins can manage all admins" ALL policy uses is_admin(), 
-    // which only returns true for admins. Students truly can't query admins table anymore.
-    // We need an RPC for this too.
-    return null; // Will be replaced after we add the admin RPC
+    const { data, error } = await supabase.rpc('get_admin_for_support');
+    if (error || !data || data.length === 0) return null;
+    return data[0];
   };
 
   // Fetch manager for support using RPC
