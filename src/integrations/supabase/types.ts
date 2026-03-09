@@ -80,6 +80,13 @@ export type Database = {
             foreignKeyName: "activity_logs_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "profile_basics"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "activity_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
@@ -298,6 +305,13 @@ export type Database = {
             foreignKeyName: "community_messages_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "profile_basics"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "community_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
@@ -388,6 +402,13 @@ export type Database = {
             foreignKeyName: "doubt_answers_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "profile_basics"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "doubt_answers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
@@ -428,6 +449,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "recordings"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "doubts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profile_basics"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "doubts_user_id_fkey"
@@ -689,6 +717,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "community_messages"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_likes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profile_basics"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "message_likes_user_id_fkey"
@@ -1187,6 +1222,13 @@ export type Database = {
             foreignKeyName: "user_enrollments_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "profile_basics"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_enrollments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
           },
@@ -1275,7 +1317,24 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      profile_basics: {
+        Row: {
+          email: string | null
+          name: string | null
+          user_id: string | null
+        }
+        Insert: {
+          email?: string | null
+          name?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          email?: string | null
+          name?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       app_is_admin: { Args: never; Returns: boolean }
