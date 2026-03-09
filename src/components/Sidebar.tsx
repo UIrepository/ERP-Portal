@@ -50,7 +50,7 @@ interface UserEnrollment {
 }
 
 export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps) => {
-  const { profile, signOut, resolvedRole } = useAuth();
+  const { profile, user, signOut, resolvedRole } = useAuth();
   const queryClient = useQueryClient();
 
   const ADMIN_WHATSAPP_NUMBER = '916297143798'; 
