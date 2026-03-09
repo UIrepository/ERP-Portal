@@ -67,18 +67,20 @@ const StudentMainContent = () => {
   };
 
   // Fetch user enrollments
+  const userId = user?.id || profile?.user_id;
+
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
-    queryKey: ['studentMainEnrollments', profile?.user_id],
+    queryKey: ['studentMainEnrollments', userId],
     queryFn: async () => {
-      if (!profile?.user_id) return [];
+      if (!userId) return [];
       const { data, error } = await supabase
         .from('user_enrollments')
         .select('batch_name, subject_name')
-        .eq('user_id', profile.user_id);
+        .eq('user_id', userId);
       if (error) return [];
       return data || [];
     },
-    enabled: !!profile?.user_id,
+    enabled: !!userId,
   });
 
   // Derive available batches
