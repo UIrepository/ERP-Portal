@@ -1,101 +1,81 @@
 
+# Fix: Duplicate Live Streams and Blank Lectures for Merged Classes
 
-# Critical Security Fix: Overly Permissive RLS Policies
+## Root Causes Identified
 
-## The Problem
+There are **3 bugs** working together to cause this:
 
-A student was able to dump the entire `profiles` table (including super_admin accounts, bank details, emails) and the `teachers` table. The root cause: four tables have **wide-open SELECT policies** that let any authenticated user read everything.
+### Bug 1: No loading guard for merge data (teacher side)
+The `activeMerges` query has no loading state check. If the teacher loads the page before merge data arrives, `activeMerges` is an empty array. The dedup logic finds no merges, so **two separate class cards appear**. The teacher clicks "Start Class" on both, creating two YouTube broadcasts and two recordings.
 
-### Vulnerable Policies
+### Bug 2: Stream key saved to only ONE schedule
+When a merged class starts (line 329), `stream_key` and `broadcast_id` are only written to `cls.id` (the first schedule in the deduped pair). The partner schedule never gets it. If the partner happens to be enumerated first on a data refetch, the card appears without a stream key, and the teacher could accidentally start a second stream.
 
-| Table | Policy | Issue |
-|-------|--------|-------|
-| `profiles` | "Authenticated users can view profiles" `USING (true)` | Exposes ALL profiles: bank_details, roles, emails, super_admin accounts |
-| `teachers` | "Authenticated users can view teachers" `USING (true)` | Exposes all teacher emails and assignments |
-| `admins` | "Authenticated users can view admins" `USING (true)` | Exposes admin emails |
-| `managers` | "Authenticated users can view managers" `USING (true)` | Exposes manager emails |
+### Bug 3: Stop recording only clears ONE schedule
+`handleStopRecording` (line 373) only clears `stream_key` from `cls.id`. The partner's stream_key (if it had one from Bug 2) would remain, causing ghost state.
 
-## Fix Plan
+## Changes
 
-### Step 1: Drop the dangerous open SELECT policies
+### File: `src/components/teacher/TeacherJoinClass.tsx`
 
-Remove these four policies:
-- `profiles`: "Authenticated users can view profiles"
-- `teachers`: "Authenticated users can view teachers"
-- `admins`: "Authenticated users can view admins"
-- `managers`: "Authenticated users can view managers"
+**Change 1 -- Add merge loading guard**
+- Destructure `isLoading` from the `activeMerges` query (rename to `isLoadingMerges`)
+- Include it in the loading check on line 401: `const isLoading = isLoadingTeacher || isLoadingSchedules || isLoadingMerges;`
+- This prevents the page from rendering before merge data is available, eliminating the race condition that shows two cards
 
-### Step 2: Add properly scoped replacement policies
+**Change 2 -- Save stream key to ALL merged schedule IDs**
+In `handleStartClass` (lines 325-332), after getting the stream details, write `stream_key` and `broadcast_id` to every schedule ID in the merged group, not just `cls.id`:
 
-**Profiles table** — Replace open access with targeted policies:
-- **Students see only their own profile** (already exists via "Authenticated users can select their own profile")
-- **Staff (admins/managers/teachers) can view all profiles** — needed for admin dashboards, staff inbox, directories
-- No change needed for the self-select policy already in place
+```
+const allIds = cls.mergedBatches
+  ? cls.mergedBatches.map(m => m.id)
+  : [cls.id];
 
-**Teachers table** — Replace open access:
-- **Staff can view all teachers** — admin/manager dashboards need this
-- **Students can view teacher name and user_id for their enrolled subjects** — needed for StudentChatbot/StudentChatTeacher. This will be a security definer function to avoid exposing email.
-
-**Admins table:**
-- **Only admins can view admins** (the "Admins can manage all admins" ALL policy already covers this)
-- No student needs to see the admins table
-
-**Managers table:**
-- **Only admins and managers can view managers**
-- Students use the chatbot to find managers, but the chatbot queries managers directly — we'll add a security definer function for that
-
-### Step 3: Create a security definer function for student-facing teacher lookup
-
-Students need to find their teacher's `user_id` and `name` for chat. Instead of giving them SELECT on the teachers table, create:
-
-```sql
-CREATE OR REPLACE FUNCTION public.get_teacher_for_subject(p_batch text, p_subject text)
-RETURNS TABLE(user_id uuid, name text)
-LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public
-AS $$
-BEGIN
-  RETURN QUERY
-  SELECT t.user_id, t.name
-  FROM public.teachers t
-  WHERE p_batch = ANY(t.assigned_batches)
-    AND p_subject = ANY(t.assigned_subjects)
-    AND t.user_id IS NOT NULL
-  LIMIT 1;
-END;
-$$;
+await supabase
+  .from('schedules')
+  .update({ stream_key: details.streamKey, broadcast_id: details.broadcastId })
+  .in('id', allIds);
 ```
 
-### Step 4: Create a security definer function for student-facing manager lookup
+**Change 3 -- Clear stream key from ALL merged schedule IDs on stop**
+In `handleStopRecording` (line 373), clear from all IDs:
 
-Similarly for manager lookup in StudentChatbot:
+```
+const allIds = cls.mergedBatches
+  ? cls.mergedBatches.map(m => m.id)
+  : [cls.id];
 
-```sql
-CREATE OR REPLACE FUNCTION public.get_manager_for_batch(p_batch text)
-RETURNS TABLE(user_id uuid, name text)
-LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public
-AS $$
-BEGIN
-  RETURN QUERY
-  SELECT m.user_id, m.name
-  FROM public.managers m
-  WHERE p_batch = ANY(m.assigned_batches)
-    AND m.user_id IS NOT NULL;
-END;
-$$;
+await supabase
+  .from('schedules')
+  .update({ stream_key: null, broadcast_id: null })
+  .in('id', allIds);
 ```
 
-### Step 5: Update frontend code
+**Change 4 -- Check ALL merged schedules for existing stream key before starting**
+Currently line 316 only checks `cls.stream_key`. For merged cards, also check if the partner already has a stream running:
 
-Update `StudentChatbot.tsx` to use the new RPC functions instead of direct table queries for teacher/manager lookups. Other admin/teacher components will continue working because staff policies grant them access.
+```
+const existingKey = cls.stream_key
+  || cls.mergedBatches?.find(m => /* lookup from schedules */)?.stream_key;
+```
 
-### Step 6: Profile name lookups for chat
+Since the deduped card spreads `cls` (the first schedule), we need to also check the partner. The simplest approach: when building the deduped card, propagate any non-null `stream_key` from the partner to the merged card.
 
-`StaffInbox.tsx` and `NotificationCenter.tsx` look up profile names by user_id. These are staff-only components (behind role-gated dashboards), so the staff SELECT policy on profiles covers them.
+In the dedup logic (around line 225-236), when creating the merged card, if the partner has a `stream_key` but `cls` doesn't, use the partner's:
 
-## Summary of Changes
+```
+deduped.push({
+  ...cls,
+  stream_key: cls.stream_key || partner.stream_key,
+  broadcast_id: cls.broadcast_id || partner.broadcast_id,
+  mergedBatches: [...]
+});
+```
 
-| What | Action |
-|------|--------|
-| Migration | Drop 4 open policies, add 4 scoped policies, create 2 RPC functions |
-| `src/components/student/StudentChatbot.tsx` | Use `get_teacher_for_subject()` and `get_manager_for_batch()` RPCs |
+## Summary
 
+These 4 changes ensure:
+- Teacher never sees two cards for merged subjects (loading guard)
+- Stream key is written to and cleared from ALL schedules in a merge group
+- An existing stream on either schedule prevents a second stream from starting
+- Only ONE YouTube broadcast and ONE recording is ever created per merged class

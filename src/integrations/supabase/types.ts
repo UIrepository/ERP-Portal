@@ -1357,6 +1357,13 @@ export type Database = {
           type: string
         }[]
       }
+      get_available_support_staff: {
+        Args: { p_student_batches?: string[] }
+        Returns: {
+          has_admin: boolean
+          has_manager: boolean
+        }[]
+      }
       get_current_ongoing_class: {
         Args: { user_batch: string; user_subjects: string[] }
         Returns: {
@@ -1376,6 +1383,13 @@ export type Database = {
       get_manager_batches: {
         Args: { check_user_id?: string }
         Returns: string[]
+      }
+      get_manager_for_batch: {
+        Args: { p_batch: string }
+        Returns: {
+          name: string
+          user_id: string
+        }[]
       }
       get_merged_pairs: {
         Args: { p_batch: string; p_subject: string }
@@ -1410,6 +1424,13 @@ export type Database = {
       get_teacher_batches: {
         Args: { check_user_id?: string }
         Returns: string[]
+      }
+      get_teacher_for_subject: {
+        Args: { p_batch: string; p_subject: string }
+        Returns: {
+          name: string
+          user_id: string
+        }[]
       }
       get_teacher_subjects: {
         Args: { check_user_id?: string }
