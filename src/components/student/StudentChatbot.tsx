@@ -48,19 +48,19 @@ export const StudentChatbot = () => {
   const premiumShadowClass = "shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_-1px_rgba(0,0,0,0.1)]";
   const chatWindowShadowClass = "shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1),0_0_0_1px_rgba(0,0,0,0.05)]";
 
-  // Pre-fetch available staff
+  // Pre-fetch available staff using security definer function
   const { data: availableStaff } = useQuery({
     queryKey: ['available-support-staff', profile?.user_id],
     queryFn: async () => {
-      const [admins, managers] = await Promise.all([
-        supabase.from('admins').select('user_id').not('user_id', 'is', null),
-        supabase.from('managers').select('user_id, assigned_batches').not('user_id', 'is', null)
-      ]);
-      
+      const { data, error } = await supabase.rpc('get_available_support_staff', {
+        p_student_batches: studentBatches || []
+      });
+      if (error || !data || data.length === 0) {
+        return { hasAdmin: false, hasManager: false };
+      }
       return {
-        hasAdmin: (admins.data?.length || 0) > 0,
-        hasManager: (managers.data?.length || 0) > 0,
-        managers: managers.data || []
+        hasAdmin: data[0].has_admin,
+        hasManager: data[0].has_manager,
       };
     },
     enabled: !!profile?.user_id && state.isOpen,
