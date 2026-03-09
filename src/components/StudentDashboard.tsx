@@ -10,9 +10,9 @@ interface StudentDashboardProps {
 }
 
 export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardProps) => {
-  const { profile } = useAuth();
+  const { resolvedRole } = useAuth();
 
-  if (profile?.role !== 'student') {
+  if (resolvedRole !== 'student') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
