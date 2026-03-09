@@ -156,16 +156,16 @@ const StudentMainContent = () => {
 
   // Real-time sync
   useEffect(() => {
-    if (!profile?.user_id) return;
+    if (!userId) return;
     const channel = supabase
       .channel('student-main-enrollments')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_enrollments', filter: `user_id=eq.${profile.user_id}` }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_enrollments', filter: `user_id=eq.${userId}` }, () => {
           queryClient.invalidateQueries({ queryKey: ['studentMainEnrollments'] });
         }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [profile?.user_id, queryClient]);
+  }, [userId, queryClient]);
 
   // Navigation handlers
   const handleSelectBatch = (batch: string) => {

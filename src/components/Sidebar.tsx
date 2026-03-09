@@ -93,15 +93,15 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
   }, [userEnrollments]);
 
   useEffect(() => {
-    if (!profile?.user_id || resolvedRole !== 'student') return;
+    if (!sidebarUserId || resolvedRole !== 'student') return;
     const channel = supabase
       .channel('sidebar-realtime-updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_enrollments', filter: `user_id=eq.${profile.user_id}` }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_enrollments', filter: `user_id=eq.${sidebarUserId}` }, () => {
           queryClient.invalidateQueries({ queryKey: ['sidebarUserEnrollments'] });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [profile?.user_id, queryClient, resolvedRole]);
+  }, [sidebarUserId, queryClient, resolvedRole]);
 
   // --- 1. STUDENT TABS ---
   const studentTabs = [
