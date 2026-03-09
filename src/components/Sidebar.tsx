@@ -50,7 +50,7 @@ interface UserEnrollment {
 }
 
 export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps) => {
-  const { profile, signOut, resolvedRole } = useAuth();
+  const { profile, user, signOut, resolvedRole } = useAuth();
   const queryClient = useQueryClient();
 
   const ADMIN_WHATSAPP_NUMBER = '916297143798'; 
@@ -72,18 +72,20 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
       window.open(whatsappLink, '_blank');
   };
 
+  const sidebarUserId = user?.id || profile?.user_id;
+
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
-    queryKey: ['sidebarUserEnrollments', profile?.user_id],
+    queryKey: ['sidebarUserEnrollments', sidebarUserId],
     queryFn: async () => {
-        if (!profile?.user_id) return [];
+        if (!sidebarUserId) return [];
         const { data, error } = await supabase
             .from('user_enrollments')
             .select('batch_name, subject_name')
-            .eq('user_id', profile.user_id);
+            .eq('user_id', sidebarUserId);
         if (error) return [];
         return data || [];
     },
-    enabled: !!profile?.user_id && resolvedRole === 'student'
+    enabled: !!sidebarUserId && resolvedRole === 'student'
   });
 
   const availableBatches = useMemo(() => {
@@ -91,15 +93,15 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
   }, [userEnrollments]);
 
   useEffect(() => {
-    if (!profile?.user_id || resolvedRole !== 'student') return;
+    if (!sidebarUserId || resolvedRole !== 'student') return;
     const channel = supabase
       .channel('sidebar-realtime-updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_enrollments', filter: `user_id=eq.${profile.user_id}` }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_enrollments', filter: `user_id=eq.${sidebarUserId}` }, () => {
           queryClient.invalidateQueries({ queryKey: ['sidebarUserEnrollments'] });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [profile?.user_id, queryClient, resolvedRole]);
+  }, [sidebarUserId, queryClient, resolvedRole]);
 
   // --- 1. STUDENT TABS ---
   const studentTabs = [

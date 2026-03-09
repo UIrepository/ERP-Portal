@@ -38,7 +38,7 @@ interface NavigationState {
 }
 
 const StudentMainContent = () => {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>('classes');
@@ -67,18 +67,20 @@ const StudentMainContent = () => {
   };
 
   // Fetch user enrollments
+  const userId = user?.id || profile?.user_id;
+
   const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
-    queryKey: ['studentMainEnrollments', profile?.user_id],
+    queryKey: ['studentMainEnrollments', userId],
     queryFn: async () => {
-      if (!profile?.user_id) return [];
+      if (!userId) return [];
       const { data, error } = await supabase
         .from('user_enrollments')
         .select('batch_name, subject_name')
-        .eq('user_id', profile.user_id);
+        .eq('user_id', userId);
       if (error) return [];
       return data || [];
     },
-    enabled: !!profile?.user_id,
+    enabled: !!userId,
   });
 
   // Derive available batches
@@ -154,16 +156,16 @@ const StudentMainContent = () => {
 
   // Real-time sync
   useEffect(() => {
-    if (!profile?.user_id) return;
+    if (!userId) return;
     const channel = supabase
       .channel('student-main-enrollments')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_enrollments', filter: `user_id=eq.${profile.user_id}` }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_enrollments', filter: `user_id=eq.${userId}` }, () => {
           queryClient.invalidateQueries({ queryKey: ['studentMainEnrollments'] });
         }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [profile?.user_id, queryClient]);
+  }, [userId, queryClient]);
 
   // Navigation handlers
   const handleSelectBatch = (batch: string) => {
