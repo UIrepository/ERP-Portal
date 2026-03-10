@@ -272,7 +272,7 @@ export const StudentDPP = ({ batch, subject }: StudentDPPProps) => {
                   return (
                     <div 
                       key={dpp.id} 
-                      onClick={() => setSelectedDPP(dpp)}
+                      onClick={(e) => handleDownload(e, dpp)}
                       className="
                         group relative bg-white 
                         border border-slate-200 
