@@ -96,7 +96,7 @@ export const StudentUIKiPadhai = ({ batch, subject }: StudentUIKiPadhaiProps) =>
             premiumContent.map((content) => (
                 <div 
                     key={content.id} 
-                    onClick={() => setSelectedContent(content)}
+                    onClick={() => handleAccessContent(content)}
                     className="
                         group relative bg-white 
                         border border-slate-200 
