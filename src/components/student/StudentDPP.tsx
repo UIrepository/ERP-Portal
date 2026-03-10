@@ -13,7 +13,6 @@ import {
   Target
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface DPPContent {
   id: string;
