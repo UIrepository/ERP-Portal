@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
-import { Button } from '@/components/ui/button';
 import { 
   FileText, 
   Download, 
@@ -102,79 +101,9 @@ const DPPSkeleton = () => (
   </div>
 );
 
-const DPPViewer = ({ dpp, onBack, onDownload, allDPPs, onDPPSelect }: { dpp: DPPContent, onBack: () => void, onDownload: (dpp: DPPContent) => void, allDPPs: DPPContent[], onDPPSelect: (dpp: DPPContent) => void }) => {
-    const otherDPPs = allDPPs.filter(d => d.id !== dpp.id);
-  
-    return (
-      <div className="p-4 md:p-6 space-y-6 bg-slate-50 min-h-full">
-        <Button variant="ghost" onClick={onBack} className="mb-4 hover:bg-slate-200">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to DPPs
-        </Button>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="md:col-span-2">
-                <Card className="bg-white rounded-lg overflow-hidden shadow-sm border-slate-200">
-                    <CardHeader className="p-6 border-b bg-white">
-                        <div className="flex justify-between items-center">
-                            <CardTitle className="text-xl font-semibold text-slate-800">{dpp.title}</CardTitle>
-                            <Button onClick={() => onDownload(dpp)} variant="outline" size="sm">
-                                <Download className="h-4 w-4 mr-2" />
-                                Open
-                            </Button>
-                        </div>
-                    </CardHeader>
-                    <Alert className="mx-6 mt-4 mb-2 p-3 bg-blue-50 border-blue-100 text-blue-800 text-sm [&>svg]:hidden">
-                      <AlertDescription>
-                        If content isn't viewing correctly, please use the <strong>Open</strong> button.
-                      </AlertDescription>
-                    </Alert>
-                    <CardContent className="p-0">
-                    <div className="w-full h-[60vh] md:h-[75vh] bg-slate-50">
-                        <iframe
-                        src={dpp.link}
-                        className="w-full h-full"
-                        title={dpp.title}
-                        />
-                    </div>
-                    </CardContent>
-                </Card>
-            </div>
-            <div className="md:col-span-1">
-                <Card className="bg-white rounded-lg shadow-sm border-slate-200">
-                    <CardHeader>
-                        <CardTitle className="text-lg">Other DPPs</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-2">
-                            {otherDPPs.map(otherDPP => {
-                                const meta = getFileMetadata(otherDPP.link);
-                                return (
-                                <div key={otherDPP.id} className="p-3 border border-slate-100 rounded-lg hover:bg-slate-50 transition-all duration-200 cursor-pointer flex items-center gap-3" onClick={() => onDPPSelect(otherDPP)}>
-                                    <div className={`p-1.5 rounded-md ${meta.bg} ${meta.color}`}>
-                                        {meta.icon}
-                                    </div>
-                                    <div className="overflow-hidden">
-                                        <p className="font-medium text-sm text-slate-700 truncate">{otherDPP.title}</p>
-                                        <p className="text-xs text-slate-400 truncate">{meta.ext}</p>
-                                    </div>
-                                </div>
-                            )})}
-                            {otherDPPs.length === 0 && (
-                                <p className="text-sm text-muted-foreground text-center py-4">No other DPPs available</p>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-        </div>
-      </div>
-    );
-};
-
 export const StudentDPP = ({ batch, subject }: StudentDPPProps) => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
-  const [selectedDPP, setSelectedDPP] = useState<DPPContent | null>(null);
 
   const { data: dpps, isLoading } = useQuery<DPPContent[]>({
     queryKey: ['student-dpp', batch, subject],
