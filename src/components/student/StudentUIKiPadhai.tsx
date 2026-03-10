@@ -68,9 +68,8 @@ export const StudentUIKiPadhai = ({ batch, subject }: StudentUIKiPadhaiProps) =>
     window.open(content.link, '_blank');
   };
 
-  if (selectedContent) {
-    return <PremiumContentViewer content={selectedContent} onBack={() => setSelectedContent(null)} onAccess={handleAccessContent} allContent={premiumContent || []} onContentSelect={setSelectedContent} />;
-  }
+
+
 
   return (
     <div className="p-6 md:p-8 bg-[#fcfcfd] min-h-full font-sans">
