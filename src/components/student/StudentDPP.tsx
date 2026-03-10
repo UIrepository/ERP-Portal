@@ -246,9 +246,7 @@ export const StudentDPP = ({ batch, subject }: StudentDPPProps) => {
     window.open(dpp.link, '_blank');
   };
 
-  if (selectedDPP) {
-    return <DPPViewer dpp={selectedDPP} onBack={() => setSelectedDPP(null)} onDownload={(d) => handleDownload({ stopPropagation: () => {} } as any, d)} allDPPs={dpps || []} onDPPSelect={setSelectedDPP} />;
-  }
+  // Removed iframe viewer - files open directly in new tab on click
 
   return (
     <div className="p-6 space-y-6 bg-[#fcfcfd] min-h-full font-sans">
