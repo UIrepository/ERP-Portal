@@ -35,7 +35,7 @@ interface ScheduleWithLink {
 
 export const StudentLiveClass = ({ batch, subject, enrolledSubjects }: StudentLiveClassProps) => {
   const { profile, user } = useAuth();
-  const { mergedPairs, orFilter, primaryPair } = useMergedSubjects(batch, subject);
+  const { mergedPairs, orFilter, primaryPair, isLoading: isMergedPairsLoading } = useMergedSubjects(batch, subject);
   const today = new Date();
   const currentDayOfWeek = today.getDay();
   const todayDateStr = format(today, 'yyyy-MM-dd');
