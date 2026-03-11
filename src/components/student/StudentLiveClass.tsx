@@ -136,9 +136,15 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects }: StudentLi
       });
 
       return deduped.map(schedule => {
-        const activeJitsi = allActiveClasses?.find(ac => ac.subject === schedule.subject && ac.batch === schedule.batch)
-          || allActiveClasses?.find(ac => ac.subject === schedule.subject);
-        const subjectLink = allMeetingLinks?.find(l => l.subject === schedule.subject && l.batch === schedule.batch);
+        const schedulePrimary = getPrimaryPair(schedule.batch, schedule.subject);
+        const activeJitsi = allActiveClasses?.find(ac => {
+          const acPrimary = getPrimaryPair(ac.batch, ac.subject);
+          return acPrimary.batch === schedulePrimary.batch && acPrimary.subject === schedulePrimary.subject;
+        });
+        const subjectLink = allMeetingLinks?.find(l => {
+          const lPrimary = getPrimaryPair(l.batch, l.subject);
+          return lPrimary.batch === schedulePrimary.batch && lPrimary.subject === schedulePrimary.subject;
+        });
 
         // Always resolve primary pair for consistent room naming (fixes merged batch students landing in different rooms)
         const primary = getPrimaryPair(schedule.batch, schedule.subject);
