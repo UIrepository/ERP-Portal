@@ -247,7 +247,7 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects }: StudentLi
     return `${formatSingle(start)} — ${formatSingle(end)}`;
   };
 
-  if (isLoading || isMergesLoading) {
+  if (isLoading || isMergesLoading || isMergedPairsLoading) {
     return <Skeleton className="h-64 w-full rounded-[4px]" />;
   }
 
