@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useMergedSubjects } from '@/hooks/useMergedSubjects';
+
 import { Input } from '@/components/ui/input';
 import { Play, Search, PlayCircle, Clock } from 'lucide-react';
 import { format } from 'date-fns';
@@ -62,8 +62,6 @@ const RecordingSkeleton = () => (
 export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) => {
     const { user, profile } = useAuth();
     const queryClient = useQueryClient();
-    const { mergedPairs, orFilter } = useMergedSubjects(batch, subject);
-    // mergedPairs now includes merged_at timestamp for filtering pre-merge recordings
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRecording, setSelectedRecording] = useState<RecordingContent | null>(null);
     
@@ -74,46 +72,26 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
 
     // Direct query when batch/subject props are provided (context-aware mode)
     const { data: recordings, isLoading } = useQuery<RecordingContent[]>({
-        queryKey: ['student-recordings', batch, subject, orFilter],
+        queryKey: ['student-recordings', batch, subject],
         queryFn: async (): Promise<RecordingContent[]> => {
-            if (!batch || !subject || !orFilter) return [];
+            if (!batch || !subject) return [];
             
             const { data, error } = await supabase
                 .from('recordings')
                 .select('*')
-                .or(orFilter)
-                .order('date', { ascending: false }); // Newest first
+                .eq('batch', batch)
+                .eq('subject', subject)
+                .order('date', { ascending: false });
             
             if (error) throw error;
-            // Deduplicate by embed_link (safety net for merged class duplicate recordings)
-            const uniqueByLink = new Map<string, any>();
-            (data || []).forEach(rec => {
-              if (!uniqueByLink.has(rec.embed_link)) {
-                uniqueByLink.set(rec.embed_link, rec);
-              }
-            });
-            return Array.from(uniqueByLink.values()) as RecordingContent[];
+            return (data || []) as RecordingContent[];
         },
-        enabled: !!batch && !!subject && !!orFilter
+        enabled: !!batch && !!subject
     });
 
-    // Filter recordings: own-batch always visible, partner-batch only after merged_at date
-    const mergeFilteredRecordings = useMemo(() => {
-        if (!recordings) return [];
-        return recordings.filter(rec => {
-            // Own batch/subject — always show
-            if (rec.batch === batch && rec.subject === subject) return true;
-            // Partner batch — find the merged_at date
-            const pair = mergedPairs.find(p => p.batch === rec.batch && p.subject === rec.subject);
-            if (!pair || !pair.merged_at) return true; // no merge info = show
-            // Only show if recording date >= merge date
-            return rec.date >= pair.merged_at.slice(0, 10);
-        });
-    }, [recordings, batch, subject, mergedPairs]);
-
-    const filteredRecordings = useMemo(() => mergeFilteredRecordings.filter(rec =>
+    const filteredRecordings = useMemo(() => (recordings || []).filter(rec =>
         rec.topic.toLowerCase().includes(searchTerm.toLowerCase())
-    ), [mergeFilteredRecordings, searchTerm]);
+    ), [recordings, searchTerm]);
 
     // Transform database recording to player Lecture format
     const recordingToLecture = useCallback((rec: RecordingContent, index: number): Lecture => ({
