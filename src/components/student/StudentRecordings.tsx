@@ -72,27 +72,21 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
 
     // Direct query when batch/subject props are provided (context-aware mode)
     const { data: recordings, isLoading } = useQuery<RecordingContent[]>({
-        queryKey: ['student-recordings', batch, subject, orFilter],
+        queryKey: ['student-recordings', batch, subject],
         queryFn: async (): Promise<RecordingContent[]> => {
-            if (!batch || !subject || !orFilter) return [];
+            if (!batch || !subject) return [];
             
             const { data, error } = await supabase
                 .from('recordings')
                 .select('*')
-                .or(orFilter)
-                .order('date', { ascending: false }); // Newest first
+                .eq('batch', batch)
+                .eq('subject', subject)
+                .order('date', { ascending: false });
             
             if (error) throw error;
-            // Deduplicate by embed_link (safety net for merged class duplicate recordings)
-            const uniqueByLink = new Map<string, any>();
-            (data || []).forEach(rec => {
-              if (!uniqueByLink.has(rec.embed_link)) {
-                uniqueByLink.set(rec.embed_link, rec);
-              }
-            });
-            return Array.from(uniqueByLink.values()) as RecordingContent[];
+            return (data || []) as RecordingContent[];
         },
-        enabled: !!batch && !!subject && !!orFilter
+        enabled: !!batch && !!subject
     });
 
     // Filter recordings: own-batch always visible, partner-batch only after merged_at date
