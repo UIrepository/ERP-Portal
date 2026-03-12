@@ -1,10 +1,12 @@
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Crown, ExternalLink } from 'lucide-react';
+import { Crown, ExternalLink, ArrowLeft } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface UIKiPadhaiContent {
@@ -41,9 +43,83 @@ const PremiumContentSkeleton = () => (
     </div>
 );
 
+const PremiumContentViewer = ({ content, onBack, onAccess, allContent, onContentSelect }: { content: UIKiPadhaiContent, onBack: () => void, onAccess: (content: UIKiPadhaiContent) => void, allContent: UIKiPadhaiContent[], onContentSelect: (content: UIKiPadhaiContent) => void }) => {
+    const otherContent = allContent.filter(c => c.id !== content.id);
+
+    return (
+        <div className="p-4 md:p-6 space-y-6 bg-slate-50 min-h-full font-sans">
+            <Button variant="ghost" onClick={onBack} className="mb-4 hover:bg-slate-200">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Premium Content
+            </Button>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                    <Card className="bg-black rounded-lg overflow-hidden shadow-sm border-0">
+                         <CardHeader className="p-6 border-b border-white/10 bg-neutral-900">
+                            <div className="flex justify-between items-center">
+                                <CardTitle className="text-white flex items-center gap-3 font-normal">
+                                    <Crown className="text-yellow-500 fill-yellow-500" />
+                                    {content.title}
+                                </CardTitle>
+                                <Button onClick={() => onAccess(content)} className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-full">
+                                    <ExternalLink className="h-4 w-4 mr-2" />
+                                    Open Link
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <div className="w-full h-[60vh] md:h-[75vh] bg-neutral-950 flex items-center justify-center">
+                                <iframe
+                                    src={content.link}
+                                    className="w-full h-full"
+                                    title={content.title}
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowFullScreen
+                                />
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+                <div className="lg:col-span-1">
+                     <Card className="bg-white rounded-lg shadow-sm border border-slate-200">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-gray-900 text-lg font-normal">
+                                More Premium Content
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+                                {otherContent.map(item => (
+                                    <div 
+                                        key={item.id} 
+                                        className="p-4 bg-white border border-slate-200 rounded-md hover:border-black transition-colors duration-200 cursor-pointer group" 
+                                        onClick={() => onContentSelect(item)}
+                                    >
+                                        <div className="flex justify-between items-start mb-2">
+                                            <Badge variant="outline" className="bg-yellow-50 text-amber-600 border-yellow-100 text-[10px] uppercase tracking-wider font-bold rounded-sm">
+                                                Premium
+                                            </Badge>
+                                        </div>
+                                        <p className="font-normal text-slate-800 transition-colors line-clamp-2">
+                                            {item.title}
+                                        </p>
+                                    </div>
+                                ))}
+                                {otherContent.length === 0 && (
+                                    <p className="text-sm text-slate-400 text-center py-8">No other content available</p>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 export const StudentUIKiPadhai = ({ batch, subject }: StudentUIKiPadhaiProps) => {
   const { profile } = useAuth();
+  const [selectedContent, setSelectedContent] = useState<UIKiPadhaiContent | null>(null);
 
   const { data: premiumContent, isLoading } = useQuery<UIKiPadhaiContent[]>({
     queryKey: ['student-ui-ki-padhai', batch, subject],
@@ -68,8 +144,9 @@ export const StudentUIKiPadhai = ({ batch, subject }: StudentUIKiPadhaiProps) =>
     window.open(content.link, '_blank');
   };
 
-
-
+  if (selectedContent) {
+    return <PremiumContentViewer content={selectedContent} onBack={() => setSelectedContent(null)} onAccess={handleAccessContent} allContent={premiumContent || []} onContentSelect={setSelectedContent} />;
+  }
 
   return (
     <div className="p-6 md:p-8 bg-[#fcfcfd] min-h-full font-sans">
@@ -96,7 +173,7 @@ export const StudentUIKiPadhai = ({ batch, subject }: StudentUIKiPadhaiProps) =>
             premiumContent.map((content) => (
                 <div 
                     key={content.id} 
-                    onClick={() => handleAccessContent(content)}
+                    onClick={() => setSelectedContent(content)}
                     className="
                         group relative bg-white 
                         border border-slate-200 
