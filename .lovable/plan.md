@@ -1,81 +1,24 @@
 
-# Fix: Duplicate Live Streams and Blank Lectures for Merged Classes
 
-## Root Causes Identified
+# Simplify Recordings Fetch for Merged Subjects
 
-There are **3 bugs** working together to cause this:
+## Context
+The recordings table now has a separate row for each batch/subject in a merge group (with the same embed_link). The current code already uses `useMergedSubjects` + `orFilter` to fetch across merge pairs, and deduplicates by `embed_link`. It also has a `mergeFilteredRecordings` step that filters partner-batch recordings by merge date -- this is now unnecessary since each batch gets its own row.
 
-### Bug 1: No loading guard for merge data (teacher side)
-The `activeMerges` query has no loading state check. If the teacher loads the page before merge data arrives, `activeMerges` is an empty array. The dedup logic finds no merges, so **two separate class cards appear**. The teacher clicks "Start Class" on both, creating two YouTube broadcasts and two recordings.
+## What needs to change
 
-### Bug 2: Stream key saved to only ONE schedule
-When a merged class starts (line 329), `stream_key` and `broadcast_id` are only written to `cls.id` (the first schedule in the deduped pair). The partner schedule never gets it. If the partner happens to be enumerated first on a data refetch, the card appears without a stream key, and the teacher could accidentally start a second stream.
+**File: `src/components/student/StudentRecordings.tsx`**
 
-### Bug 3: Stop recording only clears ONE schedule
-`handleStopRecording` (line 373) only clears `stream_key` from `cls.id`. The partner's stream_key (if it had one from Bug 2) would remain, causing ghost state.
+1. **Remove the `mergeFilteredRecordings` filter** (lines 100-112) -- since every merged batch now has its own recording row, the student's own batch/subject row will always exist. No need to filter partner recordings by merge date.
 
-## Changes
+2. **Simplify the query**: Instead of using `orFilter` (which fetches all merge partners and then deduplicates), query only for the student's own `batch` + `subject`. Since each merged batch now gets its own row, the student will see all their recordings directly without needing the merge OR filter.
 
-### File: `src/components/teacher/TeacherJoinClass.tsx`
+3. **Remove the deduplication by `embed_link`** -- no longer needed since we query only the student's own batch/subject.
 
-**Change 1 -- Add merge loading guard**
-- Destructure `isLoading` from the `activeMerges` query (rename to `isLoadingMerges`)
-- Include it in the loading check on line 401: `const isLoading = isLoadingTeacher || isLoadingSchedules || isLoadingMerges;`
-- This prevents the page from rendering before merge data is available, eliminating the race condition that shows two cards
+4. **Update `filteredRecordings`** to filter directly from `recordings` instead of `mergeFilteredRecordings`.
 
-**Change 2 -- Save stream key to ALL merged schedule IDs**
-In `handleStartClass` (lines 325-332), after getting the stream details, write `stream_key` and `broadcast_id` to every schedule ID in the merged group, not just `cls.id`:
-
-```
-const allIds = cls.mergedBatches
-  ? cls.mergedBatches.map(m => m.id)
-  : [cls.id];
-
-await supabase
-  .from('schedules')
-  .update({ stream_key: details.streamKey, broadcast_id: details.broadcastId })
-  .in('id', allIds);
-```
-
-**Change 3 -- Clear stream key from ALL merged schedule IDs on stop**
-In `handleStopRecording` (line 373), clear from all IDs:
-
-```
-const allIds = cls.mergedBatches
-  ? cls.mergedBatches.map(m => m.id)
-  : [cls.id];
-
-await supabase
-  .from('schedules')
-  .update({ stream_key: null, broadcast_id: null })
-  .in('id', allIds);
-```
-
-**Change 4 -- Check ALL merged schedules for existing stream key before starting**
-Currently line 316 only checks `cls.stream_key`. For merged cards, also check if the partner already has a stream running:
-
-```
-const existingKey = cls.stream_key
-  || cls.mergedBatches?.find(m => /* lookup from schedules */)?.stream_key;
-```
-
-Since the deduped card spreads `cls` (the first schedule), we need to also check the partner. The simplest approach: when building the deduped card, propagate any non-null `stream_key` from the partner to the merged card.
-
-In the dedup logic (around line 225-236), when creating the merged card, if the partner has a `stream_key` but `cls` doesn't, use the partner's:
-
-```
-deduped.push({
-  ...cls,
-  stream_key: cls.stream_key || partner.stream_key,
-  broadcast_id: cls.broadcast_id || partner.broadcast_id,
-  mergedBatches: [...]
-});
-```
+5. **Remove `mergedPairs` destructuring** from `useMergedSubjects` since it's no longer used for filtering (keep `orFilter` only if other parts depend on it, but since we're simplifying the query, we can remove the hook usage entirely).
 
 ## Summary
+This is a simplification: replace the complex merge-aware query + date filter + dedup with a straightforward query on `batch` + `subject` directly, since the recordings table now guarantees each batch has its own rows.
 
-These 4 changes ensure:
-- Teacher never sees two cards for merged subjects (loading guard)
-- Stream key is written to and cleared from ALL schedules in a merge group
-- An existing stream on either schedule prevents a second stream from starting
-- Only ONE YouTube broadcast and ONE recording is ever created per merged class
