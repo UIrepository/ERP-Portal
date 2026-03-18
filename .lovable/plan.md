@@ -1,81 +1,57 @@
 
-# Fix: Duplicate Live Streams and Blank Lectures for Merged Classes
 
-## Root Causes Identified
+# Fix: Staff Manager Not Showing New Batch/Subject Combinations
 
-There are **3 bugs** working together to cause this:
+## Problem Analysis
+The `.limit(10000)` fix was applied but the issue persists. After investigating:
 
-### Bug 1: No loading guard for merge data (teacher side)
-The `activeMerges` query has no loading state check. If the teacher loads the page before merge data arrives, `activeMerges` is an empty array. The dedup logic finds no merges, so **two separate class cards appear**. The teacher clicks "Start Class" on both, creating two YouTube broadcasts and two recordings.
+- The `user_enrollments` table has 1211 rows with 51 unique batch/subject combinations
+- All new combos (e.g., "Foundation Quiz 2 - Data Science", "Python OPPE 1 Batch") exist in the database
+- The query code looks correct with `.limit(10000)`
 
-### Bug 2: Stream key saved to only ONE schedule
-When a merged class starts (line 329), `stream_key` and `broadcast_id` are only written to `cls.id` (the first schedule in the deduped pair). The partner schedule never gets it. If the partner happens to be enumerated first on a data refetch, the card appears without a stream key, and the teacher could accidentally start a second stream.
+The likely root cause is a **client-side issue**: either React Query is serving stale cached data, or the Supabase client-side query is still being limited by the PostgREST default. A more robust fix is to **move the distinct computation to the database** using an RPC function, eliminating the row-limit concern entirely.
 
-### Bug 3: Stop recording only clears ONE schedule
-`handleStopRecording` (line 373) only clears `stream_key` from `cls.id`. The partner's stream_key (if it had one from Bug 2) would remain, causing ghost state.
+## Plan
 
-## Changes
+### 1. Create a database function to return distinct batch/subject pairs
+Create a new Supabase RPC function `get_distinct_enrollment_options()` that returns only the unique `batch_name` and `subject_name` pairs directly from the database. This avoids any row-limit issues entirely and is more performant than fetching all 1211+ rows to deduplicate client-side.
 
-### File: `src/components/teacher/TeacherJoinClass.tsx`
-
-**Change 1 -- Add merge loading guard**
-- Destructure `isLoading` from the `activeMerges` query (rename to `isLoadingMerges`)
-- Include it in the loading check on line 401: `const isLoading = isLoadingTeacher || isLoadingSchedules || isLoadingMerges;`
-- This prevents the page from rendering before merge data is available, eliminating the race condition that shows two cards
-
-**Change 2 -- Save stream key to ALL merged schedule IDs**
-In `handleStartClass` (lines 325-332), after getting the stream details, write `stream_key` and `broadcast_id` to every schedule ID in the merged group, not just `cls.id`:
-
-```
-const allIds = cls.mergedBatches
-  ? cls.mergedBatches.map(m => m.id)
-  : [cls.id];
-
-await supabase
-  .from('schedules')
-  .update({ stream_key: details.streamKey, broadcast_id: details.broadcastId })
-  .in('id', allIds);
+```sql
+CREATE OR REPLACE FUNCTION public.get_distinct_enrollment_options()
+RETURNS TABLE(batch_name text, subject_name text)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+  SELECT DISTINCT ue.batch_name, ue.subject_name 
+  FROM public.user_enrollments ue
+  WHERE ue.batch_name IS NOT NULL AND ue.subject_name IS NOT NULL
+  ORDER BY ue.batch_name, ue.subject_name;
+$$;
 ```
 
-**Change 3 -- Clear stream key from ALL merged schedule IDs on stop**
-In `handleStopRecording` (line 373), clear from all IDs:
+### 2. Update AdminStaffManager.tsx to use the RPC function
+Replace the raw table query with the RPC call:
 
-```
-const allIds = cls.mergedBatches
-  ? cls.mergedBatches.map(m => m.id)
-  : [cls.id];
-
-await supabase
-  .from('schedules')
-  .update({ stream_key: null, broadcast_id: null })
-  .in('id', allIds);
-```
-
-**Change 4 -- Check ALL merged schedules for existing stream key before starting**
-Currently line 316 only checks `cls.stream_key`. For merged cards, also check if the partner already has a stream running:
-
-```
-const existingKey = cls.stream_key
-  || cls.mergedBatches?.find(m => /* lookup from schedules */)?.stream_key;
-```
-
-Since the deduped card spreads `cls` (the first schedule), we need to also check the partner. The simplest approach: when building the deduped card, propagate any non-null `stream_key` from the partner to the merged card.
-
-In the dedup logic (around line 225-236), when creating the merged card, if the partner has a `stream_key` but `cls` doesn't, use the partner's:
-
-```
-deduped.push({
-  ...cls,
-  stream_key: cls.stream_key || partner.stream_key,
-  broadcast_id: cls.broadcast_id || partner.broadcast_id,
-  mergedBatches: [...]
+```ts
+const { data: rawEnrollments } = useQuery({
+  queryKey: ['raw-enrollments-staff'],
+  queryFn: async () => {
+    const { data, error } = await supabase.rpc('get_distinct_enrollment_options');
+    if (error) {
+      console.error("Error fetching enrollments", error);
+      return [];
+    }
+    return data || [];
+  }
 });
 ```
 
-## Summary
+The `uniqueBatches` and `availableSubjects` `useMemo` computations remain the same since they already operate on `batch_name` and `subject_name` fields.
 
-These 4 changes ensure:
-- Teacher never sees two cards for merged subjects (loading guard)
-- Stream key is written to and cleared from ALL schedules in a merge group
-- An existing stream on either schedule prevents a second stream from starting
-- Only ONE YouTube broadcast and ONE recording is ever created per merged class
+## Why This Fixes It
+- **No row limit**: The RPC function returns only distinct pairs (51 rows), well under any limit
+- **SECURITY DEFINER**: Bypasses RLS, so even if there's a policy evaluation issue, the admin gets all data
+- **Database-side DISTINCT**: More efficient than fetching thousands of rows and deduplicating in JS
+
