@@ -1387,6 +1387,13 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"]
       }
       get_current_user_subjects: { Args: never; Returns: string[] }
+      get_distinct_enrollment_options: {
+        Args: never
+        Returns: {
+          batch_name: string
+          subject_name: string
+        }[]
+      }
       get_manager_batches: {
         Args: { check_user_id?: string }
         Returns: string[]

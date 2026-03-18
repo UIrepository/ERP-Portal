@@ -210,12 +210,12 @@ export const AdminStaffManager = () => {
   const { data: rawEnrollments } = useQuery({
     queryKey: ['raw-enrollments-staff'],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_distinct_enrollment_options');
+      const { data, error } = await supabase.rpc('get_distinct_enrollment_options' as any);
       if (error) {
         console.error("Error fetching enrollments", error);
-        return [];
+        return [] as { batch_name: string; subject_name: string }[];
       }
-      return data || [];
+      return (data || []) as { batch_name: string; subject_name: string }[];
     }
   });
 
