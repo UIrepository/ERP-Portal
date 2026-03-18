@@ -212,7 +212,8 @@ export const AdminStaffManager = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('user_enrollments')
-        .select('batch_name, subject_name');
+        .select('batch_name, subject_name')
+        .limit(10000);
       
       if (error) {
         console.error("Error fetching enrollments", error);
