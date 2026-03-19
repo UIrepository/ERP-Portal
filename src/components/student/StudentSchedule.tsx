@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { format, getDay, startOfWeek, addDays, isSameDay, subDays, isWithinInterval } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -46,8 +46,8 @@ const ScheduleSkeleton = () => (
                  </div>
              ))}
              {[...Array(5)].map((_, r) => (
-                 <>
-                    <div key={`time-${r}`} className="h-32 border-b border-r border-gray-200 p-4">
+                 <div key={`row-${r}`} className="contents">
+                    <div className="h-32 border-b border-r border-gray-200 p-4">
                         <Skeleton className="h-4 w-12 ml-auto" />
                     </div>
                     {[...Array(7)].map((_, c) => (
@@ -55,15 +55,15 @@ const ScheduleSkeleton = () => (
                              {Math.random() > 0.7 && <Skeleton className="h-20 w-full rounded-md" />}
                         </div>
                     ))}
-                 </>
+                 </div>
              ))}
         </div>
     </div>
 );
 
 export const StudentSchedule = () => {
+  const { user } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
   const [displayDate, setDisplayDate] = useState(new Date());
 
   // Real-time clock
@@ -72,53 +72,53 @@ export const StudentSchedule = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch ALL schedules (read-only timetable for students)
-  const { data: schedules, isLoading } = useQuery<Schedule[]>({
-    queryKey: ['student-schedule-all', selectedBatchFilter],
+  // 1. Fetch student's enrollments from user_enrollments table
+  const { data: enrollments, isLoading: isEnrollmentsLoading } = useQuery({
+    queryKey: ['student-enrollments', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      
+      const { data, error } = await supabase
+        .from('user_enrollments')
+        .select('batch_name, subject_name')
+        .eq('user_id', user.id);
+        
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user?.id,
+  });
+
+  // Extract unique batches from the user's enrollments
+  const studentBatches = useMemo(() => {
+    if (!enrollments) return [];
+    return Array.from(new Set(enrollments.map(e => e.batch_name))).filter(Boolean);
+  }, [enrollments]);
+
+  // 2. Fetch ONLY schedules mapped to the student's enrolled batches
+  const { data: schedules, isLoading: isSchedulesLoading } = useQuery<Schedule[]>({
+    queryKey: ['student-schedule', studentBatches],
     queryFn: async (): Promise<Schedule[]> => {
-      let query = supabase
+      if (studentBatches.length === 0) return []; // Require an assigned batch
+
+      const { data, error } = await supabase
         .from('schedules')
         .select('*')
+        .in('batch', studentBatches) // Get everything for their assigned batches
         .order('date', { nullsFirst: false })
         .order('day_of_week')
         .order('start_time');
 
-      if (selectedBatchFilter !== 'all') {
-        query = query.eq('batch', selectedBatchFilter);
-      }
-
-      const { data, error } = await query;
       if (error) throw error;
+      
+      // Since subject combos aren't strictly mandatory, returning all subjects 
+      // under the matching batches is perfectly fine here.
       return data || [];
     },
+    enabled: studentBatches.length > 0,
   });
 
-  // Derive available batches from fetched schedule data
-  const availableBatches = useMemo(() => {
-    if (!schedules) return [];
-    return Array.from(new Set(schedules.map(s => s.batch))).sort();
-  }, [schedules]);
-
-  // Note: we fetch all schedules first, then the batch filter is applied at query level
-  // So we need a separate query for batch list (fetch all once)
-  const { data: allSchedulesForBatches } = useQuery<string[]>({
-    queryKey: ['student-schedule-batch-list'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('schedules')
-        .select('batch');
-      if (error) return [];
-      return Array.from(new Set((data || []).map((s: any) => s.batch))).sort();
-    },
-  });
-
-  const batchList = allSchedulesForBatches || availableBatches;
-
-  useEffect(() => {
-    if (selectedBatchFilter !== 'all' && batchList.length > 0 && !batchList.includes(selectedBatchFilter)) {
-      setSelectedBatchFilter('all');
-    }
-  }, [selectedBatchFilter, batchList]);
+  const isLoading = isEnrollmentsLoading || isSchedulesLoading;
 
   const weekDates = useMemo(() => {
     const start = startOfWeek(displayDate, { weekStartsOn: 1 });
@@ -192,20 +192,14 @@ export const StudentSchedule = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 bg-gray-50/80 p-1.5 rounded-lg border border-gray-200 shadow-sm w-full md:w-auto">
-          {/* Batch Filter */}
-          <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
-            <SelectTrigger className="h-8 w-[180px] border-none bg-transparent shadow-none focus:ring-0 text-xs font-semibold text-slate-700">
-              <SelectValue placeholder="All Batches" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Batches</SelectItem>
-              {batchList.map((batch) => (
-                <SelectItem key={batch} value={batch}>{batch}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* Static Batch Identifiers instead of dropdown */}
+          {studentBatches.length > 0 && (
+             <div className="px-3 py-1.5 bg-white rounded-md border border-gray-200 text-xs font-semibold text-slate-700 shadow-sm uppercase tracking-wide">
+                 {studentBatches.join(', ')}
+             </div>
+          )}
           
-          <div className="h-5 w-px bg-gray-300 mx-1 hidden sm:block"></div>
+          {studentBatches.length > 0 && <div className="h-5 w-px bg-gray-300 mx-1 hidden sm:block"></div>}
 
           {/* Navigation */}
           <div className="flex items-center gap-1">
@@ -257,9 +251,9 @@ export const StudentSchedule = () => {
 
             {/* Time Slots Rows */}
             {timeSlots.map((time, timeIndex) => (
-                <>
+                <div key={`row-${time}`} className="contents">
                     {/* Time Label */}
-                    <div key={`time-${time}`} className="sticky left-0 z-10 bg-white p-3 text-right text-[11px] font-medium text-slate-400 border-r border-b border-gray-200 flex flex-col justify-start pt-6">
+                    <div className="sticky left-0 z-10 bg-white p-3 text-right text-[11px] font-medium text-slate-400 border-r border-b border-gray-200 flex flex-col justify-start pt-6">
                         {formatTime(time)}
                     </div>
 
@@ -304,13 +298,11 @@ export const StudentSchedule = () => {
                                                 </div>
                                                 
                                                 <div className="flex items-center justify-between text-[10px] text-slate-500 mb-2">
-                                                    <span>{classInfo.batch}</span>
-                                                    <span className="bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-[2px] text-[9px] font-medium text-slate-600">
+                                                    <span className="truncate pr-1">{classInfo.batch}</span>
+                                                    <span className="bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-[2px] text-[9px] font-medium text-slate-600 whitespace-nowrap">
                                                         Upto {formatTime(classInfo.end_time)}
                                                     </span>
                                                 </div>
-
-                                                {/* Join buttons removed — read-only timetable */}
                                             </div>
                                         </div>
                                     );
@@ -318,15 +310,19 @@ export const StudentSchedule = () => {
                             </div>
                         );
                     })}
-                </>
+                </div>
             ))}
             
-            {/* Empty State if no schedules */}
-            {timeSlots.length === 0 && (
+            {/* Empty States */}
+            {studentBatches.length === 0 ? (
+                 <div className="col-span-8 py-16 flex flex-col items-center justify-center text-slate-400">
+                    <p className="text-sm">You are not currently enrolled in any batches. Please contact administration.</p>
+                </div>
+            ) : timeSlots.length === 0 ? (
                 <div className="col-span-8 py-16 flex flex-col items-center justify-center text-slate-400">
                     <p className="text-sm">No classes scheduled for this week.</p>
                 </div>
-            )}
+            ) : null}
           </div>
       </div>
       )}
