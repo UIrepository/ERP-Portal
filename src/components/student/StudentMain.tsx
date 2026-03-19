@@ -99,17 +99,29 @@ const StudentMainContent = () => {
     setSearchParams(params, { replace: true });
   }, [setSearchParams]);
 
-  // Initialize navigation from URL
+  // Initialize navigation from URL or localStorage
   useEffect(() => {
     if (!userEnrollments || userEnrollments.length === 0 || isInitialized) return;
     
     const batchParam = searchParams.get('batch');
     const subjectParam = searchParams.get('subject');
     const blockParam = searchParams.get('block');
+    const savedBatch = localStorage.getItem('student-selected-batch');
     
-    const validBatch = batchParam && availableBatches.includes(batchParam) 
-      ? batchParam 
-      : availableBatches[0] || null;
+    // Priority: URL param > localStorage > latest enrolled batch
+    let validBatch: string | null = null;
+    if (batchParam && availableBatches.includes(batchParam)) {
+      validBatch = batchParam;
+    } else if (savedBatch && availableBatches.includes(savedBatch)) {
+      validBatch = savedBatch;
+    } else {
+      validBatch = availableBatches[0] || null;
+    }
+    
+    // Persist the selection
+    if (validBatch) {
+      localStorage.setItem('student-selected-batch', validBatch);
+    }
     
     const subjectsForBatch = userEnrollments
       .filter(e => e.batch_name === validBatch)
