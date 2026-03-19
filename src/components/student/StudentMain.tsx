@@ -25,6 +25,7 @@ import { Lecture } from '@/components/video-player/types';
 interface UserEnrollment {
   batch_name: string;
   subject_name: string;
+  created_at: string;
 }
 
 type NavigationLevel = 'batch' | 'subject' | 'block';
