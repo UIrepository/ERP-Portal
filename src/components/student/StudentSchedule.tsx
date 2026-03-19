@@ -66,7 +66,11 @@ export const StudentSchedule = () => {
   const { user } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [displayDate, setDisplayDate] = useState(new Date());
-  const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
+  
+  // Initialize state from localStorage (or empty string if none exists)
+  const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>(() => {
+    return localStorage.getItem('ui_ssp_schedule_batch') || '';
+  });
 
   // Real-time clock
   useEffect(() => {
@@ -74,7 +78,7 @@ export const StudentSchedule = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // 1. Fetch student's enrollments from user_enrollments table
+  // 1. Fetch student's enrollments, ordered by newest first
   const { data: enrollments, isLoading: isEnrollmentsLoading } = useQuery({
     queryKey: ['student-enrollments', user?.id],
     queryFn: async () => {
@@ -82,8 +86,9 @@ export const StudentSchedule = () => {
       
       const { data, error } = await supabase
         .from('user_enrollments')
-        .select('batch_name, subject_name')
-        .eq('user_id', user.id);
+        .select('batch_name, subject_name, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false }); // Latest enrollments bubble to the top
         
       if (error) throw error;
       return data || [];
@@ -91,29 +96,44 @@ export const StudentSchedule = () => {
     enabled: !!user?.id,
   });
 
-  // Extract unique batches from the user's enrollments
+  // Extract unique batches (preserves the "newest first" order from the DB query)
   const studentBatches = useMemo(() => {
     if (!enrollments) return [];
-    return Array.from(new Set(enrollments.map(e => e.batch_name))).filter(Boolean).sort();
+    return Array.from(new Set(enrollments.map(e => e.batch_name))).filter(Boolean);
   }, [enrollments]);
 
-  // Make sure selected batch stays valid if their enrollments change
+  // Set default batch logic
   useEffect(() => {
-    if (selectedBatchFilter !== 'all' && studentBatches.length > 0 && !studentBatches.includes(selectedBatchFilter)) {
-      setSelectedBatchFilter('all');
+    if (studentBatches.length > 0) {
+      if (selectedBatchFilter === '') {
+        // First load ever: Default to the most recent batch
+        const latestBatch = studentBatches[0];
+        setSelectedBatchFilter(latestBatch);
+        localStorage.setItem('ui_ssp_schedule_batch', latestBatch);
+      } else if (selectedBatchFilter !== 'all' && !studentBatches.includes(selectedBatchFilter)) {
+        // Edge case: They have a saved batch in localStorage, but they were un-enrolled from it. Revert to latest.
+        const latestBatch = studentBatches[0];
+        setSelectedBatchFilter(latestBatch);
+        localStorage.setItem('ui_ssp_schedule_batch', latestBatch);
+      }
     }
-  }, [selectedBatchFilter, studentBatches]);
+  }, [studentBatches, selectedBatchFilter]);
+
+  // Handle dropdown changes and persist to localStorage
+  const handleBatchChange = (value: string) => {
+    setSelectedBatchFilter(value);
+    localStorage.setItem('ui_ssp_schedule_batch', value);
+  };
 
   // 2. Fetch schedules based on selected filter OR all enrolled batches
   const { data: schedules, isLoading: isSchedulesLoading } = useQuery<Schedule[]>({
     queryKey: ['student-schedule', studentBatches, selectedBatchFilter],
     queryFn: async (): Promise<Schedule[]> => {
-      if (studentBatches.length === 0) return []; // Require an assigned batch
+      if (studentBatches.length === 0) return [];
 
       let query = supabase.from('schedules').select('*');
 
-      // If a specific batch is chosen, filter by that. Otherwise, get all assigned batches.
-      if (selectedBatchFilter !== 'all') {
+      if (selectedBatchFilter !== 'all' && selectedBatchFilter !== '') {
         query = query.eq('batch', selectedBatchFilter);
       } else {
         query = query.in('batch', studentBatches);
@@ -127,7 +147,8 @@ export const StudentSchedule = () => {
       if (error) throw error;
       return data || [];
     },
-    enabled: studentBatches.length > 0,
+    // Don't fire the query until the default selection logic has set a valid state
+    enabled: studentBatches.length > 0 && selectedBatchFilter !== '', 
   });
 
   const isLoading = isEnrollmentsLoading || isSchedulesLoading;
@@ -205,8 +226,8 @@ export const StudentSchedule = () => {
 
         <div className="flex flex-wrap items-center gap-3 bg-gray-50/80 p-1.5 rounded-lg border border-gray-200 shadow-sm w-full md:w-auto">
           {/* Dynamic Dropdown showing ONLY enrolled batches */}
-          {studentBatches.length > 0 && (
-            <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
+          {studentBatches.length > 0 && selectedBatchFilter && (
+            <Select value={selectedBatchFilter} onValueChange={handleBatchChange}>
               <SelectTrigger className="h-8 w-[180px] border-none bg-transparent shadow-none focus:ring-0 text-xs font-semibold text-slate-700">
                 <SelectValue placeholder="All My Batches" />
               </SelectTrigger>
