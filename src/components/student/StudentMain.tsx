@@ -183,6 +183,7 @@ const StudentMainContent = () => {
 
   // Navigation handlers
   const handleSelectBatch = (batch: string) => {
+    localStorage.setItem('student-selected-batch', batch);
     const newNav: NavigationState = { level: 'batch', batch, subject: null, block: null };
     setNavigation(newNav);
     updateUrl(newNav);
