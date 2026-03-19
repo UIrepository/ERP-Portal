@@ -76,17 +76,18 @@ const StudentMainContent = () => {
       if (!userId) return [];
       const { data, error } = await supabase
         .from('user_enrollments')
-        .select('batch_name, subject_name')
-        .eq('user_id', userId);
+        .select('batch_name, subject_name, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
       if (error) return [];
-      return data || [];
+      return (data || []) as UserEnrollment[];
     },
     enabled: !!userId,
   });
 
-  // Derive available batches
+  // Derive available batches - preserve insertion order (latest first)
   const availableBatches = useMemo(() => {
-    return Array.from(new Set(userEnrollments?.map((e) => e.batch_name) || [])).sort();
+    return Array.from(new Set(userEnrollments?.map((e) => e.batch_name) || []));
   }, [userEnrollments]);
 
   // Update URL when navigation changes
