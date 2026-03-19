@@ -25,6 +25,7 @@ import { Lecture } from '@/components/video-player/types';
 interface UserEnrollment {
   batch_name: string;
   subject_name: string;
+  created_at: string;
 }
 
 type NavigationLevel = 'batch' | 'subject' | 'block';
@@ -75,17 +76,18 @@ const StudentMainContent = () => {
       if (!userId) return [];
       const { data, error } = await supabase
         .from('user_enrollments')
-        .select('batch_name, subject_name')
-        .eq('user_id', userId);
+        .select('batch_name, subject_name, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
       if (error) return [];
-      return data || [];
+      return (data || []) as UserEnrollment[];
     },
     enabled: !!userId,
   });
 
-  // Derive available batches
+  // Derive available batches - preserve insertion order (latest first)
   const availableBatches = useMemo(() => {
-    return Array.from(new Set(userEnrollments?.map((e) => e.batch_name) || [])).sort();
+    return Array.from(new Set(userEnrollments?.map((e) => e.batch_name) || []));
   }, [userEnrollments]);
 
   // Update URL when navigation changes
@@ -97,17 +99,29 @@ const StudentMainContent = () => {
     setSearchParams(params, { replace: true });
   }, [setSearchParams]);
 
-  // Initialize navigation from URL
+  // Initialize navigation from URL or localStorage
   useEffect(() => {
     if (!userEnrollments || userEnrollments.length === 0 || isInitialized) return;
     
     const batchParam = searchParams.get('batch');
     const subjectParam = searchParams.get('subject');
     const blockParam = searchParams.get('block');
+    const savedBatch = localStorage.getItem('student-selected-batch');
     
-    const validBatch = batchParam && availableBatches.includes(batchParam) 
-      ? batchParam 
-      : availableBatches[0] || null;
+    // Priority: URL param > localStorage > latest enrolled batch
+    let validBatch: string | null = null;
+    if (batchParam && availableBatches.includes(batchParam)) {
+      validBatch = batchParam;
+    } else if (savedBatch && availableBatches.includes(savedBatch)) {
+      validBatch = savedBatch;
+    } else {
+      validBatch = availableBatches[0] || null;
+    }
+    
+    // Persist the selection
+    if (validBatch) {
+      localStorage.setItem('student-selected-batch', validBatch);
+    }
     
     const subjectsForBatch = userEnrollments
       .filter(e => e.batch_name === validBatch)
@@ -169,6 +183,7 @@ const StudentMainContent = () => {
 
   // Navigation handlers
   const handleSelectBatch = (batch: string) => {
+    localStorage.setItem('student-selected-batch', batch);
     const newNav: NavigationState = { level: 'batch', batch, subject: null, block: null };
     setNavigation(newNav);
     updateUrl(newNav);

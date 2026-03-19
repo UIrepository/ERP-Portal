@@ -1,40 +1,81 @@
 
+# Fix: Duplicate Live Streams and Blank Lectures for Merged Classes
 
-# Default to Latest Batch & Persist Batch Selection
+## Root Causes Identified
 
-## Problem
-1. When the student opens the dashboard, the default batch is the first one alphabetically (`availableBatches[0]` after `.sort()`), not the most recently enrolled batch.
-2. When the user switches batches, the selection is lost on tab change, sidebar navigation, or logout — it reverts to the alphabetical default.
+There are **3 bugs** working together to cause this:
 
-## Solution
+### Bug 1: No loading guard for merge data (teacher side)
+The `activeMerges` query has no loading state check. If the teacher loads the page before merge data arrives, `activeMerges` is an empty array. The dedup logic finds no merges, so **two separate class cards appear**. The teacher clicks "Start Class" on both, creating two YouTube broadcasts and two recordings.
 
-### 1. Fetch enrollments ordered by `created_at DESC`
-Update the `user_enrollments` query in `StudentMain.tsx` to include `created_at` and order by `created_at` descending. This ensures the first unique batch extracted is the most recently enrolled one.
+### Bug 2: Stream key saved to only ONE schedule
+When a merged class starts (line 329), `stream_key` and `broadcast_id` are only written to `cls.id` (the first schedule in the deduped pair). The partner schedule never gets it. If the partner happens to be enumerated first on a data refetch, the card appears without a stream key, and the teacher could accidentally start a second stream.
 
-### 2. Derive batches preserving insertion order (latest first)
-Change `availableBatches` from `.sort()` to preserve the order from the query (latest `created_at` first). Use a `Set` to deduplicate while keeping first-occurrence order.
+### Bug 3: Stop recording only clears ONE schedule
+`handleStopRecording` (line 373) only clears `stream_key` from `cls.id`. The partner's stream_key (if it had one from Bug 2) would remain, causing ghost state.
 
-### 3. Persist selected batch in `localStorage`
-- When user switches batch (or on initial selection), save it to `localStorage` with key `student-selected-batch`.
-- On initialization, check `localStorage` first (before URL params), then fall back to the latest batch from the query.
-- This persists across tab changes, sidebar navigation, and even logout/login (same browser).
+## Changes
 
-## File Changes
+### File: `src/components/teacher/TeacherJoinClass.tsx`
 
-**`src/components/student/StudentMain.tsx`**
+**Change 1 -- Add merge loading guard**
+- Destructure `isLoading` from the `activeMerges` query (rename to `isLoadingMerges`)
+- Include it in the loading check on line 401: `const isLoading = isLoadingTeacher || isLoadingSchedules || isLoadingMerges;`
+- This prevents the page from rendering before merge data is available, eliminating the race condition that shows two cards
 
-1. **Update `UserEnrollment` interface** — add `created_at: string`.
+**Change 2 -- Save stream key to ALL merged schedule IDs**
+In `handleStartClass` (lines 325-332), after getting the stream details, write `stream_key` and `broadcast_id` to every schedule ID in the merged group, not just `cls.id`:
 
-2. **Update query** — add `.select('batch_name, subject_name, created_at')` and `.order('created_at', { ascending: false })`.
+```
+const allIds = cls.mergedBatches
+  ? cls.mergedBatches.map(m => m.id)
+  : [cls.id];
 
-3. **Update `availableBatches`** — remove `.sort()`, keep insertion order (latest first since query is ordered by `created_at DESC`).
+await supabase
+  .from('schedules')
+  .update({ stream_key: details.streamKey, broadcast_id: details.broadcastId })
+  .in('id', allIds);
+```
 
-4. **Update initialization logic** — priority order for default batch:
-   - URL `?batch=` param (if valid)
-   - `localStorage` saved batch (if valid/still enrolled)
-   - First batch from `availableBatches` (latest enrolled)
+**Change 3 -- Clear stream key from ALL merged schedule IDs on stop**
+In `handleStopRecording` (line 373), clear from all IDs:
 
-5. **Update `handleSelectBatch`** — save to `localStorage` on switch.
+```
+const allIds = cls.mergedBatches
+  ? cls.mergedBatches.map(m => m.id)
+  : [cls.id];
 
-6. **Update initial batch selection** — also save to `localStorage` when auto-selecting.
+await supabase
+  .from('schedules')
+  .update({ stream_key: null, broadcast_id: null })
+  .in('id', allIds);
+```
 
+**Change 4 -- Check ALL merged schedules for existing stream key before starting**
+Currently line 316 only checks `cls.stream_key`. For merged cards, also check if the partner already has a stream running:
+
+```
+const existingKey = cls.stream_key
+  || cls.mergedBatches?.find(m => /* lookup from schedules */)?.stream_key;
+```
+
+Since the deduped card spreads `cls` (the first schedule), we need to also check the partner. The simplest approach: when building the deduped card, propagate any non-null `stream_key` from the partner to the merged card.
+
+In the dedup logic (around line 225-236), when creating the merged card, if the partner has a `stream_key` but `cls` doesn't, use the partner's:
+
+```
+deduped.push({
+  ...cls,
+  stream_key: cls.stream_key || partner.stream_key,
+  broadcast_id: cls.broadcast_id || partner.broadcast_id,
+  mergedBatches: [...]
+});
+```
+
+## Summary
+
+These 4 changes ensure:
+- Teacher never sees two cards for merged subjects (loading guard)
+- Stream key is written to and cleared from ALL schedules in a merge group
+- An existing stream on either schedule prevents a second stream from starting
+- Only ONE YouTube broadcast and ONE recording is ever created per merged class
