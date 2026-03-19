@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ChevronLeft, ChevronRight, Clock } from 'lucide-react';
 import { format, getDay, startOfWeek, addDays, isSameDay, subDays, isWithinInterval } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -65,6 +66,7 @@ export const StudentSchedule = () => {
   const { user } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [displayDate, setDisplayDate] = useState(new Date());
+  const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>('all');
 
   // Real-time clock
   useEffect(() => {
@@ -92,27 +94,37 @@ export const StudentSchedule = () => {
   // Extract unique batches from the user's enrollments
   const studentBatches = useMemo(() => {
     if (!enrollments) return [];
-    return Array.from(new Set(enrollments.map(e => e.batch_name))).filter(Boolean);
+    return Array.from(new Set(enrollments.map(e => e.batch_name))).filter(Boolean).sort();
   }, [enrollments]);
 
-  // 2. Fetch ONLY schedules mapped to the student's enrolled batches
+  // Make sure selected batch stays valid if their enrollments change
+  useEffect(() => {
+    if (selectedBatchFilter !== 'all' && studentBatches.length > 0 && !studentBatches.includes(selectedBatchFilter)) {
+      setSelectedBatchFilter('all');
+    }
+  }, [selectedBatchFilter, studentBatches]);
+
+  // 2. Fetch schedules based on selected filter OR all enrolled batches
   const { data: schedules, isLoading: isSchedulesLoading } = useQuery<Schedule[]>({
-    queryKey: ['student-schedule', studentBatches],
+    queryKey: ['student-schedule', studentBatches, selectedBatchFilter],
     queryFn: async (): Promise<Schedule[]> => {
       if (studentBatches.length === 0) return []; // Require an assigned batch
 
-      const { data, error } = await supabase
-        .from('schedules')
-        .select('*')
-        .in('batch', studentBatches) // Get everything for their assigned batches
+      let query = supabase.from('schedules').select('*');
+
+      // If a specific batch is chosen, filter by that. Otherwise, get all assigned batches.
+      if (selectedBatchFilter !== 'all') {
+        query = query.eq('batch', selectedBatchFilter);
+      } else {
+        query = query.in('batch', studentBatches);
+      }
+
+      const { data, error } = await query
         .order('date', { nullsFirst: false })
         .order('day_of_week')
         .order('start_time');
 
       if (error) throw error;
-      
-      // Since subject combos aren't strictly mandatory, returning all subjects 
-      // under the matching batches is perfectly fine here.
       return data || [];
     },
     enabled: studentBatches.length > 0,
@@ -192,11 +204,19 @@ export const StudentSchedule = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 bg-gray-50/80 p-1.5 rounded-lg border border-gray-200 shadow-sm w-full md:w-auto">
-          {/* Static Batch Identifiers instead of dropdown */}
+          {/* Dynamic Dropdown showing ONLY enrolled batches */}
           {studentBatches.length > 0 && (
-             <div className="px-3 py-1.5 bg-white rounded-md border border-gray-200 text-xs font-semibold text-slate-700 shadow-sm uppercase tracking-wide">
-                 {studentBatches.join(', ')}
-             </div>
+            <Select value={selectedBatchFilter} onValueChange={setSelectedBatchFilter}>
+              <SelectTrigger className="h-8 w-[180px] border-none bg-transparent shadow-none focus:ring-0 text-xs font-semibold text-slate-700">
+                <SelectValue placeholder="All My Batches" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All My Batches</SelectItem>
+                {studentBatches.map((batch) => (
+                  <SelectItem key={batch} value={batch}>{batch}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
           
           {studentBatches.length > 0 && <div className="h-5 w-px bg-gray-300 mx-1 hidden sm:block"></div>}
@@ -320,7 +340,7 @@ export const StudentSchedule = () => {
                 </div>
             ) : timeSlots.length === 0 ? (
                 <div className="col-span-8 py-16 flex flex-col items-center justify-center text-slate-400">
-                    <p className="text-sm">No classes scheduled for this week.</p>
+                    <p className="text-sm">No classes scheduled for this filter/week.</p>
                 </div>
             ) : null}
           </div>
