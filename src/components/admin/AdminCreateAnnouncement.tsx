@@ -33,7 +33,11 @@ export const AdminCreateAnnouncement = () => {
   const { data: enrollments = [] } = useQuery({
     queryKey: ['all-enrollments-for-announcements'],
     queryFn: async () => {
-      const { data } = await supabase.from('user_enrollments').select('batch_name, subject_name');
+      const { data, error } = await supabase.rpc('get_distinct_enrollment_options');
+      if (error) {
+        console.error('Error fetching enrollment options:', error);
+        return [];
+      }
       return data || [];
     }
   });
