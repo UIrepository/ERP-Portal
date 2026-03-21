@@ -1,0 +1,91 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { Resend } from 'https://esm.sh/resend@2.0.0';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': 'https://ssp.unknowniitians.com',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+};
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { content_type, batch, subject, title } = await req.json();
+
+    if (!content_type || !batch || !subject || !title) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required fields: content_type, batch, subject, title' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    const resendKey = Deno.env.get('RESEND_API_KEY');
+    if (!resendKey) {
+      return new Response(JSON.stringify({ error: 'RESEND_API_KEY not configured' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const resend = new Resend(resendKey);
+
+    // Look up Google Group for this batch + subject
+    const { data: group } = await supabase
+      .from('google_groups')
+      .select('group_email')
+      .eq('batch_name', batch)
+      .eq('subject_name', subject)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (!group?.group_email) {
+      console.log(`No Google Group found for ${subject} - ${batch}`);
+      return new Response(
+        JSON.stringify({ error: `No Google Group found for ${subject} - ${batch}` }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const contentLabel = content_type === 'dpp' ? 'Daily Practice Problem (DPP)' : 'UI Ki Padhai Resource';
+    const contentShort = content_type === 'dpp' ? 'DPP' : 'UI Ki Padhai';
+
+    const emailText = `Dear Student,
+
+A new ${contentLabel} has been uploaded for your course.
+
+Subject: ${subject}
+Batch: ${batch}
+Title: ${title}
+
+Please check the ${contentShort} section on your dashboard for details.
+
+Regards,
+Unknown IITians Academic Team`;
+
+    const emailResponse = await resend.emails.send({
+      from: 'Unknown IITians <notifications@hq.unknowniitians.com>',
+      to: [group.group_email],
+      subject: `Unknown IITians - New ${contentShort}: ${title} (${subject})`,
+      text: emailText,
+    });
+
+    console.log(`Content email sent for ${content_type}:`, emailResponse);
+
+    return new Response(JSON.stringify({ success: true, emailResponse }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  } catch (error) {
+    console.error('send-content-email error:', error);
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
