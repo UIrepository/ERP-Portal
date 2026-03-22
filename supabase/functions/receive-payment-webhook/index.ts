@@ -2,24 +2,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-razorpay-signature',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-async function verifyRazorpaySignature(body: string, signature: string, secret: string): Promise<boolean> {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
-  const expectedSignature = Array.from(new Uint8Array(sig))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-  return expectedSignature === signature;
-}
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -28,41 +12,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Read raw body for signature verification
-    const rawBody = await req.text();
-
-    // Verify Razorpay webhook signature
-    const razorpaySignature = req.headers.get('x-razorpay-signature');
-    const webhookSecret = Deno.env.get('RAZORPAY_WEBHOOK_SECRET');
-
-    if (!webhookSecret) {
-      console.error('RAZORPAY_WEBHOOK_SECRET not configured');
-      return new Response(
-        JSON.stringify({ error: 'Webhook secret not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (!razorpaySignature) {
-      console.error('Missing x-razorpay-signature header');
-      return new Response(
-        JSON.stringify({ error: 'Missing signature' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const isValid = await verifyRazorpaySignature(rawBody, razorpaySignature, webhookSecret);
-    if (!isValid) {
-      console.error('Invalid Razorpay webhook signature');
-      return new Response(
-        JSON.stringify({ error: 'Invalid signature' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log('Razorpay signature verified successfully');
-
-    const payload = JSON.parse(rawBody);
+    const payload = await req.json();
     console.log('Received payment webhook payload:', JSON.stringify(payload));
 
     const { batch, courses, customer_email, status } = payload;
