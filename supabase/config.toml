@@ -7,16 +7,16 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.manage-google-group]
-verify_jwt = true
+verify_jwt = false
 
 [functions.sync-google-groups]
-verify_jwt = true
+verify_jwt = false
 
 [functions.send-class-reminders]
-verify_jwt = true
+verify_jwt = false
 
 [functions.send-recording-emails]
-verify_jwt = true
+verify_jwt = false
 
 [functions.send-community-email]
-verify_jwt = true
+verify_jwt = false
