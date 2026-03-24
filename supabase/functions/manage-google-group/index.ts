@@ -45,6 +45,8 @@ async function getGoogleAccessToken(): Promise<string> {
   return body.access_token;
 }
 
+const ADMIN_MEMBER_EMAIL = 'desk@unknowniitians.com';
+
 async function createGoogleGroup(accessToken: string, email: string, name: string): Promise<{ status: string }> {
   const res = await fetch('https://admin.googleapis.com/admin/directory/v1/groups', {
     method: 'POST',
@@ -58,11 +60,21 @@ async function createGoogleGroup(accessToken: string, email: string, name: strin
   const data = await res.json();
   if (res.status === 409) {
     console.log(`Group ${email} already exists`);
-    return { status: 'already_exists' };
+  } else if (!res.ok) {
+    throw new Error(`Create group failed: ${JSON.stringify(data)}`);
+  } else {
+    console.log(`Created group: ${email}`);
   }
-  if (!res.ok) throw new Error(`Create group failed: ${JSON.stringify(data)}`);
-  console.log(`Created group: ${email}`);
-  return { status: 'created' };
+
+  // Always ensure desk@ is a member of every group
+  try {
+    await addMember(accessToken, email, ADMIN_MEMBER_EMAIL);
+    console.log(`Ensured ${ADMIN_MEMBER_EMAIL} is member of ${email}`);
+  } catch (err) {
+    console.error(`Failed to add ${ADMIN_MEMBER_EMAIL} to ${email}:`, err);
+  }
+
+  return { status: res.status === 409 ? 'already_exists' : 'created' };
 }
 
 async function addMember(accessToken: string, groupEmail: string, memberEmail: string): Promise<{ status: string }> {
