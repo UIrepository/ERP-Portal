@@ -338,10 +338,9 @@ export const AdminCommunity = () => {
   const { data: allGroups = [], isLoading: isLoadingGroups } = useQuery<GroupInfo[]>({
     queryKey: ['admin-all-groups'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('user_enrollments').select('batch_name, subject_name');
+      const { data, error } = await supabase.rpc('get_distinct_enrollment_options');
       if (error) throw error;
-      const uniqueGroups = Array.from(new Set(data.map(item => JSON.stringify(item)))).map(str => JSON.parse(str));
-      return uniqueGroups.sort((a, b) => a.batch_name.localeCompare(b.batch_name));
+      return (data || []).sort((a: any, b: any) => a.batch_name.localeCompare(b.batch_name)) as GroupInfo[];
     }
   });
 

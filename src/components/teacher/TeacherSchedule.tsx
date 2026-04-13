@@ -100,6 +100,25 @@ function AddClassForm({
     batch: ''
   });
 
+  // Query subjects valid for the selected batch
+  const { data: batchSubjects = [] } = useQuery({
+    queryKey: ['batch-subjects-for-teacher', newClass.batch],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_distinct_enrollment_options');
+      if (error) throw error;
+      // Filter to subjects for this batch that the teacher is also assigned to
+      return (data || [])
+        .filter((e: any) => e.batch_name === newClass.batch && assignedSubjects.includes(e.subject_name))
+        .map((e: any) => e.subject_name);
+    },
+    enabled: !!newClass.batch,
+  });
+
+  // Reset subject when batch changes
+  const handleBatchChange = (val: string) => {
+    setNewClass({ ...newClass, batch: val, subject: '' });
+  };
+
   const addClassMutation = useMutation({
     mutationFn: async () => {
       if (!newClass.batch || !newClass.subject || !newClass.date || !newClass.start_time || !newClass.end_time) {
