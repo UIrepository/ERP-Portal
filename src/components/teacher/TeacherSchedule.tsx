@@ -100,6 +100,25 @@ function AddClassForm({
     batch: ''
   });
 
+  // Query subjects valid for the selected batch
+  const { data: batchSubjects = [] } = useQuery({
+    queryKey: ['batch-subjects-for-teacher', newClass.batch],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_distinct_enrollment_options');
+      if (error) throw error;
+      // Filter to subjects for this batch that the teacher is also assigned to
+      return (data || [])
+        .filter((e: any) => e.batch_name === newClass.batch && assignedSubjects.includes(e.subject_name))
+        .map((e: any) => e.subject_name);
+    },
+    enabled: !!newClass.batch,
+  });
+
+  // Reset subject when batch changes
+  const handleBatchChange = (val: string) => {
+    setNewClass({ ...newClass, batch: val, subject: '' });
+  };
+
   const addClassMutation = useMutation({
     mutationFn: async () => {
       if (!newClass.batch || !newClass.subject || !newClass.date || !newClass.start_time || !newClass.end_time) {
@@ -151,7 +170,7 @@ function AddClassForm({
           <Label htmlFor="batch" className="text-right">Batch</Label>
           <Select 
               value={newClass.batch} 
-              onValueChange={(val) => setNewClass({...newClass, batch: val})}
+              onValueChange={handleBatchChange}
           >
               <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="Select batch" />
@@ -169,23 +188,24 @@ function AddClassForm({
       </div>
       <div className="grid grid-cols-4 items-center gap-4">
           <Label htmlFor="subject" className="text-right">Subject</Label>
-          <Select 
-              value={newClass.subject} 
-              onValueChange={(val) => setNewClass({...newClass, subject: val})}
-          >
-              <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select subject" />
-              </SelectTrigger>
-              <SelectContent>
-                  {assignedSubjects.length > 0 ? (
-                    assignedSubjects.map((subj) => (
-                      <SelectItem key={subj} value={subj}>{subj}</SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="none" disabled>No subjects assigned</SelectItem>
-                  )}
-              </SelectContent>
-          </Select>
+           <Select 
+               value={newClass.subject} 
+               onValueChange={(val) => setNewClass({...newClass, subject: val})}
+               disabled={!newClass.batch}
+           >
+               <SelectTrigger className="col-span-3">
+                   <SelectValue placeholder={!newClass.batch ? "Select batch first" : "Select subject"} />
+               </SelectTrigger>
+               <SelectContent>
+                   {batchSubjects.length > 0 ? (
+                     batchSubjects.map((subj: string) => (
+                       <SelectItem key={subj} value={subj}>{subj}</SelectItem>
+                     ))
+                   ) : (
+                     <SelectItem value="none" disabled>No subjects for this batch</SelectItem>
+                   )}
+               </SelectContent>
+           </Select>
       </div>
       <div className="grid grid-cols-4 items-center gap-4">
           <Label htmlFor="date" className="text-right">Date</Label>
