@@ -1,41 +1,46 @@
 
 
-# Fix: All Edge Function Calls from Database Return 401
+# Plan: Fix Community Groups Visibility + Teacher Add Class Step-by-Step Filter
 
-## Root Cause
+## Issue 1: Community Groups Not Visible (1000-row limit)
 
-Two issues causing 401 errors on all `pg_net` HTTP calls from the database:
+**Root Cause**: `AdminCommunity.tsx` line 341 fetches ALL rows from `user_enrollments` to build the group list. With 1712 enrollments, Supabase's default 1000-row limit truncates results, hiding some batch/subject combinations.
 
-### Issue 1: Cron jobs use placeholder auth key
-The `check-class-reminders` and `check-recording-emails` cron jobs (running every 1 and 5 minutes respectively) have `"Authorization": "Bearer YOUR_SERVICE_ROLE_KEY"` -- a literal placeholder string that was never replaced with the actual key. This causes 401 on every run.
+**Fix**: Replace the raw `user_enrollments` query with the existing `get_distinct_enrollment_options` RPC (already used by AdminCreateAnnouncement and AdminStaffManager). This RPC is a SECURITY DEFINER function that returns distinct batch/subject pairs without hitting the 1000-row limit.
 
-### Issue 2: Edge functions require JWT but triggers can't provide user JWTs
-`manage-google-group`, `sync-google-groups`, `send-class-reminders`, `send-recording-emails`, and `send-community-email` all have `verify_jwt = true` in `config.toml`. Database triggers and cron jobs cannot produce user-level JWTs. The anon key sent by triggers is being rejected with "Invalid Token or Protected Header formatting".
+### Files to change:
+- **`src/components/admin/AdminCommunity.tsx`** (line ~341): Replace `supabase.from('user_enrollments').select(...)` with `supabase.rpc('get_distinct_enrollment_options')` and map the result to `{ batch_name, subject_name }` format.
 
-## Fix Plan
+Student and Teacher community components are unaffected -- students query only their own enrollments (small set), and teachers derive groups from the `teachers` table.
 
-### Step 1: Update `supabase/config.toml`
-Set `verify_jwt = false` for all edge functions called from database triggers or cron jobs. These functions are backend-only and called from the database -- they should NOT require JWT verification at the gateway level. Instead, they should validate requests internally if needed.
+---
 
-Functions to change to `verify_jwt = false`:
-- `manage-google-group` (called by `auto_add_to_google_group` trigger)
-- `sync-google-groups` (called manually/admin)
-- `send-class-reminders` (called by cron every minute)
-- `send-recording-emails` (called by cron every 5 minutes)
-- `send-community-email` (called from app)
+## Issue 2: Teacher Add Class -- Step-by-Step Batch/Subject Selection
 
-### Step 2: Fix cron jobs to use the service role key
-Update the two cron jobs to use the actual service role key instead of the `"YOUR_SERVICE_ROLE_KEY"` placeholder. This requires a database migration to alter the cron jobs.
+**Current Behavior**: The `AddClassForm` in `TeacherSchedule.tsx` shows ALL assigned batches and ALL assigned subjects independently. Teachers can pick any combination, even invalid ones.
 
-We'll use the service role key stored in the Supabase environment. The cron SQL will read it from `current_setting('supabase.service_role_key')` or we'll need to pass it directly.
+**New Behavior**: Step-by-step wizard:
+1. **Step 1**: Select Batch (from `teacher.assigned_batches`)
+2. **Step 2**: Select Subject -- filtered to only show subjects that exist for the selected batch. Cross-reference `teacher.assigned_subjects` with actual `schedules` or `user_enrollments` for that batch.
+3. **Step 3**: Fill in date and time (same as current)
 
-### Step 3: Clean up stale 401 responses
-Clear the `net._http_response` table of old failed responses to prevent confusion.
+### Files to change:
+- **`src/components/teacher/TeacherSchedule.tsx`** (`AddClassForm` component, lines 82-271):
+  - Add state for `selectedBatch` that gates subject visibility
+  - Query distinct subjects for the selected batch from the `schedules` table (or `user_enrollments`)
+  - Intersect with `assignedSubjects` to show only valid options
+  - Reset subject when batch changes
+  - Disable subject select until batch is chosen
+  - Show subjects only after batch selection (step-by-step UX)
 
-## Impact
-- Google Group creation on new enrollment will start working
-- Class reminder emails will start sending
-- Recording notification emails will start sending
-- Content emails (DPP, UI Ki Padhai) already work via direct Resend API calls from triggers -- unaffected
-- Announcement/notes/schedule emails also work via direct Resend API -- unaffected
+### Technical approach:
+```
+1. User selects Batch -> sets newClass.batch
+2. Filter assignedSubjects: for each subject, check if it exists in schedules/user_enrollments for that batch
+3. If no schedule history exists, fall back to showing all assigned subjects for that batch
+4. Subject dropdown is disabled/hidden until batch is selected
+5. Changing batch resets subject selection
+```
+
+No database changes required.
 
