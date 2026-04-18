@@ -22,10 +22,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<any | null>(null);
   const [resolvedRole, setResolvedRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  
+
   const mounted = useRef(true);
 
-  // Helper: Wrapper to prevent DB hangs from freezing the app
+  // Helper: timeout wrapper
   const safeDbCall = async <T,>(promise: PromiseLike<T>, timeoutMs = 10000): Promise<T> => {
     let timeoutId: NodeJS.Timeout;
     const timeoutPromise = new Promise<never>((_, reject) => {
@@ -39,12 +39,46 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const fetchProfileAndRole = async (currentUser: User) => {
-    let profileLoaded = false;
-    let roleLoaded = false;
-
+  // Direct table-based role resolution as a backup if RPC fails
+  const resolveRoleFromTables = async (userId: string): Promise<string | null> => {
     try {
-      // 1. Fetch Profile (with timeout)
+      const [adminRes, managerRes, teacherRes] = await Promise.all([
+        safeDbCall(supabase.from('admins').select('id').eq('user_id', userId).maybeSingle(), 6000),
+        safeDbCall(supabase.from('managers').select('id').eq('user_id', userId).maybeSingle(), 6000),
+        safeDbCall(supabase.from('teachers').select('id').eq('user_id', userId).maybeSingle(), 6000),
+      ]);
+
+      if (adminRes.data) return 'admin';
+      if (managerRes.data) return 'manager';
+      if (teacherRes.data) return 'teacher';
+      return 'student';
+    } catch {
+      return null;
+    }
+  };
+
+  // Resolve role via RPC with one retry, then fall back to direct table checks
+  const resolveRoleAuthoritative = async (userId: string): Promise<string | null> => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const { data, error } = await safeDbCall(
+          supabase.rpc('get_user_role_from_tables', { check_user_id: userId }),
+          7000
+        );
+        if (!error && data) {
+          return data as string;
+        }
+      } catch {
+        // fall through to retry / fallback
+      }
+    }
+    // RPC failed or returned NULL — directly check role tables
+    return await resolveRoleFromTables(userId);
+  };
+
+  const fetchProfileAndRole = async (currentUser: User) => {
+    try {
+      // 1. Profile
       const { data: profileData, error: profileError } = await safeDbCall(
         supabase
           .from('profiles')
@@ -57,56 +91,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (profileError) console.error('Profile fetch error:', profileError);
       if (mounted.current && profileData) {
         setProfile(profileData);
-        profileLoaded = true;
         try {
           localStorage.setItem('ui_ssp_profile', JSON.stringify(profileData));
         } catch {
-          // ignore storage issues
+          // ignore
         }
       }
 
-      // 2. Fetch Role (with timeout)
-      const { data: roleData, error: roleError } = await safeDbCall(
-        supabase.rpc('get_user_role_from_tables', { check_user_id: currentUser.id }),
-        8000
-      );
+      // 2. Role — authoritative resolution (RPC + retry + table fallback)
+      const role = await resolveRoleAuthoritative(currentUser.id);
 
-      if (mounted.current) {
-        if (!roleError && roleData) {
-          setResolvedRole(roleData as string);
-          roleLoaded = true;
-          try {
-            localStorage.setItem('ui_ssp_role', String(roleData));
-          } catch {
-            // ignore storage issues
-          }
-        } else if (profileData?.role) {
-          setResolvedRole(profileData.role);
-          roleLoaded = true;
-          try {
-            localStorage.setItem('ui_ssp_role', String(profileData.role));
-          } catch {
-            // ignore storage issues
-          }
+      if (mounted.current && role) {
+        setResolvedRole(role);
+        try {
+          localStorage.setItem('ui_ssp_role', role);
+        } catch {
+          // ignore
         }
-      }
-    } catch (error) {
-      // Don't block UX on timeout; let the UI continue and role can hydrate later.
-      if (error instanceof Error && error.message === 'DB_TIMEOUT') {
-        console.warn('Profile/role fetch timed out; using cached values if available.');
-        return;
-      }
-
-      console.error('Error fetching user details:', error);
-
-      // Only show toast if we completely failed to load essential data (and it's not a timeout)
-      if (!profileLoaded && !roleLoaded) {
+      } else if (mounted.current) {
+        // Could not confirm role; keep null so Index.tsx shows a spinner instead of wrong dashboard
         toast({
           title: 'Connection Issue',
-          description: 'Please refresh the page to try again.',
+          description: 'Unable to confirm your account role. Please refresh the page.',
           variant: 'destructive',
         });
       }
+    } catch (error) {
+      console.error('Error fetching user details:', error);
     }
   };
 
@@ -115,7 +126,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const initAuth = async () => {
       try {
-        // Hydrate cached values immediately to avoid long splash screen
+        // Hydrate cached profile (UI hint only — role is NOT trusted from cache)
         try {
           const cachedProfile = localStorage.getItem('ui_ssp_profile');
           if (cachedProfile) setProfile(JSON.parse(cachedProfile));
@@ -123,14 +134,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           // ignore
         }
 
-        try {
-          const cachedRole = localStorage.getItem('ui_ssp_role');
-          if (cachedRole) setResolvedRole(cachedRole);
-        } catch {
-          // ignore
-        }
-
-        // Check for session
         const { data: { session: initialSession } } = await safeDbCall(
           supabase.auth.getSession(),
           6000
@@ -172,10 +175,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
+      // On a fresh sign-in, invalidate cached role so a previously-miscached
+      // role can't poison the new session.
+      if (event === 'SIGNED_IN') {
+        try {
+          localStorage.removeItem('ui_ssp_role');
+        } catch {
+          // ignore
+        }
+        setResolvedRole(null);
+      }
+
       if (newSession?.user && event !== 'INITIAL_SESSION') {
-        fetchProfileAndRole(newSession.user!).finally(() => {
-          if (mounted.current) setLoading(false);
-        });
+        // Defer DB calls to avoid deadlocks inside the auth callback
+        setTimeout(() => {
+          if (!mounted.current) return;
+          fetchProfileAndRole(newSession.user!).finally(() => {
+            if (mounted.current) setLoading(false);
+          });
+        }, 0);
       } else {
         setLoading(false);
       }
@@ -197,9 +215,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     profile,
     resolvedRole,
     loading,
-    signIn: () => {}, 
-    signUp: () => {}, 
-    signOut
+    signIn: () => {},
+    signUp: () => {},
+    signOut,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
