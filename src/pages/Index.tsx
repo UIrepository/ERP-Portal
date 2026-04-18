@@ -21,8 +21,11 @@ const Index = () => {
   const { tab } = useParams<{ tab: string }>();
   const navigate = useNavigate();
 
+  // Treat legacy super_admin as admin for routing
+  const effectiveRole = resolvedRole === 'super_admin' ? 'admin' : resolvedRole;
+
   const getInitialTab = () => {
-    switch (resolvedRole) {
+    switch (effectiveRole) {
       case 'admin': return 'enrollment-analytics';
       case 'manager': return 'manager-overview';
       case 'teacher': return 'teacher-schedule';
@@ -30,9 +33,6 @@ const Index = () => {
       default: return 'dashboard';
     }
   };
-
-  // Treat legacy super_admin as admin for routing
-  const effectiveRole = resolvedRole === 'super_admin' ? 'admin' : resolvedRole;
 
   // Active tab is either the URL param or the default for the role
   const activeTab = tab || getInitialTab();
