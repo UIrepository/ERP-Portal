@@ -31,6 +31,9 @@ const Index = () => {
     }
   };
 
+  // Treat legacy super_admin as admin for routing
+  const effectiveRole = resolvedRole === 'super_admin' ? 'admin' : resolvedRole;
+
   // Active tab is either the URL param or the default for the role
   const activeTab = tab || getInitialTab();
 
@@ -60,8 +63,14 @@ const Index = () => {
     return <MaintenancePage message={maintenanceMessage} />;
   }
 
+  // Wait for role resolution before rendering a dashboard to avoid showing
+  // the wrong interface (e.g. teacher seeing student dashboard)
+  if (!effectiveRole) {
+    return <LoadingSpinner />;
+  }
+
   const renderDashboard = () => {
-    switch (resolvedRole) {
+    switch (effectiveRole) {
       case 'student':
         return <StudentDashboard activeTab={activeTab} onTabChange={handleTabChange} />;
       case 'teacher':
@@ -80,7 +89,7 @@ const Index = () => {
     }
   };
 
-  if (resolvedRole === 'student') {
+  if (effectiveRole === 'student') {
     return (
       <ChatDrawerProvider>
         <Layout activeTab={activeTab} onTabChange={handleTabChange}>
