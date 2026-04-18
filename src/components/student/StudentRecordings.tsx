@@ -81,7 +81,8 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                 .select('*')
                 .eq('batch', batch)
                 .eq('subject', subject)
-                .order('date', { ascending: false });
+                .order('date', { ascending: false })
+                .order('created_at', { ascending: false });
             
             if (error) throw error;
             return (data || []) as RecordingContent[];
