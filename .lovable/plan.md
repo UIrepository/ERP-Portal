@@ -1,46 +1,56 @@
 
 
-# Plan: Fix Community Groups Visibility + Teacher Add Class Step-by-Step Filter
+## Root Cause Analysis
 
-## Issue 1: Community Groups Not Visible (1000-row limit)
+### Bug 1: Teachers seeing student interface (e.g., tanushribadoni2@gmail.com)
 
-**Root Cause**: `AdminCommunity.tsx` line 341 fetches ALL rows from `user_enrollments` to build the group list. With 1712 enrollments, Supabase's default 1000-row limit truncates results, hiding some batch/subject combinations.
+Tanushri's data:
+- `auth.users`: id `4131c303...` ✅
+- `teachers` table: `user_id = 4131c303...`, properly linked ✅
+- `profiles.role = 'super_admin'` (legacy/manual value, but she's NOT in admins table)
 
-**Fix**: Replace the raw `user_enrollments` query with the existing `get_distinct_enrollment_options` RPC (already used by AdminCreateAnnouncement and AdminStaffManager). This RPC is a SECURITY DEFINER function that returns distinct batch/subject pairs without hitting the 1000-row limit.
+The role-resolution flow has **three serious bugs**:
 
-### Files to change:
-- **`src/components/admin/AdminCommunity.tsx`** (line ~341): Replace `supabase.from('user_enrollments').select(...)` with `supabase.rpc('get_distinct_enrollment_options')` and map the result to `{ batch_name, subject_name }` format.
+**A. `get_user_role_from_tables` RPC ignores its parameter.** It declares `actual_user_id := auth.uid()` and never uses the passed `check_user_id`. When Postgres receives the call before the JWT/session header is fully attached on a fresh login, `auth.uid()` returns NULL → function returns `'student'`. This is exactly what happens for newly-signed-in teachers on their first page load.
 
-Student and Teacher community components are unaffected -- students query only their own enrollments (small set), and teachers derive groups from the `teachers` table.
+**B. Stale localStorage cache wins the race.** `useAuth.tsx` hydrates `resolvedRole` from `localStorage` instantly, then `Index.tsx` immediately renders the dashboard for that cached role. If she ever previously loaded the app before her teacher row was linked, she got cached as `'student'` and that wrong role is shown until the RPC eventually overwrites it (which often doesn't happen because of bug A).
+
+**C. Fallback to `profile.role` is wrong.** When the RPC fails or returns falsy, useAuth falls back to `profile.role` — which for Tanushri is `'super_admin'` (a stale/manual value). Since super_admin isn't a case in `Index.tsx`'s switch, this would also break her dashboard.
+
+### Bug 2: "Start Class" → "Join Session" transition not always working
+This is tied to Bug 1 — when she lands as student, she never sees the teacher's Start Class button at all. Once role resolves correctly, this works.
 
 ---
 
-## Issue 2: Teacher Add Class -- Step-by-Step Batch/Subject Selection
+## Fix Plan
 
-**Current Behavior**: The `AddClassForm` in `TeacherSchedule.tsx` shows ALL assigned batches and ALL assigned subjects independently. Teachers can pick any combination, even invalid ones.
+### Step 1 — Fix the RPC (database migration)
+Rewrite `public.get_user_role_from_tables(check_user_id uuid)` to:
+- Actually use the `check_user_id` parameter (fall back to `auth.uid()` only if not provided).
+- Return `NULL` instead of `'student'` when no user id is available, so the client can distinguish "unknown" from "confirmed student".
 
-**New Behavior**: Step-by-step wizard:
-1. **Step 1**: Select Batch (from `teacher.assigned_batches`)
-2. **Step 2**: Select Subject -- filtered to only show subjects that exist for the selected batch. Cross-reference `teacher.assigned_subjects` with actual `schedules` or `user_enrollments` for that batch.
-3. **Step 3**: Fill in date and time (same as current)
+### Step 2 — Harden `useAuth.tsx`
+- **Don't trust cached role for routing.** Keep cache for instant UI hints, but only set `resolvedRole` after the live RPC call confirms it (or after a clear timeout fallback). If RPC returns NULL/timeout, retry once before falling back.
+- **Always pass `currentUser.id` to the RPC** (already done in code, but now the RPC will actually honor it).
+- **Stop falling back to `profile.role`** for stale values like `super_admin`. Instead, on RPC failure, do a direct check against `admins`/`managers`/`teachers` tables by user_id as a backup, and only then default to `student`.
+- **Invalidate cached role on every fresh sign-in event** (`SIGNED_IN`) so a previously-miscached role can't poison the new session.
 
-### Files to change:
-- **`src/components/teacher/TeacherSchedule.tsx`** (`AddClassForm` component, lines 82-271):
-  - Add state for `selectedBatch` that gates subject visibility
-  - Query distinct subjects for the selected batch from the `schedules` table (or `user_enrollments`)
-  - Intersect with `assignedSubjects` to show only valid options
-  - Reset subject when batch changes
-  - Disable subject select until batch is chosen
-  - Show subjects only after batch selection (step-by-step UX)
+### Step 3 — Harden `Index.tsx`
+- While `resolvedRole` is still null/unconfirmed after `loading=false`, show a brief role-resolving spinner instead of defaulting to a wrong dashboard.
+- Treat `super_admin` profile.role as `admin` for routing (so legacy super_admin entries don't render Access Denied).
 
-### Technical approach:
-```
-1. User selects Batch -> sets newClass.batch
-2. Filter assignedSubjects: for each subject, check if it exists in schedules/user_enrollments for that batch
-3. If no schedule history exists, fall back to showing all assigned subjects for that batch
-4. Subject dropdown is disabled/hidden until batch is selected
-5. Changing batch resets subject selection
-```
+### Step 4 — Data cleanup (one-time migration)
+Reset `profiles.role` to match the role tables for the 5 users whose `profiles.role` is admin/manager/teacher/super_admin but who have NO matching row in those tables. Tanushri's profile row will be set to `'teacher'` since she's in the teachers table.
 
-No database changes required.
+### Step 5 — Verification
+After deploy, ask Tanushri to hard-reload (clears stale localStorage). Confirm she lands on `/teacher-schedule` and the `Start Class` → `Join Session` flow opens Jitsi as moderator.
+
+---
+
+## Files Touched
+- `supabase/migrations/<new>.sql` — rewrite RPC + clean up stale `profiles.role` values
+- `src/hooks/useAuth.tsx` — race-condition fix, role-resolution hardening
+- `src/pages/Index.tsx` — role-resolving guard + super_admin alias
+
+No changes needed to `TeacherJoinClass.tsx` — once role resolves correctly, the existing Start/Join flow works as designed.
 
