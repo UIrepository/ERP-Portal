@@ -166,81 +166,22 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
         });
     };
 
-    // Handle opening the fullscreen player
-    const handlePlayInFullscreen = useCallback(async (recording: RecordingContent, index: number) => {
-        const lecture = recordingToLecture(recording, index);
-        setPlayerLecture(lecture);
-        setSelectedRecording(recording);
-        setIsPlayerOpen(true);
-        
-        await logActivity('recording_view', `Opened fullscreen: ${recording.topic}`, {
-            recordingId: recording.id, 
+    // Open the lecture in a new tab via standalone /lecture/:id route
+    const handlePlayInFullscreen = useCallback(async (recording: RecordingContent, _index: number) => {
+        await logActivity('recording_view', `Opened lecture in new tab: ${recording.topic}`, {
+            recordingId: recording.id,
             topic: recording.topic,
-            playMode: 'fullscreen'
+            playMode: 'new-tab'
         });
-    }, [recordingToLecture, logActivity]);
+        window.open(`/lecture/${recording.id}`, '_blank', 'noopener,noreferrer');
+    }, [logActivity]);
 
-    // Handle lecture change from within the player
-    const handleLectureChange = useCallback((lecture: Lecture) => {
-        setPlayerLecture(lecture);
-        const rec = recordings?.find(r => r.id === lecture.id);
-        if (rec) {
-            setSelectedRecording(rec);
-            logActivity('recording_view', `Switched to: ${rec.topic}`, {
-                recordingId: rec.id,
-                topic: rec.topic,
-                playMode: 'fullscreen'
-            });
-        }
-    }, [recordings, logActivity]);
-
-    // Handle doubt submission from the player
-    const handleDoubtSubmit = useCallback(async (question: string) => {
-        if (!user || !selectedRecording) return;
-        
-        const { error } = await supabase.from('doubts').insert({
-            recording_id: selectedRecording.id,
-            user_id: user.id,
-            question_text: question,
-            batch: batch || selectedRecording.batch,
-            subject: subject || selectedRecording.subject
-        });
-        
-        if (error) {
-            toast({ 
-                title: 'Error posting question', 
-                description: error.message, 
-                variant: 'destructive' 
-            });
-        } else {
-            toast({ 
-                title: 'Success', 
-                description: 'Your question has been posted.' 
-            });
-            // Refresh doubts
-            queryClient.invalidateQueries({ queryKey: ['player-doubts', selectedRecording.id] });
-        }
-    }, [user, selectedRecording, batch, subject, queryClient]);
-
-    // Handle closing the player
+    // Handle closing the player (legacy — kept for safety)
     const handleClosePlayer = useCallback(() => {
         setIsPlayerOpen(false);
     }, []);
 
-    // Render fullscreen player when open
-    if (isPlayerOpen && playerLecture) {
-        return (
-            <FullScreenVideoPlayer
-                currentLecture={playerLecture}
-                lectures={allLectures}
-                doubts={playerDoubts}
-                onLectureChange={handleLectureChange}
-                onDoubtSubmit={handleDoubtSubmit}
-                onClose={handleClosePlayer}
-                userName={profile?.name || user?.email}
-            />
-        );
-    }
+    // Inline player no longer used — recordings now open in a new tab.
 
     return (
         <div className="p-6 bg-white min-h-full font-sans">
