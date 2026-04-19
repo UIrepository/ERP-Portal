@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ClassSession from "./pages/ClassSession";
+import LecturePlayer from "./pages/LecturePlayer";
 import { ScreenRecordingProtection } from "@/components/ScreenRecordingProtection";
 
 // Import Community Components
@@ -29,6 +30,9 @@ const App = () => (
               
               {/* SECURE CLASS SESSION ROUTE */}
               <Route path="/class-session/:enrollmentId" element={<ClassSession />} />
+
+              {/* STANDALONE LECTURE PLAYER (opens in new tab) */}
+              <Route path="/lecture/:recordingId" element={<LecturePlayer />} />
               
               {/* COMMUNITY ROUTES (Open in new tabs) */}
               <Route path="/portal/student/community" element={<StudentCommunity />} />
