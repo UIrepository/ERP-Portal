@@ -215,7 +215,7 @@ export const FullScreenVideoPlayer = ({
         const dur = youtubePlayerRef.current.getDuration();
         setBuffered(loaded * dur);
         
-        if (time > 1 && showVignette) {
+        if (time > 1) {
           setShowVignette(false);
         }
       }
@@ -229,7 +229,10 @@ export const FullScreenVideoPlayer = ({
       }
       youtubeInitialized.current = false;
     };
-  }, [videoSource.type, videoSource.videoId, setCurrentTime, setDuration, setIsPlaying, setBuffered, youtubePlayerRef, showVignette]);
+    // IMPORTANT: do not depend on `showVignette` or other transient state — it would
+    // tear down and re-create the YouTube player (causing a refresh on tab switch).
+     
+  }, [videoSource.type, videoSource.videoId]);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
