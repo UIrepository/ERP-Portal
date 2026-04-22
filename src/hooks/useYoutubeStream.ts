@@ -9,6 +9,7 @@ export const useYoutubeStream = () => {
   
   // Store the Broadcast ID so we can stop it later
   const broadcastIdRef = useRef<string | null>(null);
+  const streamIdRef = useRef<string | null>(null);
 
   /**
    * Creates a YouTube Broadcast via Edge Function and saves the link to the database.
@@ -41,8 +42,9 @@ export const useYoutubeStream = () => {
 
       console.log("Stream created:", streamData.videoUrl);
       
-      // SAVE THE ID FOR STOPPING LATER
+      // SAVE IDS FOR STOPPING LATER
       broadcastIdRef.current = streamData.videoId;
+      streamIdRef.current = streamData.streamId;
 
       // 2. Save Recording Link to DB for ALL merged pairs (so each batch retains access after demerge)
       const pairs = allMergedPairs && allMergedPairs.length > 0
@@ -70,7 +72,8 @@ export const useYoutubeStream = () => {
       
       return {
         streamKey: streamData.streamKey as string,
-        broadcastId: streamData.videoId as string
+        broadcastId: streamData.videoId as string,
+        streamId: streamData.streamId as string
       };
 
     } catch (error: any) {
@@ -97,7 +100,10 @@ export const useYoutubeStream = () => {
 
     try {
       const { error } = await supabase.functions.invoke('stop-youtube-stream', {
-        body: { broadcastId: broadcastIdRef.current }
+        body: {
+          broadcastId: broadcastIdRef.current,
+          streamId: streamIdRef.current,
+        }
       });
 
       if (error) throw error;
@@ -105,11 +111,14 @@ export const useYoutubeStream = () => {
       toast.success("Recording Stopped Successfully!", { id: toastId });
       setIsStreaming(false);
       broadcastIdRef.current = null;
+      streamIdRef.current = null;
     } catch (error: any) {
       console.error("Stop Stream Error:", error);
       toast.error("Failed to stop stream automatically. Please check YouTube Studio.", { id: toastId });
       // Reset UI anyway so the button doesn't get stuck
       setIsStreaming(false);
+      broadcastIdRef.current = null;
+      streamIdRef.current = null;
     }
   };
 
