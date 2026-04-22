@@ -11,8 +11,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { SignJWT, importPKCS8 } from 'https://deno.land/x/jose@v5.2.0/index.ts';
 
-const BATCH_SIZE = 400;             // rows per cron tick
-const INTER_CALL_DELAY_MS = 120;    // ~8 QPS — safely under Google's 10/s recommendation
+const BATCH_SIZE = 100;             // rows per cron tick (stays within edge worker CPU/time budget)
+const INTER_CALL_DELAY_MS = 100;    // 10 QPS — at Google's recommended safe ceiling
 const ADMIN_MEMBER_EMAIL = 'desk@unknowniitians.com';
 
 const corsHeaders = {
@@ -29,8 +29,10 @@ async function getGoogleAccessToken(): Promise<string> {
 
   const privateKey = await importPKCS8(keyJson.private_key, 'RS256');
   const jwt = await new SignJWT({
-    scope:
-      'https://www.googleapis.com/auth/admin.directory.group https://www.googleapis.com/auth/admin.directory.group.member',
+    scope: [
+      'https://www.googleapis.com/auth/admin.directory.group',
+      'https://www.googleapis.com/auth/admin.directory.group.member',
+    ].join(' '),
     sub: adminEmail,
   })
     .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
@@ -62,27 +64,39 @@ async function groupExists(accessToken: string, groupEmail: string): Promise<boo
 }
 
 async function ensureGroup(accessToken: string, groupEmail: string): Promise<void> {
-  if (await groupExists(accessToken, groupEmail)) return;
-  const res = await fetch('https://admin.googleapis.com/admin/directory/v1/groups', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email: groupEmail,
-      name: groupEmail.split('@')[0],
-      description: 'Auto-created by Unknown IITians ERP queue processor',
-    }),
-  });
-  if (!res.ok && res.status !== 409) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(`Create group ${groupEmail} failed: ${JSON.stringify(body)}`);
+  const exists = await groupExists(accessToken, groupEmail);
+  if (!exists) {
+    const res = await fetch('https://admin.googleapis.com/admin/directory/v1/groups', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: groupEmail,
+        name: groupEmail.split('@')[0],
+        description: 'Auto-created by Unknown IITians ERP queue processor',
+      }),
+    });
+    if (!res.ok && res.status !== 409) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(`Create group ${groupEmail} failed: ${JSON.stringify(body)}`);
+    }
   }
-  // Ensure desk@ is in the new group
+
+  // Ensure desk@ is OWNER (idempotent).
   await fetch(
     `https://admin.googleapis.com/admin/directory/v1/groups/${encodeURIComponent(groupEmail)}/members`,
     {
       method: 'POST',
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: ADMIN_MEMBER_EMAIL, role: 'MEMBER' }),
+      body: JSON.stringify({ email: ADMIN_MEMBER_EMAIL, role: 'OWNER' }),
+    }
+  ).catch(() => {});
+  // If desk@ was already a plain MEMBER, upgrade them to OWNER.
+  await fetch(
+    `https://admin.googleapis.com/admin/directory/v1/groups/${encodeURIComponent(groupEmail)}/members/${encodeURIComponent(ADMIN_MEMBER_EMAIL)}`,
+    {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: ADMIN_MEMBER_EMAIL, role: 'OWNER' }),
     }
   ).catch(() => {});
 }
@@ -92,18 +106,33 @@ type AddResult = { kind: 'success' | 'skipped' | 'failed'; error?: string };
 async function addMember(
   accessToken: string,
   groupEmail: string,
-  memberEmail: string
+  memberEmail: string,
+  role: 'MEMBER' | 'MANAGER' | 'OWNER' = 'MEMBER'
 ): Promise<AddResult> {
   const res = await fetch(
     `https://admin.googleapis.com/admin/directory/v1/groups/${encodeURIComponent(groupEmail)}/members`,
     {
       method: 'POST',
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: memberEmail, role: 'MEMBER' }),
+      body: JSON.stringify({ email: memberEmail, role }),
     }
   );
 
-  if (res.status === 409) return { kind: 'skipped' };
+  if (res.status === 409) {
+    // Already a member — if we asked for a higher role, upgrade via PUT.
+    if (role !== 'MEMBER') {
+      const putRes = await fetch(
+        `https://admin.googleapis.com/admin/directory/v1/groups/${encodeURIComponent(groupEmail)}/members/${encodeURIComponent(memberEmail)}`,
+        {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: memberEmail, role }),
+        }
+      );
+      if (putRes.ok) return { kind: 'success' };
+    }
+    return { kind: 'skipped' };
+  }
   if (res.status === 204 || res.ok) return { kind: 'success' };
   const body = await res.text();
   return { kind: 'failed', error: `${res.status}: ${body.slice(0, 400)}` };
@@ -149,7 +178,8 @@ serve(async (req) => {
 
     for (const row of claimed as any[]) {
       try {
-        const result = await addMember(accessToken, row.group_email, row.email);
+        const role = (row.role ?? 'MEMBER') as 'MEMBER' | 'MANAGER' | 'OWNER';
+        const result = await addMember(accessToken, row.group_email, row.email, role);
 
         if (result.kind === 'success') stats.success++;
         else if (result.kind === 'skipped') stats.skipped++;
