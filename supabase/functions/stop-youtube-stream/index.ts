@@ -9,7 +9,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const { broadcastId } = await req.json();
+    const { broadcastId, streamId } = await req.json();
     if (!broadcastId) throw new Error('Broadcast ID is required');
 
     // 1. Get access token
@@ -56,6 +56,19 @@ serve(async (req) => {
       });
     }
 
+    // Helper: free the liveStream resource so the key isn't left dangling
+    const deleteStreamIfProvided = async () => {
+      if (!streamId) return;
+      try {
+        await fetch(
+          `https://www.googleapis.com/youtube/v3/liveStreams?id=${streamId}`,
+          { method: 'DELETE', headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+      } catch (e) {
+        console.warn('Failed to delete liveStream (non-fatal):', e);
+      }
+    };
+
     if (lifeCycleStatus === 'live') {
       // Transition to complete
       const transitionRes = await fetch(
@@ -67,6 +80,7 @@ serve(async (req) => {
         console.error('YouTube Transition Error:', err);
         throw new Error('Failed to stop broadcast on YouTube');
       }
+      await deleteStreamIfProvided();
       return new Response(JSON.stringify({ success: true, message: 'Broadcast transitioned to complete.' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
