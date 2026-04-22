@@ -9,7 +9,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const { broadcastId, streamId } = await req.json();
+    const { broadcastId } = await req.json();
     if (!broadcastId) throw new Error('Broadcast ID is required');
 
     // 1. Get access token
@@ -32,7 +32,7 @@ serve(async (req) => {
 
     // 2. Check broadcast's current status
     const statusRes = await fetch(
-      `https://www.googleapis.com/youtube/v3/liveBroadcasts?id=${broadcastId}&part=status,contentDetails`,
+      `https://www.googleapis.com/youtube/v3/liveBroadcasts?id=${broadcastId}&part=status`,
       { headers: { 'Authorization': `Bearer ${accessToken}` } }
     );
     const statusData = await statusRes.json();
@@ -45,7 +45,6 @@ serve(async (req) => {
       });
     }
 
-    const boundStreamId = streamId || statusData.items[0].contentDetails?.boundStreamId;
     const lifeCycleStatus = statusData.items[0].status?.lifeCycleStatus;
     console.log('Broadcast lifeCycleStatus:', lifeCycleStatus);
 
@@ -56,19 +55,6 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    // Helper: free the liveStream resource so the key isn't left dangling
-    const deleteStreamIfProvided = async () => {
-      if (!boundStreamId) return;
-      try {
-        await fetch(
-          `https://www.googleapis.com/youtube/v3/liveStreams?id=${boundStreamId}`,
-          { method: 'DELETE', headers: { 'Authorization': `Bearer ${accessToken}` } }
-        );
-      } catch (e) {
-        console.warn('Failed to delete liveStream (non-fatal):', e);
-      }
-    };
 
     if (lifeCycleStatus === 'live') {
       // Transition to complete
@@ -81,7 +67,6 @@ serve(async (req) => {
         console.error('YouTube Transition Error:', err);
         throw new Error('Failed to stop broadcast on YouTube');
       }
-      await deleteStreamIfProvided();
       return new Response(JSON.stringify({ success: true, message: 'Broadcast transitioned to complete.' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -98,7 +83,6 @@ serve(async (req) => {
         console.error('YouTube Delete Error:', err);
         // Still return success so frontend can clean up
       }
-      await deleteStreamIfProvided();
       return new Response(JSON.stringify({ success: true, message: `Broadcast was in "${lifeCycleStatus}" state and has been deleted.` }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
