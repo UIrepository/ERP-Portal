@@ -358,13 +358,20 @@ export const TeacherJoinClass = () => {
         ? cls.mergedBatches.map(m => m.id)
         : [cls.id];
 
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from('schedules')
         .update({ stream_key: details.streamKey, broadcast_id: details.broadcastId })
-        .in('id', allIds);
+        .in('id', allIds)
+        .select('id');
 
-      if (error) { console.error("Error saving stream key:", error); } 
-      else { queryClient.invalidateQueries({ queryKey: ['allSchedulesTeacher'] }); }
+      if (error) {
+        console.error("Error saving stream key:", error);
+        toast.error("Stream created but failed to save to database. Contact admin.");
+      } else if (!updated || updated.length < allIds.length) {
+        console.error(`Stream key save partial: expected ${allIds.length} rows, got ${updated?.length ?? 0}`);
+        toast.error(`Saved ${updated?.length ?? 0}/${allIds.length} schedules. Students on merged partner batches may not receive the stream — contact admin.`);
+      }
+      queryClient.invalidateQueries({ queryKey: ['allSchedulesTeacher'] });
 
       setStreamKey(details.streamKey);
       setShowStreamDialog(true);
