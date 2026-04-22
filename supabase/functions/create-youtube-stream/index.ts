@@ -27,39 +27,83 @@ async function getAccessToken(): Promise<string> {
   return tokenData.access_token;
 }
 
-// Best-effort cleanup of stale "upcoming" broadcasts that were never started.
-// These accumulate and cause YouTube to throttle the channel with the
-// "All our stream servers are busy" error on new ingests.
+// Best-effort cleanup of stale broadcasts and idle stream resources.
+// If the bound liveStream is left behind, YouTube can keep rejecting new
+// ingests with "All our stream servers are busy" even after the broadcast is gone.
 async function cleanupStaleBroadcasts(accessToken: string) {
   try {
     const listRes = await fetch(
-      'https://www.googleapis.com/youtube/v3/liveBroadcasts?broadcastStatus=upcoming&mine=true&part=id,snippet,status&maxResults=50',
+      'https://www.googleapis.com/youtube/v3/liveBroadcasts?broadcastStatus=upcoming&mine=true&part=id,snippet,status,contentDetails&maxResults=50',
       { headers: { 'Authorization': `Bearer ${accessToken}` } }
     );
     if (!listRes.ok) return;
     const data = await listRes.json();
     const items = data.items ?? [];
-    const sixHoursAgo = Date.now() - 6 * 60 * 60 * 1000;
+    const staleThreshold = Date.now() - 30 * 60 * 1000;
 
     for (const item of items) {
       const created = item.snippet?.publishedAt
         ? new Date(item.snippet.publishedAt).getTime()
         : 0;
       const lifeCycle = item.status?.lifeCycleStatus;
+      const boundStreamId = item.contentDetails?.boundStreamId;
       // Only delete clearly orphaned broadcasts that never went live
       if (
         created &&
-        created < sixHoursAgo &&
+        created < staleThreshold &&
         ['created', 'ready'].includes(lifeCycle)
       ) {
         await fetch(
           `https://www.googleapis.com/youtube/v3/liveBroadcasts?id=${item.id}`,
           { method: 'DELETE', headers: { 'Authorization': `Bearer ${accessToken}` } }
         ).catch(() => {});
+
+        if (boundStreamId) {
+          await fetch(
+            `https://www.googleapis.com/youtube/v3/liveStreams?id=${boundStreamId}`,
+            { method: 'DELETE', headers: { 'Authorization': `Bearer ${accessToken}` } }
+          ).catch(() => {});
+        }
       }
     }
   } catch (err) {
     console.warn('Stale broadcast cleanup failed (non-fatal):', err);
+  }
+}
+
+async function cleanupIdleStreams(accessToken: string) {
+  try {
+    const listRes = await fetch(
+      'https://www.googleapis.com/youtube/v3/liveStreams?mine=true&part=id,snippet,status,contentDetails,cdn&maxResults=50',
+      { headers: { 'Authorization': `Bearer ${accessToken}` } }
+    );
+    if (!listRes.ok) return;
+
+    const data = await listRes.json();
+    const items = data.items ?? [];
+    const staleThreshold = Date.now() - 30 * 60 * 1000;
+
+    for (const item of items) {
+      const created = item.snippet?.publishedAt
+        ? new Date(item.snippet.publishedAt).getTime()
+        : 0;
+      const streamStatus = item.status?.streamStatus;
+      const isReusable = item.contentDetails?.isReusable === true;
+
+      if (
+        created &&
+        created < staleThreshold &&
+        ['created', 'inactive', 'ready', 'error'].includes(streamStatus) &&
+        isReusable
+      ) {
+        await fetch(
+          `https://www.googleapis.com/youtube/v3/liveStreams?id=${item.id}`,
+          { method: 'DELETE', headers: { 'Authorization': `Bearer ${accessToken}` } }
+        ).catch(() => {});
+      }
+    }
+  } catch (err) {
+    console.warn('Idle stream cleanup failed (non-fatal):', err);
   }
 }
 
@@ -74,6 +118,7 @@ serve(async (req) => {
 
     // Pre-clean to avoid channel-level throttling
     await cleanupStaleBroadcasts(accessToken);
+    await cleanupIdleStreams(accessToken);
 
     // 1. Create Broadcast (Unlisted)
     const broadcastRes = await fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails', {
