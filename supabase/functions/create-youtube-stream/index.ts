@@ -41,31 +41,32 @@ async function cleanupStaleBroadcasts(accessToken: string) {
     const items = data.items ?? [];
     const staleThreshold = Date.now() - 30 * 60 * 1000;
 
+    const deletions: Promise<unknown>[] = [];
     for (const item of items) {
       const created = item.snippet?.publishedAt
         ? new Date(item.snippet.publishedAt).getTime()
         : 0;
       const lifeCycle = item.status?.lifeCycleStatus;
       const boundStreamId = item.contentDetails?.boundStreamId;
-      // Only delete clearly orphaned broadcasts that never went live
       if (
         created &&
         created < staleThreshold &&
         ['created', 'ready'].includes(lifeCycle)
       ) {
-        await fetch(
+        deletions.push(fetch(
           `https://www.googleapis.com/youtube/v3/liveBroadcasts?id=${item.id}`,
           { method: 'DELETE', headers: { 'Authorization': `Bearer ${accessToken}` } }
-        ).catch(() => {});
+        ).catch(() => {}));
 
         if (boundStreamId) {
-          await fetch(
+          deletions.push(fetch(
             `https://www.googleapis.com/youtube/v3/liveStreams?id=${boundStreamId}`,
             { method: 'DELETE', headers: { 'Authorization': `Bearer ${accessToken}` } }
-          ).catch(() => {});
+          ).catch(() => {}));
         }
       }
     }
+    await Promise.all(deletions);
   } catch (err) {
     console.warn('Stale broadcast cleanup failed (non-fatal):', err);
   }
@@ -83,6 +84,7 @@ async function cleanupIdleStreams(accessToken: string) {
     const items = data.items ?? [];
     const staleThreshold = Date.now() - 30 * 60 * 1000;
 
+    const deletions: Promise<unknown>[] = [];
     for (const item of items) {
       const created = item.snippet?.publishedAt
         ? new Date(item.snippet.publishedAt).getTime()
@@ -96,12 +98,13 @@ async function cleanupIdleStreams(accessToken: string) {
         ['created', 'inactive', 'ready', 'error'].includes(streamStatus) &&
         isReusable
       ) {
-        await fetch(
+        deletions.push(fetch(
           `https://www.googleapis.com/youtube/v3/liveStreams?id=${item.id}`,
           { method: 'DELETE', headers: { 'Authorization': `Bearer ${accessToken}` } }
-        ).catch(() => {});
+        ).catch(() => {}));
       }
     }
+    await Promise.all(deletions);
   } catch (err) {
     console.warn('Idle stream cleanup failed (non-fatal):', err);
   }
@@ -115,10 +118,6 @@ serve(async (req) => {
   try {
     const { title, description } = await req.json();
     const accessToken = await getAccessToken();
-
-    // Pre-clean to avoid channel-level throttling
-    await cleanupStaleBroadcasts(accessToken);
-    await cleanupIdleStreams(accessToken);
 
     // 1. Create Broadcast (Unlisted)
     const broadcastRes = await fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails', {
@@ -186,6 +185,20 @@ serve(async (req) => {
     
     if (!bindRes.ok) {
         throw new Error('Failed to bind stream to broadcast');
+    }
+
+    // Fire-and-forget cleanup AFTER response is sent — never blocks the user.
+    // EdgeRuntime.waitUntil keeps the worker alive without delaying the reply.
+    try {
+      // @ts-ignore — EdgeRuntime is provided by Supabase Edge Runtime
+      EdgeRuntime.waitUntil(Promise.all([
+        cleanupStaleBroadcasts(accessToken),
+        cleanupIdleStreams(accessToken),
+      ]).catch(() => {}));
+    } catch {
+      // Fallback: just kick them off without awaiting
+      cleanupStaleBroadcasts(accessToken).catch(() => {});
+      cleanupIdleStreams(accessToken).catch(() => {});
     }
 
     return new Response(
