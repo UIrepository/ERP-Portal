@@ -32,7 +32,7 @@ serve(async (req) => {
 
     // 2. Check broadcast's current status
     const statusRes = await fetch(
-      `https://www.googleapis.com/youtube/v3/liveBroadcasts?id=${broadcastId}&part=status`,
+      `https://www.googleapis.com/youtube/v3/liveBroadcasts?id=${broadcastId}&part=status,contentDetails`,
       { headers: { 'Authorization': `Bearer ${accessToken}` } }
     );
     const statusData = await statusRes.json();
@@ -45,6 +45,7 @@ serve(async (req) => {
       });
     }
 
+    const boundStreamId = streamId || statusData.items[0].contentDetails?.boundStreamId;
     const lifeCycleStatus = statusData.items[0].status?.lifeCycleStatus;
     console.log('Broadcast lifeCycleStatus:', lifeCycleStatus);
 
@@ -58,10 +59,10 @@ serve(async (req) => {
 
     // Helper: free the liveStream resource so the key isn't left dangling
     const deleteStreamIfProvided = async () => {
-      if (!streamId) return;
+      if (!boundStreamId) return;
       try {
         await fetch(
-          `https://www.googleapis.com/youtube/v3/liveStreams?id=${streamId}`,
+          `https://www.googleapis.com/youtube/v3/liveStreams?id=${boundStreamId}`,
           { method: 'DELETE', headers: { 'Authorization': `Bearer ${accessToken}` } }
         );
       } catch (e) {
@@ -97,6 +98,7 @@ serve(async (req) => {
         console.error('YouTube Delete Error:', err);
         // Still return success so frontend can clean up
       }
+      await deleteStreamIfProvided();
       return new Response(JSON.stringify({ success: true, message: `Broadcast was in "${lifeCycleStatus}" state and has been deleted.` }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
