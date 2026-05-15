@@ -26,7 +26,7 @@ export const MaintenancePage = ({ message }: MaintenancePageProps) => {
         <div className="pt-4">
           <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-            <span style={{ fontFamily: 'Inter, sans-serif' }}>Maintenance in progress. Please check back on 7th Feb 2026.</span>
+            <span style={{ fontFamily: 'Inter, sans-serif' }}>Maintenance in progress. Please check back on 10th June 2026.</span>
           </div>
         </div>
       </div>
