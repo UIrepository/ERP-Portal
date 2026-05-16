@@ -610,6 +610,45 @@ export type Database = {
         }
         Relationships: []
       }
+      group_addition_queue: {
+        Row: {
+          attempts: number
+          created_at: string
+          email: string
+          group_email: string
+          id: string
+          last_error: string | null
+          max_attempts: number
+          processed_at: string | null
+          role: string
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          email: string
+          group_email: string
+          id?: string
+          last_error?: string | null
+          max_attempts?: number
+          processed_at?: string | null
+          role?: string
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          email?: string
+          group_email?: string
+          id?: string
+          last_error?: string | null
+          max_attempts?: number
+          processed_at?: string | null
+          role?: string
+          status?: string
+        }
+        Relationships: []
+      }
       maintenance_settings: {
         Row: {
           id: string
@@ -1349,8 +1388,38 @@ export type Database = {
       }
       check_is_admin_or_manager: { Args: never; Returns: boolean }
       check_user_role_sync: { Args: never; Returns: Json }
+      claim_group_addition_batch: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          created_at: string
+          email: string
+          group_email: string
+          id: string
+          last_error: string | null
+          max_attempts: number
+          processed_at: string | null
+          role: string
+          status: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "group_addition_queue"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       delete_expired_chat_images: { Args: never; Returns: undefined }
       delete_old_chat_uploads: { Args: never; Returns: undefined }
+      enqueue_emails_for_group:
+        | {
+            Args: { p_emails: string[]; p_group_email: string }
+            Returns: number
+          }
+        | {
+            Args: { p_emails: string[]; p_group_email: string; p_role: string }
+            Returns: number
+          }
       get_admin_for_support: {
         Args: never
         Returns: {
@@ -1483,6 +1552,11 @@ export type Database = {
       is_admin: { Args: { check_user_id?: string }; Returns: boolean }
       is_manager: { Args: { check_user_id?: string }; Returns: boolean }
       is_teacher: { Args: { check_user_id?: string }; Returns: boolean }
+      subject_normalize: { Args: { s: string }; Returns: string }
+      teacher_can_modify_schedule: {
+        Args: { p_batch: string; p_subject: string }
+        Returns: boolean
+      }
       update_profile_allotment: {
         Args: {
           p_new_batches: string[]
