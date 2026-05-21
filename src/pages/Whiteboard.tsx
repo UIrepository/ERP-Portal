@@ -276,7 +276,7 @@ const Whiteboard = () => {
       x: 0,
       y: 0,
       isLocked: true,
-      opacity: 0.35,
+      opacity: 0.45,
       props: {
         geo: 'rectangle',
         w: BLANK_PAGE_W,
@@ -284,7 +284,7 @@ const Whiteboard = () => {
         color: 'white',
         fill: 'none',
         dash: 'solid',
-        size: 's',
+        size: 'm',
       },
     });
   };
