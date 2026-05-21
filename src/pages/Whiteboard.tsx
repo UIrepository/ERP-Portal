@@ -36,7 +36,11 @@ interface ScheduleContext {
   date?: string | null;
 }
 
-const PDF_RENDER_SCALE = 2;
+// PDF render quality vs IndexedDB size. 1.5x is crisp enough for handwriting
+// overlay; JPEG quality 0.85 keeps a typical A4 page under ~250KB so a
+// 50-page deck stays well within browser storage limits.
+const PDF_RENDER_SCALE = 1.5;
+const PDF_JPEG_QUALITY = 0.85;
 
 const Whiteboard = () => {
   const { scheduleId } = useParams<{ scheduleId: string }>();
@@ -95,7 +99,11 @@ const Whiteboard = () => {
     });
   }, []);
 
-  const renderPdfPageToBlob = async (pdf: pdfjsLib.PDFDocumentProxy, pageIndex: number) => {
+  // Render one PDF page to a data URL. We deliberately avoid
+  // URL.createObjectURL/blob: URLs because tldraw's asset validator rejects
+  // them (they die on page refresh, so persistence breaks). Data URLs are
+  // self-contained and survive an IndexedDB reload.
+  const renderPdfPageToDataUrl = async (pdf: pdfjsLib.PDFDocumentProxy, pageIndex: number) => {
     const page = await pdf.getPage(pageIndex);
     const viewport = page.getViewport({ scale: PDF_RENDER_SCALE });
     const canvas = document.createElement('canvas');
@@ -103,23 +111,23 @@ const Whiteboard = () => {
     canvas.height = viewport.height;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas 2D context not available');
+    // White background so JPEG (which has no alpha) shows correctly
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     await page.render({ canvasContext: ctx, viewport }).promise;
-    const blob: Blob = await new Promise((resolve, reject) =>
-      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png'),
-    );
-    return { blob, width: viewport.width, height: viewport.height };
+    const src = canvas.toDataURL('image/jpeg', PDF_JPEG_QUALITY);
+    return { src, width: viewport.width, height: viewport.height };
   };
 
   const placeImageOnPage = async (
     ed: Editor,
     pageId: TLPageId,
-    blob: Blob,
+    src: string,
     width: number,
     height: number,
     locked: boolean,
   ) => {
     ed.setCurrentPage(pageId);
-    const src = URL.createObjectURL(blob);
     const assetId: TLAssetId = AssetRecordType.createId(getHashForString(`${pageId}-${Date.now()}-${Math.random()}`));
     ed.createAssets([
       {
@@ -127,11 +135,11 @@ const Whiteboard = () => {
         type: 'image',
         typeName: 'asset',
         props: {
-          name: 'page.png',
+          name: 'page.jpg',
           src,
           w: width,
           h: height,
-          mimeType: 'image/png',
+          mimeType: 'image/jpeg',
           isAnimated: false,
         },
         meta: {},
@@ -170,7 +178,7 @@ const Whiteboard = () => {
 
         for (let i = 1; i <= pdf.numPages; i++) {
           setBusyLabel(`Importing page ${i} of ${pdf.numPages}…`);
-          const { blob, width, height } = await renderPdfPageToBlob(pdf, i);
+          const { src, width, height } = await renderPdfPageToDataUrl(pdf, i);
           let pageId: TLPageId;
           if (mode === 'replace' && i === 1) {
             pageId = editor.getPages()[0].id;
@@ -179,7 +187,7 @@ const Whiteboard = () => {
             editor.createPage({ name: `Page ${editor.getPages().length + 1}` });
             pageId = editor.getPages()[editor.getPages().length - 1].id;
           }
-          await placeImageOnPage(editor, pageId, blob, width, height, true);
+          await placeImageOnPage(editor, pageId, src, width, height, true);
         }
 
         editor.setCurrentPage(editor.getPages()[0].id);
