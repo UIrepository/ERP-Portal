@@ -8,7 +8,9 @@ import {
   exportToBlob,
   createShapeId,
   TLPageId,
+  TLImageShape,
   getHashForString,
+  Box,
 } from 'tldraw';
 import 'tldraw/tldraw.css';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -41,6 +43,13 @@ interface ScheduleContext {
 // 50-page deck stays well within browser storage limits.
 const PDF_RENDER_SCALE = 1.5;
 const PDF_JPEG_QUALITY = 0.85;
+
+// Default "slide" size for blank whiteboard pages — 16:9 at a comfortable
+// resolution. Exports are pinned to this box (or the PDF image's box on
+// imported pages) so every page in the final PDF has the same dimensions.
+const BLANK_PAGE_W = 1920;
+const BLANK_PAGE_H = 1080;
+const EXPORT_SCALE = 1.5;
 
 const Whiteboard = () => {
   const { scheduleId } = useParams<{ scheduleId: string }>();
@@ -281,23 +290,32 @@ const Whiteboard = () => {
         setBusyLabel(`Rendering page ${i + 1} of ${pages.length}…`);
         const p = pages[i];
         editor.setCurrentPage(p.id);
-        const ids = Array.from(editor.getCurrentPageShapeIds());
-        let blob: Blob;
-        if (ids.length > 0) {
-          blob = await exportToBlob({ editor, ids, format: 'png', opts: { background: true, padding: 0, scale: 2 } });
-        } else {
-          const c = document.createElement('canvas');
-          c.width = 1240;
-          c.height = 1754;
-          const cx = c.getContext('2d');
-          if (cx) {
-            cx.fillStyle = '#ffffff';
-            cx.fillRect(0, 0, c.width, c.height);
-          }
-          blob = await new Promise<Blob>((resolve, reject) =>
-            c.toBlob((b) => (b ? resolve(b) : reject(new Error('blank toBlob failed'))), 'image/png')!,
-          );
-        }
+
+        // Pin the export to a fixed rectangle so every page in the final
+        // PDF has uniform dimensions. PDF-imported pages reuse the locked
+        // image's bounds; blank pages use the default 16:9 slide.
+        const shapes = editor.getCurrentPageShapes();
+        const pageBg = shapes.find(
+          (s): s is TLImageShape => s.type === 'image' && s.isLocked && s.x === 0 && s.y === 0,
+        );
+        const bounds = pageBg
+          ? new Box(0, 0, pageBg.props.w, pageBg.props.h)
+          : new Box(0, 0, BLANK_PAGE_W, BLANK_PAGE_H);
+
+        const ids = shapes.map((s) => s.id);
+        const blob = await exportToBlob({
+          editor,
+          ids,
+          format: 'png',
+          opts: {
+            background: true,
+            darkMode: !pageBg,
+            bounds,
+            padding: 0,
+            scale: EXPORT_SCALE,
+          },
+        });
+
         const bytes = new Uint8Array(await blob.arrayBuffer());
         const img = await pdfDoc.embedPng(bytes);
         const page = pdfDoc.addPage([img.width, img.height]);
