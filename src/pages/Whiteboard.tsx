@@ -100,10 +100,22 @@ const Whiteboard = () => {
     ed.user.updateUserPreferences({ colorScheme: 'dark' });
     setPageCount(ed.getPages().length);
     setCurrentPage(1);
+
+    // Resume detection: if this device already has a persisted session
+    // (more than one page, or any shapes anywhere), skip the start chooser.
+    const pages = ed.getPages();
+    const totalShapes = pages.reduce(
+      (acc, p) => acc + ed.getPageShapeIds(p.id).size,
+      0,
+    );
+    if (totalShapes > 0 || pages.length > 1) {
+      setStartMode('blank');
+    }
+
     ed.store.listen(() => {
-      const pages = ed.getPages();
-      setPageCount(pages.length);
-      const idx = pages.findIndex((p) => p.id === ed.getCurrentPageId());
+      const ps = ed.getPages();
+      setPageCount(ps.length);
+      const idx = ps.findIndex((p) => p.id === ed.getCurrentPageId());
       if (idx >= 0) setCurrentPage(idx + 1);
     });
   }, []);
@@ -498,31 +510,31 @@ const Whiteboard = () => {
         )}
 
         {startMode === 'choose' && (
-          <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center z-30">
-            <div className="bg-slate-900 border border-white/10 rounded-2xl p-8 max-w-2xl w-full mx-4 shadow-2xl">
+          <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-30">
+            <div className="bg-white text-slate-900 border border-slate-200 rounded-lg p-7 max-w-2xl w-full mx-4 shadow-2xl">
               <h2 className="text-lg font-semibold mb-1">Start the whiteboard</h2>
-              <p className="text-sm text-white/60 mb-6">
+              <p className="text-sm text-slate-500 mb-6">
                 {scheduleCtx ? `${scheduleCtx.subject} — ${scheduleCtx.batch}` : 'Pick how you want to begin'}
               </p>
               <div className="grid grid-cols-2 gap-4">
                 <button
                   onClick={startBlank}
-                  className="flex flex-col items-center justify-center gap-2 p-6 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition"
+                  className="flex flex-col items-center justify-center gap-2 p-6 rounded-md border border-slate-200 bg-slate-50 hover:bg-fuchsia-50 hover:border-fuchsia-200 transition"
                 >
-                  <Square className="h-8 w-8 text-fuchsia-300" />
-                  <div className="text-sm font-medium">Blank board</div>
-                  <div className="text-[11px] text-white/50 text-center">Draw on empty pages, add more anytime</div>
+                  <Square className="h-8 w-8 text-fuchsia-600" />
+                  <div className="text-sm font-medium text-slate-900">Blank board</div>
+                  <div className="text-[11px] text-slate-500 text-center">Draw on empty pages, add more anytime</div>
                 </button>
                 <button
                   onClick={() => pdfInputRef.current?.click()}
-                  className="flex flex-col items-center justify-center gap-2 p-6 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition"
+                  className="flex flex-col items-center justify-center gap-2 p-6 rounded-md border border-slate-200 bg-slate-50 hover:bg-fuchsia-50 hover:border-fuchsia-200 transition"
                 >
-                  <FileText className="h-8 w-8 text-fuchsia-300" />
-                  <div className="text-sm font-medium">Import PDF / Slides</div>
-                  <div className="text-[11px] text-white/50 text-center">Each PDF page becomes an annotated page</div>
+                  <FileText className="h-8 w-8 text-fuchsia-600" />
+                  <div className="text-sm font-medium text-slate-900">Import PDF / Slides</div>
+                  <div className="text-[11px] text-slate-500 text-center">Each PDF page becomes an annotated page</div>
                 </button>
               </div>
-              <div className="mt-6 text-[11px] text-white/40 text-center">
+              <div className="mt-6 text-[11px] text-slate-400 text-center">
                 Resume picks up automatically — your strokes are saved on this device.
               </div>
             </div>
