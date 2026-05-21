@@ -20,8 +20,9 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ChevronLeft, ChevronRight, FileText, Image as ImageIcon, Loader2, PenLine, Plus, Save, Square } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, FileText, Image as ImageIcon, Loader2, PenLine, Plus, Save, Square, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -65,6 +66,8 @@ const Whiteboard = () => {
   const [saveOpen, setSaveOpen] = useState(false);
   const [pageCount, setPageCount] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
+  const [headerVisible, setHeaderVisible] = useState(true);
+  const [navVisible, setNavVisible] = useState(true);
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const insertPdfInputRef = useRef<HTMLInputElement>(null);
@@ -435,12 +438,27 @@ const Whiteboard = () => {
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-slate-950 text-white overflow-hidden">
+    <div className="h-screen w-screen relative bg-slate-950 text-white overflow-hidden">
       <input ref={pdfInputRef} type="file" accept="application/pdf" hidden onChange={onPdfChosen} />
       <input ref={insertPdfInputRef} type="file" accept="application/pdf" hidden onChange={onInsertPdfChosen} />
       <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={onImageChosen} />
 
-      <header className="flex items-center justify-between px-4 py-2 bg-gradient-to-r from-fuchsia-900 via-purple-900 to-indigo-900 border-b border-white/10 shrink-0">
+      {/* Canvas — fills the whole viewport so collapsing chrome reclaims real estate */}
+      <div className="absolute inset-0">
+        <Tldraw
+          onMount={handleMount}
+          inferDarkMode
+          persistenceKey={scheduleId ? `wb-${scheduleId}` : undefined}
+        />
+      </div>
+
+      {/* Top header (overlay, slides up on collapse) */}
+      <header
+        className={cn(
+          'absolute top-0 inset-x-0 z-20 flex items-center justify-between px-4 py-2 bg-gradient-to-r from-fuchsia-900 via-purple-900 to-indigo-900 border-b border-white/10 shadow-lg transition-transform duration-300',
+          !headerVisible && '-translate-y-full',
+        )}
+      >
         <div className="flex items-center gap-3 min-w-0">
           <PenLine className="h-5 w-5 text-fuchsia-200 shrink-0" />
           <div className="min-w-0">
@@ -482,94 +500,127 @@ const Whiteboard = () => {
             <Save className="h-3.5 w-3.5 mr-1.5" />
             End & Save
           </Button>
+          <button
+            type="button"
+            onClick={() => setHeaderVisible(false)}
+            title="Hide toolbar"
+            className="ml-1 h-8 w-8 inline-flex items-center justify-center rounded-md bg-white/5 border border-white/10 text-white/80 hover:bg-white/15 hover:text-white transition-colors"
+          >
+            <ChevronUp className="h-4 w-4" />
+          </button>
         </div>
       </header>
 
-      <div className="flex-1 relative">
-        <Tldraw
-          onMount={handleMount}
-          inferDarkMode
-          persistenceKey={scheduleId ? `wb-${scheduleId}` : undefined}
-        />
+      {/* Header peek tab — shows when header is collapsed */}
+      {!headerVisible && (
+        <button
+          type="button"
+          onClick={() => setHeaderVisible(true)}
+          title="Show toolbar"
+          className="absolute top-2 right-2 z-30 h-8 w-8 inline-flex items-center justify-center rounded-full bg-slate-900/90 backdrop-blur border border-white/15 text-white/85 hover:bg-slate-800 hover:text-white shadow-lg transition-colors"
+        >
+          <ChevronDown className="h-4 w-4" />
+        </button>
+      )}
 
-        {/* Bottom-center page navigator (PW-style) */}
-        {startMode !== 'choose' && (
-          <div className="absolute bottom-16 right-4 z-20 flex items-center gap-1 bg-slate-900/90 backdrop-blur border border-white/10 rounded-full px-2 py-1.5 shadow-lg">
-            <button
-              type="button"
-              onClick={goToPrev}
-              disabled={busy || currentPage <= 1}
-              title="Previous page"
-              className="h-8 w-8 inline-flex items-center justify-center rounded-full text-white/80 hover:text-white hover:bg-white/15 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="text-xs font-medium text-white/90 tabular-nums px-2 min-w-[64px] text-center">
-              {currentPage} / {pageCount}
-            </span>
-            <button
-              type="button"
-              onClick={goToNext}
-              disabled={busy || currentPage >= pageCount}
-              title="Next page"
-              className="h-8 w-8 inline-flex items-center justify-center rounded-full text-white/80 hover:text-white hover:bg-white/15 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-            <div className="w-px h-5 bg-white/15 mx-1" />
-            <button
-              type="button"
-              onClick={addBlankPage}
-              disabled={busy}
-              title="Add blank page"
-              className="h-8 w-8 inline-flex items-center justify-center rounded-full text-fuchsia-200 hover:text-white hover:bg-fuchsia-600/40 transition-colors disabled:opacity-30"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
-          </div>
-        )}
+      {/* Bottom-right page navigator (collapsible) */}
+      {startMode !== 'choose' && navVisible && (
+        <div className="absolute bottom-16 right-4 z-20 flex items-center gap-1 bg-slate-900/90 backdrop-blur border border-white/10 rounded-full px-2 py-1.5 shadow-lg transition-all">
+          <button
+            type="button"
+            onClick={goToPrev}
+            disabled={busy || currentPage <= 1}
+            title="Previous page"
+            className="h-8 w-8 inline-flex items-center justify-center rounded-full text-white/80 hover:text-white hover:bg-white/15 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <span className="text-xs font-medium text-white/90 tabular-nums px-2 min-w-[64px] text-center">
+            {currentPage} / {pageCount}
+          </span>
+          <button
+            type="button"
+            onClick={goToNext}
+            disabled={busy || currentPage >= pageCount}
+            title="Next page"
+            className="h-8 w-8 inline-flex items-center justify-center rounded-full text-white/80 hover:text-white hover:bg-white/15 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+          <div className="w-px h-5 bg-white/15 mx-1" />
+          <button
+            type="button"
+            onClick={addBlankPage}
+            disabled={busy}
+            title="Add blank page"
+            className="h-8 w-8 inline-flex items-center justify-center rounded-full text-fuchsia-200 hover:text-white hover:bg-fuchsia-600/40 transition-colors disabled:opacity-30"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setNavVisible(false)}
+            title="Hide page navigator"
+            className="h-8 w-8 inline-flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/15 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
-        {startMode === 'choose' && (
-          <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-30">
-            <div className="bg-white text-slate-900 border border-slate-200 rounded-lg p-7 max-w-2xl w-full mx-4 shadow-2xl">
-              <h2 className="text-lg font-semibold mb-1">Start the whiteboard</h2>
-              <p className="text-sm text-slate-500 mb-6">
-                {scheduleCtx ? `${scheduleCtx.subject} — ${scheduleCtx.batch}` : 'Pick how you want to begin'}
-              </p>
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  onClick={startBlank}
-                  className="flex flex-col items-center justify-center gap-2 p-6 rounded-md border border-slate-200 bg-slate-50 hover:bg-fuchsia-50 hover:border-fuchsia-200 transition"
-                >
-                  <Square className="h-8 w-8 text-fuchsia-600" />
-                  <div className="text-sm font-medium text-slate-900">Blank board</div>
-                  <div className="text-[11px] text-slate-500 text-center">Draw on empty pages, add more anytime</div>
-                </button>
-                <button
-                  onClick={() => pdfInputRef.current?.click()}
-                  className="flex flex-col items-center justify-center gap-2 p-6 rounded-md border border-slate-200 bg-slate-50 hover:bg-fuchsia-50 hover:border-fuchsia-200 transition"
-                >
-                  <FileText className="h-8 w-8 text-fuchsia-600" />
-                  <div className="text-sm font-medium text-slate-900">Import PDF / Slides</div>
-                  <div className="text-[11px] text-slate-500 text-center">Each PDF page becomes an annotated page</div>
-                </button>
-              </div>
-              <div className="mt-6 text-[11px] text-slate-400 text-center">
-                Resume picks up automatically — your strokes are saved on this device.
-              </div>
+      {/* Navigator peek tab — shows when nav is collapsed */}
+      {startMode !== 'choose' && !navVisible && (
+        <button
+          type="button"
+          onClick={() => setNavVisible(true)}
+          title="Show page navigator"
+          className="absolute bottom-16 right-4 z-20 h-9 px-3 inline-flex items-center gap-1.5 rounded-full bg-slate-900/90 backdrop-blur border border-white/15 text-white/85 hover:bg-slate-800 hover:text-white shadow-lg transition-colors"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          <span className="text-xs font-medium tabular-nums">{currentPage}/{pageCount}</span>
+        </button>
+      )}
+
+      {startMode === 'choose' && (
+        <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-30">
+          <div className="bg-white text-slate-900 border border-slate-200 rounded-lg p-7 max-w-2xl w-full mx-4 shadow-2xl">
+            <h2 className="text-lg font-semibold mb-1">Start the whiteboard</h2>
+            <p className="text-sm text-slate-500 mb-6">
+              {scheduleCtx ? `${scheduleCtx.subject} — ${scheduleCtx.batch}` : 'Pick how you want to begin'}
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={startBlank}
+                className="flex flex-col items-center justify-center gap-2 p-6 rounded-md border border-slate-200 bg-slate-50 hover:bg-fuchsia-50 hover:border-fuchsia-200 transition"
+              >
+                <Square className="h-8 w-8 text-fuchsia-600" />
+                <div className="text-sm font-medium text-slate-900">Blank board</div>
+                <div className="text-[11px] text-slate-500 text-center">Draw on empty pages, add more anytime</div>
+              </button>
+              <button
+                onClick={() => pdfInputRef.current?.click()}
+                className="flex flex-col items-center justify-center gap-2 p-6 rounded-md border border-slate-200 bg-slate-50 hover:bg-fuchsia-50 hover:border-fuchsia-200 transition"
+              >
+                <FileText className="h-8 w-8 text-fuchsia-600" />
+                <div className="text-sm font-medium text-slate-900">Import PDF / Slides</div>
+                <div className="text-[11px] text-slate-500 text-center">Each PDF page becomes an annotated page</div>
+              </button>
+            </div>
+            <div className="mt-6 text-[11px] text-slate-400 text-center">
+              Resume picks up automatically — your strokes are saved on this device.
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {busy && (
-          <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-40">
-            <div className="bg-slate-900 border border-white/10 rounded-xl px-6 py-4 flex items-center gap-3">
-              <Loader2 className="h-5 w-5 animate-spin text-fuchsia-300" />
-              <span className="text-sm">{busyLabel || 'Working…'}</span>
-            </div>
+      {busy && (
+        <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center z-40">
+          <div className="bg-slate-900 border border-white/10 rounded-xl px-6 py-4 flex items-center gap-3">
+            <Loader2 className="h-5 w-5 animate-spin text-fuchsia-300" />
+            <span className="text-sm">{busyLabel || 'Working…'}</span>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
         <DialogContent>
