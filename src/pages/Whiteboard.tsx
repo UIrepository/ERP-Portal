@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FileText, Image as ImageIcon, Loader2, PenLine, Save, Square } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileText, Image as ImageIcon, Loader2, PenLine, Plus, Save, Square } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -255,6 +255,20 @@ const Whiteboard = () => {
     editor.setCurrentPage(last.id);
   };
 
+  const goToPrev = () => {
+    if (!editor) return;
+    const pages = editor.getPages();
+    const idx = pages.findIndex((p) => p.id === editor.getCurrentPageId());
+    if (idx > 0) editor.setCurrentPage(pages[idx - 1].id);
+  };
+
+  const goToNext = () => {
+    if (!editor) return;
+    const pages = editor.getPages();
+    const idx = pages.findIndex((p) => p.id === editor.getCurrentPageId());
+    if (idx >= 0 && idx < pages.length - 1) editor.setCurrentPage(pages[idx + 1].id);
+  };
+
   const exportPdf = async () => {
     if (!editor) return;
     setBusy(true);
@@ -347,22 +361,32 @@ const Whiteboard = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-white/70 tabular-nums">
-            Page {currentPage} / {pageCount}
-          </span>
-          <Button size="sm" variant="ghost" className="h-8 text-white hover:bg-white/10" onClick={addBlankPage} disabled={busy || startMode === 'choose'}>
-            <Square className="h-3.5 w-3.5 mr-1.5" />
-            Add page
-          </Button>
-          <Button size="sm" variant="ghost" className="h-8 text-white hover:bg-white/10" onClick={() => insertPdfInputRef.current?.click()} disabled={busy || startMode === 'choose'}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 bg-white/5 text-white/90 border border-white/10 hover:bg-white/20 hover:text-white hover:border-white/30 transition-colors"
+            onClick={() => insertPdfInputRef.current?.click()}
+            disabled={busy || startMode === 'choose'}
+          >
             <FileText className="h-3.5 w-3.5 mr-1.5" />
             Insert PDF
           </Button>
-          <Button size="sm" variant="ghost" className="h-8 text-white hover:bg-white/10" onClick={() => imageInputRef.current?.click()} disabled={busy || startMode === 'choose'}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 bg-white/5 text-white/90 border border-white/10 hover:bg-white/20 hover:text-white hover:border-white/30 transition-colors"
+            onClick={() => imageInputRef.current?.click()}
+            disabled={busy || startMode === 'choose'}
+          >
             <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
             Insert image
           </Button>
-          <Button size="sm" className="h-8 bg-fuchsia-600 hover:bg-fuchsia-700 text-white" onClick={() => setSaveOpen(true)} disabled={busy || startMode === 'choose'}>
+          <Button
+            size="sm"
+            className="h-8 bg-fuchsia-600 text-white border border-fuchsia-500 hover:bg-fuchsia-500 hover:border-fuchsia-400 transition-colors"
+            onClick={() => setSaveOpen(true)}
+            disabled={busy || startMode === 'choose'}
+          >
             <Save className="h-3.5 w-3.5 mr-1.5" />
             End & Save
           </Button>
@@ -375,6 +399,43 @@ const Whiteboard = () => {
           inferDarkMode
           persistenceKey={scheduleId ? `wb-${scheduleId}` : undefined}
         />
+
+        {/* Bottom-center page navigator (PW-style) */}
+        {startMode !== 'choose' && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 bg-slate-900/90 backdrop-blur border border-white/10 rounded-full px-2 py-1.5 shadow-lg">
+            <button
+              type="button"
+              onClick={goToPrev}
+              disabled={busy || currentPage <= 1}
+              title="Previous page"
+              className="h-8 w-8 inline-flex items-center justify-center rounded-full text-white/80 hover:text-white hover:bg-white/15 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="text-xs font-medium text-white/90 tabular-nums px-2 min-w-[64px] text-center">
+              {currentPage} / {pageCount}
+            </span>
+            <button
+              type="button"
+              onClick={goToNext}
+              disabled={busy || currentPage >= pageCount}
+              title="Next page"
+              className="h-8 w-8 inline-flex items-center justify-center rounded-full text-white/80 hover:text-white hover:bg-white/15 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            <div className="w-px h-5 bg-white/15 mx-1" />
+            <button
+              type="button"
+              onClick={addBlankPage}
+              disabled={busy}
+              title="Add blank page"
+              className="h-8 w-8 inline-flex items-center justify-center rounded-full text-fuchsia-200 hover:text-white hover:bg-fuchsia-600/40 transition-colors disabled:opacity-30"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+        )}
 
         {startMode === 'choose' && (
           <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center z-30">
