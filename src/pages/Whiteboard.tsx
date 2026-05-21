@@ -253,8 +253,48 @@ const Whiteboard = () => {
     }
   };
 
+  // Drop a faint locked rectangle at (0,0,BLANK_PAGE_W,BLANK_PAGE_H) so the
+  // teacher can see where the exported slide actually ends. Strokes drawn
+  // outside this rectangle get clipped on export.
+  const ensureFrameOnCurrentPage = (ed: Editor) => {
+    const shapes = ed.getCurrentPageShapes();
+    const alreadyHasFrame = shapes.some(
+      (s) =>
+        s.type === 'geo' &&
+        s.isLocked &&
+        s.x === 0 &&
+        s.y === 0 &&
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (s as any).props?.w === BLANK_PAGE_W &&
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (s as any).props?.h === BLANK_PAGE_H,
+    );
+    if (alreadyHasFrame) return;
+    ed.createShape({
+      id: createShapeId(),
+      type: 'geo',
+      x: 0,
+      y: 0,
+      isLocked: true,
+      opacity: 0.35,
+      props: {
+        geo: 'rectangle',
+        w: BLANK_PAGE_W,
+        h: BLANK_PAGE_H,
+        color: 'white',
+        fill: 'none',
+        dash: 'solid',
+        size: 's',
+      },
+    });
+  };
+
   const startBlank = () => {
     setStartMode('blank');
+    if (editor) {
+      ensureFrameOnCurrentPage(editor);
+      editor.zoomToFit();
+    }
   };
 
   const addBlankPage = () => {
@@ -262,6 +302,8 @@ const Whiteboard = () => {
     editor.createPage({ name: `Page ${editor.getPages().length + 1}` });
     const last = editor.getPages()[editor.getPages().length - 1];
     editor.setCurrentPage(last.id);
+    ensureFrameOnCurrentPage(editor);
+    editor.zoomToFit();
   };
 
   const goToPrev = () => {
