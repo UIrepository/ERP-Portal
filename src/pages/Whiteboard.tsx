@@ -265,6 +265,20 @@ const Whiteboard = () => {
     }
   };
 
+  // Re-center / zoom the current page to its canonical bounds — so flipping
+  // between pages always lands the teacher on the slide area, even if they
+  // scrolled away on a previous visit to that page.
+  const focusPage = (ed: Editor) => {
+    const shapes = ed.getCurrentPageShapes();
+    const pageBg = shapes.find(
+      (s): s is TLImageShape => s.type === 'image' && s.isLocked && s.x === 0 && s.y === 0,
+    );
+    const bounds = pageBg
+      ? new Box(0, 0, pageBg.props.w, pageBg.props.h)
+      : new Box(0, 0, BLANK_PAGE_W, BLANK_PAGE_H);
+    ed.zoomToBounds(bounds, { animation: { duration: 220 }, inset: 24 });
+  };
+
   // Drop a faint locked rectangle at (0,0,BLANK_PAGE_W,BLANK_PAGE_H) so the
   // teacher can see where the exported slide actually ends. Strokes drawn
   // outside this rectangle get clipped on export.
@@ -305,7 +319,7 @@ const Whiteboard = () => {
     setStartMode('blank');
     if (editor) {
       ensureFrameOnCurrentPage(editor);
-      editor.zoomToFit();
+      focusPage(editor);
     }
   };
 
@@ -315,21 +329,27 @@ const Whiteboard = () => {
     const last = editor.getPages()[editor.getPages().length - 1];
     editor.setCurrentPage(last.id);
     ensureFrameOnCurrentPage(editor);
-    editor.zoomToFit();
+    focusPage(editor);
   };
 
   const goToPrev = () => {
     if (!editor) return;
     const pages = editor.getPages();
     const idx = pages.findIndex((p) => p.id === editor.getCurrentPageId());
-    if (idx > 0) editor.setCurrentPage(pages[idx - 1].id);
+    if (idx > 0) {
+      editor.setCurrentPage(pages[idx - 1].id);
+      focusPage(editor);
+    }
   };
 
   const goToNext = () => {
     if (!editor) return;
     const pages = editor.getPages();
     const idx = pages.findIndex((p) => p.id === editor.getCurrentPageId());
-    if (idx >= 0 && idx < pages.length - 1) editor.setCurrentPage(pages[idx + 1].id);
+    if (idx >= 0 && idx < pages.length - 1) {
+      editor.setCurrentPage(pages[idx + 1].id);
+      focusPage(editor);
+    }
   };
 
   const exportPdf = async () => {
