@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Clock, Key, Copy, Merge, X, Loader2, Square } from 'lucide-react'; 
+import { Clock, Key, Copy, Merge, X, Loader2, Square, PenLine } from 'lucide-react';
 import { format, isToday, parse, isBefore, isAfter } from 'date-fns';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { generateJitsiRoomName, subjectsMatch } from '@/lib/jitsiUtils';
@@ -552,7 +552,15 @@ export const TeacherJoinClass = () => {
                   )}
 
                   <button onClick={() => setSelectedClassForAttendance(cls)} className={styles.btn}>Attendance</button>
-                  <button 
+                  <button
+                    onClick={() => window.open(`/whiteboard/${cls.id}`, '_blank', 'noopener')}
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded text-sm font-semibold cursor-pointer transition-all border border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100"
+                    title="Open whiteboard in new tab"
+                  >
+                    <PenLine className="w-4 h-4" />
+                    Whiteboard
+                  </button>
+                  <button
                     onClick={() => handleStartClass(cls)}
                     disabled={isStartingStream}
                     className={styles.btnBlue}
@@ -588,8 +596,16 @@ export const TeacherJoinClass = () => {
                 </div>
                 <div className={styles.actionsWrapper}>
                   <button onClick={() => setSelectedClassForAttendance(cls)} className={styles.btn}>Attendance</button>
-                  <button 
-                    onClick={() => handleStartClass(cls)} 
+                  <button
+                    onClick={() => window.open(`/whiteboard/${cls.id}`, '_blank', 'noopener')}
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded text-sm font-semibold cursor-pointer transition-all border border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100"
+                    title="Open whiteboard in new tab"
+                  >
+                    <PenLine className="w-4 h-4" />
+                    Whiteboard
+                  </button>
+                  <button
+                    onClick={() => handleStartClass(cls)}
                     disabled={isStartingStream}
                     className={styles.btnPrimary}
                   >
@@ -617,6 +633,14 @@ export const TeacherJoinClass = () => {
                 </div>
                 <div className={styles.actionsWrapper}>
                   <button onClick={() => setSelectedClassForAttendance(cls)} className={styles.btn}>View Attendance</button>
+                  <button
+                    onClick={() => window.open(`/whiteboard/${cls.id}`, '_blank', 'noopener')}
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded text-sm font-semibold cursor-pointer transition-all border border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100"
+                    title="Open whiteboard in new tab"
+                  >
+                    <PenLine className="w-4 h-4" />
+                    Whiteboard
+                  </button>
                 </div>
              </div>
           ))}
