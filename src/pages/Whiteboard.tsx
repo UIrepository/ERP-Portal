@@ -402,7 +402,7 @@ const Whiteboard = () => {
 
         {/* Bottom-center page navigator (PW-style) */}
         {startMode !== 'choose' && (
-          <div className="absolute bottom-4 right-4 z-20 flex items-center gap-1 bg-slate-900/90 backdrop-blur border border-white/10 rounded-full px-2 py-1.5 shadow-lg">
+          <div className="absolute bottom-16 right-4 z-20 flex items-center gap-1 bg-slate-900/90 backdrop-blur border border-white/10 rounded-full px-2 py-1.5 shadow-lg">
             <button
               type="button"
               onClick={goToPrev}
