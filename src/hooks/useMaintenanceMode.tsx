@@ -29,23 +29,28 @@ export const useMaintenanceMode = (userEmail: string | undefined) => {
     retry: 1, // Only retry once to fail fast if there's an issue
   });
 
-  // Check if user is verified for maintenance access
+  // Check if user is verified for maintenance access.
+  // Compare case-insensitively — auth emails and stored emails can drift in case.
+  const normalizedEmail = userEmail?.trim().toLowerCase();
   const { data: isVerified, isLoading: verifiedLoading } = useQuery({
-    queryKey: ['maintenance-verified', userEmail],
+    queryKey: ['maintenance-verified', normalizedEmail],
     queryFn: async () => {
-      if (!userEmail) return false;
+      if (!normalizedEmail) return false;
 
       const { data, error } = await supabase
         .from('verified_maintenance_users')
         .select('email')
-        .eq('email', userEmail)
+        .ilike('email', normalizedEmail)
         .maybeSingle();
 
-      if (error) return false;
+      if (error) {
+        console.error('verified_maintenance_users lookup failed:', error);
+        return false;
+      }
       return !!data;
     },
-    enabled: !!userEmail && !!settings?.is_maintenance_mode,
-    staleTime: 60000, 
+    enabled: !!normalizedEmail && !!settings?.is_maintenance_mode,
+    staleTime: 60000,
   });
 
   const isMaintenanceMode = settings?.is_maintenance_mode ?? false;

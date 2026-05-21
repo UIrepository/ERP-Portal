@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format, getDay, startOfWeek, addDays, isSameDay, subDays, parseISO, isWithinInterval } from 'date-fns';
-import { ChevronLeft, ChevronRight, Clock, Video, Plus, Loader2, BookOpen } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, Video, Plus, Loader2, BookOpen, PenLine } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -599,26 +599,37 @@ export const TeacherSchedule = () => {
                                                 </div>
 
                                                 {/* Teacher Action: Join or View */}
-                                                {classInfo.link ? (
-                                                    <Button 
-                                                        size="sm" 
-                                                        variant={isLive ? "default" : "outline"}
-                                                        className={cn(
-                                                            "w-full h-7 text-[10px] font-medium",
-                                                            isLive ? "bg-indigo-600 hover:bg-indigo-700 text-white" : "text-slate-600 border-slate-200 hover:bg-slate-50"
-                                                        )}
-                                                        asChild
+                                                <div className="flex items-center gap-1">
+                                                    {classInfo.link ? (
+                                                        <Button
+                                                            size="sm"
+                                                            variant={isLive ? "default" : "outline"}
+                                                            className={cn(
+                                                                "flex-1 h-7 text-[10px] font-medium",
+                                                                isLive ? "bg-indigo-600 hover:bg-indigo-700 text-white" : "text-slate-600 border-slate-200 hover:bg-slate-50"
+                                                            )}
+                                                            asChild
+                                                        >
+                                                            <a href={classInfo.link} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5">
+                                                                {isLive ? <Video className="h-3 w-3" /> : null}
+                                                                {isLive ? "Join Live" : "Join Class"}
+                                                            </a>
+                                                        </Button>
+                                                    ) : (
+                                                        <div className="flex-1 h-7 flex items-center justify-center text-[10px] text-slate-400 italic bg-slate-50 rounded border border-slate-100">
+                                                            No Link
+                                                        </div>
+                                                    )}
+                                                    <Button
+                                                        size="icon"
+                                                        variant="outline"
+                                                        title="Open whiteboard in new tab"
+                                                        className="h-7 w-7 shrink-0 text-fuchsia-700 border-fuchsia-200 hover:bg-fuchsia-50"
+                                                        onClick={() => window.open(`/whiteboard/${classInfo.id}`, '_blank', 'noopener')}
                                                     >
-                                                        <a href={classInfo.link} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5">
-                                                            {isLive ? <Video className="h-3 w-3" /> : null}
-                                                            {isLive ? "Join Live" : "Join Class"}
-                                                        </a>
+                                                        <PenLine className="h-3 w-3" />
                                                     </Button>
-                                                ) : (
-                                                    <div className="h-7 flex items-center justify-center text-[10px] text-slate-400 italic bg-slate-50 rounded border border-slate-100">
-                                                        No Link
-                                                    </div>
-                                                )}
+                                                </div>
                                             </div>
                                         </div>
                                     );

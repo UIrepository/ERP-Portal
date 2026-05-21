@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ClassSession from "./pages/ClassSession";
 import LecturePlayer from "./pages/LecturePlayer";
+import Whiteboard from "./pages/Whiteboard";
 import { ScreenRecordingProtection } from "@/components/ScreenRecordingProtection";
 
 // Import Community Components
@@ -33,6 +34,9 @@ const App = () => (
 
               {/* STANDALONE LECTURE PLAYER (opens in new tab) */}
               <Route path="/lecture/:recordingId" element={<LecturePlayer />} />
+
+              {/* WHITEBOARD (opens in new tab) */}
+              <Route path="/whiteboard/:scheduleId" element={<Whiteboard />} />
               
               {/* COMMUNITY ROUTES (Open in new tabs) */}
               <Route path="/portal/student/community" element={<StudentCommunity />} />
