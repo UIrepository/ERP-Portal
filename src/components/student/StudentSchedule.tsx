@@ -5,12 +5,11 @@ import { useAuth } from '@/hooks/useAuth';
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Clock01Icon, ArrowLeft01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons';
+import { ArrowLeft01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons';
 
 // Drop-in icon wrappers (premium Hugeicons, keeping the existing call sites)
-const mkIcon = (icon: typeof Clock01Icon) =>
+const mkIcon = (icon: typeof ArrowLeft01Icon) =>
   ({ className }: { className?: string }) => <HugeiconsIcon icon={icon} className={className} strokeWidth={1.8} />;
-const Clock = mkIcon(Clock01Icon);
 const ChevronLeft = mkIcon(ArrowLeft01Icon);
 const ChevronRight = mkIcon(ArrowRight01Icon);
 import { format, getDay, startOfWeek, addDays, isSameDay, subDays, isWithinInterval } from 'date-fns';
@@ -46,21 +45,21 @@ const subjectBorderColors = [
 ];
 
 const ScheduleSkeleton = () => (
-    <div className="border border-gray-200 rounded-md overflow-hidden bg-white shadow-sm">
+    <div className="border border-slate-100 rounded-md overflow-hidden bg-white shadow-sm">
         <div className="grid grid-cols-[80px_repeat(7,1fr)] min-w-[800px]">
-             <div className="h-14 bg-gray-50 border-b border-r border-gray-200" />
+             <div className="h-14 bg-gray-50 border-b border-r border-slate-100" />
              {[...Array(7)].map((_, i) => (
-                 <div key={i} className="h-14 border-b border-r border-gray-200 bg-gray-50 p-4">
+                 <div key={i} className="h-14 border-b border-r border-slate-100 bg-gray-50 p-4">
                      <Skeleton className="h-4 w-8 mx-auto" />
                  </div>
              ))}
              {[...Array(5)].map((_, r) => (
                  <div key={`row-${r}`} className="contents">
-                    <div className="h-32 border-b border-r border-gray-200 p-4">
+                    <div className="h-32 border-b border-r border-slate-100 p-4">
                         <Skeleton className="h-4 w-12 ml-auto" />
                     </div>
                     {[...Array(7)].map((_, c) => (
-                        <div key={`cell-${r}-${c}`} className="h-32 border-b border-r border-gray-200 p-2">
+                        <div key={`cell-${r}-${c}`} className="h-32 border-b border-r border-slate-100 p-2">
                              {Math.random() > 0.7 && <Skeleton className="h-20 w-full rounded-md" />}
                         </div>
                     ))}
@@ -227,7 +226,7 @@ export const StudentSchedule = () => {
       
       {/* TOOLBAR */}
       <header className="flex md:justify-end mb-6">
-        <div className="flex flex-wrap items-center gap-3 bg-gray-50/80 p-1.5 rounded-lg border border-gray-200 shadow-sm w-full md:w-auto">
+        <div className="flex flex-wrap items-center gap-3 bg-gray-50/80 p-1.5 rounded-lg border border-slate-100 shadow-sm w-full md:w-auto">
           {/* Dynamic Dropdown showing ONLY enrolled batches */}
           {studentBatches.length > 0 && selectedBatchFilter && (
             <Select value={selectedBatchFilter} onValueChange={handleBatchChange}>
@@ -260,9 +259,12 @@ export const StudentSchedule = () => {
 
           <div className="h-5 w-px bg-gray-300 mx-1 hidden sm:block"></div>
 
-          {/* Real-time Timer - premium dark pill, Inter tabular */}
+          {/* Real-time Timer - premium dark pill with a live pulse dot, Inter tabular */}
           <div className="px-3 flex items-center gap-2 bg-slate-900 text-white rounded-md h-7 shadow-sm">
-            <Clock className="h-3.5 w-3.5 text-indigo-300" />
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400"></span>
+            </span>
             <span className="text-xs font-semibold tabular-nums tracking-wider">
                 {format(currentTime, 'h:mm:ss a')}
             </span>
@@ -272,22 +274,22 @@ export const StudentSchedule = () => {
 
       {/* CALENDAR GRID */}
       {isLoading ? <ScheduleSkeleton /> : (
-      <div className="border border-gray-200 rounded-md overflow-hidden bg-white shadow-sm overflow-x-auto relative">
-          <div className="grid min-w-[900px] grid-cols-[80px_repeat(7,1fr)] bg-slate-50">
+      <div className="border border-slate-100 rounded-md overflow-hidden bg-white shadow-sm overflow-x-auto relative">
+          <div className="grid min-w-[900px] grid-cols-[80px_repeat(7,1fr)] bg-white">
             
             {/* Header Row */}
-            <div className="p-4 border-b border-r border-gray-200 bg-gray-50/50 sticky left-0 z-20"></div>
+            <div className="p-4 border-b border-r border-slate-100 bg-gray-50/50 sticky left-0 z-20"></div>
             {weekDates.map((date, index) => {
                 const isToday = isSameDay(date, currentTime);
                 return (
                     <div key={index} className={cn(
-                        "p-3 text-center border-b border-r border-gray-200 last:border-r-0 transition-colors",
-                        isToday ? "bg-white" : "bg-gray-50/50"
+                        "p-3 text-center border-b border-r border-slate-100 last:border-r-0 transition-colors",
+                        isToday ? "bg-indigo-50/40" : "bg-white"
                     )}>
                         <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{format(date, 'EEE')}</div>
                         <div className={cn(
-                            "text-lg font-medium",
-                            isToday ? "text-indigo-600" : "text-slate-700"
+                            "text-base font-semibold inline-flex items-center justify-center h-8 w-8 mx-auto rounded-full",
+                            isToday ? "bg-indigo-600 text-white" : "text-slate-700"
                         )}>{format(date, 'dd')}</div>
                     </div>
                 );
@@ -297,7 +299,7 @@ export const StudentSchedule = () => {
             {timeSlots.map((time, timeIndex) => (
                 <div key={`row-${time}`} className="contents">
                     {/* Time Label */}
-                    <div className="sticky left-0 z-10 bg-white px-2 text-center border-r border-b border-gray-200 flex flex-col items-center justify-start pt-6 tabular-nums">
+                    <div className="sticky left-0 z-10 bg-white px-2 text-center border-r border-b border-slate-100 flex flex-col items-center justify-start pt-6 tabular-nums">
                         <span className="text-[13px] font-semibold text-slate-700 leading-none">{formatTime(time).replace(/ [AP]M$/, '')}</span>
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">{formatTime(time).slice(-2)}</span>
                     </div>
@@ -314,7 +316,10 @@ export const StudentSchedule = () => {
                         }) || [];
 
                         return (
-                            <div key={`cell-${dayIndex}-${timeIndex}`} className="p-2 border-r border-b border-gray-200 last:border-r-0 bg-white min-h-[140px] hover:bg-slate-50/30 transition-colors relative">
+                            <div key={`cell-${dayIndex}-${timeIndex}`} className={cn(
+                              "p-2 border-r border-b border-slate-100 last:border-r-0 min-h-[120px] hover:bg-slate-50/40 transition-colors relative",
+                              isSameDay(date, currentTime) ? "bg-indigo-50/20" : "bg-white"
+                            )}>
                                 {cellClasses.map(classInfo => {
                                     const isLive = isClassLive(classInfo, date);
                                     
@@ -323,7 +328,7 @@ export const StudentSchedule = () => {
                                           key={classInfo.id} 
                                           className={cn(
                                             "relative bg-white border rounded-md p-3 mb-2 shadow-sm transition-all group overflow-hidden",
-                                            isLive ? "border-indigo-200 shadow-md ring-1 ring-indigo-50" : "border-gray-200 hover:border-gray-300"
+                                            isLive ? "border-indigo-200 shadow-md ring-1 ring-indigo-50" : "border-slate-100 hover:border-gray-300"
                                           )}
                                         >
                                             {/* Accent Left Border */}
@@ -342,9 +347,8 @@ export const StudentSchedule = () => {
                                                     </h3>
                                                 </div>
                                                 
-                                                <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-600 mb-1 tabular-nums">
-                                                    <Clock className="h-3 w-3 text-slate-400 shrink-0" />
-                                                    <span className="whitespace-nowrap">{formatTime(classInfo.start_time)} – {formatTime(classInfo.end_time)}</span>
+                                                <div className="text-[10px] font-medium text-slate-600 mb-1 tabular-nums whitespace-nowrap">
+                                                    {formatTime(classInfo.start_time)} – {formatTime(classInfo.end_time)}
                                                 </div>
                                                 <div className="text-[10px] text-slate-400 truncate">{classInfo.batch}</div>
                                             </div>
