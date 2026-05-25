@@ -10,8 +10,19 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Plus, Clock, Calendar, CheckCircle, XCircle, Loader2, ArrowRight, AlertCircle, Filter } from 'lucide-react';
+import { Plus, Clock, Calendar, CheckCircle, XCircle, Loader2, ArrowRight, AlertCircle, Filter, Trash2 } from 'lucide-react';
 import { format, isSameDay, parseISO, getDay } from 'date-fns';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -167,6 +178,25 @@ export const TeacherScheduleRequests = () => {
       toast.error('Failed to submit request');
       console.error(error);
     }
+  });
+
+  // Delete Request Mutation — teachers can remove their own requests (any status)
+  const deleteRequest = useMutation({
+    mutationFn: async (requestId: string) => {
+      const { error } = await supabase
+        .from('schedule_requests')
+        .delete()
+        .eq('id', requestId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teacherScheduleRequests'] });
+      toast.success('Request deleted');
+    },
+    onError: (error) => {
+      toast.error('Failed to delete request');
+      console.error(error);
+    },
   });
 
   const getStatusBadge = (status: string) => {
@@ -345,11 +375,45 @@ export const TeacherScheduleRequests = () => {
                       <p className="text-sm text-foreground/80 mt-1 italic">"{request.reason}"</p>
                     )}
                   </div>
-                  <div className="flex flex-col items-end gap-1">
-                     {getStatusBadge(request.status || 'pending')}
-                     {request.status !== 'pending' && (
-                        <span className="text-xs text-muted-foreground">Reviewed {request.reviewed_at ? format(new Date(request.reviewed_at), 'MMM d') : ''}</span>
-                     )}
+                  <div className="flex items-start gap-3">
+                    <div className="flex flex-col items-end gap-1">
+                       {getStatusBadge(request.status || 'pending')}
+                       {request.status !== 'pending' && (
+                          <span className="text-xs text-muted-foreground">Reviewed {request.reviewed_at ? format(new Date(request.reviewed_at), 'MMM d') : ''}</span>
+                       )}
+                    </div>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 shrink-0"
+                          title="Delete this request"
+                          disabled={deleteRequest.isPending}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete this request?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This removes your {request.status || 'pending'} reschedule request for{' '}
+                            <strong>{request.subject}</strong> ({request.batch}). This does not change
+                            the actual class schedule. This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteRequest.mutate(request.id)}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
               </CardContent>
