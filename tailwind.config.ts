@@ -52,7 +52,7 @@ export default {
 		extend: {
 			fontFamily: {
 				sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-				display: ['"Instrument Serif"', 'Georgia', '"Times New Roman"', 'serif'],
+				display: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
 			},
 			colors: {
 				...decorativeAliases,

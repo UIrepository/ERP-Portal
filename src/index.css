@@ -1,6 +1,6 @@
-/* Type pairing matching neuralai.in: Instrument Serif (display serif) for
-   headings and Inter (humanist sans) for body/UI. */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap');
+/* Single type family across the whole app: Inter (humanist sans) for body,
+   UI, and headings alike. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -19,12 +19,11 @@ All colors MUST be HSL.
     font-optical-sizing: auto;
   }
 
-  /* Display serif for major headings — editorial, human, not stock.
-     Smaller headings stay on the body sans to keep dense UI legible. */
+  /* Headings stay on Inter — bolder weight + tighter tracking for hierarchy. */
   h1, h2, .font-display {
-    font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif;
-    letter-spacing: 0;
-    font-weight: 400;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    letter-spacing: -0.02em;
+    font-weight: 700;
   }
 
   /* Numbers in tables, schedules, counters line up and read as data */
