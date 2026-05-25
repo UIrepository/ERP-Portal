@@ -199,7 +199,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
 
   return (
     <TooltipProvider delayDuration={0}>
-    <div className="w-full bg-white h-full flex flex-col overflow-hidden">
+    <div className={cn('w-full h-full flex flex-col overflow-hidden', collapsed ? 'bg-transparent' : 'bg-white')}>
       {/* Header - mobile only (logo); desktop sidebar starts straight at the nav */}
       <div className="p-4 border-b border-slate-200 shrink-0 md:hidden">
         <img src="/imagelogo.png" alt="Unknown IITians" className="h-14 w-auto mx-auto" />
@@ -296,7 +296,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
       </nav>
 
       {/* Logout Button - Always fixed at bottom */}
-      <div className="p-3 border-t border-slate-200 bg-white shrink-0">
+      <div className={cn('p-3 shrink-0', collapsed ? '' : 'border-t border-slate-200 bg-white')}>
         {withTooltip('Logout',
           <Button
             variant="ghost"

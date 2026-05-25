@@ -129,8 +129,8 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
 
       {/* Content Area: floating Sidebar over Main */}
       <div className="relative flex flex-1 min-h-0 overflow-hidden">
-        {/* Desktop Sidebar - floating icon-only rail; labels appear as hover tooltips */}
-        <aside className="hidden md:flex absolute left-3 top-3 bottom-3 z-20 w-16 rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden">
+        {/* Desktop Sidebar - floating icon-only rail; transparent so it blends with the white screen */}
+        <aside className="hidden md:flex absolute left-3 top-3 bottom-3 z-20 w-16 bg-transparent">
           <Sidebar
             activeTab={activeTab}
             onTabChange={onTabChange}
