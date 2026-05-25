@@ -1,7 +1,6 @@
-/* Editorial pairing in the spirit of Hinge (Tiempos + Modern Era), using
-   the closest freely-available faces: Fraunces (display serif) for headings
-   and Hanken Grotesk (humanist sans) for body/UI. */
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..700&family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap');
+/* Type pairing matching neuralai.in: Instrument Serif (display serif) for
+   headings and Inter (humanist sans) for body/UI. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -13,7 +12,7 @@ All colors MUST be HSL.
 
 @layer base {
   html {
-    font-family: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -23,9 +22,9 @@ All colors MUST be HSL.
   /* Display serif for major headings — editorial, human, not stock.
      Smaller headings stay on the body sans to keep dense UI legible. */
   h1, h2, .font-display {
-    font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
-    letter-spacing: -0.01em;
-    font-weight: 600;
+    font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+    letter-spacing: 0;
+    font-weight: 400;
   }
 
   /* Numbers in tables, schedules, counters line up and read as data */
