@@ -35,6 +35,15 @@ All colors MUST be HSL.
     font-variant-numeric: tabular-nums;
   }
 
+  /* Refine all Lucide icons: the default 2px stroke reads heavy/generic.
+     1.75 with round joins looks intentional. (CSS overrides the inline
+     stroke-width attribute, so this applies app-wide.) */
+  svg.lucide {
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
   :root {
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;

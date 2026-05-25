@@ -612,7 +612,7 @@ const Whiteboard = () => {
           type="button"
           onClick={showAllChrome}
           title="Show all controls"
-          className="absolute top-2 left-1/2 -translate-x-1/2 z-40 h-9 px-3 inline-flex items-center gap-1.5 rounded-full bg-slate-900/90 backdrop-blur border border-white/15 text-white/90 hover:bg-slate-800 hover:text-white shadow-lg transition-colors"
+          className="absolute top-2 left-1/2 -translate-x-1/2 z-40 h-9 px-3 inline-flex items-center gap-1.5 rounded-lg bg-slate-900/90 backdrop-blur border border-white/15 text-white/90 hover:bg-slate-800 hover:text-white shadow-lg transition-colors"
         >
           <ChevronDown className="h-4 w-4" />
           <span className="text-xs font-medium">Show controls</span>
@@ -621,13 +621,13 @@ const Whiteboard = () => {
 
       {/* Bottom-right page navigator (collapsible) */}
       {startMode !== 'choose' && navVisible && !chromeHidden && (
-        <div className="absolute bottom-16 right-4 z-20 flex items-center gap-1 bg-slate-900/90 backdrop-blur border border-white/10 rounded-full px-2 py-1.5 shadow-lg transition-all">
+        <div className="absolute bottom-16 right-4 z-20 flex items-center gap-1 bg-slate-900/90 backdrop-blur border border-white/10 rounded-lg px-2 py-1.5 shadow-lg transition-all">
           <button
             type="button"
             onClick={goToPrev}
             disabled={busy || currentPage <= 1}
             title="Previous page"
-            className="h-8 w-8 inline-flex items-center justify-center rounded-full text-white/80 hover:text-white hover:bg-white/15 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+            className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-white/80 hover:text-white hover:bg-white/15 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -639,7 +639,7 @@ const Whiteboard = () => {
             onClick={goToNext}
             disabled={busy || currentPage >= pageCount}
             title="Next page"
-            className="h-8 w-8 inline-flex items-center justify-center rounded-full text-white/80 hover:text-white hover:bg-white/15 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+            className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-white/80 hover:text-white hover:bg-white/15 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -649,7 +649,7 @@ const Whiteboard = () => {
             onClick={addBlankPage}
             disabled={busy}
             title="Add blank page"
-            className="h-8 w-8 inline-flex items-center justify-center rounded-full text-fuchsia-200 hover:text-white hover:bg-fuchsia-600/40 transition-colors disabled:opacity-30"
+            className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-fuchsia-200 hover:text-white hover:bg-fuchsia-600/40 transition-colors disabled:opacity-30"
           >
             <Plus className="h-4 w-4" />
           </button>
@@ -657,7 +657,7 @@ const Whiteboard = () => {
             type="button"
             onClick={() => setNavVisible(false)}
             title="Hide page navigator"
-            className="h-8 w-8 inline-flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/15 transition-colors"
+            className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -670,7 +670,7 @@ const Whiteboard = () => {
           type="button"
           onClick={() => setNavVisible(true)}
           title="Show page navigator"
-          className="absolute bottom-16 right-4 z-20 h-9 px-3 inline-flex items-center gap-1.5 rounded-full bg-slate-900/90 backdrop-blur border border-white/15 text-white/85 hover:bg-slate-800 hover:text-white shadow-lg transition-colors"
+          className="absolute bottom-16 right-4 z-20 h-9 px-3 inline-flex items-center gap-1.5 rounded-lg bg-slate-900/90 backdrop-blur border border-white/15 text-white/85 hover:bg-slate-800 hover:text-white shadow-lg transition-colors"
         >
           <ChevronLeft className="h-4 w-4" />
           <span className="text-xs font-medium tabular-nums">{currentPage}/{pageCount}</span>
