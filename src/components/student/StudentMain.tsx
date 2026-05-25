@@ -330,23 +330,22 @@ const StudentMainContent = () => {
       <header className="w-full rounded-t-lg rounded-b-none overflow-hidden shadow-sm border border-indigo-100/50 relative z-10 group">
         
         {/* Banner */}
-        <div className="relative bg-gradient-to-br from-violet-100 via-indigo-50 to-purple-100 px-6 py-8 text-slate-900">
-          
+        <div className="relative overflow-hidden bg-gradient-to-br from-indigo-950 via-indigo-700 to-indigo-500 px-6 py-8 text-white">
+
           {/* Dot Pattern Overlay */}
-          <div className="absolute inset-0 z-0 opacity-[0.3]" 
-               style={{ backgroundImage: 'radial-gradient(#8b5cf6 0.5px, transparent 0.5px)', backgroundSize: '12px 12px' }}>
+          <div className="absolute inset-0 z-0 opacity-[0.18]"
+               style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.8) 0.5px, transparent 0.5px)', backgroundSize: '12px 12px' }}>
           </div>
 
-          {/* Decorative Blur Accent */}
-          <div 
-            className="absolute top-0 right-0 w-[400px] h-full bg-indigo-200/20 blur-3xl z-0 pointer-events-none"
-            style={{ clipPath: 'polygon(100% 0, 0% 100%, 100% 100%)' }}
-          />
+          {/* Premium light glows over the deep base for a mesh-gradient feel */}
+          <div className="pointer-events-none absolute -top-20 -right-12 h-60 w-60 rounded-full bg-indigo-300/30 blur-3xl z-0" />
+          <div className="pointer-events-none absolute -bottom-24 left-1/4 h-52 w-52 rounded-full bg-indigo-400/25 blur-3xl z-0" />
+          <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(120%_120%_at_0%_0%,rgba(255,255,255,0.12),transparent_55%)]" />
           
           <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             {/* Title - Arrow REMOVED */}
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              <h1 className="text-2xl font-bold tracking-tight text-white">
                 {navigation.batch || "No Batch Selected"}
               </h1>
             </div>
@@ -355,7 +354,7 @@ const StudentMainContent = () => {
               {/* Tutorial Button */}
               <Button 
                 variant="outline"
-                className="bg-white/80 backdrop-blur-sm border-indigo-200 text-indigo-700 hover:bg-white hover:text-indigo-800 shadow-sm gap-2 font-sans font-normal"
+                className="bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/20 hover:text-white shadow-sm gap-2 font-sans font-normal"
                 onClick={() => setShowTutorial(true)}
               >
                 How to use me?
@@ -367,7 +366,7 @@ const StudentMainContent = () => {
                     <SheetTrigger asChild>
                       <Button 
                         variant="outline" 
-                        className="bg-white/80 backdrop-blur-sm border-indigo-200 text-indigo-700 hover:bg-white hover:text-indigo-800 shadow-sm gap-2 font-medium"
+                        className="bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/20 hover:text-white shadow-sm gap-2 font-medium"
                       >
                         Switch Batch
                         <ArrowRightLeft className="h-4 w-4 opacity-70" />
