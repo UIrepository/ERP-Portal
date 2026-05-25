@@ -302,7 +302,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
       <div className="p-3 border-t border-slate-200 bg-white shrink-0">
         <Button
           variant="ghost"
-          className="w-full justify-start gap-3 h-9 px-3 text-sm font-normal text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors"
+          className="w-full justify-start gap-3 h-9 px-3 text-sm font-normal text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
           onClick={signOut}
         >
           <HugeiconsIcon icon={Logout01Icon} size={18} strokeWidth={1.8} className="shrink-0" />

@@ -4,6 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useChatDrawer } from '@/hooks/useChatDrawer';
 import { Loader2, Send, X, MessageSquare, Minus, ChevronLeft } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { BubbleChatIcon, Cancel01Icon } from '@hugeicons/core-free-icons';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -494,9 +496,9 @@ export const StudentChatbot = () => {
         )}
       >
         {state.isOpen && !isMobile ? (
-          <X className="w-6 h-6" />
+          <HugeiconsIcon icon={Cancel01Icon} size={24} strokeWidth={2} />
         ) : (
-          <MessageSquare className="w-6 h-6" />
+          <HugeiconsIcon icon={BubbleChatIcon} size={24} strokeWidth={2} />
         )}
       </button>
 
