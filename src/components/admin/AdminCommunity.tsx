@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useMergedSubjects } from '@/hooks/useMergedSubjects';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -363,20 +364,22 @@ export const AdminCommunity = () => {
   }, [selectedGroup]);
 
 
+  // Merged batch/subject pairs: read across all of them, write to the canonical primary
+  const { orFilter, primaryPair } = useMergedSubjects(selectedGroup?.batch_name, selectedGroup?.subject_name);
+
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery({
-    queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
+    queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name, orFilter],
     queryFn: async (): Promise<CommunityMessage[]> => {
-      if (!selectedGroup) return [];
+      if (!selectedGroup || !orFilter) return [];
       const { data, error } = await supabase
         .from('community_messages')
         .select(`*, profiles:profile_basics (name, email), message_likes ( user_id, reaction_type )`)
-        .eq('batch', selectedGroup.batch_name)
-        .eq('subject', selectedGroup.subject_name)
+        .or(orFilter)
         .order('created_at', { ascending: true });
       if (error) throw error;
       return (data || []) as CommunityMessage[];
     },
-    enabled: !!selectedGroup
+    enabled: !!selectedGroup && !!orFilter
   });
 
   const messageMap = useMemo(() => {
@@ -422,7 +425,7 @@ export const AdminCommunity = () => {
     if (!selectedGroup) return;
     const refresh = () => { queryClient.invalidateQueries({ queryKey: ['community-messages', selectedGroup.batch_name, selectedGroup.subject_name] }); };
     const channel = supabase.channel(`community-${selectedGroup.batch_name}-${selectedGroup.subject_name}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'community_messages', filter: `batch=eq.${selectedGroup.batch_name}` }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'community_messages' }, refresh)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_likes' }, refresh)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -448,8 +451,9 @@ export const AdminCommunity = () => {
         content: text,
         image_url: imageUrl,
         user_id: profile.user_id,
-        batch: selectedGroup.batch_name,
-        subject: selectedGroup.subject_name,
+        // Write to the canonical primary pair so both sides of a merge share one thread
+        batch: primaryPair?.batch || selectedGroup.batch_name,
+        subject: primaryPair?.subject || selectedGroup.subject_name,
         reply_to_id: replyId,
         is_priority: priority
       };
