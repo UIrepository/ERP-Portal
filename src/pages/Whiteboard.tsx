@@ -68,6 +68,8 @@ const Whiteboard = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [headerVisible, setHeaderVisible] = useState(true);
   const [navVisible, setNavVisible] = useState(true);
+  const [postToNotes, setPostToNotes] = useState(true);
+  const [alsoDownload, setAlsoDownload] = useState(false);
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const insertPdfInputRef = useRef<HTMLInputElement>(null);
@@ -355,66 +357,110 @@ const Whiteboard = () => {
     }
   };
 
+  // Render every page into a single uniform-sized PDF and return its bytes.
+  const buildPdfBytes = async (): Promise<Uint8Array> => {
+    if (!editor) throw new Error('Editor not ready');
+    const pages = editor.getPages();
+    const pdfDoc = await PDFDocument.create();
+    const startedFrom = editor.getCurrentPageId();
+    for (let i = 0; i < pages.length; i++) {
+      setBusyLabel(`Rendering page ${i + 1} of ${pages.length}…`);
+      const p = pages[i];
+      editor.setCurrentPage(p.id);
+
+      // Pin the export to a fixed rectangle so every page in the final
+      // PDF has uniform dimensions. PDF-imported pages reuse the locked
+      // image's bounds; blank pages use the default 16:9 slide.
+      const shapes = editor.getCurrentPageShapes();
+      const pageBg = shapes.find(
+        (s): s is TLImageShape => s.type === 'image' && s.isLocked && s.x === 0 && s.y === 0,
+      );
+      const bounds = pageBg
+        ? new Box(0, 0, pageBg.props.w, pageBg.props.h)
+        : new Box(0, 0, BLANK_PAGE_W, BLANK_PAGE_H);
+
+      const ids = shapes.map((s) => s.id);
+      const blob = await exportToBlob({
+        editor,
+        ids,
+        format: 'png',
+        opts: { background: true, darkMode: !pageBg, bounds, padding: 0, scale: EXPORT_SCALE },
+      });
+
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      const img = await pdfDoc.embedPng(bytes);
+      const page = pdfDoc.addPage([img.width, img.height]);
+      page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+    }
+    editor.setCurrentPage(startedFrom);
+    return pdfDoc.save();
+  };
+
+  const downloadBytes = (bytes: Uint8Array, fileName: string) => {
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const bytesToBase64 = (bytes: Uint8Array): string => {
+    let binary = '';
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)));
+    }
+    return btoa(binary);
+  };
+
   const exportPdf = async () => {
     if (!editor) return;
     setBusy(true);
     setBusyLabel('Building PDF…');
     try {
-      const pages = editor.getPages();
-      const pdfDoc = await PDFDocument.create();
-      const startedFrom = editor.getCurrentPageId();
-      for (let i = 0; i < pages.length; i++) {
-        setBusyLabel(`Rendering page ${i + 1} of ${pages.length}…`);
-        const p = pages[i];
-        editor.setCurrentPage(p.id);
+      const safeTitle =
+        (title || 'whiteboard').replace(/[^a-z0-9_\-\s]/gi, '').trim() || 'whiteboard';
+      const bytes = await buildPdfBytes();
+      const wantsDrive = postToNotes && !!scheduleCtx;
 
-        // Pin the export to a fixed rectangle so every page in the final
-        // PDF has uniform dimensions. PDF-imported pages reuse the locked
-        // image's bounds; blank pages use the default 16:9 slide.
-        const shapes = editor.getCurrentPageShapes();
-        const pageBg = shapes.find(
-          (s): s is TLImageShape => s.type === 'image' && s.isLocked && s.x === 0 && s.y === 0,
-        );
-        const bounds = pageBg
-          ? new Box(0, 0, pageBg.props.w, pageBg.props.h)
-          : new Box(0, 0, BLANK_PAGE_W, BLANK_PAGE_H);
-
-        const ids = shapes.map((s) => s.id);
-        const blob = await exportToBlob({
-          editor,
-          ids,
-          format: 'png',
-          opts: {
-            background: true,
-            darkMode: !pageBg,
-            bounds,
-            padding: 0,
-            scale: EXPORT_SCALE,
+      if (wantsDrive) {
+        setBusyLabel('Uploading to Drive & Notes…');
+        const { data, error } = await supabase.functions.invoke('upload-whiteboard-pdf', {
+          body: {
+            scheduleId,
+            title: title || safeTitle,
+            pdfBase64: bytesToBase64(bytes),
+            postToNotes: true,
           },
         });
 
-        const bytes = new Uint8Array(await blob.arrayBuffer());
-        const img = await pdfDoc.embedPng(bytes);
-        const page = pdfDoc.addPage([img.width, img.height]);
-        page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
-      }
-      editor.setCurrentPage(startedFrom);
+        if (error || !data?.success) {
+          console.error('upload-whiteboard-pdf failed:', error, data);
+          downloadBytes(bytes, `${safeTitle}.pdf`);
+          toast.error('Could not save to Drive/Notes — downloaded a copy instead.');
+          setSaveOpen(false);
+          return;
+        }
 
-      const safeTitle = (title || 'whiteboard').replace(/[^a-z0-9_\-\s]/gi, '').trim() || 'whiteboard';
-      const bytes = await pdfDoc.save();
-      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${safeTitle}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      toast.success('PDF saved');
+        if (data.noteInserted === false) {
+          toast.error('Uploaded to Drive, but attaching to Notes failed. Link is in your Drive.');
+        } else {
+          toast.success(`Saved to Notes for ${scheduleCtx!.batch} — ${scheduleCtx!.subject}`);
+        }
+      }
+
+      if (alsoDownload || !wantsDrive) {
+        downloadBytes(bytes, `${safeTitle}.pdf`);
+        if (!wantsDrive) toast.success('PDF downloaded');
+      }
+
       setSaveOpen(false);
     } catch (e) {
       console.error(e);
-      toast.error('Failed to export PDF');
+      toast.error('Failed to save whiteboard');
     } finally {
       setBusy(false);
       setBusyLabel('');
@@ -630,14 +676,45 @@ const Whiteboard = () => {
               Exports all {pageCount} page{pageCount === 1 ? '' : 's'} as a single PDF.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 py-2">
+          <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label htmlFor="wb-title">PDF name</Label>
               <Input id="wb-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Kinematics — 2026-05-17" />
             </div>
-            <div className="text-xs text-slate-500">
-              Drive upload + auto-attach to Notes will be added next. For now the PDF downloads to your device.
-            </div>
+
+            <label className={cn(
+              'flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors',
+              scheduleCtx ? 'border-slate-200 hover:bg-slate-50' : 'border-slate-100 opacity-60 cursor-not-allowed',
+            )}>
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 accent-fuchsia-600"
+                checked={postToNotes && !!scheduleCtx}
+                disabled={!scheduleCtx}
+                onChange={(e) => setPostToNotes(e.target.checked)}
+              />
+              <span className="text-sm">
+                <span className="font-medium text-slate-900">Upload to Drive &amp; add to Notes</span>
+                <span className="block text-xs text-slate-500">
+                  {scheduleCtx
+                    ? `Saves to Google Drive and posts to ${scheduleCtx.batch} — ${scheduleCtx.subject}. Students see it in References.`
+                    : 'Unavailable — this whiteboard has no class context.'}
+                </span>
+              </span>
+            </label>
+
+            <label className="flex items-start gap-3 rounded-md border border-slate-200 p-3 cursor-pointer hover:bg-slate-50 transition-colors">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 accent-fuchsia-600"
+                checked={alsoDownload}
+                onChange={(e) => setAlsoDownload(e.target.checked)}
+              />
+              <span className="text-sm">
+                <span className="font-medium text-slate-900">Also download a copy</span>
+                <span className="block text-xs text-slate-500">Saves the PDF to this device as well.</span>
+              </span>
+            </label>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSaveOpen(false)} disabled={busy}>

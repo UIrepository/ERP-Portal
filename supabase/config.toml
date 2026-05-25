@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.send-community-email]
 verify_jwt = false
+
+[functions.upload-whiteboard-pdf]
+verify_jwt = true
