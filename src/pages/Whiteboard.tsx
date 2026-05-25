@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ChevronDown, ChevronLeft, ChevronRight, EyeOff, FileText, Image as ImageIcon, Loader2, Palette, PenLine, Plus, Save, Square, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, CloudUpload, EyeOff, FileStack, ImagePlus, Loader2, Palette, PenLine, Plus, Square, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -560,7 +560,7 @@ const Whiteboard = () => {
             onClick={() => insertPdfInputRef.current?.click()}
             disabled={busy || startMode === 'choose'}
           >
-            <FileText className="h-3.5 w-3.5 mr-1.5" />
+            <FileStack className="h-3.5 w-3.5 mr-1.5" />
             Insert PDF
           </Button>
           <Button
@@ -570,7 +570,7 @@ const Whiteboard = () => {
             onClick={() => imageInputRef.current?.click()}
             disabled={busy || startMode === 'choose'}
           >
-            <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
+            <ImagePlus className="h-3.5 w-3.5 mr-1.5" />
             Insert image
           </Button>
           <Button
@@ -579,7 +579,7 @@ const Whiteboard = () => {
             onClick={() => setSaveOpen(true)}
             disabled={busy || startMode === 'choose'}
           >
-            <Save className="h-3.5 w-3.5 mr-1.5" />
+            <CloudUpload className="h-3.5 w-3.5 mr-1.5" />
             End & Save
           </Button>
           <button
@@ -697,7 +697,7 @@ const Whiteboard = () => {
                 onClick={() => pdfInputRef.current?.click()}
                 className="flex flex-col items-center justify-center gap-2 p-6 rounded-md border border-slate-200 bg-slate-50 hover:bg-fuchsia-50 hover:border-fuchsia-200 transition"
               >
-                <FileText className="h-8 w-8 text-fuchsia-600" />
+                <FileStack className="h-8 w-8 text-fuchsia-600" />
                 <div className="text-sm font-medium text-slate-900">Import PDF / Slides</div>
                 <div className="text-[11px] text-slate-500 text-center">Each PDF page becomes an annotated page</div>
               </button>
