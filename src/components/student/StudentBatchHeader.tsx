@@ -20,11 +20,15 @@ export const StudentBatchHeader = ({
     : selectedBatch || 'No Batch Selected';
 
   return (
-    <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white rounded-b-2xl shadow-xl">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="relative overflow-hidden bg-gradient-to-br from-indigo-950 via-indigo-700 to-indigo-500 text-white rounded-b-2xl shadow-xl">
+      {/* Premium light glows over the deep base for a mesh-gradient feel */}
+      <div className="pointer-events-none absolute -top-20 -right-12 h-60 w-60 rounded-full bg-indigo-300/30 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 left-1/4 h-52 w-52 rounded-full bg-indigo-400/25 blur-3xl" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_120%_at_0%_0%,rgba(255,255,255,0.10),transparent_55%)]" />
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-cyan-400/80 text-xs font-semibold uppercase tracking-wider mb-1.5">
+            <p className="text-indigo-200 text-xs font-semibold uppercase tracking-wider mb-1.5">
               Selected Batch
             </p>
             <Button
@@ -38,14 +42,14 @@ export const StudentBatchHeader = ({
             >
               {displayText}
               {batchCount > 1 && (
-                <ChevronDown className="h-5 w-5 text-slate-400" />
+                <ChevronDown className="h-5 w-5 text-indigo-200" />
               )}
             </Button>
           </div>
           <div className="flex items-center gap-3">
             {batchCount > 1 && (
-              <div className="hidden sm:flex items-center gap-2 text-slate-400 text-sm">
-                <span className="bg-slate-700/50 px-3 py-1.5 rounded-full text-xs font-medium">
+              <div className="hidden sm:flex items-center gap-2 text-sm">
+                <span className="bg-white/10 border border-white/15 backdrop-blur-sm text-white/90 px-3 py-1.5 rounded-full text-xs font-medium">
                   {batchCount} batches enrolled
                 </span>
               </div>
@@ -53,7 +57,7 @@ export const StudentBatchHeader = ({
             <Button
               variant="ghost"
               size="icon"
-              className="text-slate-400 hover:text-white hover:bg-slate-700/50"
+              className="text-white/70 hover:text-white hover:bg-white/10"
             >
               <MoreVertical className="h-5 w-5" />
             </Button>
