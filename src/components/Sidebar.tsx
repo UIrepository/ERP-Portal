@@ -166,16 +166,6 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
     }
   };
 
-  const getPortalName = () => {
-    switch (resolvedRole) {
-      case 'student': return 'Student Portal';
-      case 'teacher': return 'Teacher Portal';
-      case 'manager': return 'Manager Portal';
-      case 'admin': return 'Admin Portal';
-      default: return 'Portal';
-    }
-  };
-
   const tabs = getTabs();
 
   // Shared nav-item styling: solid deep-violet active state with white text,
@@ -188,23 +178,11 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
         : 'text-slate-600 hover:bg-brand/5 hover:text-brand',
     );
 
-  const initial = (profile?.name?.trim()?.[0] || 'U').toUpperCase();
-
   return (
     <div className="w-full bg-white h-full flex flex-col overflow-hidden">
-      {/* Header - Fixed at top */}
-      <div className="p-4 border-b border-slate-200 shrink-0">
-        <img src="/imagelogo.png" alt="Unknown IITians" className="h-14 w-auto mx-auto mb-4 md:hidden" />
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-brand/10 text-brand flex items-center justify-center font-display font-semibold text-sm shrink-0">
-            {initial}
-          </div>
-          <div className="min-w-0">
-            <h2 className="font-display font-semibold text-slate-900 text-[15px] leading-tight truncate">
-              {getPortalName()}
-            </h2>
-          </div>
-        </div>
+      {/* Header - mobile only (logo); desktop sidebar starts straight at the nav */}
+      <div className="p-4 border-b border-slate-200 shrink-0 md:hidden">
+        <img src="/imagelogo.png" alt="Unknown IITians" className="h-14 w-auto mx-auto" />
       </div>
 
       {/* Navigation - Scrollable only if needed */}
