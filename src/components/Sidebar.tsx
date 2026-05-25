@@ -1,5 +1,6 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useMemo, useEffect } from 'react';
@@ -174,46 +175,68 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
 
   const tabs = getTabs();
 
+  // Shared nav-item styling: brand-tinted active state with a left indicator,
+  // quiet hover otherwise.
+  const navItemClass = (active: boolean) =>
+    cn(
+      'relative w-full justify-start gap-3 h-9 px-3 rounded-md text-sm font-normal transition-colors',
+      active
+        ? 'bg-brand/10 text-brand font-medium hover:bg-brand/10 hover:text-brand'
+        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+    );
+  const ActiveBar = ({ show }: { show: boolean }) =>
+    show ? <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-brand" /> : null;
+
+  const initial = (profile?.name?.trim()?.[0] || 'U').toUpperCase();
+
   return (
     <div className="w-full bg-white h-full flex flex-col overflow-hidden">
       {/* Header - Fixed at top */}
       <div className="p-4 border-b border-slate-200 shrink-0">
-        <img src="/imagelogo.png" alt="Unknown IITians Logo" className="h-16 w-auto mx-auto mb-4 md:hidden" />
-        <h2 className="font-semibold text-slate-800 text-lg">
-          {getPortalName()}
-        </h2>
-        <p className="text-sm text-slate-500 mt-1">{profile?.name}</p>
-        
+        <img src="/imagelogo.png" alt="Unknown IITians" className="h-14 w-auto mx-auto mb-4 md:hidden" />
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-lg bg-brand/10 text-brand flex items-center justify-center font-display font-semibold text-sm shrink-0">
+            {initial}
+          </div>
+          <div className="min-w-0">
+            <h2 className="font-display font-semibold text-slate-900 text-[15px] leading-tight truncate">
+              {getPortalName()}
+            </h2>
+            <p className="text-xs text-slate-500 truncate">{profile?.name}</p>
+          </div>
+        </div>
+
         {resolvedRole === 'student' && availableBatches.length > 0 && (
-          <p className="text-xs text-slate-500 mt-1">Batch: {availableBatches.join(', ')}</p>
+          <p className="text-[11px] text-slate-500 mt-3 truncate">Batch: {availableBatches.join(', ')}</p>
         )}
         {resolvedRole === 'student' && isLoadingEnrollments && (
-             <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+             <p className="text-[11px] text-slate-500 mt-3 flex items-center gap-1.5">
                 <span className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-slate-400"></span>
                 Loading enrollments...
              </p>
         )}
         {resolvedRole === 'student' && !isLoadingEnrollments && availableBatches.length === 0 && (
-             <p className="text-xs text-slate-500 mt-1">No enrollments found.</p>
+             <p className="text-[11px] text-slate-500 mt-3">No enrollments found.</p>
         )}
       </div>
-      
+
       {/* Navigation - Scrollable only if needed */}
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto min-h-0">
+      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto min-h-0">
           {tabs.map((tab) => {
             const isContactAdminTab = tab.id === 'contact-admin';
             const isSupportTab = tab.id === 'support';
-            
-            // Community opens in new tab (Icon removed)
+            const active = activeTab === tab.id;
+
+            // Community opens in new tab
             if (tab.id === 'teacher-community') {
               return (
                 <Button
                   key={tab.id}
                   variant="ghost"
-                  className="w-full justify-start text-slate-600 hover:text-slate-900 hover:bg-slate-100 group"
+                  className={navItemClass(false)}
                   onClick={() => window.open('/teacher-community', '_blank')}
                 >
-                  <tab.icon className="mr-3 h-4 w-4" />
+                  <tab.icon className="h-4 w-4 shrink-0" />
                   <span className="flex-1 text-left">{tab.label}</span>
                 </Button>
               );
@@ -224,10 +247,10 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
                     <Button
                         key={tab.id}
                         variant="ghost"
-                        className="w-full justify-start text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                        className={navItemClass(false)}
                         onClick={onSupportClick}
                     >
-                        <tab.icon className="mr-3 h-4 w-4" />
+                        <tab.icon className="h-4 w-4 shrink-0" />
                         {tab.label}
                     </Button>
                 );
@@ -237,15 +260,9 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
                 return (
                     <AlertDialog key={tab.id}>
                         <AlertDialogTrigger asChild>
-                            <Button
-                                variant={activeTab === tab.id ? 'default' : 'ghost'}
-                                className={`w-full justify-start ${
-                                    activeTab === tab.id 
-                                        ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
-                                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                                }`}
-                            >
-                                <tab.icon className="mr-3 h-4 w-4" />
+                            <Button variant="ghost" className={navItemClass(active)}>
+                                <ActiveBar show={active} />
+                                <tab.icon className="h-4 w-4 shrink-0" />
                                 {tab.label}
                             </Button>
                         </AlertDialogTrigger>
@@ -270,29 +287,26 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
             return (
                 <Button
                     key={tab.id}
-                    variant={activeTab === tab.id ? 'default' : 'ghost'}
-                    className={`w-full justify-start ${
-                    activeTab === tab.id 
-                        ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                    }`}
+                    variant="ghost"
+                    className={navItemClass(active)}
                     onClick={() => onTabChange(tab.id)}
                 >
-                    <tab.icon className="mr-3 h-4 w-4" />
+                    <ActiveBar show={active} />
+                    <tab.icon className="h-4 w-4 shrink-0" />
                     {tab.label}
                 </Button>
             );
           })}
       </nav>
-      
+
       {/* Logout Button - Always fixed at bottom */}
-      <div className="p-4 border-t border-slate-200 bg-white shrink-0">
+      <div className="p-3 border-t border-slate-200 bg-white shrink-0">
         <Button
-          variant="destructive"
-          className="w-full justify-center"
+          variant="ghost"
+          className="w-full justify-start gap-3 h-9 px-3 text-sm font-normal text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors"
           onClick={signOut}
         >
-          <LogOut className="mr-2 h-4 w-4" />
+          <LogOut className="h-4 w-4 shrink-0" />
           Logout
         </Button>
       </div>
