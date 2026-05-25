@@ -4,28 +4,31 @@ import { cn } from '@/lib/utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useMemo, useEffect } from 'react';
+import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  LayoutDashboard,
-  Calendar,
-  Video,
-  Users,
-  Link as LinkIcon,
-  BarChart2,
-  LogOut,
-  Megaphone,
-  History,
-  Phone,
-  ClipboardList,
-  UserCog,
-  GraduationCap,
-  Contact,
-  Star,
-  Wrench,
-  Headphones,
-  GitMerge,
-  MessageSquare, 
-  BookOpen       
-} from 'lucide-react';
+  DashboardSquare01Icon,
+  Calendar03Icon,
+  Video01Icon,
+  VideoReplayIcon,
+  UserGroupIcon,
+  Link01Icon,
+  Analytics01Icon,
+  Logout01Icon,
+  Megaphone01Icon,
+  WorkHistoryIcon,
+  WhatsappIcon,
+  TaskDaily01Icon,
+  UserSettings01Icon,
+  Mortarboard01Icon,
+  UserListIcon,
+  FavouriteIcon,
+  Wrench01Icon,
+  CustomerSupportIcon,
+  GitMergeIcon,
+  Message01Icon,
+  InboxIcon,
+  Quiz01Icon,
+} from '@hugeicons/core-free-icons';
 
 import {
   AlertDialog,
@@ -106,51 +109,51 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
 
   // --- 1. STUDENT TABS ---
   const studentTabs = [
-    { id: 'dashboard', label: 'My Learning', icon: LayoutDashboard },
-    { id: 'schedule', label: 'Schedule', icon: Calendar },
-    { id: 'support', label: 'Support', icon: Headphones },
-    { id: 'feedback', label: 'Submit Feedback', icon: MessageSquare },
-    { id: 'exams', label: 'Exams', icon: BookOpen },
-    { id: 'contact-admin', label: 'Contact Admin', icon: Phone }, 
+    { id: 'dashboard', label: 'My Learning', icon: DashboardSquare01Icon },
+    { id: 'schedule', label: 'Schedule', icon: Calendar03Icon },
+    { id: 'support', label: 'Support', icon: CustomerSupportIcon },
+    { id: 'feedback', label: 'Submit Feedback', icon: Message01Icon },
+    { id: 'exams', label: 'Exams', icon: Quiz01Icon },
+    { id: 'contact-admin', label: 'Contact Admin', icon: WhatsappIcon },
   ];
 
   // --- 2. TEACHER TABS ---
   const teacherTabs = [
-    { id: 'teacher-schedule', label: 'My Schedule', icon: Calendar },
-    { id: 'teacher-join-class', label: 'Join Class', icon: Video },
-    { id: 'teacher-community', label: 'Community', icon: Users },
-    { id: 'teacher-recordings', label: 'My Recordings', icon: Video },
-    { id: 'teacher-schedule-requests', label: 'Schedule Requests', icon: ClipboardList },
-    { id: 'teacher-feedback', label: 'Feedback', icon: Star },
-    { id: 'teacher-messages', label: 'Messages', icon: MessageSquare },
+    { id: 'teacher-schedule', label: 'My Schedule', icon: Calendar03Icon },
+    { id: 'teacher-join-class', label: 'Join Class', icon: Video01Icon },
+    { id: 'teacher-community', label: 'Community', icon: UserGroupIcon },
+    { id: 'teacher-recordings', label: 'My Recordings', icon: VideoReplayIcon },
+    { id: 'teacher-schedule-requests', label: 'Schedule Requests', icon: TaskDaily01Icon },
+    { id: 'teacher-feedback', label: 'Feedback', icon: FavouriteIcon },
+    { id: 'teacher-messages', label: 'Messages', icon: Message01Icon },
   ];
 
   // --- 3. MANAGER TABS ---
   const managerTabs = [
-    { id: 'manager-overview', label: 'Batch Overview', icon: LayoutDashboard },
-    { id: 'manager-join-class', label: 'Join Class', icon: Video },
-    { id: 'manager-messages', label: 'Messages', icon: MessageSquare },
-    { id: 'manager-schedule-requests', label: 'Schedule Requests', icon: ClipboardList },
-    { id: 'manager-teachers', label: 'Teachers', icon: UserCog },
-    { id: 'manager-students', label: 'Students', icon: GraduationCap },
+    { id: 'manager-overview', label: 'Batch Overview', icon: DashboardSquare01Icon },
+    { id: 'manager-join-class', label: 'Join Class', icon: Video01Icon },
+    { id: 'manager-messages', label: 'Messages', icon: Message01Icon },
+    { id: 'manager-schedule-requests', label: 'Schedule Requests', icon: TaskDaily01Icon },
+    { id: 'manager-teachers', label: 'Teachers', icon: UserSettings01Icon },
+    { id: 'manager-students', label: 'Students', icon: Mortarboard01Icon },
   ];
 
   // --- 4. ADMIN TABS ---
   const adminTabs = [
-    { id: 'enrollment-analytics', label: 'Student Analytics', icon: BarChart2 },
-    { id: 'admin-join-class', label: 'Join Class', icon: Video },
-    { id: 'admin-messages', label: 'Messages / Inbox', icon: MessageSquare },
-    { id: 'directory', label: 'Student Directory', icon: Contact },
-    { id: 'staff-manager', label: 'Staff Management', icon: UserCog },
-    { id: 'community-admin', label: 'Community Chat', icon: Users }, 
-    { id: 'schedules', label: 'Schedules', icon: Calendar },
-    { id: 'schedule-requests', label: 'Schedule Requests', icon: ClipboardList },
-    { id: 'meeting-manager', label: 'Meeting Links', icon: LinkIcon },
-    { id: 'feedback-viewer', label: 'Feedback Viewer', icon: MessageSquare },
-    { id: 'create-announcement', label: 'Create Announcement', icon: Megaphone },
-    { id: 'announcement-history', label: 'Announcement History', icon: History },
-    { id: 'maintenance', label: 'Maintenance Mode', icon: Wrench },
-    { id: 'subject-merges', label: 'Subject Merges', icon: GitMerge },
+    { id: 'enrollment-analytics', label: 'Student Analytics', icon: Analytics01Icon },
+    { id: 'admin-join-class', label: 'Join Class', icon: Video01Icon },
+    { id: 'admin-messages', label: 'Messages / Inbox', icon: InboxIcon },
+    { id: 'directory', label: 'Student Directory', icon: UserListIcon },
+    { id: 'staff-manager', label: 'Staff Management', icon: UserSettings01Icon },
+    { id: 'community-admin', label: 'Community Chat', icon: UserGroupIcon },
+    { id: 'schedules', label: 'Schedules', icon: Calendar03Icon },
+    { id: 'schedule-requests', label: 'Schedule Requests', icon: TaskDaily01Icon },
+    { id: 'meeting-manager', label: 'Meeting Links', icon: Link01Icon },
+    { id: 'feedback-viewer', label: 'Feedback Viewer', icon: Message01Icon },
+    { id: 'create-announcement', label: 'Create Announcement', icon: Megaphone01Icon },
+    { id: 'announcement-history', label: 'Announcement History', icon: WorkHistoryIcon },
+    { id: 'maintenance', label: 'Maintenance Mode', icon: Wrench01Icon },
+    { id: 'subject-merges', label: 'Subject Merges', icon: GitMergeIcon },
   ];
 
   const getTabs = () => {
@@ -175,17 +178,15 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
 
   const tabs = getTabs();
 
-  // Shared nav-item styling: brand-tinted active state with a left indicator,
-  // quiet hover otherwise.
+  // Shared nav-item styling: solid deep-violet active state with white text,
+  // soft violet-tinted hover otherwise.
   const navItemClass = (active: boolean) =>
     cn(
       'relative w-full justify-start gap-3 h-9 px-3 rounded-md text-sm font-normal transition-colors',
       active
-        ? 'bg-brand/10 text-brand font-medium hover:bg-brand/10 hover:text-brand'
-        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
+        ? 'bg-brand text-white font-medium shadow-sm hover:bg-brand hover:text-white'
+        : 'text-slate-600 hover:bg-brand/5 hover:text-brand',
     );
-  const ActiveBar = ({ show }: { show: boolean }) =>
-    show ? <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-brand" /> : null;
 
   const initial = (profile?.name?.trim()?.[0] || 'U').toUpperCase();
 
@@ -236,7 +237,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
                   className={navItemClass(false)}
                   onClick={() => window.open('/teacher-community', '_blank')}
                 >
-                  <tab.icon className="h-4 w-4 shrink-0" />
+                  <HugeiconsIcon icon={tab.icon} size={18} strokeWidth={1.8} className="shrink-0" />
                   <span className="flex-1 text-left">{tab.label}</span>
                 </Button>
               );
@@ -250,7 +251,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
                         className={navItemClass(false)}
                         onClick={onSupportClick}
                     >
-                        <tab.icon className="h-4 w-4 shrink-0" />
+                        <HugeiconsIcon icon={tab.icon} size={18} strokeWidth={1.8} className="shrink-0" />
                         {tab.label}
                     </Button>
                 );
@@ -261,8 +262,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
                     <AlertDialog key={tab.id}>
                         <AlertDialogTrigger asChild>
                             <Button variant="ghost" className={navItemClass(active)}>
-                                <ActiveBar show={active} />
-                                <tab.icon className="h-4 w-4 shrink-0" />
+                                <HugeiconsIcon icon={tab.icon} size={18} strokeWidth={1.8} className="shrink-0" />
                                 {tab.label}
                             </Button>
                         </AlertDialogTrigger>
@@ -291,8 +291,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
                     className={navItemClass(active)}
                     onClick={() => onTabChange(tab.id)}
                 >
-                    <ActiveBar show={active} />
-                    <tab.icon className="h-4 w-4 shrink-0" />
+                    <HugeiconsIcon icon={tab.icon} size={18} strokeWidth={1.8} className="shrink-0" />
                     {tab.label}
                 </Button>
             );
@@ -306,7 +305,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
           className="w-full justify-start gap-3 h-9 px-3 text-sm font-normal text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors"
           onClick={signOut}
         >
-          <LogOut className="h-4 w-4 shrink-0" />
+          <HugeiconsIcon icon={Logout01Icon} size={18} strokeWidth={1.8} className="shrink-0" />
           Logout
         </Button>
       </div>
