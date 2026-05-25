@@ -38,7 +38,7 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
   };
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-white">
       {renderTabContent()}
     </div>
   );
