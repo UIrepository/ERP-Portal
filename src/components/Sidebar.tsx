@@ -175,11 +175,13 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
   // soft violet-tinted hover otherwise. Collapsed = centered icon-only square.
   const navItemClass = (active: boolean) =>
     cn(
-      'relative rounded-md text-sm font-normal transition-colors',
-      collapsed ? 'h-10 w-10 mx-auto justify-center p-0' : 'w-full justify-start gap-3 h-9 px-3',
+      'relative rounded-xl text-sm font-normal transition-colors',
+      collapsed ? 'h-10 w-10 mx-auto justify-center p-0' : 'w-full justify-start gap-3 h-9 px-3 rounded-md',
       active
         ? 'bg-brand text-white font-medium shadow-sm hover:bg-brand hover:text-white'
-        : 'text-slate-600 hover:bg-brand/5 hover:text-brand',
+        : collapsed
+          ? 'text-slate-400 hover:bg-white/10 hover:text-white'
+          : 'text-slate-600 hover:bg-brand/5 hover:text-brand',
     );
 
   const icon = (i: typeof DashboardSquare01Icon) => (
@@ -295,14 +297,16 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
           })}
       </nav>
 
-      {/* Logout Button - Always fixed at bottom */}
+      {/* Logout Button - pinned at the bottom of the dock */}
       <div className={cn('p-3 shrink-0', collapsed ? '' : 'border-t border-slate-200 bg-white')}>
         {withTooltip('Logout',
           <Button
             variant="ghost"
             className={cn(
-              'text-sm font-normal text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors',
-              collapsed ? 'h-10 w-10 mx-auto justify-center p-0' : 'w-full justify-start gap-3 h-9 px-3',
+              'text-sm font-normal transition-colors',
+              collapsed
+                ? 'h-10 w-10 mx-auto justify-center p-0 rounded-xl text-red-400 hover:bg-red-500/15 hover:text-red-300'
+                : 'w-full justify-start gap-3 h-9 px-3 text-red-600 hover:bg-red-50 hover:text-red-700',
             )}
             onClick={signOut}
           >
