@@ -175,8 +175,8 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
   // soft violet-tinted hover otherwise. Collapsed = centered icon-only square.
   const navItemClass = (active: boolean) =>
     cn(
-      'relative rounded-xl text-sm font-normal transition-colors',
-      collapsed ? 'h-10 w-10 mx-auto justify-center p-0' : 'w-full justify-start gap-3 h-9 px-3 rounded-md',
+      'relative rounded-md text-sm font-normal transition-colors',
+      collapsed ? 'h-10 w-10 mx-auto justify-center p-0' : 'w-full justify-start gap-3 h-9 px-3',
       active
         ? 'bg-brand text-white font-medium shadow-sm hover:bg-brand hover:text-white'
         : 'text-slate-600 hover:bg-brand/5 hover:text-brand',
@@ -303,7 +303,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
             className={cn(
               'text-sm font-normal transition-colors',
               collapsed
-                ? 'h-10 w-10 mx-auto justify-center p-0 rounded-xl text-red-600 hover:bg-red-50 hover:text-red-700'
+                ? 'h-10 w-10 mx-auto justify-center p-0 rounded-md text-red-600 hover:bg-red-50 hover:text-red-700'
                 : 'w-full justify-start gap-3 h-9 px-3 text-red-600 hover:bg-red-50 hover:text-red-700',
             )}
             onClick={signOut}
