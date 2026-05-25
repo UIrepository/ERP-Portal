@@ -130,7 +130,7 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
       {/* Content Area: floating Sidebar over Main */}
       <div className="relative flex flex-1 min-h-0 overflow-hidden">
         {/* Desktop floating dock - tall light capsule that floats over the page */}
-        <aside className="hidden md:flex absolute left-4 top-4 bottom-4 z-20 w-16 rounded-3xl bg-white border border-slate-200 shadow-lg overflow-hidden">
+        <aside className="hidden md:flex absolute left-4 top-4 bottom-4 z-20 w-16 rounded-lg bg-white border border-slate-200 overflow-hidden">
           <Sidebar
             activeTab={activeTab}
             onTabChange={onTabChange}
