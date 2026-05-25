@@ -8,20 +8,36 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { 
-  Send, 
-  Image as ImageIcon, 
-  Reply, 
-  ArrowLeft, 
-  Users, 
-  Loader2, 
-  Paperclip, 
-  Trash2, 
-  X,
-  Ban,
-  Lock,
-  Megaphone
-} from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import {
+  Sent02Icon,
+  Image01Icon,
+  ArrowTurnBackwardIcon,
+  ArrowLeft01Icon,
+  UserGroupIcon,
+  Attachment01Icon,
+  Delete02Icon,
+  Cancel01Icon,
+  CancelCircleIcon,
+  SquareLock02Icon,
+  Megaphone01Icon,
+} from '@hugeicons/core-free-icons';
+
+// Drop-in icon wrappers (keep the lucide-style call sites unchanged)
+const mkIcon = (icon: typeof Sent02Icon) =>
+  ({ className }: { className?: string }) => <HugeiconsIcon icon={icon} className={className} strokeWidth={1.8} />;
+const Send = mkIcon(Sent02Icon);
+const ImageIcon = mkIcon(Image01Icon);
+const Reply = mkIcon(ArrowTurnBackwardIcon);
+const ArrowLeft = mkIcon(ArrowLeft01Icon);
+const Users = mkIcon(UserGroupIcon);
+const Paperclip = mkIcon(Attachment01Icon);
+const Trash2 = mkIcon(Delete02Icon);
+const X = mkIcon(Cancel01Icon);
+const Ban = mkIcon(CancelCircleIcon);
+const Lock = mkIcon(SquareLock02Icon);
+const Megaphone = mkIcon(Megaphone01Icon);
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -110,7 +126,7 @@ const MessageItem = ({
     if (!text) return null;
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const parts = text.split(urlRegex);
-    const linkColor = isMe && !isPriority ? 'text-teal-100 hover:text-white' : 'text-teal-600 hover:text-teal-800';
+    const linkColor = isMe && !isPriority ? 'text-indigo-100 hover:text-white' : 'text-indigo-600 hover:text-indigo-800';
     return parts.map((part, i) => part.match(urlRegex) ? (
       <a key={i} href={part} target="_blank" rel="noopener noreferrer" className={`${linkColor} underline break-all`}>{part}</a>
     ) : part);
@@ -118,9 +134,9 @@ const MessageItem = ({
 
   const isReplyToMe = replyData?.user_id === profile?.user_id;
   const replySenderName = isReplyToMe ? "You" : replyData?.profiles?.name;
-  const replyBorderColor = isMe ? "border-teal-300/50" : "border-teal-500";
-  const replyNameColor = isMe ? "text-teal-100" : "text-teal-700";
-  const replyTextColor = isMe ? "text-teal-50/80" : "text-gray-500";
+  const replyBorderColor = isMe ? "border-indigo-300/50" : "border-indigo-500";
+  const replyNameColor = isMe ? "text-indigo-100" : "text-indigo-700";
+  const replyTextColor = isMe ? "text-indigo-50/80" : "text-gray-500";
   const replyBg = isMe ? "bg-black/10" : "bg-gray-50";
 
   const myReaction = msg.message_likes?.find(l => l.user_id === profile?.user_id);
@@ -179,7 +195,7 @@ const MessageItem = ({
   const priorityClass = msg.is_priority 
     ? "bg-rose-50 border-2 border-rose-200 text-rose-900 shadow-md" 
     : isMe 
-      ? "bg-teal-700 text-white" 
+      ? "bg-indigo-700 text-white" 
       : "bg-white text-gray-800 border border-gray-200";
 
   return (
@@ -218,7 +234,7 @@ const MessageItem = ({
               </div>
             )}
 
-            {!isMe && !msg.is_priority && <div className="text-[11px] font-bold text-teal-600 mb-1">{msg.profiles?.name}</div>}
+            {!isMe && !msg.is_priority && <div className="text-[11px] font-bold text-indigo-600 mb-1">{msg.profiles?.name}</div>}
             {!isMe && msg.is_priority && <div className="text-[11px] font-bold text-rose-700 mb-1">{msg.profiles?.name}</div>}
 
             {replyData && replyText && (
@@ -254,7 +270,7 @@ const MessageItem = ({
             </div>
 
             <div className={`flex justify-end items-center mt-1 gap-1 min-w-[50px]`}>
-               <span className={`text-[10px] ${isMe && !msg.is_priority ? 'text-teal-100' : 'text-gray-400'} whitespace-nowrap ml-auto`}>
+               <span className={`text-[10px] ${isMe && !msg.is_priority ? 'text-indigo-100' : 'text-gray-400'} whitespace-nowrap ml-auto`}>
                  {format(new Date(msg.created_at), 'h:mm a')}
                </span>
             </div>
@@ -345,6 +361,55 @@ export const StudentCommunity = () => {
     enabled: !!profile?.user_id
   });
 
+  // --- Per-community overview: last activity (recent on top) + unread counts (badges) ---
+  const seenKey = (g: { batch_name: string; subject_name: string }) =>
+    `community-seen-${g.batch_name}|${g.subject_name}`;
+
+  const markGroupSeen = (g: { batch_name: string; subject_name: string }) => {
+    try { localStorage.setItem(seenKey(g), new Date().toISOString()); } catch { /* ignore */ }
+    queryClient.invalidateQueries({ queryKey: ['community-overview'] });
+  };
+
+  const { data: overview = {} } = useQuery<Record<string, { lastAt: string | null; unread: number }>>({
+    queryKey: ['community-overview', profile?.user_id, enrollments.map(e => `${e.batch_name}|${e.subject_name}`).join(',')],
+    queryFn: async () => {
+      const result: Record<string, { lastAt: string | null; unread: number }> = {};
+      await Promise.all(enrollments.map(async (e) => {
+        const key = `${e.batch_name}|${e.subject_name}`;
+        const { data: last } = await supabase
+          .from('community_messages')
+          .select('created_at')
+          .eq('batch', e.batch_name).eq('subject', e.subject_name).eq('is_deleted', false)
+          .order('created_at', { ascending: false }).limit(1).maybeSingle();
+        const lastAt = (last as { created_at: string } | null)?.created_at ?? null;
+        let seen: string | null = null;
+        try { seen = localStorage.getItem(seenKey(e)); } catch { /* ignore */ }
+        let unread = 0;
+        if (lastAt && (!seen || new Date(lastAt) > new Date(seen))) {
+          const { count } = await supabase
+            .from('community_messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('batch', e.batch_name).eq('subject', e.subject_name).eq('is_deleted', false)
+            .neq('user_id', profile?.user_id || '')
+            .gt('created_at', seen || '1970-01-01T00:00:00Z');
+          unread = count ?? 0;
+        }
+        result[key] = { lastAt, unread };
+      }));
+      return result;
+    },
+    enabled: enrollments.length > 0 && !!profile?.user_id,
+    refetchInterval: 10000,
+  });
+
+  const sortedEnrollments = useMemo(() => {
+    return [...enrollments].sort((a, b) => {
+      const aAt = overview[`${a.batch_name}|${a.subject_name}`]?.lastAt || '';
+      const bAt = overview[`${b.batch_name}|${b.subject_name}`]?.lastAt || '';
+      return bAt.localeCompare(aAt); // most recent activity first
+    });
+  }, [enrollments, overview]);
+
   // 🟢 UPDATED: Handle Selection & Deep Linking (Params)
   useEffect(() => {
     if (isLoadingEnrollments || enrollments.length === 0) return;
@@ -429,9 +494,27 @@ export const StudentCommunity = () => {
     return () => { supabase.removeChannel(channel); };
   }, [selectedGroup, queryClient]);
 
+  // Global listener: keep the community list's order + unread badges fresh in near real-time
+  useEffect(() => {
+    if (enrollments.length === 0) return;
+    const channel = supabase
+      .channel('community-overview-global')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'community_messages' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['community-overview'] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [enrollments.length, queryClient]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [messages?.length, selectedGroup]);
+
+  // Mark the open community as read (clears its unread badge)
+  useEffect(() => {
+    if (selectedGroup) markGroupSeen(selectedGroup);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGroup, messages?.length]);
 
   const sendMessageMutation = useMutation({
     mutationFn: async ({ text, image, replyId }: { text: string; image: File | null; replyId: string | null }) => {
@@ -526,7 +609,7 @@ export const StudentCommunity = () => {
   };
 
   return (
-    <div className="flex h-[100dvh] w-full bg-[#fdfbf7] relative overflow-hidden">
+    <div className="flex h-[100dvh] w-full bg-white relative overflow-hidden">
       
       {/* GROUP LIST SIDEBAR */}
       <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
@@ -536,20 +619,29 @@ export const StudentCommunity = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="mr-1 text-gray-500 hover:text-gray-900 hover:bg-gray-200">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Users className="h-5 w-5 text-teal-600" /> Communities</h2>
+          <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Users className="h-5 w-5 text-indigo-600" /> Communities</h2>
         </div>
 
         <ScrollArea className="flex-1">
           <div className="p-2 space-y-1">
             {isLoadingEnrollments ? <div className="p-6 text-center text-gray-500 flex justify-center"><Loader2 className="animate-spin" /></div> : 
              enrollments.length === 0 ? <div className="p-6 text-center text-gray-500">No communities found.</div> :
-             enrollments.map((group) => (
-              <div key={`${group.batch_name}-${group.subject_name}`} onClick={() => setSelectedGroup(group)}
-                className={`p-3 rounded-lg cursor-pointer transition-colors flex items-center gap-3 ${selectedGroup?.batch_name === group.batch_name && selectedGroup?.subject_name === group.subject_name ? 'bg-teal-50 border-teal-200 border' : 'hover:bg-gray-100 border border-transparent'}`}>
-                <div className="h-10 w-10 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold shrink-0">{group.subject_name[0]}</div>
-                <div className="overflow-hidden text-left"><p className="font-semibold text-gray-900 truncate">{group.subject_name}</p><p className="text-xs text-gray-500 truncate">{group.batch_name}</p></div>
+             sortedEnrollments.map((group) => {
+              const isActive = selectedGroup?.batch_name === group.batch_name && selectedGroup?.subject_name === group.subject_name;
+              const unread = overview[`${group.batch_name}|${group.subject_name}`]?.unread || 0;
+              return (
+              <div key={`${group.batch_name}-${group.subject_name}`} onClick={() => { setSelectedGroup(group); markGroupSeen(group); }}
+                className={`p-3 rounded-lg cursor-pointer transition-colors flex items-center gap-3 ${isActive ? 'bg-indigo-50 border-indigo-200 border' : 'hover:bg-gray-100 border border-transparent'}`}>
+                <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold shrink-0">{group.subject_name[0]}</div>
+                <div className="overflow-hidden text-left flex-1 min-w-0"><p className="font-semibold text-gray-900 truncate">{group.subject_name}</p><p className="text-xs text-gray-500 truncate">{group.batch_name}</p></div>
+                {unread > 0 && !isActive && (
+                  <span className="ml-auto shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-brand text-white text-[11px] font-semibold flex items-center justify-center">
+                    {unread > 99 ? '99+' : unread}
+                  </span>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </ScrollArea>
       </div>
@@ -558,7 +650,7 @@ export const StudentCommunity = () => {
       {!selectedGroup && (
         <div className={`flex-1 flex flex-col items-center justify-center bg-gray-50 text-gray-400 ${isMobile ? 'hidden' : 'flex'}`}>
           <div className="h-20 w-20 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm">
-            <Users className="h-10 w-10 text-teal-200" />
+            <Users className="h-10 w-10 text-indigo-200" />
           </div>
           <p className="text-lg font-medium text-gray-600">Select a community to start chatting</p>
         </div>
@@ -566,14 +658,14 @@ export const StudentCommunity = () => {
 
       {/* CHAT AREA */}
       {selectedGroup && (
-        <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-[#fdfbf7]' : 'w-full'}`}>
+        <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-white' : 'w-full'}`}>
           
           {/* Header */}
           <div className="px-4 py-3 bg-white border-b flex items-center justify-between shadow-sm z-20 relative">
             <div className="flex items-center gap-3">
               {isMobile && <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }} className="-ml-2 mr-1 text-gray-600"><ArrowLeft className="h-5 w-5" /></Button>}
               <Avatar className="h-9 w-9 border border-gray-200">
-                <AvatarFallback className="bg-teal-600 text-white font-bold rounded-full">{selectedGroup.subject_name[0]}</AvatarFallback>
+                <AvatarFallback className="bg-indigo-600 text-white font-bold rounded-full">{selectedGroup.subject_name[0]}</AvatarFallback>
               </Avatar>
               <div>
                 <h3 className="font-bold text-gray-800 leading-none flex items-center gap-2 text-base">
@@ -606,7 +698,7 @@ export const StudentCommunity = () => {
                 </div>
             </div>
 
-            {isLoadingMessages ? <div className="flex justify-center p-10"><Loader2 className="animate-spin h-8 w-8 text-teal-400" /></div> : 
+            {isLoadingMessages ? <div className="flex justify-center p-10"><Loader2 className="animate-spin h-8 w-8 text-indigo-400" /></div> : 
              Object.keys(groupedMessages).length === 0 ? <div className="text-center py-20 text-gray-400 text-sm">No messages yet. Break the ice!</div> :
              Object.entries(groupedMessages).map(([dateKey, dateMessages]) => (
                <div key={dateKey} id={`date-${dateKey}`} className="space-y-3">
@@ -661,9 +753,9 @@ export const StudentCommunity = () => {
           <div className="p-3 md:p-4 bg-white border-t z-20">
             {/* Reply Preview */}
             {replyingTo && (
-              <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg mb-3 border-l-4 border-teal-500 animate-in slide-in-from-bottom-2">
+              <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg mb-3 border-l-4 border-indigo-500 animate-in slide-in-from-bottom-2">
                 <div className="flex flex-col px-2">
-                    <span className="text-xs font-bold text-teal-600 mb-0.5">Replying to {replyingTo.user_id === profile?.user_id ? 'You' : replyingTo.profiles?.name}</span>
+                    <span className="text-xs font-bold text-indigo-600 mb-0.5">Replying to {replyingTo.user_id === profile?.user_id ? 'You' : replyingTo.profiles?.name}</span>
                     <span className="text-xs text-gray-500 truncate max-w-[250px]">{replyingTo.content || 'Attachment'}</span>
                 </div>
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setReplyingTo(null)}><X className="h-4 w-4 text-gray-500" /></Button>
@@ -671,18 +763,18 @@ export const StudentCommunity = () => {
             )}
 
             {selectedImage && (
-              <div className="flex items-center justify-between bg-teal-50 p-2 rounded-lg mb-3 border border-teal-100">
+              <div className="flex items-center justify-between bg-indigo-50 p-2 rounded-lg mb-3 border border-indigo-100">
                 <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 bg-white rounded-md shadow-sm flex items-center justify-center text-teal-600"><ImageIcon className="h-5 w-5"/></div>
-                    <div className="text-sm text-teal-900 truncate max-w-[200px] font-medium">{selectedImage.name}</div>
+                    <div className="h-10 w-10 bg-white rounded-md shadow-sm flex items-center justify-center text-indigo-600"><ImageIcon className="h-5 w-5"/></div>
+                    <div className="text-sm text-indigo-900 truncate max-w-[200px] font-medium">{selectedImage.name}</div>
                 </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-teal-100 rounded-full" onClick={() => setSelectedImage(null)}><X className="h-4 w-4 text-teal-500" /></Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-indigo-100 rounded-full" onClick={() => setSelectedImage(null)}><X className="h-4 w-4 text-indigo-500" /></Button>
               </div>
             )}
 
-            <div className="flex items-end gap-2 bg-gray-50 p-2 rounded-xl border border-gray-200 focus-within:border-teal-300 focus-within:ring-2 focus-within:ring-teal-100 transition-all">
+            <div className="flex items-end gap-2 bg-gray-50 p-2 rounded-xl border border-gray-200 focus-within:border-indigo-300 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
               <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={(e) => e.target.files && setSelectedImage(e.target.files[0])} />
-              <Button variant="ghost" size="icon" className="h-10 w-10 text-gray-400 hover:bg-white hover:text-teal-600 rounded-lg shrink-0" onClick={() => fileInputRef.current?.click()}><Paperclip className="h-5 w-5" /></Button>
+              <Button variant="ghost" size="icon" className="h-10 w-10 text-gray-400 hover:bg-white hover:text-indigo-600 rounded-lg shrink-0" onClick={() => fileInputRef.current?.click()}><Paperclip className="h-5 w-5" /></Button>
               <Input 
                 value={messageText} 
                 onChange={(e) => setMessageText(e.target.value)} 
@@ -691,7 +783,7 @@ export const StudentCommunity = () => {
                 className="flex-1 border-none shadow-none focus-visible:ring-0 bg-transparent min-h-[40px] py-2 text-[15px] placeholder:text-gray-400" 
                 disabled={isUploading || sendMessageMutation.isPending} 
               />
-              <Button onClick={handleSend} disabled={(!messageText.trim() && !selectedImage) || isUploading} className="h-10 w-10 rounded-lg bg-teal-700 hover:bg-teal-800 text-white shrink-0 p-0 flex items-center justify-center shadow-sm transition-all hover:scale-105">{isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5 ml-0.5" />}</Button>
+              <Button onClick={handleSend} disabled={(!messageText.trim() && !selectedImage) || isUploading} className="h-10 w-10 rounded-lg bg-indigo-700 hover:bg-indigo-800 text-white shrink-0 p-0 flex items-center justify-center shadow-sm transition-all hover:scale-105">{isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5 ml-0.5" />}</Button>
             </div>
           </div>
         </div>
