@@ -62,7 +62,7 @@ interface CommunityMessage {
   created_at: string;
   is_deleted: boolean;
   is_priority: boolean;
-  profiles: { name: string | null } | null;
+  profiles: { name: string | null; email?: string | null } | null;
   message_likes: { user_id: string; reaction_type: string }[]; 
 }
 
@@ -119,12 +119,15 @@ const cleanList = (raw: any): string[] => {
 };
 
 // --- Avatar Color Helper ---
-// First name only — concise, readable label so the teacher can tell students apart
-const firstName = (name?: string | null) => (name || 'Student').trim().split(/\s+/)[0] || 'Student';
+// Last name — concise, readable label so the teacher can tell students apart
+const lastName = (name?: string | null) => {
+  const parts = (name || 'Student').trim().split(/\s+/).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : 'Student';
+};
 
-// Students show their real (first) name; teachers are shown generically as "Teacher"
+// Students show their real (last) name; teachers are shown generically as "Teacher"
 const senderLabel = (name?: string | null, isTeacher?: boolean) =>
-  isTeacher ? 'Teacher' : firstName(name);
+  isTeacher ? 'Teacher' : lastName(name);
 
 const getAvatarColor = (name: string) => {
   const colors = ['bg-red-100 text-red-700', 'bg-green-100 text-green-700', 'bg-blue-100 text-blue-700', 'bg-purple-100 text-purple-700', 'bg-yellow-100 text-yellow-700', 'bg-pink-100 text-pink-700'];
@@ -452,15 +455,16 @@ export const TeacherCommunity = () => {
     enabled: !!profile?.user_id
   });
 
-  // Identify teachers by membership in the teachers table (profiles.role is RLS-locked)
-  const { data: teacherIds } = useQuery<Set<string>>({
-    queryKey: ['community-teacher-ids'],
+  // Identify teachers by their email in the teachers table (profiles.role is RLS-locked)
+  const { data: teacherEmails } = useQuery<Set<string>>({
+    queryKey: ['community-teacher-emails'],
     queryFn: async () => {
-      const { data } = await supabase.from('teachers').select('user_id');
-      return new Set((data || []).map((t) => t.user_id).filter(Boolean) as string[]);
+      const { data } = await supabase.from('teachers').select('email');
+      return new Set((data || []).map((t) => t.email?.trim().toLowerCase()).filter(Boolean) as string[]);
     },
     staleTime: 10 * 60 * 1000,
   });
+  const isTeacherEmail = (email?: string | null) => !!email && (teacherEmails?.has(email.trim().toLowerCase()) ?? false);
 
   // --- Per-community overview: recent activity (recent on top) + unread counts ---
   const seenKey = (g: TeacherGroup) => `community-seen-${g.batch_name}|${g.subject_name}`;
@@ -525,7 +529,7 @@ export const TeacherCommunity = () => {
         .from('community_messages')
         .select(`
           *,
-          profiles:profile_basics (name),
+          profiles:profile_basics (name, email),
           message_likes ( user_id, reaction_type )
         `)
         .eq('batch', selectedGroup.batch_name) 
@@ -872,7 +876,7 @@ export const TeacherCommunity = () => {
                        key={msg.id}
                        msg={msg}
                        isMe={msg.user_id === profile?.user_id}
-                       isSenderTeacher={teacherIds?.has(msg.user_id) ?? false}
+                       isSenderTeacher={isTeacherEmail(msg.profiles?.email)}
                        replyData={msg.reply_to_id ? messageMap.get(msg.reply_to_id) : null}
                        replyText={msg.reply_to_id ? (messageMap.get(msg.reply_to_id)?.content || 'Message') : null}
                        onReply={setReplyingTo}

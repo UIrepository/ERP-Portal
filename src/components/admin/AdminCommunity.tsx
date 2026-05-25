@@ -63,7 +63,7 @@ interface CommunityMessage {
   created_at: string;
   is_deleted: boolean;
   is_priority: boolean;
-  profiles: { name: string | null } | null;
+  profiles: { name: string | null; email?: string | null } | null;
   message_likes: { user_id: string; reaction_type: string }[]; 
 }
 
@@ -72,12 +72,15 @@ interface GroupInfo {
   subject_name: string;
 }
 
-// First name only — concise, readable label so people are easy to tell apart
-const firstName = (name?: string | null) => (name || 'Student').trim().split(/\s+/)[0] || 'Student';
+// Last name — concise, readable label so people are easy to tell apart
+const lastName = (name?: string | null) => {
+  const parts = (name || 'Student').trim().split(/\s+/).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : 'Student';
+};
 
-// Students show their real (first) name; teachers are shown generically as "Teacher"
+// Students show their real (last) name; teachers are shown generically as "Teacher"
 const senderLabel = (name?: string | null, isTeacher?: boolean) =>
-  isTeacher ? 'Teacher' : firstName(name);
+  isTeacher ? 'Teacher' : lastName(name);
 
 // --- Helper for Avatar Colors ---
 const getAvatarColor = (name: string) => {
@@ -361,15 +364,16 @@ export const AdminCommunity = () => {
     setMessageText(''); setSelectedImage(null); setReplyingTo(null); setIsPriority(false);
   }, [selectedGroup]);
 
-  // Identify teachers by membership in the teachers table (profiles.role is RLS-locked)
-  const { data: teacherIds } = useQuery<Set<string>>({
-    queryKey: ['community-teacher-ids'],
+  // Identify teachers by their email in the teachers table (profiles.role is RLS-locked)
+  const { data: teacherEmails } = useQuery<Set<string>>({
+    queryKey: ['community-teacher-emails'],
     queryFn: async () => {
-      const { data } = await supabase.from('teachers').select('user_id');
-      return new Set((data || []).map((t) => t.user_id).filter(Boolean) as string[]);
+      const { data } = await supabase.from('teachers').select('email');
+      return new Set((data || []).map((t) => t.email?.trim().toLowerCase()).filter(Boolean) as string[]);
     },
     staleTime: 10 * 60 * 1000,
   });
+  const isTeacherEmail = (email?: string | null) => !!email && (teacherEmails?.has(email.trim().toLowerCase()) ?? false);
 
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery({
     queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
@@ -377,7 +381,7 @@ export const AdminCommunity = () => {
       if (!selectedGroup) return [];
       const { data, error } = await supabase
         .from('community_messages')
-        .select(`*, profiles:profile_basics (name), message_likes ( user_id, reaction_type )`)
+        .select(`*, profiles:profile_basics (name, email), message_likes ( user_id, reaction_type )`)
         .eq('batch', selectedGroup.batch_name)
         .eq('subject', selectedGroup.subject_name)
         .order('created_at', { ascending: true });
@@ -614,7 +618,7 @@ export const AdminCommunity = () => {
                        key={msg.id}
                        msg={msg}
                        isMe={msg.user_id === profile?.user_id}
-                       isSenderTeacher={teacherIds?.has(msg.user_id) ?? false}
+                       isSenderTeacher={isTeacherEmail(msg.profiles?.email)}
                        replyData={messageMap.get(msg.reply_to_id || '')} // Admin map has all messages
                        replyText={messageMap.get(msg.reply_to_id || '')?.content || 'Message'}
                        onReply={setReplyingTo}
