@@ -127,10 +127,10 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
         </div>
       </header>
 
-      {/* Content Area: Sidebar + Main */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* Desktop Sidebar - icon-only rail; labels appear as hover tooltips */}
-        <aside className="hidden md:flex h-full w-16 border-r flex-shrink-0">
+      {/* Content Area: floating Sidebar over Main */}
+      <div className="relative flex flex-1 min-h-0 overflow-hidden">
+        {/* Desktop Sidebar - floating icon-only rail; labels appear as hover tooltips */}
+        <aside className="hidden md:flex absolute left-3 top-3 bottom-3 z-20 w-16 rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden">
           <Sidebar
             activeTab={activeTab}
             onTabChange={onTabChange}
@@ -139,8 +139,8 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
           />
         </aside>
 
-        {/* Scrollable Main Content */}
-        <main className="flex-1 overflow-y-auto min-w-0">
+        {/* Scrollable Main Content - left padding on desktop to clear the floating rail */}
+        <main className="flex-1 overflow-y-auto min-w-0 md:pl-24">
           <div className="min-h-full flex flex-col">
             <div className="flex-1">
               {children}
