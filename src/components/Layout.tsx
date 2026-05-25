@@ -129,12 +129,13 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
 
       {/* Content Area: Sidebar + Main */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* Desktop Sidebar - Fixed height below navbar */}
-        <aside className="hidden md:flex h-full w-64 border-r flex-shrink-0">
-          <Sidebar 
-            activeTab={activeTab} 
+        {/* Desktop Sidebar - icon-only rail; labels appear as hover tooltips */}
+        <aside className="hidden md:flex h-full w-16 border-r flex-shrink-0">
+          <Sidebar
+            activeTab={activeTab}
             onTabChange={onTabChange}
             onSupportClick={resolvedRole === 'student' ? openSupportDrawer : undefined}
+            collapsed
           />
         </aside>
 

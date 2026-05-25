@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, type ReactNode } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
   DashboardSquare01Icon,
@@ -40,12 +40,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'; 
+} from '@/components/ui/alert-dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface SidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   onSupportClick?: () => void;
+  /** Desktop rail mode: icons only, labels shown as hover tooltips. */
+  collapsed?: boolean;
 }
 
 interface UserEnrollment {
@@ -53,7 +56,7 @@ interface UserEnrollment {
     subject_name: string;
 }
 
-export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps) => {
+export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = false }: SidebarProps) => {
   const { profile, user, signOut, resolvedRole } = useAuth();
   const queryClient = useQueryClient();
 
@@ -169,16 +172,33 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
   const tabs = getTabs();
 
   // Shared nav-item styling: solid deep-violet active state with white text,
-  // soft violet-tinted hover otherwise.
+  // soft violet-tinted hover otherwise. Collapsed = centered icon-only square.
   const navItemClass = (active: boolean) =>
     cn(
-      'relative w-full justify-start gap-3 h-9 px-3 rounded-md text-sm font-normal transition-colors',
+      'relative rounded-md text-sm font-normal transition-colors',
+      collapsed ? 'h-10 w-10 mx-auto justify-center p-0' : 'w-full justify-start gap-3 h-9 px-3',
       active
         ? 'bg-brand text-white font-medium shadow-sm hover:bg-brand hover:text-white'
         : 'text-slate-600 hover:bg-brand/5 hover:text-brand',
     );
 
+  const icon = (i: typeof DashboardSquare01Icon) => (
+    <HugeiconsIcon icon={i} size={18} strokeWidth={1.8} className="shrink-0" />
+  );
+
+  // In collapsed mode wrap the trigger in a hover tooltip showing the label.
+  const withTooltip = (label: string, node: ReactNode) =>
+    collapsed ? (
+      <Tooltip delayDuration={0}>
+        <TooltipTrigger asChild>{node}</TooltipTrigger>
+        <TooltipContent side="right" className="font-sans">{label}</TooltipContent>
+      </Tooltip>
+    ) : (
+      node
+    );
+
   return (
+    <TooltipProvider delayDuration={0}>
     <div className="w-full bg-white h-full flex flex-col overflow-hidden">
       {/* Header - mobile only (logo); desktop sidebar starts straight at the nav */}
       <div className="p-4 border-b border-slate-200 shrink-0 md:hidden">
@@ -192,44 +212,54 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
             const isSupportTab = tab.id === 'support';
             const active = activeTab === tab.id;
 
+            const label = <span className="flex-1 text-left truncate">{tab.label}</span>;
+
             // Community opens in new tab
             if (tab.id === 'teacher-community') {
               return (
-                <Button
-                  key={tab.id}
-                  variant="ghost"
-                  className={navItemClass(false)}
-                  onClick={() => window.open('/teacher-community', '_blank')}
-                >
-                  <HugeiconsIcon icon={tab.icon} size={18} strokeWidth={1.8} className="shrink-0" />
-                  <span className="flex-1 text-left">{tab.label}</span>
-                </Button>
+                <div key={tab.id}>
+                  {withTooltip(tab.label,
+                    <Button
+                      variant="ghost"
+                      className={navItemClass(false)}
+                      onClick={() => window.open('/teacher-community', '_blank')}
+                    >
+                      {icon(tab.icon)}
+                      {!collapsed && label}
+                    </Button>
+                  )}
+                </div>
               );
             }
 
             if (isSupportTab && onSupportClick) {
                 return (
-                    <Button
-                        key={tab.id}
-                        variant="ghost"
-                        className={navItemClass(false)}
-                        onClick={onSupportClick}
-                    >
-                        <HugeiconsIcon icon={tab.icon} size={18} strokeWidth={1.8} className="shrink-0" />
-                        {tab.label}
-                    </Button>
+                    <div key={tab.id}>
+                      {withTooltip(tab.label,
+                        <Button
+                            variant="ghost"
+                            className={navItemClass(false)}
+                            onClick={onSupportClick}
+                        >
+                            {icon(tab.icon)}
+                            {!collapsed && label}
+                        </Button>
+                      )}
+                    </div>
                 );
             }
 
             if (isContactAdminTab) {
                 return (
                     <AlertDialog key={tab.id}>
-                        <AlertDialogTrigger asChild>
-                            <Button variant="ghost" className={navItemClass(active)}>
-                                <HugeiconsIcon icon={tab.icon} size={18} strokeWidth={1.8} className="shrink-0" />
-                                {tab.label}
-                            </Button>
-                        </AlertDialogTrigger>
+                        {withTooltip(tab.label,
+                            <AlertDialogTrigger asChild>
+                                <Button variant="ghost" className={navItemClass(active)}>
+                                    {icon(tab.icon)}
+                                    {!collapsed && label}
+                                </Button>
+                            </AlertDialogTrigger>
+                        )}
                         <AlertDialogContent>
                             <AlertDialogHeader>
                                 <AlertDialogTitle>Contact Admin on WhatsApp</AlertDialogTitle>
@@ -249,30 +279,39 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
             }
 
             return (
-                <Button
-                    key={tab.id}
-                    variant="ghost"
-                    className={navItemClass(active)}
-                    onClick={() => onTabChange(tab.id)}
-                >
-                    <HugeiconsIcon icon={tab.icon} size={18} strokeWidth={1.8} className="shrink-0" />
-                    {tab.label}
-                </Button>
+                <div key={tab.id}>
+                  {withTooltip(tab.label,
+                    <Button
+                        variant="ghost"
+                        className={navItemClass(active)}
+                        onClick={() => onTabChange(tab.id)}
+                    >
+                        {icon(tab.icon)}
+                        {!collapsed && label}
+                    </Button>
+                  )}
+                </div>
             );
           })}
       </nav>
 
       {/* Logout Button - Always fixed at bottom */}
       <div className="p-3 border-t border-slate-200 bg-white shrink-0">
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-3 h-9 px-3 text-sm font-normal text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
-          onClick={signOut}
-        >
-          <HugeiconsIcon icon={Logout01Icon} size={18} strokeWidth={1.8} className="shrink-0" />
-          Logout
-        </Button>
+        {withTooltip('Logout',
+          <Button
+            variant="ghost"
+            className={cn(
+              'text-sm font-normal text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors',
+              collapsed ? 'h-10 w-10 mx-auto justify-center p-0' : 'w-full justify-start gap-3 h-9 px-3',
+            )}
+            onClick={signOut}
+          >
+            <HugeiconsIcon icon={Logout01Icon} size={18} strokeWidth={1.8} className="shrink-0" />
+            {!collapsed && 'Logout'}
+          </Button>
+        )}
       </div>
     </div>
+    </TooltipProvider>
   );
 };

@@ -324,7 +324,7 @@ const StudentMainContent = () => {
 
   return (
     // Outer Container
-    <div className="w-full max-w-[1600px] mx-auto px-4 md:px-6 py-6 flex flex-col gap-6 min-h-screen font-sans">
+    <div className="w-full max-w-[1840px] mx-auto px-4 md:px-6 py-6 flex flex-col gap-6 min-h-screen font-sans">
       
       {/* HEADER SECTION */}
       <header className="w-full rounded-t-lg rounded-b-none overflow-hidden shadow-sm border border-indigo-100/50 relative z-10 group">
