@@ -62,7 +62,8 @@ interface CommunityMessage {
   created_at: string;
   is_deleted: boolean;
   is_priority: boolean;
-  profiles: { name: string; role?: string | null } | null;
+  profiles: { name: string | null } | null;
+  roleinfo: { role?: string | null } | null;
   message_likes: { user_id: string; reaction_type: string }[]; 
 }
 
@@ -123,8 +124,8 @@ const cleanList = (raw: any): string[] => {
 const firstName = (name?: string | null) => (name || 'Student').trim().split(/\s+/)[0] || 'Student';
 
 // Students show their real (first) name; teachers are shown generically as "Teacher"
-const senderLabel = (p?: { name?: string | null; role?: string | null } | null) =>
-  p?.role === 'teacher' ? 'Teacher' : firstName(p?.name);
+const senderLabel = (name?: string | null, role?: string | null) =>
+  role === 'teacher' ? 'Teacher' : firstName(name);
 
 const getAvatarColor = (name: string) => {
   const colors = ['bg-red-100 text-red-700', 'bg-green-100 text-green-700', 'bg-blue-100 text-blue-700', 'bg-purple-100 text-purple-700', 'bg-yellow-100 text-yellow-700', 'bg-pink-100 text-pink-700'];
@@ -272,8 +273,8 @@ const MessageItem = ({
               </div>
             )}
 
-            {!isMe && !msg.is_priority && <div className="text-[11px] font-bold text-teal-600 mb-1">{senderLabel(msg.profiles)}</div>}
-            {!isMe && msg.is_priority && <div className="text-[11px] font-bold text-rose-700 mb-1">{senderLabel(msg.profiles)}</div>}
+            {!isMe && !msg.is_priority && <div className="text-[11px] font-bold text-teal-600 mb-1">{senderLabel(msg.profiles?.name, msg.roleinfo?.role)}</div>}
+            {!isMe && msg.is_priority && <div className="text-[11px] font-bold text-rose-700 mb-1">{senderLabel(msg.profiles?.name, msg.roleinfo?.role)}</div>}
 
             {replyData && replyText && (
               <div 
@@ -513,7 +514,8 @@ export const TeacherCommunity = () => {
         .from('community_messages')
         .select(`
           *,
-          profiles (name, role),
+          profiles:profile_basics (name),
+          roleinfo:profiles (role),
           message_likes ( user_id, reaction_type )
         `)
         .eq('batch', selectedGroup.batch_name) 

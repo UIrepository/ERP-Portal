@@ -78,7 +78,8 @@ interface CommunityMessage {
   created_at: string;
   is_deleted: boolean;
   is_priority: boolean;
-  profiles: { name: string; role?: string | null } | null;
+  profiles: { name: string | null } | null;
+  roleinfo: { role?: string | null } | null;
   message_likes: { user_id: string; reaction_type: string }[];
 }
 
@@ -91,8 +92,8 @@ interface UserEnrollment {
 const firstName = (name?: string | null) => (name || 'Student').trim().split(/\s+/)[0] || 'Student';
 
 // Students show their real (first) name; teachers are shown generically as "Teacher"
-const senderLabel = (p?: { name?: string | null; role?: string | null } | null) =>
-  p?.role === 'teacher' ? 'Teacher' : firstName(p?.name);
+const senderLabel = (name?: string | null, role?: string | null) =>
+  role === 'teacher' ? 'Teacher' : firstName(name);
 
 // --- Helper for Avatar Colors ---
 const getAvatarColor = (name: string) => {
@@ -241,8 +242,8 @@ const MessageItem = ({
               </div>
             )}
 
-            {!isMe && !msg.is_priority && <div className="text-[11px] font-bold text-indigo-600 mb-1">{senderLabel(msg.profiles)}</div>}
-            {!isMe && msg.is_priority && <div className="text-[11px] font-bold text-rose-700 mb-1">{senderLabel(msg.profiles)}</div>}
+            {!isMe && !msg.is_priority && <div className="text-[11px] font-bold text-indigo-600 mb-1">{senderLabel(msg.profiles?.name, msg.roleinfo?.role)}</div>}
+            {!isMe && msg.is_priority && <div className="text-[11px] font-bold text-rose-700 mb-1">{senderLabel(msg.profiles?.name, msg.roleinfo?.role)}</div>}
 
             {replyData && replyText && (
               <div 
@@ -455,7 +456,8 @@ export const StudentCommunity = () => {
         .from('community_messages')
         .select(`
           *,
-          profiles (name, role),
+          profiles:profile_basics (name),
+          roleinfo:profiles (role),
           message_likes ( user_id, reaction_type )
         `)
         .eq('batch', selectedGroup.batch_name)
