@@ -131,6 +131,21 @@ const Whiteboard = () => {
       const idx = ps.findIndex((p) => p.id === ed.getCurrentPageId());
       if (idx >= 0) setCurrentPage(idx + 1);
     });
+
+    // Auto-enter focus mode the moment the teacher starts drawing/writing —
+    // a pointer-down on the canvas with any content tool (pen, text, shapes,
+    // etc.) hides all chrome. Non-drawing tools (select/hand/zoom/eraser)
+    // are ignored so the toolbar stays put while they're just navigating.
+    const NON_DRAWING = new Set(['select', 'hand', 'zoom', 'eraser']);
+    ed.on('event', (info) => {
+      if (
+        info.type === 'pointer' &&
+        info.name === 'pointer_down' &&
+        !NON_DRAWING.has(ed.getCurrentToolId())
+      ) {
+        setChromeHidden(true);
+      }
+    });
   }, []);
 
   // Render one PDF page to a data URL. We deliberately avoid
