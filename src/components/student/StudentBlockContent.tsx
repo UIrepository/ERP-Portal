@@ -36,7 +36,7 @@ export const StudentBlockContent = ({
   const renderContent = () => {
     switch (blockId) {
       case 'live-class':
-        return <StudentLiveClass batch={batch} subject={subject} />;
+        return <div className="p-4 md:p-6"><StudentLiveClass batch={batch} subject={subject} /></div>;
       case 'recordings':
         return <StudentRecordings batch={batch} subject={subject} />;
       case 'notes':

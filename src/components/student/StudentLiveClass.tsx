@@ -248,11 +248,12 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects }: StudentLi
   const allClasses = [...liveClasses, ...upcomingClasses];
 
   return (
-    <div className="w-full font-sans antialiased text-slate-900 p-4 md:p-6">
+    <div className="w-full font-sans antialiased text-slate-900">
       <div className="mb-6">
-        <h1 className="text-[18px] font-semibold tracking-tight text-slate-900">
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900">
            Live Class Sessions
         </h1>
+        <p className="text-sm text-slate-500 mt-1">Join your live and upcoming sessions for today.</p>
       </div>
 
       {allClasses.length > 0 ? (
