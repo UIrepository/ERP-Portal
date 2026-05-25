@@ -455,16 +455,20 @@ export const TeacherCommunity = () => {
     enabled: !!profile?.user_id
   });
 
-  // Identify teachers by their email in the teachers table (profiles.role is RLS-locked)
-  const { data: teacherEmails } = useQuery<Set<string>>({
-    queryKey: ['community-teacher-emails'],
+  // Identify the teacher(s) of the selected community via RPC (SECURITY DEFINER)
+  const { data: teacherUserIds } = useQuery<Set<string>>({
+    queryKey: ['community-teacher-userids', selectedGroup?.batch_name, selectedGroup?.subject_name],
     queryFn: async () => {
-      const { data } = await supabase.from('teachers').select('email');
-      return new Set((data || []).map((t) => t.email?.trim().toLowerCase()).filter(Boolean) as string[]);
+      if (!selectedGroup) return new Set<string>();
+      const { data } = await supabase.rpc('get_teacher_for_subject', {
+        p_batch: selectedGroup.batch_name,
+        p_subject: selectedGroup.subject_name,
+      });
+      return new Set(((data as { user_id: string }[]) || []).map((t) => t.user_id).filter(Boolean));
     },
-    staleTime: 10 * 60 * 1000,
+    enabled: !!selectedGroup,
+    staleTime: 5 * 60 * 1000,
   });
-  const isTeacherEmail = (email?: string | null) => !!email && (teacherEmails?.has(email.trim().toLowerCase()) ?? false);
 
   // --- Per-community overview: recent activity (recent on top) + unread counts ---
   const seenKey = (g: TeacherGroup) => `community-seen-${g.batch_name}|${g.subject_name}`;
@@ -509,11 +513,7 @@ export const TeacherCommunity = () => {
     });
   }, [teacherGroups, overview]);
 
-  useEffect(() => {
-    if (!isMobile && !selectedGroup && teacherGroups.length > 0) {
-      setSelectedGroup(teacherGroups[0]);
-    }
-  }, [teacherGroups, selectedGroup, isMobile]);
+  // No auto-selection: the chat opens only when the teacher picks a community.
 
   useEffect(() => {
     setMessageText('');
@@ -876,7 +876,7 @@ export const TeacherCommunity = () => {
                        key={msg.id}
                        msg={msg}
                        isMe={msg.user_id === profile?.user_id}
-                       isSenderTeacher={isTeacherEmail(msg.profiles?.email)}
+                       isSenderTeacher={teacherUserIds?.has(msg.user_id) ?? false}
                        replyData={msg.reply_to_id ? messageMap.get(msg.reply_to_id) : null}
                        replyText={msg.reply_to_id ? (messageMap.get(msg.reply_to_id)?.content || 'Message') : null}
                        onReply={setReplyingTo}

@@ -356,24 +356,26 @@ export const AdminCommunity = () => {
     }
   });
 
-  useEffect(() => {
-    if (!isMobile && !selectedGroup && allGroups.length > 0) setSelectedGroup(allGroups[0]);
-  }, [allGroups, selectedGroup, isMobile]);
+  // No auto-selection: the chat opens only when a community is picked.
 
   useEffect(() => {
     setMessageText(''); setSelectedImage(null); setReplyingTo(null); setIsPriority(false);
   }, [selectedGroup]);
 
-  // Identify teachers by their email in the teachers table (profiles.role is RLS-locked)
-  const { data: teacherEmails } = useQuery<Set<string>>({
-    queryKey: ['community-teacher-emails'],
+  // Identify the teacher(s) of the selected community via RPC (SECURITY DEFINER)
+  const { data: teacherUserIds } = useQuery<Set<string>>({
+    queryKey: ['community-teacher-userids', selectedGroup?.batch_name, selectedGroup?.subject_name],
     queryFn: async () => {
-      const { data } = await supabase.from('teachers').select('email');
-      return new Set((data || []).map((t) => t.email?.trim().toLowerCase()).filter(Boolean) as string[]);
+      if (!selectedGroup) return new Set<string>();
+      const { data } = await supabase.rpc('get_teacher_for_subject', {
+        p_batch: selectedGroup.batch_name,
+        p_subject: selectedGroup.subject_name,
+      });
+      return new Set(((data as { user_id: string }[]) || []).map((t) => t.user_id).filter(Boolean));
     },
-    staleTime: 10 * 60 * 1000,
+    enabled: !!selectedGroup,
+    staleTime: 5 * 60 * 1000,
   });
-  const isTeacherEmail = (email?: string | null) => !!email && (teacherEmails?.has(email.trim().toLowerCase()) ?? false);
 
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery({
     queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
@@ -618,7 +620,7 @@ export const AdminCommunity = () => {
                        key={msg.id}
                        msg={msg}
                        isMe={msg.user_id === profile?.user_id}
-                       isSenderTeacher={isTeacherEmail(msg.profiles?.email)}
+                       isSenderTeacher={teacherUserIds?.has(msg.user_id) ?? false}
                        replyData={messageMap.get(msg.reply_to_id || '')} // Admin map has all messages
                        replyText={messageMap.get(msg.reply_to_id || '')?.content || 'Message'}
                        onReply={setReplyingTo}
