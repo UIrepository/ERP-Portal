@@ -199,6 +199,19 @@ export const TeacherScheduleRequests = () => {
     },
   });
 
+  // Open the reschedule dialog pre-filled from an existing request.
+  const startReschedule = (request: any) => {
+    setFilterDate(request.new_date || todayStr);
+    setSelectedScheduleId(request.schedule_id || '');
+    setFormData({
+      new_date: request.new_date || '',
+      new_start_time: request.new_start_time || '',
+      new_end_time: request.new_end_time || '',
+      reason: request.reason || '',
+    });
+    setIsDialogOpen(true);
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'approved':
@@ -396,21 +409,30 @@ export const TeacherScheduleRequests = () => {
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Delete this request?</AlertDialogTitle>
+                          <AlertDialogTitle>Delete or reschedule?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            This removes your {request.status || 'pending'} reschedule request for{' '}
-                            <strong>{request.subject}</strong> ({request.batch}). This does not change
-                            the actual class schedule. This action cannot be undone.
+                            For your {request.status || 'pending'} request on{' '}
+                            <strong>{request.subject}</strong> ({request.batch}) — do you want to
+                            remove it, or open the reschedule form to change the timing instead?
+                            Neither option changes the actual class schedule.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
-                        <AlertDialogFooter>
+                        <AlertDialogFooter className="sm:justify-between">
                           <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => deleteRequest.mutate(request.id)}
-                            className="bg-red-600 hover:bg-red-700 text-white"
-                          >
-                            Delete
-                          </AlertDialogAction>
+                          <div className="flex gap-2">
+                            <AlertDialogAction
+                              onClick={() => startReschedule(request)}
+                              className="bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                              Reschedule
+                            </AlertDialogAction>
+                            <AlertDialogAction
+                              onClick={() => deleteRequest.mutate(request.id)}
+                              className="bg-red-600 hover:bg-red-700 text-white"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </div>
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
