@@ -362,20 +362,6 @@ export const AdminCommunity = () => {
     setMessageText(''); setSelectedImage(null); setReplyingTo(null); setIsPriority(false);
   }, [selectedGroup]);
 
-  // Identify the teacher(s) of the selected community via RPC (SECURITY DEFINER)
-  const { data: teacherUserIds } = useQuery<Set<string>>({
-    queryKey: ['community-teacher-userids', selectedGroup?.batch_name, selectedGroup?.subject_name],
-    queryFn: async () => {
-      if (!selectedGroup) return new Set<string>();
-      const { data } = await supabase.rpc('get_teacher_for_subject', {
-        p_batch: selectedGroup.batch_name,
-        p_subject: selectedGroup.subject_name,
-      });
-      return new Set(((data as { user_id: string }[]) || []).map((t) => t.user_id).filter(Boolean));
-    },
-    enabled: !!selectedGroup,
-    staleTime: 5 * 60 * 1000,
-  });
 
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery({
     queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
@@ -398,6 +384,25 @@ export const AdminCommunity = () => {
     messages.forEach(msg => map.set(msg.id, msg));
     return map;
   }, [messages]);
+
+  // Resolve each sender's role directly (subject-independent, RLS-safe), so teachers are labelled "Teacher"
+  const senderIds = useMemo(
+    () => Array.from(new Set(messages.map(m => m.user_id).filter(Boolean))),
+    [messages]
+  );
+  const { data: teacherIdSet } = useQuery<Set<string>>({
+    queryKey: ['community-sender-roles', senderIds],
+    queryFn: async () => {
+      const teachers = new Set<string>();
+      await Promise.all(senderIds.map(async (uid) => {
+        const { data } = await supabase.rpc('get_user_role_from_tables', { check_user_id: uid });
+        if ((data as string) === 'teacher') teachers.add(uid);
+      }));
+      return teachers;
+    },
+    enabled: senderIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const groupedMessages = useMemo(() => {
     const groups: Record<string, CommunityMessage[]> = {};
@@ -620,7 +625,7 @@ export const AdminCommunity = () => {
                        key={msg.id}
                        msg={msg}
                        isMe={msg.user_id === profile?.user_id}
-                       isSenderTeacher={teacherUserIds?.has(msg.user_id) ?? false}
+                       isSenderTeacher={teacherIdSet?.has(msg.user_id) ?? false}
                        replyData={messageMap.get(msg.reply_to_id || '')} // Admin map has all messages
                        replyText={messageMap.get(msg.reply_to_id || '')?.content || 'Message'}
                        onReply={setReplyingTo}

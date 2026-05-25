@@ -373,22 +373,6 @@ export const StudentCommunity = () => {
     enabled: !!profile?.user_id
   });
 
-  // Identify the teacher(s) of the selected community via RPC (the teachers table is
-  // RLS-locked for students; this SECURITY DEFINER fn returns the subject's teacher).
-  const { data: teacherUserIds } = useQuery<Set<string>>({
-    queryKey: ['community-teacher-userids', selectedGroup?.batch_name, selectedGroup?.subject_name],
-    queryFn: async () => {
-      if (!selectedGroup) return new Set<string>();
-      const { data } = await supabase.rpc('get_teacher_for_subject', {
-        p_batch: selectedGroup.batch_name,
-        p_subject: selectedGroup.subject_name,
-      });
-      return new Set(((data as { user_id: string }[]) || []).map((t) => t.user_id).filter(Boolean));
-    },
-    enabled: !!selectedGroup,
-    staleTime: 5 * 60 * 1000,
-  });
-
   // --- Per-community overview: last activity (recent on top) + unread counts (badges) ---
   const seenKey = (g: { batch_name: string; subject_name: string }) =>
     `community-seen-${g.batch_name}|${g.subject_name}`;
@@ -491,6 +475,26 @@ export const StudentCommunity = () => {
     messages.forEach(msg => map.set(msg.id, msg));
     return map;
   }, [messages]);
+
+  // Resolve each sender's role directly (subject-independent, RLS-safe via SECURITY DEFINER RPC),
+  // so a teacher allotted to this batch/subject is always labelled "Teacher", never by name.
+  const senderIds = useMemo(
+    () => Array.from(new Set(messages.map(m => m.user_id).filter(Boolean))),
+    [messages]
+  );
+  const { data: teacherIdSet } = useQuery<Set<string>>({
+    queryKey: ['community-sender-roles', senderIds],
+    queryFn: async () => {
+      const teachers = new Set<string>();
+      await Promise.all(senderIds.map(async (uid) => {
+        const { data } = await supabase.rpc('get_user_role_from_tables', { check_user_id: uid });
+        if ((data as string) === 'teacher') teachers.add(uid);
+      }));
+      return teachers;
+    },
+    enabled: senderIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const groupedMessages = useMemo(() => {
     const groups: Record<string, CommunityMessage[]> = {};
@@ -759,7 +763,7 @@ export const StudentCommunity = () => {
                        key={msg.id}
                        msg={msg}
                        isMe={msg.user_id === profile?.user_id}
-                       isSenderTeacher={teacherUserIds?.has(msg.user_id) ?? false}
+                       isSenderTeacher={teacherIdSet?.has(msg.user_id) ?? false}
                        replyData={msg.reply_to_id ? messageMap.get(msg.reply_to_id) : null}
                        replyText={msg.reply_to_id ? (messageMap.get(msg.reply_to_id)?.content || 'Message') : null}
                        onReply={setReplyingTo}
