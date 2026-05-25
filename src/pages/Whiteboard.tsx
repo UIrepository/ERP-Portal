@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, FileText, Image as ImageIcon, Loader2, PenLine, Plus, Save, Square, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, FileText, Image as ImageIcon, Loader2, Palette, PenLine, Plus, Save, Square, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -70,6 +70,7 @@ const Whiteboard = () => {
   const [navVisible, setNavVisible] = useState(true);
   const [postToNotes, setPostToNotes] = useState(true);
   const [alsoDownload, setAlsoDownload] = useState(false);
+  const [stylePanelHidden, setStylePanelHidden] = useState(false);
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const insertPdfInputRef = useRef<HTMLInputElement>(null);
@@ -489,8 +490,21 @@ const Whiteboard = () => {
       <input ref={insertPdfInputRef} type="file" accept="application/pdf" hidden onChange={onInsertPdfChosen} />
       <input ref={imageInputRef} type="file" accept="image/*" hidden onChange={onImageChosen} />
 
+      {/* Scoped CSS: shift tldraw's top UI below our header so the style
+          panel never sits under the Insert/Save buttons; allow hiding it. */}
+      <style>{`
+        .wb-canvas.wb-offset .tlui-layout__top { padding-top: 52px; }
+        .wb-canvas.wb-hide-style .tlui-style-panel__wrapper { display: none !important; }
+      `}</style>
+
       {/* Canvas — fills the whole viewport so collapsing chrome reclaims real estate */}
-      <div className="absolute inset-0">
+      <div
+        className={cn(
+          'absolute inset-0 wb-canvas',
+          headerVisible && 'wb-offset',
+          stylePanelHidden && 'wb-hide-style',
+        )}
+      >
         <Tldraw
           onMount={handleMount}
           inferDarkMode
@@ -548,9 +562,22 @@ const Whiteboard = () => {
           </Button>
           <button
             type="button"
+            onClick={() => setStylePanelHidden((v) => !v)}
+            title={stylePanelHidden ? 'Show color & size tools' : 'Hide color & size tools'}
+            className={cn(
+              'ml-1 h-8 w-8 inline-flex items-center justify-center rounded-md border transition-colors',
+              stylePanelHidden
+                ? 'bg-white/5 border-white/10 text-white/50 hover:bg-white/15 hover:text-white'
+                : 'bg-fuchsia-500/30 border-fuchsia-400/40 text-white hover:bg-fuchsia-500/50',
+            )}
+          >
+            <Palette className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
             onClick={() => setHeaderVisible(false)}
             title="Hide toolbar"
-            className="ml-1 h-8 w-8 inline-flex items-center justify-center rounded-md bg-white/5 border border-white/10 text-white/80 hover:bg-white/15 hover:text-white transition-colors"
+            className="h-8 w-8 inline-flex items-center justify-center rounded-md bg-white/5 border border-white/10 text-white/80 hover:bg-white/15 hover:text-white transition-colors"
           >
             <ChevronUp className="h-4 w-4" />
           </button>
