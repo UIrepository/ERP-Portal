@@ -199,7 +199,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
 
   return (
     <TooltipProvider delayDuration={0}>
-    <div className={cn('w-full flex flex-col overflow-hidden', collapsed ? 'h-auto bg-transparent' : 'h-full bg-white')}>
+    <div className={cn('w-full h-full flex flex-col overflow-hidden', collapsed ? 'bg-transparent' : 'bg-white')}>
       {/* Header - mobile only (logo); desktop sidebar starts straight at the nav */}
       <div className="p-4 border-b border-slate-200 shrink-0 md:hidden">
         <img src="/imagelogo.png" alt="Unknown IITians" className="h-14 w-auto mx-auto" />

@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { cn } from '@/lib/utils';
 import { Sidebar } from './Sidebar';
 import { useChatDrawer } from '@/hooks/useChatDrawer';
 import { NotificationCenter } from './NotificationCenter';
@@ -27,6 +28,7 @@ interface LayoutProps {
 export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
   const { profile, signOut, resolvedRole } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isRailExpanded, setIsRailExpanded] = useState(false);
   
   // Only try to use chat drawer for students (it's wrapped in provider only for students)
   let openSupportDrawer: (() => void) | undefined;
@@ -129,14 +131,36 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
 
       {/* Content Area: floating Sidebar over Main */}
       <div className="relative flex flex-1 min-h-0 overflow-hidden">
-        {/* Desktop Sidebar - floating icon dock: vertically centered, height fits its icons */}
-        <aside className="hidden md:flex absolute left-3 top-1/2 -translate-y-1/2 z-20 w-16 max-h-[calc(100%-1.5rem)] overflow-y-auto no-scrollbar bg-transparent">
-          <Sidebar
-            activeTab={activeTab}
-            onTabChange={onTabChange}
-            onSupportClick={resolvedRole === 'student' ? openSupportDrawer : undefined}
-            collapsed
-          />
+        {/* Desktop floating sidebar - icon rail; toggle expands it to a labeled panel */}
+        <aside
+          className={cn(
+            "hidden md:flex flex-col absolute left-3 top-3 bottom-3 z-20 transition-[width] duration-200 ease-out",
+            isRailExpanded
+              ? "w-60 bg-white border border-slate-200 shadow-xl rounded-2xl overflow-hidden"
+              : "w-16 bg-transparent"
+          )}
+        >
+          {/* Toggle */}
+          <button
+            onClick={() => setIsRailExpanded((v) => !v)}
+            aria-label={isRailExpanded ? "Collapse sidebar" : "Expand sidebar"}
+            className={cn(
+              "flex items-center h-10 shrink-0 rounded-md text-slate-500 hover:text-brand hover:bg-brand/5 transition-colors mt-3",
+              isRailExpanded ? "mx-3 px-3 gap-3 justify-start" : "w-10 mx-auto justify-center p-0"
+            )}
+          >
+            <PanelLeft className="h-4 w-4 shrink-0" />
+            {isRailExpanded && <span className="text-sm font-medium">Collapse</span>}
+          </button>
+
+          <div className="flex-1 min-h-0">
+            <Sidebar
+              activeTab={activeTab}
+              onTabChange={onTabChange}
+              onSupportClick={resolvedRole === 'student' ? openSupportDrawer : undefined}
+              collapsed={!isRailExpanded}
+            />
+          </div>
         </aside>
 
         {/* Scrollable Main Content - left padding on desktop to clear the floating rail */}
