@@ -609,17 +609,16 @@ export const StudentCommunity = () => {
   };
 
   return (
-    <div className="flex h-[100dvh] w-full bg-white relative overflow-hidden">
-      
-      {/* GROUP LIST SIDEBAR */}
-      <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
-        
-        {/* BACK TO DASHBOARD BUTTON */}
-        <div className="p-4 border-b bg-gray-50 flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="mr-1 text-gray-500 hover:text-gray-900 hover:bg-gray-200">
+    <div className="flex h-[100dvh] w-full bg-slate-50 relative overflow-hidden md:gap-3 md:p-3">
+
+      {/* GROUP LIST FRAME */}
+      <div className={`bg-white flex flex-col h-full z-20 transition-all duration-300 ease-in-out overflow-hidden md:rounded-xl md:border md:border-slate-200 ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80 shrink-0'}`}>
+
+        {/* Slim header: back to dashboard (no community title) */}
+        <div className="p-3 border-b border-slate-100 flex items-center shrink-0">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/')} className="text-gray-500 hover:text-gray-900 hover:bg-gray-100">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Users className="h-5 w-5 text-indigo-600" /> Communities</h2>
         </div>
 
         <ScrollArea className="flex-1">
@@ -648,7 +647,7 @@ export const StudentCommunity = () => {
 
       {/* EMPTY STATE */}
       {!selectedGroup && (
-        <div className={`flex-1 flex flex-col items-center justify-center bg-gray-50 text-gray-400 ${isMobile ? 'hidden' : 'flex'}`}>
+        <div className={`flex-1 flex-col items-center justify-center bg-white text-gray-400 overflow-hidden md:rounded-xl md:border md:border-slate-200 ${isMobile ? 'hidden' : 'flex'}`}>
           <div className="h-20 w-20 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm">
             <Users className="h-10 w-10 text-indigo-200" />
           </div>
@@ -658,7 +657,7 @@ export const StudentCommunity = () => {
 
       {/* CHAT AREA */}
       {selectedGroup && (
-        <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-white' : 'w-full'}`}>
+        <div className={`flex-1 flex flex-col h-full relative overflow-hidden ${isMobile ? 'w-full fixed inset-0 z-50 bg-white' : 'w-full bg-white md:rounded-xl md:border md:border-slate-200'}`}>
           
           {/* Header */}
           <div className="px-4 py-3 bg-white border-b flex items-center justify-between shadow-sm z-20 relative">
