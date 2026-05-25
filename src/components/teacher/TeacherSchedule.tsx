@@ -39,17 +39,19 @@ interface Exam {
 
 // --- Constants ---
 
+// Single-accent: subjects are distinguished by brand-tint depth + neutral,
+// not by a rainbow of hues.
 const subjectBorderColors = [
-    'bg-blue-500',
-    'bg-purple-500',
-    'bg-emerald-500',
-    'bg-amber-500',
-    'bg-rose-500',
-    'bg-cyan-500',
+    'bg-brand',
+    'bg-indigo-400',
+    'bg-indigo-700',
+    'bg-slate-400',
+    'bg-indigo-300',
+    'bg-slate-600',
     'bg-indigo-500',
-    'bg-lime-500',
-    'bg-teal-500',
-    'bg-fuchsia-500',
+    'bg-slate-500',
+    'bg-indigo-600',
+    'bg-slate-300',
 ];
 
 const ScheduleSkeleton = () => (

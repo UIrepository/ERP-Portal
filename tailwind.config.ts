@@ -1,5 +1,38 @@
 import type { Config } from "tailwindcss";
 
+// Single-accent discipline: every decorative hue used across the app resolves
+// to the indigo brand scale, so the UI never goes multi-colour. Status hues
+// (red / green / emerald / amber / yellow) are intentionally NOT aliased so
+// error / success / warning still read correctly.
+const brandScale = {
+  50: '#eef2ff',
+  100: '#e0e7ff',
+  200: '#c7d2fe',
+  300: '#a5b4fc',
+  400: '#818cf8',
+  500: '#6366f1',
+  600: '#4f46e5',
+  700: '#4338ca',
+  800: '#3730a3',
+  900: '#312e81',
+  950: '#1e1b4b',
+};
+
+const decorativeAliases = {
+  blue: brandScale,
+  indigo: brandScale,
+  violet: brandScale,
+  purple: brandScale,
+  fuchsia: brandScale,
+  pink: brandScale,
+  rose: brandScale,
+  sky: brandScale,
+  cyan: brandScale,
+  teal: brandScale,
+  lime: brandScale,
+  orange: brandScale,
+};
+
 export default {
 	content: [
 		"./pages/**/*.{ts,tsx}",
@@ -22,6 +55,7 @@ export default {
 				display: ['"Bricolage Grotesque"', 'Inter', 'system-ui', 'sans-serif'],
 			},
 			colors: {
+				...decorativeAliases,
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',
