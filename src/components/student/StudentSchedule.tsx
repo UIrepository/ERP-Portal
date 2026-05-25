@@ -217,13 +217,8 @@ export const StudentSchedule = () => {
   return (
     <div className="p-4 sm:p-8 bg-white min-h-screen font-sans text-slate-900 max-w-7xl mx-auto">
       
-      {/* HEADER */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Class Schedule</h1>
-          <p className="text-sm text-slate-500 font-medium">{format(displayDate, 'MMMM yyyy')}</p>
-        </div>
-
+      {/* TOOLBAR */}
+      <header className="flex md:justify-end mb-6">
         <div className="flex flex-wrap items-center gap-3 bg-gray-50/80 p-1.5 rounded-lg border border-gray-200 shadow-sm w-full md:w-auto">
           {/* Dynamic Dropdown showing ONLY enrolled batches */}
           {studentBatches.length > 0 && selectedBatchFilter && (
@@ -294,8 +289,9 @@ export const StudentSchedule = () => {
             {timeSlots.map((time, timeIndex) => (
                 <div key={`row-${time}`} className="contents">
                     {/* Time Label */}
-                    <div className="sticky left-0 z-10 bg-white p-3 text-right text-[11px] font-medium text-slate-400 border-r border-b border-gray-200 flex flex-col justify-start pt-6">
-                        {formatTime(time)}
+                    <div className="sticky left-0 z-10 bg-white px-2 text-center border-r border-b border-gray-200 flex flex-col items-center justify-start pt-6 tabular-nums">
+                        <span className="text-[13px] font-semibold text-slate-700 leading-none">{formatTime(time).replace(/ [AP]M$/, '')}</span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">{formatTime(time).slice(-2)}</span>
                     </div>
 
                     {/* Day Cells for this Time Slot */}
@@ -338,12 +334,11 @@ export const StudentSchedule = () => {
                                                     </h3>
                                                 </div>
                                                 
-                                                <div className="flex items-center justify-between text-[10px] text-slate-500 mb-2">
-                                                    <span className="truncate pr-1">{classInfo.batch}</span>
-                                                    <span className="bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-[2px] text-[9px] font-medium text-slate-600 whitespace-nowrap">
-                                                        Upto {formatTime(classInfo.end_time)}
-                                                    </span>
+                                                <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-600 mb-1 tabular-nums">
+                                                    <Clock className="h-3 w-3 text-slate-400 shrink-0" />
+                                                    <span className="whitespace-nowrap">{formatTime(classInfo.start_time)} – {formatTime(classInfo.end_time)}</span>
                                                 </div>
+                                                <div className="text-[10px] text-slate-400 truncate">{classInfo.batch}</div>
                                             </div>
                                         </div>
                                     );
