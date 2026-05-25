@@ -78,7 +78,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
 
   const sidebarUserId = user?.id || profile?.user_id;
 
-  const { data: userEnrollments, isLoading: isLoadingEnrollments } = useQuery<UserEnrollment[]>({
+  const { data: userEnrollments } = useQuery<UserEnrollment[]>({
     queryKey: ['sidebarUserEnrollments', sidebarUserId],
     queryFn: async () => {
         if (!sidebarUserId) return [];
@@ -203,22 +203,8 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick }: SidebarProps
             <h2 className="font-display font-semibold text-slate-900 text-[15px] leading-tight truncate">
               {getPortalName()}
             </h2>
-            <p className="text-xs text-slate-500 truncate">{profile?.name}</p>
           </div>
         </div>
-
-        {resolvedRole === 'student' && availableBatches.length > 0 && (
-          <p className="text-[11px] text-slate-500 mt-3 truncate">Batch: {availableBatches.join(', ')}</p>
-        )}
-        {resolvedRole === 'student' && isLoadingEnrollments && (
-             <p className="text-[11px] text-slate-500 mt-3 flex items-center gap-1.5">
-                <span className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-slate-400"></span>
-                Loading enrollments...
-             </p>
-        )}
-        {resolvedRole === 'student' && !isLoadingEnrollments && availableBatches.length === 0 && (
-             <p className="text-[11px] text-slate-500 mt-3">No enrollments found.</p>
-        )}
       </div>
 
       {/* Navigation - Scrollable only if needed */}
