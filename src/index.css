@@ -1,17 +1,40 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+/* Body/UI: Inter (kept). Display/headings: Bricolage Grotesque — a
+   characterful grotesque that reads as deliberately designed, not stock. */
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Inter:wght@400;450;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here.
 All colors MUST be HSL.
 */
 
 @layer base {
   html {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    /* Make Inter read intentionally, not like a browser default */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'cv11', 'ss01';
+    font-optical-sizing: auto;
   }
+
+  /* Display font for the major headings; tightened tracking gives it
+     editorial polish. Smaller headings stay on Inter to keep dense
+     dashboard UI legible. */
+  h1, h2, .font-display {
+    font-family: 'Bricolage Grotesque', 'Inter', system-ui, sans-serif;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+  }
+
+  /* Numbers in tables, schedules, counters line up and read as data */
+  .tabular-nums, [class*="tabular"] {
+    font-variant-numeric: tabular-nums;
+  }
+
   :root {
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
@@ -39,9 +62,16 @@ All colors MUST be HSL.
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    /* Branded focus ring instead of generic near-black */
+    --ring: 243 75% 59%;
 
-    --radius: 0.5rem;
+    /* Brand accent — opt-in via the `brand` Tailwind color. Indigo to match
+       the portal's existing accent, available as bg-brand / text-brand etc. */
+    --brand: 243 75% 59%;
+    --brand-foreground: 0 0% 100%;
+    --brand-muted: 243 75% 97%;
+
+    --radius: 0.625rem;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
