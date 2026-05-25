@@ -354,7 +354,7 @@ const StudentMainContent = () => {
               {/* Tutorial Button */}
               <Button 
                 variant="outline"
-                className="bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/20 hover:text-white shadow-sm gap-2 font-sans font-normal"
+                className="bg-white/15 backdrop-blur-xl backdrop-saturate-150 border-white/30 text-white hover:bg-white/25 hover:text-white shadow-lg shadow-black/10 gap-2 font-sans font-normal"
                 onClick={() => setShowTutorial(true)}
               >
                 How to use me?
@@ -366,7 +366,7 @@ const StudentMainContent = () => {
                     <SheetTrigger asChild>
                       <Button 
                         variant="outline" 
-                        className="bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/20 hover:text-white shadow-sm gap-2 font-medium"
+                        className="bg-white/15 backdrop-blur-xl backdrop-saturate-150 border-white/30 text-white hover:bg-white/25 hover:text-white shadow-lg shadow-black/10 gap-2 font-medium"
                       >
                         Switch Batch
                         <ArrowRightLeft className="h-4 w-4 opacity-70" />
