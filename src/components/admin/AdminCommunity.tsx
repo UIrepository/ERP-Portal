@@ -64,7 +64,6 @@ interface CommunityMessage {
   is_deleted: boolean;
   is_priority: boolean;
   profiles: { name: string | null } | null;
-  roleinfo: { role?: string | null } | null;
   message_likes: { user_id: string; reaction_type: string }[]; 
 }
 
@@ -77,8 +76,8 @@ interface GroupInfo {
 const firstName = (name?: string | null) => (name || 'Student').trim().split(/\s+/)[0] || 'Student';
 
 // Students show their real (first) name; teachers are shown generically as "Teacher"
-const senderLabel = (name?: string | null, role?: string | null) =>
-  role === 'teacher' ? 'Teacher' : firstName(name);
+const senderLabel = (name?: string | null, isTeacher?: boolean) =>
+  isTeacher ? 'Teacher' : firstName(name);
 
 // --- Helper for Avatar Colors ---
 const getAvatarColor = (name: string) => {
@@ -91,18 +90,20 @@ const getAvatarColor = (name: string) => {
 };
 
 // --- Full Featured Message Component (from StudentCommunity) ---
-const MessageItemAdmin = ({ 
-  msg, 
-  isMe, 
-  replyData, 
-  replyText, 
-  onReply, 
-  onDelete, 
-  onReact, 
-  profile 
+const MessageItemAdmin = ({
+  msg,
+  isMe,
+  isSenderTeacher,
+  replyData,
+  replyText,
+  onReply,
+  onDelete,
+  onReact,
+  profile
 }: {
   msg: CommunityMessage,
   isMe: boolean,
+  isSenderTeacher: boolean,
   replyData: CommunityMessage | undefined | null,
   replyText: string | null,
   onReply: (msg: CommunityMessage) => void,
@@ -228,8 +229,8 @@ const MessageItemAdmin = ({
               </div>
             )}
 
-            {!isMe && !msg.is_priority && <div className="text-[11px] font-bold text-teal-600 mb-1">{senderLabel(msg.profiles?.name, msg.roleinfo?.role)}</div>}
-            {!isMe && msg.is_priority && <div className="text-[11px] font-bold text-rose-700 mb-1">{senderLabel(msg.profiles?.name, msg.roleinfo?.role)}</div>}
+            {!isMe && !msg.is_priority && <div className="text-[11px] font-bold text-teal-600 mb-1">{senderLabel(msg.profiles?.name, isSenderTeacher)}</div>}
+            {!isMe && msg.is_priority && <div className="text-[11px] font-bold text-rose-700 mb-1">{senderLabel(msg.profiles?.name, isSenderTeacher)}</div>}
 
             {replyData && replyText && (
               <div 
@@ -360,13 +361,23 @@ export const AdminCommunity = () => {
     setMessageText(''); setSelectedImage(null); setReplyingTo(null); setIsPriority(false);
   }, [selectedGroup]);
 
+  // Identify teachers by membership in the teachers table (profiles.role is RLS-locked)
+  const { data: teacherIds } = useQuery<Set<string>>({
+    queryKey: ['community-teacher-ids'],
+    queryFn: async () => {
+      const { data } = await supabase.from('teachers').select('user_id');
+      return new Set((data || []).map((t) => t.user_id).filter(Boolean) as string[]);
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery({
     queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name],
     queryFn: async (): Promise<CommunityMessage[]> => {
       if (!selectedGroup) return [];
       const { data, error } = await supabase
         .from('community_messages')
-        .select(`*, profiles:profile_basics (name), roleinfo:profiles (role), message_likes ( user_id, reaction_type )`)
+        .select(`*, profiles:profile_basics (name), message_likes ( user_id, reaction_type )`)
         .eq('batch', selectedGroup.batch_name)
         .eq('subject', selectedGroup.subject_name)
         .order('created_at', { ascending: true });
@@ -603,6 +614,7 @@ export const AdminCommunity = () => {
                        key={msg.id}
                        msg={msg}
                        isMe={msg.user_id === profile?.user_id}
+                       isSenderTeacher={teacherIds?.has(msg.user_id) ?? false}
                        replyData={messageMap.get(msg.reply_to_id || '')} // Admin map has all messages
                        replyText={messageMap.get(msg.reply_to_id || '')?.content || 'Message'}
                        onReply={setReplyingTo}
