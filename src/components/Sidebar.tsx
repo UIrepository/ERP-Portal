@@ -206,7 +206,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
       </div>
 
       {/* Navigation - Scrollable only if needed */}
-      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto min-h-0">
+      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto min-h-0 no-scrollbar">
           {tabs.map((tab) => {
             const isContactAdminTab = tab.id === 'contact-admin';
             const isSupportTab = tab.id === 'support';

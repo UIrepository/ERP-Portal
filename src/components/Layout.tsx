@@ -134,9 +134,9 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
         {/* Desktop floating sidebar - icon rail; toggle expands it to a labeled panel */}
         <aside
           className={cn(
-            "hidden md:flex flex-col absolute left-3 top-3 bottom-3 z-20 transition-[width] duration-200 ease-out",
+            "hidden md:flex flex-col absolute left-3 top-6 z-20 max-h-[calc(100%-3rem)] overflow-hidden transition-[width] duration-200 ease-out",
             isRailExpanded
-              ? "w-60 bg-white border border-slate-200 shadow-xl rounded-2xl overflow-hidden"
+              ? "w-60 bg-white border border-slate-200 shadow-xl rounded-2xl"
               : "w-16 bg-transparent"
           )}
         >
