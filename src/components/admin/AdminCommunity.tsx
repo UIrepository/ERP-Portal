@@ -63,7 +63,7 @@ interface CommunityMessage {
   created_at: string;
   is_deleted: boolean;
   is_priority: boolean;
-  profiles: { name: string } | null;
+  profiles: { name: string; role?: string | null } | null;
   message_likes: { user_id: string; reaction_type: string }[]; 
 }
 
@@ -74,6 +74,10 @@ interface GroupInfo {
 
 // First name only — concise, readable label so people are easy to tell apart
 const firstName = (name?: string | null) => (name || 'Student').trim().split(/\s+/)[0] || 'Student';
+
+// Students show their real (first) name; teachers are shown generically as "Teacher"
+const senderLabel = (p?: { name?: string | null; role?: string | null } | null) =>
+  p?.role === 'teacher' ? 'Teacher' : firstName(p?.name);
 
 // --- Helper for Avatar Colors ---
 const getAvatarColor = (name: string) => {
@@ -223,8 +227,8 @@ const MessageItemAdmin = ({
               </div>
             )}
 
-            {!isMe && !msg.is_priority && <div className="text-[11px] font-bold text-teal-600 mb-1">{firstName(msg.profiles?.name)}</div>}
-            {!isMe && msg.is_priority && <div className="text-[11px] font-bold text-rose-700 mb-1">{firstName(msg.profiles?.name)}</div>}
+            {!isMe && !msg.is_priority && <div className="text-[11px] font-bold text-teal-600 mb-1">{senderLabel(msg.profiles)}</div>}
+            {!isMe && msg.is_priority && <div className="text-[11px] font-bold text-rose-700 mb-1">{senderLabel(msg.profiles)}</div>}
 
             {replyData && replyText && (
               <div 
@@ -361,7 +365,7 @@ export const AdminCommunity = () => {
       if (!selectedGroup) return [];
       const { data, error } = await supabase
         .from('community_messages')
-        .select(`*, profiles (name), message_likes ( user_id, reaction_type )`)
+        .select(`*, profiles (name, role), message_likes ( user_id, reaction_type )`)
         .eq('batch', selectedGroup.batch_name)
         .eq('subject', selectedGroup.subject_name)
         .order('created_at', { ascending: true });
