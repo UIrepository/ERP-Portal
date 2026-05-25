@@ -51,8 +51,8 @@ export default {
 		},
 		extend: {
 			fontFamily: {
-				sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-				display: ['"Bricolage Grotesque"', 'Inter', 'system-ui', 'sans-serif'],
+				sans: ['"Hanken Grotesk"', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
+				display: ['Fraunces', 'Georgia', '"Times New Roman"', 'serif'],
 			},
 			colors: {
 				...decorativeAliases,
