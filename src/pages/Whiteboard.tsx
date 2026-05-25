@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, EyeOff, FileText, Image as ImageIcon, Loader2, Palette, PenLine, Plus, Save, Square, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, EyeOff, FileText, Image as ImageIcon, Loader2, Palette, PenLine, Plus, Save, Square, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -66,7 +66,6 @@ const Whiteboard = () => {
   const [saveOpen, setSaveOpen] = useState(false);
   const [pageCount, setPageCount] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
-  const [headerVisible, setHeaderVisible] = useState(true);
   const [navVisible, setNavVisible] = useState(true);
   const [postToNotes, setPostToNotes] = useState(true);
   const [alsoDownload, setAlsoDownload] = useState(false);
@@ -76,7 +75,6 @@ const Whiteboard = () => {
 
   const showAllChrome = () => {
     setChromeHidden(false);
-    setHeaderVisible(true);
     setNavVisible(true);
     setStylePanelHidden(false);
   };
@@ -510,7 +508,7 @@ const Whiteboard = () => {
       <div
         className={cn(
           'absolute inset-0 wb-canvas',
-          headerVisible && !chromeHidden && 'wb-offset',
+          !chromeHidden && 'wb-offset',
           (stylePanelHidden || chromeHidden) && 'wb-hide-style',
         )}
       >
@@ -525,7 +523,7 @@ const Whiteboard = () => {
       <header
         className={cn(
           'absolute top-0 inset-x-0 z-20 flex items-center justify-between px-4 py-2 bg-gradient-to-r from-fuchsia-900 via-purple-900 to-indigo-900 border-b border-white/10 shadow-lg transition-transform duration-300',
-          (!headerVisible || chromeHidden) && '-translate-y-full',
+          chromeHidden && '-translate-y-full',
         )}
       >
         <div className="flex items-center gap-3 min-w-0">
@@ -584,14 +582,6 @@ const Whiteboard = () => {
           </button>
           <button
             type="button"
-            onClick={() => setHeaderVisible(false)}
-            title="Hide toolbar only"
-            className="h-8 w-8 inline-flex items-center justify-center rounded-md bg-white/5 border border-white/10 text-white/80 hover:bg-white/15 hover:text-white transition-colors"
-          >
-            <ChevronUp className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
             onClick={() => setChromeHidden(true)}
             title="Focus mode — hide everything"
             className="h-8 w-8 inline-flex items-center justify-center rounded-md bg-white/5 border border-white/10 text-white/80 hover:bg-white/15 hover:text-white transition-colors"
@@ -600,18 +590,6 @@ const Whiteboard = () => {
           </button>
         </div>
       </header>
-
-      {/* Header peek tab — shows when only the header is collapsed */}
-      {!headerVisible && !chromeHidden && (
-        <button
-          type="button"
-          onClick={() => setHeaderVisible(true)}
-          title="Show toolbar"
-          className="absolute top-2 right-2 z-30 h-8 w-8 inline-flex items-center justify-center rounded-full bg-slate-900/90 backdrop-blur border border-white/15 text-white/85 hover:bg-slate-800 hover:text-white shadow-lg transition-colors"
-        >
-          <ChevronDown className="h-4 w-4" />
-        </button>
-      )}
 
       {/* Focus-mode restore tab — single control to bring all chrome back */}
       {chromeHidden && (
