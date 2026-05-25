@@ -179,9 +179,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
       collapsed ? 'h-10 w-10 mx-auto justify-center p-0' : 'w-full justify-start gap-3 h-9 px-3 rounded-md',
       active
         ? 'bg-brand text-white font-medium shadow-sm hover:bg-brand hover:text-white'
-        : collapsed
-          ? 'text-slate-400 hover:bg-white/10 hover:text-white'
-          : 'text-slate-600 hover:bg-brand/5 hover:text-brand',
+        : 'text-slate-600 hover:bg-brand/5 hover:text-brand',
     );
 
   const icon = (i: typeof DashboardSquare01Icon) => (
@@ -305,7 +303,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
             className={cn(
               'text-sm font-normal transition-colors',
               collapsed
-                ? 'h-10 w-10 mx-auto justify-center p-0 rounded-xl text-red-400 hover:bg-red-500/15 hover:text-red-300'
+                ? 'h-10 w-10 mx-auto justify-center p-0 rounded-xl text-red-600 hover:bg-red-50 hover:text-red-700'
                 : 'w-full justify-start gap-3 h-9 px-3 text-red-600 hover:bg-red-50 hover:text-red-700',
             )}
             onClick={signOut}
