@@ -4,7 +4,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Clock01Icon, ArrowLeft01Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons';
+
+// Drop-in icon wrappers (premium Hugeicons, keeping the existing call sites)
+const mkIcon = (icon: typeof Clock01Icon) =>
+  ({ className }: { className?: string }) => <HugeiconsIcon icon={icon} className={className} strokeWidth={1.8} />;
+const Clock = mkIcon(Clock01Icon);
+const ChevronLeft = mkIcon(ArrowLeft01Icon);
+const ChevronRight = mkIcon(ArrowRight01Icon);
 import { format, getDay, startOfWeek, addDays, isSameDay, subDays, isWithinInterval } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -38,7 +46,7 @@ const subjectBorderColors = [
 ];
 
 const ScheduleSkeleton = () => (
-    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+    <div className="border border-gray-200 rounded-md overflow-hidden bg-white shadow-sm">
         <div className="grid grid-cols-[80px_repeat(7,1fr)] min-w-[800px]">
              <div className="h-14 bg-gray-50 border-b border-r border-gray-200" />
              {[...Array(7)].map((_, i) => (
@@ -215,7 +223,7 @@ export const StudentSchedule = () => {
   const handleNextWeek = () => setDisplayDate(addDays(displayDate, 7));
 
   return (
-    <div className="p-4 sm:p-8 bg-white min-h-screen font-sans text-slate-900 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-8 bg-white min-h-screen font-sans text-slate-900 max-w-[1840px] mx-auto">
       
       {/* TOOLBAR */}
       <header className="flex md:justify-end mb-6">
@@ -252,11 +260,11 @@ export const StudentSchedule = () => {
 
           <div className="h-5 w-px bg-gray-300 mx-1 hidden sm:block"></div>
 
-          {/* Real-time Timer */}
-          <div className="px-2 flex items-center gap-2 text-slate-600 bg-white border border-gray-200 rounded-md h-7 shadow-sm">
-            <Clock className="h-3.5 w-3.5 text-slate-400" />
-            <span className="text-xs font-mono font-medium tabular-nums tracking-wide">
-                {format(currentTime, 'HH:mm:ss')}
+          {/* Real-time Timer - premium dark pill, Inter tabular */}
+          <div className="px-3 flex items-center gap-2 bg-slate-900 text-white rounded-md h-7 shadow-sm">
+            <Clock className="h-3.5 w-3.5 text-indigo-300" />
+            <span className="text-xs font-semibold tabular-nums tracking-wider">
+                {format(currentTime, 'h:mm:ss a')}
             </span>
           </div>
         </div>
@@ -264,7 +272,7 @@ export const StudentSchedule = () => {
 
       {/* CALENDAR GRID */}
       {isLoading ? <ScheduleSkeleton /> : (
-      <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm overflow-x-auto relative">
+      <div className="border border-gray-200 rounded-md overflow-hidden bg-white shadow-sm overflow-x-auto relative">
           <div className="grid min-w-[900px] grid-cols-[80px_repeat(7,1fr)] bg-slate-50">
             
             {/* Header Row */}
