@@ -119,6 +119,9 @@ const cleanList = (raw: any): string[] => {
 };
 
 // --- Avatar Color Helper ---
+// First name only — concise, readable label so the teacher can tell students apart
+const firstName = (name?: string | null) => (name || 'Student').trim().split(/\s+/)[0] || 'Student';
+
 const getAvatarColor = (name: string) => {
   const colors = ['bg-red-100 text-red-700', 'bg-green-100 text-green-700', 'bg-blue-100 text-blue-700', 'bg-purple-100 text-purple-700', 'bg-yellow-100 text-yellow-700', 'bg-pink-100 text-pink-700'];
   let hash = 0;
@@ -265,8 +268,8 @@ const MessageItem = ({
               </div>
             )}
 
-            {!isMe && !msg.is_priority && <div className="text-[11px] font-bold text-teal-600 mb-1">{msg.profiles?.name}</div>}
-            {!isMe && msg.is_priority && <div className="text-[11px] font-bold text-rose-700 mb-1">{msg.profiles?.name}</div>}
+            {!isMe && !msg.is_priority && <div className="text-[11px] font-bold text-teal-600 mb-1">{firstName(msg.profiles?.name)}</div>}
+            {!isMe && msg.is_priority && <div className="text-[11px] font-bold text-rose-700 mb-1">{firstName(msg.profiles?.name)}</div>}
 
             {replyData && replyText && (
               <div 
@@ -443,6 +446,49 @@ export const TeacherCommunity = () => {
     enabled: !!profile?.user_id
   });
 
+  // --- Per-community overview: recent activity (recent on top) + unread counts ---
+  const seenKey = (g: TeacherGroup) => `community-seen-${g.batch_name}|${g.subject_name}`;
+  const markGroupSeen = (g: TeacherGroup) => {
+    try { localStorage.setItem(seenKey(g), new Date().toISOString()); } catch { /* ignore */ }
+    queryClient.invalidateQueries({ queryKey: ['teacher-community-overview'] });
+  };
+  const { data: overview = {} } = useQuery<Record<string, { lastAt: string | null; unread: number }>>({
+    queryKey: ['teacher-community-overview', profile?.user_id, teacherGroups.map(g => `${g.batch_name}|${g.subject_name}`).join(',')],
+    queryFn: async () => {
+      const result: Record<string, { lastAt: string | null; unread: number }> = {};
+      await Promise.all(teacherGroups.map(async (g) => {
+        const key = `${g.batch_name}|${g.subject_name}`;
+        const { data: last } = await supabase
+          .from('community_messages').select('created_at')
+          .eq('batch', g.batch_name).eq('subject', g.subject_name).eq('is_deleted', false)
+          .order('created_at', { ascending: false }).limit(1).maybeSingle();
+        const lastAt = (last as { created_at: string } | null)?.created_at ?? null;
+        let seen: string | null = null;
+        try { seen = localStorage.getItem(seenKey(g)); } catch { /* ignore */ }
+        let unread = 0;
+        if (lastAt && (!seen || new Date(lastAt) > new Date(seen))) {
+          const { count } = await supabase
+            .from('community_messages').select('*', { count: 'exact', head: true })
+            .eq('batch', g.batch_name).eq('subject', g.subject_name).eq('is_deleted', false)
+            .neq('user_id', profile?.user_id || '')
+            .gt('created_at', seen || '1970-01-01T00:00:00Z');
+          unread = count ?? 0;
+        }
+        result[key] = { lastAt, unread };
+      }));
+      return result;
+    },
+    enabled: teacherGroups.length > 0 && !!profile?.user_id,
+    refetchInterval: 10000,
+  });
+  const sortedGroups = useMemo(() => {
+    return [...teacherGroups].sort((a, b) => {
+      const aAt = overview[`${a.batch_name}|${a.subject_name}`]?.lastAt || '';
+      const bAt = overview[`${b.batch_name}|${b.subject_name}`]?.lastAt || '';
+      return bAt.localeCompare(aAt);
+    });
+  }, [teacherGroups, overview]);
+
   useEffect(() => {
     if (!isMobile && !selectedGroup && teacherGroups.length > 0) {
       setSelectedGroup(teacherGroups[0]);
@@ -509,9 +555,27 @@ export const TeacherCommunity = () => {
     return () => { supabase.removeChannel(channel); };
   }, [selectedGroup, queryClient]);
 
+  // Global listener: keep the community list order + unread badges fresh
+  useEffect(() => {
+    if (teacherGroups.length === 0) return;
+    const channel = supabase
+      .channel('teacher-community-overview-global')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'community_messages' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['teacher-community-overview'] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [teacherGroups.length, queryClient]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [messages?.length, selectedGroup]);
+
+  // Mark the open community as read (clears its unread badge)
+  useEffect(() => {
+    if (selectedGroup) markGroupSeen(selectedGroup);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGroup, messages?.length]);
 
   const sendMessageMutation = useMutation({
     mutationFn: async ({ text, image, replyId }: { text: string; image: File | null; replyId: string | null }) => {
@@ -664,13 +728,22 @@ export const TeacherCommunity = () => {
           <div className="p-2 space-y-1">
             {isLoadingGroups ? <div className="p-6 text-center text-gray-500 flex justify-center"><Loader2 className="animate-spin" /></div> : 
              teacherGroups.length === 0 ? <div className="p-6 text-center text-gray-500">No communities found.</div> :
-             teacherGroups.map((group) => (
-              <div key={`${group.batch_name}-${group.subject_name}`} onClick={() => setSelectedGroup(group)}
-                className={`p-3 rounded-lg cursor-pointer transition-colors flex items-center gap-3 ${selectedGroup?.batch_name === group.batch_name && selectedGroup?.subject_name === group.subject_name ? 'bg-teal-50 border-teal-200 border' : 'hover:bg-gray-100 border border-transparent'}`}>
+             sortedGroups.map((group) => {
+              const isActive = selectedGroup?.batch_name === group.batch_name && selectedGroup?.subject_name === group.subject_name;
+              const unread = overview[`${group.batch_name}|${group.subject_name}`]?.unread || 0;
+              return (
+              <div key={`${group.batch_name}-${group.subject_name}`} onClick={() => { setSelectedGroup(group); markGroupSeen(group); }}
+                className={`p-3 rounded-lg cursor-pointer transition-colors flex items-center gap-3 ${isActive ? 'bg-teal-50 border-teal-200 border' : 'hover:bg-gray-100 border border-transparent'}`}>
                 <div className="h-10 w-10 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold shrink-0">{group.subject_name[0]}</div>
-                <div className="overflow-hidden text-left"><p className="font-semibold text-gray-900 truncate">{group.subject_name}</p><p className="text-xs text-gray-500 truncate">{group.batch_name}</p></div>
+                <div className="overflow-hidden text-left flex-1 min-w-0"><p className="font-semibold text-gray-900 truncate">{group.subject_name}</p><p className="text-xs text-gray-500 truncate">{group.batch_name}</p></div>
+                {unread > 0 && !isActive && (
+                  <span className="ml-auto shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-teal-600 text-white text-[11px] font-semibold flex items-center justify-center">
+                    {unread > 99 ? '99+' : unread}
+                  </span>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </ScrollArea>
       </div>

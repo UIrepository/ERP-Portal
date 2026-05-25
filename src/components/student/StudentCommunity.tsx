@@ -87,6 +87,9 @@ interface UserEnrollment {
   subject_name: string;
 }
 
+// First name only — concise, readable label so people are easy to tell apart
+const firstName = (name?: string | null) => (name || 'Student').trim().split(/\s+/)[0] || 'Student';
+
 // --- Helper for Avatar Colors ---
 const getAvatarColor = (name: string) => {
   const colors = ['bg-red-100 text-red-700', 'bg-green-100 text-green-700', 'bg-blue-100 text-blue-700', 'bg-purple-100 text-purple-700', 'bg-yellow-100 text-yellow-700', 'bg-pink-100 text-pink-700'];
@@ -234,8 +237,8 @@ const MessageItem = ({
               </div>
             )}
 
-            {!isMe && !msg.is_priority && <div className="text-[11px] font-bold text-indigo-600 mb-1">{msg.profiles?.name}</div>}
-            {!isMe && msg.is_priority && <div className="text-[11px] font-bold text-rose-700 mb-1">{msg.profiles?.name}</div>}
+            {!isMe && !msg.is_priority && <div className="text-[11px] font-bold text-indigo-600 mb-1">{firstName(msg.profiles?.name)}</div>}
+            {!isMe && msg.is_priority && <div className="text-[11px] font-bold text-rose-700 mb-1">{firstName(msg.profiles?.name)}</div>}
 
             {replyData && replyText && (
               <div 
