@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, FileText, Image as ImageIcon, Loader2, Palette, PenLine, Plus, Save, Square, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, EyeOff, FileText, Image as ImageIcon, Loader2, Palette, PenLine, Plus, Save, Square, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -71,6 +71,15 @@ const Whiteboard = () => {
   const [postToNotes, setPostToNotes] = useState(true);
   const [alsoDownload, setAlsoDownload] = useState(false);
   const [stylePanelHidden, setStylePanelHidden] = useState(false);
+  // Focus mode — hide all chrome (header, navigator, style panel) at once.
+  const [chromeHidden, setChromeHidden] = useState(false);
+
+  const showAllChrome = () => {
+    setChromeHidden(false);
+    setHeaderVisible(true);
+    setNavVisible(true);
+    setStylePanelHidden(false);
+  };
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const insertPdfInputRef = useRef<HTMLInputElement>(null);
@@ -501,8 +510,8 @@ const Whiteboard = () => {
       <div
         className={cn(
           'absolute inset-0 wb-canvas',
-          headerVisible && 'wb-offset',
-          stylePanelHidden && 'wb-hide-style',
+          headerVisible && !chromeHidden && 'wb-offset',
+          (stylePanelHidden || chromeHidden) && 'wb-hide-style',
         )}
       >
         <Tldraw
@@ -516,7 +525,7 @@ const Whiteboard = () => {
       <header
         className={cn(
           'absolute top-0 inset-x-0 z-20 flex items-center justify-between px-4 py-2 bg-gradient-to-r from-fuchsia-900 via-purple-900 to-indigo-900 border-b border-white/10 shadow-lg transition-transform duration-300',
-          !headerVisible && '-translate-y-full',
+          (!headerVisible || chromeHidden) && '-translate-y-full',
         )}
       >
         <div className="flex items-center gap-3 min-w-0">
@@ -576,16 +585,24 @@ const Whiteboard = () => {
           <button
             type="button"
             onClick={() => setHeaderVisible(false)}
-            title="Hide toolbar"
+            title="Hide toolbar only"
             className="h-8 w-8 inline-flex items-center justify-center rounded-md bg-white/5 border border-white/10 text-white/80 hover:bg-white/15 hover:text-white transition-colors"
           >
             <ChevronUp className="h-4 w-4" />
           </button>
+          <button
+            type="button"
+            onClick={() => setChromeHidden(true)}
+            title="Focus mode — hide everything"
+            className="h-8 w-8 inline-flex items-center justify-center rounded-md bg-white/5 border border-white/10 text-white/80 hover:bg-white/15 hover:text-white transition-colors"
+          >
+            <EyeOff className="h-4 w-4" />
+          </button>
         </div>
       </header>
 
-      {/* Header peek tab — shows when header is collapsed */}
-      {!headerVisible && (
+      {/* Header peek tab — shows when only the header is collapsed */}
+      {!headerVisible && !chromeHidden && (
         <button
           type="button"
           onClick={() => setHeaderVisible(true)}
@@ -596,8 +613,21 @@ const Whiteboard = () => {
         </button>
       )}
 
+      {/* Focus-mode restore tab — single control to bring all chrome back */}
+      {chromeHidden && (
+        <button
+          type="button"
+          onClick={showAllChrome}
+          title="Show all controls"
+          className="absolute top-2 left-1/2 -translate-x-1/2 z-40 h-9 px-3 inline-flex items-center gap-1.5 rounded-full bg-slate-900/90 backdrop-blur border border-white/15 text-white/90 hover:bg-slate-800 hover:text-white shadow-lg transition-colors"
+        >
+          <ChevronDown className="h-4 w-4" />
+          <span className="text-xs font-medium">Show controls</span>
+        </button>
+      )}
+
       {/* Bottom-right page navigator (collapsible) */}
-      {startMode !== 'choose' && navVisible && (
+      {startMode !== 'choose' && navVisible && !chromeHidden && (
         <div className="absolute bottom-16 right-4 z-20 flex items-center gap-1 bg-slate-900/90 backdrop-blur border border-white/10 rounded-full px-2 py-1.5 shadow-lg transition-all">
           <button
             type="button"
@@ -642,7 +672,7 @@ const Whiteboard = () => {
       )}
 
       {/* Navigator peek tab — shows when nav is collapsed */}
-      {startMode !== 'choose' && !navVisible && (
+      {startMode !== 'choose' && !navVisible && !chromeHidden && (
         <button
           type="button"
           onClick={() => setNavVisible(true)}
