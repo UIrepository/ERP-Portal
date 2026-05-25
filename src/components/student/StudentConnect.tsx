@@ -71,7 +71,7 @@ export const StudentConnect = ({ onOpenSupportDrawer }: StudentConnectProps) => 
   const filteredFaqs = filterFaqs(faqs);
 
   return (
-    <div className="max-w-[850px] mx-auto p-4 md:p-8 animate-in fade-in slide-in-from-bottom-4 duration-500 font-sans">
+    <div className="max-w-[1100px] mx-auto p-4 md:p-8 animate-in fade-in slide-in-from-bottom-4 duration-500 font-sans">
       
       {/* --- Header & Search --- */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6 mb-6 md:mb-8">
@@ -97,16 +97,16 @@ export const StudentConnect = ({ onOpenSupportDrawer }: StudentConnectProps) => 
         </div>
       </div>
 
-      {/* --- Content Area --- */}
-      <div className="space-y-6 md:space-y-8">
-        
-        {/* FAQ Accordion */}
+      {/* --- Content Area: questions on the left, "Still need help" on the right --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-6 lg:gap-8 items-start">
+
+        {/* FAQ Accordion (left) */}
         <div className="space-y-2">
           <Accordion type="single" collapsible className="w-full space-y-2">
             {filteredFaqs.map((faq) => (
-              <AccordionItem 
-                key={faq.id} 
-                value={faq.id} 
+              <AccordionItem
+                key={faq.id}
+                value={faq.id}
                 className="border rounded-lg bg-white px-1 border-slate-200 shadow-sm"
               >
                 <AccordionTrigger className="px-3 md:px-4 py-3 md:py-4 hover:no-underline text-sm md:text-[15px] font-medium text-slate-800 hover:text-indigo-600 transition-colors text-left">
@@ -118,7 +118,7 @@ export const StudentConnect = ({ onOpenSupportDrawer }: StudentConnectProps) => 
               </AccordionItem>
             ))}
           </Accordion>
-          
+
           {filteredFaqs.length === 0 && (
             <div className="text-center py-6 md:py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">
               <p className="text-slate-500 text-xs md:text-sm">No results found for "{searchQuery}"</p>
@@ -126,39 +126,34 @@ export const StudentConnect = ({ onOpenSupportDrawer }: StudentConnectProps) => 
           )}
         </div>
 
-        {/* Rich Support Card - Optimized for Mobile */}
-        <div className="mt-6 md:mt-8 bg-gradient-to-br from-white to-[#f9faff] rounded-xl border border-slate-200 p-5 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 md:gap-8 shadow-[0_4px_20px_rgba(0,0,0,0.02)] relative overflow-hidden">
+        {/* Still need help card (right) - vertical, sticky on desktop */}
+        <div className="bg-gradient-to-br from-white to-[#f9faff] rounded-xl border border-slate-200 p-6 md:p-7 flex flex-col items-center text-center gap-4 shadow-[0_4px_20px_rgba(0,0,0,0.02)] relative overflow-hidden lg:sticky lg:top-6">
           {/* Decorative background element */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 opacity-50 pointer-events-none" />
 
-          <div className="flex-1 text-center md:text-left space-y-3 md:space-y-4 relative z-10">
-            <div>
-              <h2 className="text-lg md:text-xl font-bold text-slate-900">Still need help?</h2>
-              <p className="text-slate-500 text-xs md:text-sm mt-1 leading-relaxed max-w-md mx-auto md:mx-0">
-                Can't find the answer you're looking for? Chat with our support team directly.
-              </p>
-            </div>
-            
-            {onOpenSupportDrawer && (
-              <button 
-                onClick={onOpenSupportDrawer}
-                className="inline-flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 md:px-6 md:py-3 rounded-lg md:rounded-xl text-xs md:text-sm font-semibold hover:bg-indigo-700 active:scale-95 transition-all shadow-lg shadow-indigo-200"
-              >
-                <Mail className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                Contact Support
-              </button>
-            )}
+          <img
+            src="https://illustrations.popsy.co/blue/customer-support.svg"
+            alt="Customer Support"
+            className="w-32 h-32 md:w-40 md:h-40 object-contain drop-shadow-sm relative z-10"
+            loading="lazy"
+          />
+
+          <div className="relative z-10">
+            <h2 className="text-lg md:text-xl font-bold text-slate-900">Still need help?</h2>
+            <p className="text-slate-500 text-xs md:text-sm mt-1.5 leading-relaxed">
+              Can't find the answer you're looking for? Chat with our support team directly.
+            </p>
           </div>
-          
-          {/* Illustration - Scaled and Reordered for Mobile */}
-          <div className="shrink-0 relative z-10 order-first md:order-last">
-             <img 
-               src="https://illustrations.popsy.co/blue/customer-support.svg" 
-               alt="Customer Support" 
-               className="w-32 h-32 md:w-48 md:h-auto drop-shadow-sm transform hover:scale-105 transition-transform duration-500"
-               loading="lazy"
-             />
-          </div>
+
+          {onOpenSupportDrawer && (
+            <button
+              onClick={onOpenSupportDrawer}
+              className="relative z-10 w-full inline-flex items-center justify-center gap-2 bg-indigo-600 text-white px-5 py-2.5 md:py-3 rounded-lg md:rounded-xl text-xs md:text-sm font-semibold hover:bg-indigo-700 active:scale-95 transition-all shadow-lg shadow-indigo-200"
+            >
+              <Mail className="w-3.5 h-3.5 md:w-4 md:h-4" />
+              Contact Support
+            </button>
+          )}
         </div>
 
       </div>
