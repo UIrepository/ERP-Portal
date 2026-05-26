@@ -225,12 +225,12 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
                                         key={recording.id}
                                         onClick={() => handlePlayInFullscreen(recording, index)}
                                         className={cn(
-                                            "bg-white rounded-lg p-3",
+                                            "bg-white rounded-md p-3",
                                             "shadow-[0_1px_3px_rgba(0,0,0,0.05)]",
                                             "border border-slate-200",
                                             "cursor-pointer",
                                             "flex flex-col",
-                                            "hover:shadow-md hover:border-teal-200 transition-all duration-200"
+                                            "hover:border-indigo-200 transition-colors duration-200"
                                         )}
                                         style={{
                                             width: CARD_WIDTH,
