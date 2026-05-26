@@ -1,6 +1,6 @@
 // Minimal service worker — enables PWA installability, push notifications,
 // and a tiny offline app-shell cache.
-const CACHE = 'ui-portal-v2';
+const CACHE = 'ui-portal-v3';
 const APP_SHELL = ['/', '/icon-192.png', '/icon-512.png', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
@@ -34,8 +34,12 @@ self.addEventListener('fetch', (event) => {
       caches.match(req).then((cached) =>
         cached ||
         fetch(req).then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+          // Only cache successful, basic (same-origin, non-opaque) responses so
+          // a 404/redirect can't poison the cache and white-screen the app.
+          if (res.ok && res.type === 'basic') {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+          }
           return res;
         }).catch(() => cached)
       )

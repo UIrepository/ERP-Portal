@@ -9,8 +9,26 @@ inject()
 
 // Register the service worker so the app is installable (PWA).
 if ('serviceWorker' in navigator) {
+  // If a service worker already controls this page, a later controllerchange
+  // means a new version activated — reload once so the running page can't use
+  // a stale bundle against freshly-deployed assets (the white-screen cause).
+  if (navigator.serviceWorker.controller) {
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloading) return;
+      reloading = true;
+      window.location.reload();
+    });
+  }
+
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((reg) => {
+        // Check for an updated worker on every load.
+        reg.update().catch(() => {});
+      })
+      .catch(() => {});
   });
 }
 
