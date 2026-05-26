@@ -1,4 +1,4 @@
-import { StudentSubjectHeader } from './StudentSubjectHeader';
+import { ChevronLeft } from 'lucide-react';
 import { StudentSchedule } from './StudentSchedule';
 import { StudentRecordings } from './StudentRecordings';
 import { StudentNotes } from './StudentNotes';
@@ -15,17 +15,6 @@ interface StudentBlockContentProps {
   subject: string;
   onBack: () => void;
 }
-
-const blockLabels: Record<string, string> = {
-  'live-class': 'Live Class',
-  recordings: 'Lectures',
-  notes: 'Notes',
-  dpps: 'DPPs',
-  'ui-ki-padhai': 'UI Ki Padhai',
-  announcements: 'Announcements',
-  community: 'Community',
-  connect: 'Connect with Mentors',
-};
 
 export const StudentBlockContent = ({
   blockId,
@@ -61,18 +50,19 @@ export const StudentBlockContent = ({
   };
 
   return (
-    <div className="min-h-full bg-slate-50">
-      {/* White sticky header with breadcrumb */}
-      <StudentSubjectHeader
-        batch={batch}
-        subject={subject}
-        block={blockId}
-        blockLabel={blockLabels[blockId] || blockId}
-        onBack={onBack}
-      />
+    <div className="w-full max-w-[1840px] mx-auto px-4 md:px-6 py-6 font-sans">
 
-      {/* Content */}
-      <div className="flex-1">
+      {/* Back */}
+      <button
+        onClick={onBack}
+        className="flex items-center gap-2 text-[#1e293b] font-medium text-[15px] hover:opacity-80 transition-opacity mb-4"
+      >
+        <ChevronLeft className="h-5 w-5" />
+        Back
+      </button>
+
+      {/* Framed content card (matches dashboard frame) */}
+      <div className="w-full bg-white rounded-lg border border-slate-100 shadow-sm overflow-hidden min-h-[400px]">
         {renderContent()}
       </div>
     </div>

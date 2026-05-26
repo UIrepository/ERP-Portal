@@ -126,23 +126,20 @@ export const StudentSubjectBlocks = ({
   ];
 
   return (
-    <div className="min-h-screen bg-[#F8F8F8] font-sans pb-10">
-      
-      {/* Top Navbar */}
-      <nav className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-10">
-        <button 
-          onClick={onBack}
-          className="flex items-center gap-2 text-[#1e293b] font-medium text-[15px] hover:opacity-80 transition-opacity"
-        >
-          <ChevronLeft className="h-5 w-5" />
-          Back
-        </button>
-      </nav>
+    <div className="w-full max-w-[1840px] mx-auto px-4 md:px-6 py-6 font-sans">
 
-      {/* Main Content Wrapper */}
-      <div className="max-w-[1200px] mx-auto mt-8 px-4 md:px-6">
-        <div className="bg-white rounded-md border border-slate-200 shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-8">
-          
+      {/* Back */}
+      <button
+        onClick={onBack}
+        className="flex items-center gap-2 text-[#1e293b] font-medium text-[15px] hover:opacity-80 transition-opacity mb-4"
+      >
+        <ChevronLeft className="h-5 w-5" />
+        Back
+      </button>
+
+      {/* Framed content card (matches dashboard frame) */}
+      <div className="w-full bg-white rounded-lg border border-slate-100 shadow-sm p-6 md:p-8 min-h-[400px]">
+
           {/* Subject Title */}
           <h2 className="text-xl md:text-2xl font-bold text-[#1e293b] mb-8 tracking-tight whitespace-normal break-words leading-tight">
             {subject}
@@ -203,7 +200,6 @@ export const StudentSubjectBlocks = ({
             ))}
           </div>
 
-        </div>
       </div>
     </div>
   );
