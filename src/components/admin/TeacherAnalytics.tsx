@@ -5,10 +5,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { UserCheck, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { UserGroupIcon, ChartColumnStackedIcon } from '@hugeicons/core-free-icons';
 
-// On-brand indigo/violet palette (matches Enrollment Analytics)
-const TA_COLORS = ["#4f46e5", "#7c3aed", "#6366f1", "#0ea5e9", "#8b5cf6", "#3b82f6", "#a855f7", "#2dd4bf"];
+// Refined, muted categorical palette (matches Enrollment Analytics)
+const TA_COLORS = ['#4f46e5', '#0ea5e9', '#14b8a6', '#f59e0b', '#e11d48', '#8b5cf6', '#10b981', '#64748b'];
 
 interface TeacherProfile {
   batch: string | string[] | null;
@@ -97,14 +99,16 @@ export const TeacherAnalytics = () => {
 
       {/* Filter and Stats Section */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <Card className="border-slate-200 shadow-sm bg-gradient-to-br from-indigo-600 to-violet-600 text-white">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-white/80">Total Teachers</CardTitle>
-            <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center">
-              <UserCheck className="h-4 w-4 text-white" />
+        <Card className="border-slate-200 shadow-none p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Total Teachers</p>
+              <p className="text-3xl font-bold text-slate-900 tabular-nums mt-2 leading-none">{analyticsData.totalTeachers}</p>
             </div>
-          </CardHeader>
-          <CardContent><p className="text-3xl font-bold tracking-tight">{analyticsData.totalTeachers}</p></CardContent>
+            <div className="h-9 w-9 rounded-md bg-slate-100 flex items-center justify-center text-slate-500">
+              <HugeiconsIcon icon={UserGroupIcon} size={18} strokeWidth={2} />
+            </div>
+          </div>
         </Card>
         <Card className="border-slate-200 shadow-sm">
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-slate-700">Filter by Batch</CardTitle></CardHeader>
@@ -140,7 +144,7 @@ export const TeacherAnalytics = () => {
       <Card className="border-slate-200 shadow-sm bg-white">
         <CardHeader>
           <CardTitle className="flex items-center text-lg text-slate-900">
-            <UserCheck className="mr-2 h-5 w-5 text-indigo-600" />
+            <HugeiconsIcon icon={ChartColumnStackedIcon} size={18} strokeWidth={2} className="mr-2 text-slate-400" />
             Teacher Allocation by Subject
           </CardTitle>
           <CardDescription className="text-slate-500">
