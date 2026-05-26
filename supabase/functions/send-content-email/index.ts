@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Resend } from 'https://esm.sh/resend@2.0.0';
+import { sendPushToBatchSubject } from '../_shared/push.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://ssp.unknowniitians.com',
@@ -77,6 +78,14 @@ Unknown IITians Academic Team`;
     });
 
     console.log(`Content email sent for ${content_type}:`, emailResponse);
+
+    // Mirror the email as a push notification.
+    await sendPushToBatchSubject(supabase, batch, subject, {
+      title: `New ${contentShort}: ${title}`,
+      body: `A new ${contentLabel} was uploaded for ${subject} (${batch}).`,
+      url: '/dashboard',
+      tag: `content-${content_type}-${batch}-${subject}`,
+    });
 
     return new Response(JSON.stringify({ success: true, emailResponse }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

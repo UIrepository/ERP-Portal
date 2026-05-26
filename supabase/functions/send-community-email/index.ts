@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Resend } from 'https://esm.sh/resend@2.0.0';
+import { sendPushToBatchSubject } from '../_shared/push.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://ssp.unknowniitians.com',
@@ -72,6 +73,14 @@ Unknown IITians Academic Team`;
     });
 
     console.log('Community email sent:', emailResponse);
+
+    // Mirror the email as a push notification.
+    await sendPushToBatchSubject(supabase, batch, subject, {
+      title: `${subject}: message from ${sender_name || 'Teacher'}`,
+      body: message_content?.length > 80 ? `${message_content.slice(0, 80)}…` : message_content,
+      url: '/student/community',
+      tag: `community-${batch}-${subject}`,
+    });
 
     return new Response(JSON.stringify({ success: true, emailResponse }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

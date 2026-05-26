@@ -1,5 +1,6 @@
-// Minimal service worker — enables PWA installability + a tiny offline app-shell cache.
-const CACHE = 'ui-portal-v1';
+// Minimal service worker — enables PWA installability, push notifications,
+// and a tiny offline app-shell cache.
+const CACHE = 'ui-portal-v2';
 const APP_SHELL = ['/', '/icon-192.png', '/icon-512.png', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
@@ -40,4 +41,40 @@ self.addEventListener('fetch', (event) => {
       )
     );
   }
+});
+
+// --- Push notifications ---
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+    data = { title: 'Unknown IITians', body: event.data ? event.data.text() : '' };
+  }
+  const title = data.title || 'Unknown IITians';
+  const options = {
+    body: data.body || '',
+    icon: data.icon || '/icon-192.png',
+    badge: '/icon-192.png',
+    tag: data.tag,
+    renotify: !!data.tag,
+    data: { url: data.url || '/' },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientsArr) => {
+      for (const client of clientsArr) {
+        if ('focus' in client) {
+          if ('navigate' in client) client.navigate(target).catch(() => {});
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(target);
+    })
+  );
 });

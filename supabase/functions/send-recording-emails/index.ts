@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Resend } from 'https://esm.sh/resend@2.0.0';
+import { sendPushToBatchSubject } from '../_shared/push.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://ssp.unknowniitians.com',
@@ -117,6 +118,14 @@ Unknown IITians Academic Team`;
           .from('recordings')
           .update({ recording_email_sent: true } as any)
           .eq('id', recording.id);
+
+        // Mirror the email as a push notification.
+        await sendPushToBatchSubject(supabase, recording.batch, recording.subject, {
+          title: `New recording: ${recording.topic}`,
+          body: `A recording for ${recording.subject} (${recording.batch}) is now available.`,
+          url: '/dashboard',
+          tag: `recording-${recording.id}`,
+        });
 
         results.push({ recording_id: recording.id, status: 'sent' });
       } catch (err) {

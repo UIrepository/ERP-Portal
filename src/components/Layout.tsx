@@ -17,6 +17,7 @@ import { Sidebar } from './Sidebar';
 import { useChatDrawer } from '@/hooks/useChatDrawer';
 import { NotificationCenter } from './NotificationCenter';
 import { NotificationListener } from './NotificationListener';
+import { PushManager } from './PushManager';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -46,6 +47,7 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
         This is invisible but plays the sound and shows the toast popup 
       */}
       <NotificationListener />
+      <PushManager />
 
       {/* Full-width Header */}
       <header className="border-b bg-card shrink-0 z-30 w-full">

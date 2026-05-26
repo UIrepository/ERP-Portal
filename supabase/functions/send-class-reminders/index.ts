@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { Resend } from 'https://esm.sh/resend@2.0.0';
+import { sendPushToBatchSubject } from '../_shared/push.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://ssp.unknowniitians.com',
@@ -147,6 +148,15 @@ Unknown IITians Academic Team`;
           }
         }
       }
+
+      // Push notification (mirrors the email) to enrolled students + teachers
+      const push = await sendPushToBatchSubject(supabase, schedule.batch, schedule.subject, {
+        title: `${schedule.subject} class starting soon`,
+        body: `Your ${schedule.subject} (${schedule.batch}) class starts in 15 minutes. Tap to join.`,
+        url: '/schedule',
+        tag: `class-${schedule.id}`,
+      });
+      results.push({ batch: schedule.batch, subject: schedule.subject, status: `push_sent: ${push.sent}` });
 
       // Mark reminder as sent today
       await supabase

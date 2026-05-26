@@ -3,6 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { DownloadCircle01Icon, Download01Icon, Share01Icon, AddSquareIcon, More01Icon } from '@hugeicons/core-free-icons';
 import { useInstallApp } from '@/hooks/useInstallApp';
+import { useAuth } from '@/hooks/useAuth';
+import { subscribeToPush } from '@/lib/push';
 import {
   Dialog,
   DialogContent,
@@ -18,6 +20,8 @@ import {
  */
 export const InstallAppBanner = () => {
   const { standalone, ios, canPrompt, installOrShowHelp } = useInstallApp();
+  const { user, profile } = useAuth();
+  const userId = user?.id || profile?.user_id;
   const [visible, setVisible] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
 
@@ -38,11 +42,13 @@ export const InstallAppBanner = () => {
   if (standalone) return null;
 
   const handleInstall = async () => {
+    // This is a user gesture — also a good moment to enable notifications.
+    void subscribeToPush(userId);
     if (canPrompt) {
-      const result = await installOrShowHelp(); // prompts natively
+      await installOrShowHelp(); // prompts natively
       // If accepted, the appinstalled event hides everything; close the card regardless.
       setVisible(false);
-      return result;
+      return;
     }
     // No native prompt available → show manual instructions.
     setShowHelp(true);
