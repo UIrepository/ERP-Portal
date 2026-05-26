@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { NotificationToggle } from './NotificationToggle';
 
 interface NotificationItem {
   id: string;
@@ -189,7 +190,16 @@ export const NotificationCenter = () => {
             </Button>
           )}
         </div>
-        
+
+        {/* Push notifications toggle */}
+        <div className="flex items-center justify-between px-3 py-2.5 border-b">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-slate-700">Push notifications</p>
+            <p className="text-[11px] text-slate-400 leading-tight">Alerts even when the app is closed</p>
+          </div>
+          <NotificationToggle />
+        </div>
+
         <ScrollArea className="h-[350px]">
           <div className="flex flex-col">
             <AnimatePresence initial={false}>
