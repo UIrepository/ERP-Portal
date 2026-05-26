@@ -143,7 +143,7 @@ export const StaffInbox = () => {
       return Array.from(contactMap.values());
     },
     enabled: !!profile?.user_id && !!staffRole,
-    refetchInterval: 5000
+    refetchInterval: 20000
   });
 
   // Filter contacts based on selected filter
@@ -185,13 +185,14 @@ export const StaffInbox = () => {
         .from('direct_messages')
         .select('*')
         .or(`and(sender_id.eq.${profile.user_id},receiver_id.eq.${selectedContactId}),and(sender_id.eq.${selectedContactId},receiver_id.eq.${profile.user_id})`)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: false })
+        .limit(80);
 
       if (error) throw error;
-      return data as Message[];
+      return ((data as Message[]) || []).reverse();
     },
     enabled: !!profile?.user_id && !!selectedContactId,
-    refetchInterval: 3000
+    refetchInterval: 15000
   });
 
   useEffect(() => {

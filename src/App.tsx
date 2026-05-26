@@ -16,7 +16,19 @@ import { InstallAppBanner } from "@/components/InstallAppBanner";
 import { StudentCommunity } from "@/components/student/StudentCommunity";
 import { TeacherCommunity } from "@/components/teacher/TeacherCommunity";
 
-const queryClient = new QueryClient();
+// Egress-conscious defaults: don't refetch on every window/tab focus or
+// reconnect, keep data fresh for a minute, and don't hammer retries.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      staleTime: 60_000,
+      gcTime: 5 * 60_000,
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

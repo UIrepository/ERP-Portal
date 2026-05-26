@@ -29,13 +29,14 @@ export const StudentDirectMessage = ({ receiverId, receiverName }: Props) => {
         .from('direct_messages')
         .select('*')
         .or(`and(sender_id.eq.${profile.user_id},receiver_id.eq.${receiverId}),and(sender_id.eq.${receiverId},receiver_id.eq.${profile.user_id})`)
-        .order('created_at', { ascending: true });
-      
+        .order('created_at', { ascending: false })
+        .limit(80);
+
       if (error) throw error;
-      return data;
+      return (data || []).reverse();
     },
-    // Poll every 3 seconds for new messages (simple realtime)
-    refetchInterval: 3000 
+    // Poll for new messages (raised from 3s to cut egress)
+    refetchInterval: 15000
   });
 
   // Send Mutation

@@ -96,7 +96,7 @@ export const NotificationCenter = () => {
       }));
     },
     enabled: !!profile?.user_id,
-    refetchInterval: 10000, 
+    refetchInterval: 30000,
   });
 
   // --- 2. Fetch Feedback Notifications (Only for Teachers) ---

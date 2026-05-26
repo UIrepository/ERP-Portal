@@ -165,7 +165,7 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
       });
     },
     enabled: !!batch,
-    refetchInterval: 5000
+    refetchInterval: 20000
   });
 
   const now = new Date();
