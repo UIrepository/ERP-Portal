@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { DownloadCircle01Icon, ArrowDown01Icon, Share01Icon, AddSquareIcon, More01Icon } from '@hugeicons/core-free-icons';
+import { DownloadCircle01Icon, Download01Icon, Share01Icon, AddSquareIcon, More01Icon } from '@hugeicons/core-free-icons';
 import { useInstallApp } from '@/hooks/useInstallApp';
 import {
   Dialog,
@@ -79,7 +79,7 @@ export const InstallAppBanner = () => {
                     onClick={handleInstall}
                     className="inline-flex items-center justify-center gap-1.5 rounded-sm bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 active:scale-[0.98] transition-colors"
                   >
-                    <HugeiconsIcon icon={ArrowDown01Icon} size={22} strokeWidth={2.5} />
+                    <HugeiconsIcon icon={Download01Icon} size={20} strokeWidth={2} />
                     Install
                   </button>
                   <button
