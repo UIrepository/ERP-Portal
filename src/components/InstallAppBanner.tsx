@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Download04Icon, Cancel01Icon, Share01Icon, AddSquareIcon, More01Icon } from '@hugeicons/core-free-icons';
+import { DownloadCircle01Icon, Cancel01Icon, Share01Icon, AddSquareIcon, More01Icon } from '@hugeicons/core-free-icons';
 import { useInstallApp } from '@/hooks/useInstallApp';
 import {
   Dialog,
@@ -59,13 +59,10 @@ export const InstallAppBanner = () => {
             transition={{ type: 'spring', stiffness: 320, damping: 30 }}
             className="fixed inset-x-0 bottom-0 z-[120] flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pointer-events-none font-sans"
           >
-            <div className="pointer-events-auto w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_20px_60px_-15px_rgba(30,27,75,0.35)]">
-              {/* Brand accent strip */}
-              <div className="h-1 w-full bg-gradient-to-r from-indigo-600 via-violet-600 to-indigo-500" />
-
+            <div className="pointer-events-auto w-full max-w-2xl overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
               <div className="flex items-center gap-4 p-4">
                 {/* App icon */}
-                <div className="shrink-0 rounded-xl border border-slate-200 shadow-sm overflow-hidden h-12 w-12 bg-white">
+                <div className="shrink-0 rounded-md border border-slate-200 overflow-hidden h-12 w-12 bg-white">
                   <img src="/icon-192.png" alt="App icon" className="h-full w-full object-cover" />
                 </div>
 
@@ -89,14 +86,14 @@ export const InstallAppBanner = () => {
               <div className="flex items-center gap-2 px-4 pb-4">
                 <button
                   onClick={handleInstall}
-                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 hover:bg-indigo-700 active:scale-[0.98] transition-all"
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 active:scale-[0.98] transition-colors"
                 >
-                  <HugeiconsIcon icon={Download04Icon} size={18} strokeWidth={2} />
+                  <HugeiconsIcon icon={DownloadCircle01Icon} size={18} strokeWidth={2} />
                   Install app
                 </button>
                 <button
                   onClick={() => setVisible(false)}
-                  className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-500 hover:bg-slate-100 transition-colors"
+                  className="rounded-md border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
                 >
                   Not now
                 </button>
@@ -111,7 +108,7 @@ export const InstallAppBanner = () => {
         <DialogContent className="sm:max-w-md font-sans">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-slate-900">
-              <HugeiconsIcon icon={Download04Icon} size={20} strokeWidth={2} className="text-indigo-600" />
+              <HugeiconsIcon icon={DownloadCircle01Icon} size={20} strokeWidth={2} className="text-indigo-600" />
               Install UI Portal
             </DialogTitle>
             <DialogDescription>
@@ -130,7 +127,7 @@ export const InstallAppBanner = () => {
                 <Step n={2} icon={AddSquareIcon}>
                   Choose <span className="font-semibold text-slate-900">Add to Home Screen</span>.
                 </Step>
-                <Step n={3} icon={Download04Icon}>
+                <Step n={3} icon={DownloadCircle01Icon}>
                   Tap <span className="font-semibold text-slate-900">Add</span> — the app appears on your Home Screen.
                 </Step>
               </>
@@ -139,7 +136,7 @@ export const InstallAppBanner = () => {
                 <Step n={1} icon={More01Icon}>
                   Open your browser menu (<span className="font-semibold text-slate-900">⋮</span> top-right).
                 </Step>
-                <Step n={2} icon={Download04Icon}>
+                <Step n={2} icon={DownloadCircle01Icon}>
                   Choose <span className="font-semibold text-slate-900">Install app</span> or{' '}
                   <span className="font-semibold text-slate-900">Add to Home screen</span>.
                 </Step>
@@ -152,7 +149,7 @@ export const InstallAppBanner = () => {
   );
 };
 
-const Step = ({ n, icon, children }: { n: number; icon: typeof Download04Icon; children: React.ReactNode }) => (
+const Step = ({ n, icon, children }: { n: number; icon: typeof DownloadCircle01Icon; children: React.ReactNode }) => (
   <li className="flex items-start gap-3">
     <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
       <HugeiconsIcon icon={icon} size={16} strokeWidth={2} />
