@@ -3,7 +3,6 @@ import { StudentMain } from './student/StudentMain';
 import { StudentFeedback } from './student/StudentFeedback';
 import { StudentExams } from './student/StudentExams';
 import { StudentSchedule } from './student/StudentSchedule';
-import { StudentActivity } from './student/StudentActivity';
 
 interface StudentDashboardProps {
   activeTab: string;
@@ -26,8 +25,6 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
   
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'activity':
-        return <StudentActivity />;
       case 'schedule':
         return <StudentSchedule />;
       case 'feedback':

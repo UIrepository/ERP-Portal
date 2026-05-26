@@ -116,7 +116,6 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
   // --- 1. STUDENT TABS ---
   const studentTabs = [
     { id: 'dashboard', label: 'My Learning', icon: DashboardSquare01Icon },
-    { id: 'activity', label: 'My Activity', icon: Analytics01Icon },
     { id: 'schedule', label: 'Schedule', icon: Calendar03Icon },
     { id: 'support', label: 'Support', icon: CustomerSupportIcon },
     { id: 'feedback', label: 'Submit Feedback', icon: Message01Icon },
