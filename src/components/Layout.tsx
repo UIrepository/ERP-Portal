@@ -14,10 +14,21 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from './Sidebar';
+import { BottomNav, type BottomNavTab } from './BottomNav';
 import { useChatDrawer } from '@/hooks/useChatDrawer';
 import { NotificationCenter } from './NotificationCenter';
 import { NotificationListener } from './NotificationListener';
 import { PushManager } from './PushManager';
+import { DashboardSquare01Icon, Calendar03Icon, Message01Icon, Quiz01Icon } from '@hugeicons/core-free-icons';
+
+// Mobile bottom-nav for students — Support and Contact Admin are intentionally
+// left out (they live on desktop only); short labels suit the compact bar.
+const STUDENT_BOTTOM_TABS: BottomNavTab[] = [
+  { id: 'dashboard', label: 'Home', icon: DashboardSquare01Icon },
+  { id: 'schedule', label: 'Schedule', icon: Calendar03Icon },
+  { id: 'feedback', label: 'Feedback', icon: Message01Icon },
+  { id: 'exams', label: 'Exams', icon: Quiz01Icon },
+];
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -28,6 +39,10 @@ interface LayoutProps {
 export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
   const { profile, signOut, resolvedRole } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  // Students navigate via the app-style bottom bar on mobile, so they don't
+  // get the hamburger sidebar there. Other roles have too many tabs for a
+  // bottom bar and keep the slide-out menu.
+  const isStudent = resolvedRole === 'student';
   
   // Only try to use chat drawer for students (it's wrapped in provider only for students)
   let openSupportDrawer: (() => void) | undefined;
@@ -53,7 +68,8 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
       <header className="border-b bg-card shrink-0 z-30 w-full">
         <div className="flex h-16 items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3">
-            {/* Mobile Sidebar Toggle - Updated to Big Hamburger Menu */}
+            {/* Mobile Sidebar Toggle — hidden for students (they use the bottom nav) */}
+            {!isStudent && (
             <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
               <SheetTrigger asChild className="md:hidden">
                 <Button size="icon" variant="ghost" className="-ml-2 h-12 w-12 hover:bg-slate-100">
@@ -78,7 +94,8 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
                  />
               </SheetContent>
             </Sheet>
-            
+            )}
+
             {/* Responsive Logo: 'logoofficial' on mobile (icon), 'imagelogo' on desktop (text) */}
             <img 
               src="/logoofficial.png" 
@@ -144,12 +161,22 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
         {/* Scrollable Main Content - left padding on desktop to clear the floating rail */}
         <main className="flex-1 overflow-y-auto min-w-0 md:pl-24">
           <div className="min-h-full flex flex-col">
-            <div className="flex-1">
+            {/* Bottom padding on mobile keeps content clear of the bottom nav */}
+            <div className={isStudent ? 'flex-1 pb-20 md:pb-0' : 'flex-1'}>
               {children}
             </div>
           </div>
         </main>
       </div>
+
+      {/* App-style bottom navigation — students, mobile only */}
+      {isStudent && (
+        <BottomNav
+          tabs={STUDENT_BOTTOM_TABS}
+          activeTab={activeTab}
+          onTabChange={onTabChange}
+        />
+      )}
     </div>
   );
 };
