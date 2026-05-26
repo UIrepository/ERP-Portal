@@ -28,7 +28,7 @@ import {
   Message01Icon,
   InboxIcon,
   Quiz01Icon,
-  DownloadCircle01Icon,
+  Download01Icon,
 } from '@hugeicons/core-free-icons';
 
 import {
@@ -312,7 +312,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
               )}
               onClick={() => { void installOrShowHelp(); }}
             >
-              <HugeiconsIcon icon={DownloadCircle01Icon} size={18} strokeWidth={1.8} className="shrink-0" />
+              <HugeiconsIcon icon={Download01Icon} size={18} strokeWidth={1.8} className="shrink-0" />
               {!collapsed && 'Get the app'}
             </Button>
           )}
