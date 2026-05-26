@@ -69,3 +69,34 @@ export async function subscribeToPush(userId?: string | null): Promise<boolean> 
     return false;
   }
 }
+
+/** Turn push off: remove the browser subscription and its stored row. */
+export async function unsubscribeFromPush(): Promise<boolean> {
+  if (!pushSupported()) return false;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return true;
+    const endpoint = sub.endpoint;
+    await sub.unsubscribe();
+    await (supabase as unknown as { from: (t: string) => any })
+      .from('push_subscriptions')
+      .delete()
+      .eq('endpoint', endpoint);
+    return true;
+  } catch (e) {
+    console.warn('unsubscribeFromPush failed', e);
+    return false;
+  }
+}
+
+/** True when this browser currently has an active push subscription. */
+export async function isPushSubscribed(): Promise<boolean> {
+  if (!pushSupported() || Notification.permission !== 'granted') return false;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    return !!(await reg.pushManager.getSubscription());
+  } catch {
+    return false;
+  }
+}

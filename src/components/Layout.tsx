@@ -18,6 +18,7 @@ import { useChatDrawer } from '@/hooks/useChatDrawer';
 import { NotificationCenter } from './NotificationCenter';
 import { NotificationListener } from './NotificationListener';
 import { PushManager } from './PushManager';
+import { NotificationToggle } from './NotificationToggle';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -98,7 +99,8 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
                Placed right before the profile dropdown 
             */}
             <NotificationCenter />
-            
+            <NotificationToggle />
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-9 w-9 rounded-full">
