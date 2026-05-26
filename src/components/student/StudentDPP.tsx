@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { StudentBackButton } from './StudentBackButton';
 
 import { 
   FileText, 
@@ -28,6 +29,7 @@ interface DPPContent {
 interface StudentDPPProps {
   batch: string;
   subject: string;
+  onBack?: () => void;
 }
 
 // Helper function to determine icon and label based on file type/link
@@ -101,7 +103,7 @@ const DPPSkeleton = () => (
   </div>
 );
 
-export const StudentDPP = ({ batch, subject }: StudentDPPProps) => {
+export const StudentDPP = ({ batch, subject, onBack }: StudentDPPProps) => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
 
@@ -180,9 +182,12 @@ export const StudentDPP = ({ batch, subject }: StudentDPPProps) => {
       <div className="bg-white p-6 md:p-8">
           {/* Header Section */}
           <div className="mb-8 border-b border-slate-100 pb-6">
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
-              Daily Practice Problems
-            </h1>
+            <div className="flex items-center gap-3">
+              {onBack && <StudentBackButton onClick={onBack} />}
+              <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+                Daily Practice Problems
+              </h1>
+            </div>
             <p className="text-gray-500 mt-1 text-sm">Practice sets and assignments</p>
           </div>
 

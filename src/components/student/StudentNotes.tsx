@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { StudentBackButton } from './StudentBackButton';
 import { 
   FileText, 
   Download, 
@@ -31,6 +32,7 @@ interface NotesContent {
 interface StudentNotesProps {
   batch?: string;
   subject?: string;
+  onBack?: () => void;
 }
 
 // Helper function to determine icon and label based on file type
@@ -174,7 +176,7 @@ const NoteViewer = ({ note, onBack, onDownload, allNotes, onNoteSelect }: { note
     );
 };
 
-export const StudentNotes = ({ batch, subject }: StudentNotesProps) => {
+export const StudentNotes = ({ batch, subject, onBack }: StudentNotesProps) => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [selectedNote, setSelectedNote] = useState<NotesContent | null>(null);
@@ -279,9 +281,12 @@ export const StudentNotes = ({ batch, subject }: StudentNotesProps) => {
       <div className="bg-white p-6 md:p-8">
           {/* Header Section */}
           <div className="mb-8 border-b border-slate-100 pb-6">
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
-              Reference Section
-            </h1>
+            <div className="flex items-center gap-3">
+              {onBack && <StudentBackButton onClick={onBack} />}
+              <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+                Reference Section
+              </h1>
+            </div>
             <p className="text-gray-500 mt-1 text-sm">Course materials and documents</p>
           </div>
 

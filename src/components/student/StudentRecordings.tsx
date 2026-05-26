@@ -11,6 +11,7 @@ import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { FullScreenVideoPlayer } from '@/components/video-player';
 import { Lecture, Doubt as PlayerDoubt } from '@/components/video-player/types';
+import { StudentBackButton } from './StudentBackButton';
 
 // Interfaces
 interface RecordingContent {
@@ -26,6 +27,7 @@ interface RecordingContent {
 interface StudentRecordingsProps {
     batch?: string;
     subject?: string;
+    onBack?: () => void;
 }
 
 
@@ -59,7 +61,7 @@ const RecordingSkeleton = () => (
 
 
 // Main Component
-export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) => {
+export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsProps) => {
     const { user, profile } = useAuth();
     const queryClient = useQueryClient();
     const [searchTerm, setSearchTerm] = useState('');
@@ -191,6 +193,7 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
                 {/* Header Section */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                     <div className="flex items-center gap-3">
+                        {onBack && <StudentBackButton onClick={onBack} />}
                         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
                             Class Lectures
                         </h1>

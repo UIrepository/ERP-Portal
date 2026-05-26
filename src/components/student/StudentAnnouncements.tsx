@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { StudentBackButton } from './StudentBackButton';
 
 interface Announcement {
   id: string;
@@ -17,6 +18,7 @@ interface StudentAnnouncementsProps {
   batch?: string;
   subject?: string;
   enrolledSubjects?: string[];
+  onBack?: () => void;
 }
 
 const AnnouncementSkeleton = () => (
@@ -90,7 +92,7 @@ const AnnouncementCard = ({ announcement }: { announcement: Announcement }) => {
     );
 };
 
-export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [] }: StudentAnnouncementsProps) => {
+export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [], onBack }: StudentAnnouncementsProps) => {
     
     const { data: announcements, isLoading } = useQuery({
         queryKey: ['student-announcements', batch, subject, enrolledSubjects],
@@ -146,7 +148,14 @@ export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [] }: 
                     background-color: #cbd5e1;
                 }
             `}</style>
-            
+
+            {onBack && (
+                <div className="flex items-center gap-3 mb-6">
+                    <StudentBackButton onClick={onBack} />
+                    <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Announcements</h1>
+                </div>
+            )}
+
             {isLoading ? (
                 <AnnouncementSkeleton />
             ) : announcements && announcements.length > 0 ? (

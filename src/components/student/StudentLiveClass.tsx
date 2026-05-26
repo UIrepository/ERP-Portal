@@ -6,6 +6,7 @@ import { generateJitsiRoomName } from '@/lib/jitsiUtils';
 import { useAuth } from '@/hooks/useAuth';
 import { useMergedSubjects } from '@/hooks/useMergedSubjects';
 import { toast } from 'sonner';
+import { StudentBackButton } from './StudentBackButton';
 
 interface MergeRow {
   primary_batch: string;
@@ -18,6 +19,7 @@ interface StudentLiveClassProps {
   batch: string | null;
   subject?: string | null;
   enrolledSubjects?: string[];
+  onBack?: () => void;
 }
 
 interface ScheduleWithLink {
@@ -33,7 +35,7 @@ interface ScheduleWithLink {
   is_jitsi_live?: boolean;
 }
 
-export const StudentLiveClass = ({ batch, subject, enrolledSubjects }: StudentLiveClassProps) => {
+export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: StudentLiveClassProps) => {
   const { profile, user } = useAuth();
   const { mergedPairs, orFilter, primaryPair } = useMergedSubjects(batch, subject);
   const today = new Date();
@@ -250,9 +252,12 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects }: StudentLi
   return (
     <div className="w-full font-sans antialiased text-slate-900">
       <div className="mb-6">
-        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900">
-           Live Class Sessions
-        </h1>
+        <div className="flex items-center gap-3">
+          {onBack && <StudentBackButton onClick={onBack} />}
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900">
+             Live Class Sessions
+          </h1>
+        </div>
         <p className="text-sm text-slate-500 mt-1">Join your live and upcoming sessions for today.</p>
       </div>
 

@@ -118,7 +118,7 @@ export const StudentSubjectBlocks = ({
     <div className="w-full max-w-[1840px] mx-auto px-4 md:px-6 py-6 font-sans">
 
       {/* Single framed content card with 1px black border */}
-      <div className="w-full bg-white rounded-lg border border-black shadow-sm p-6 md:p-8 min-h-[400px]">
+      <div className="w-full bg-white rounded-lg border border-slate-200 shadow-sm p-6 md:p-8 min-h-[400px]">
 
           {/* Back arrow beside the subject title */}
           <div className="flex items-center gap-3 mb-8">

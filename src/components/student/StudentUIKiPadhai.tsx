@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Badge } from '@/components/ui/badge';
 import { Crown, ExternalLink } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { StudentBackButton } from './StudentBackButton';
 
 interface UIKiPadhaiContent {
   id: string;
@@ -22,6 +23,7 @@ interface UIKiPadhaiContent {
 interface StudentUIKiPadhaiProps {
   batch?: string;
   subject?: string;
+  onBack?: () => void;
 }
 
 const PremiumContentSkeleton = () => (
@@ -42,7 +44,7 @@ const PremiumContentSkeleton = () => (
 );
 
 
-export const StudentUIKiPadhai = ({ batch, subject }: StudentUIKiPadhaiProps) => {
+export const StudentUIKiPadhai = ({ batch, subject, onBack }: StudentUIKiPadhaiProps) => {
   const { profile } = useAuth();
 
   const { data: premiumContent, isLoading } = useQuery<UIKiPadhaiContent[]>({
@@ -79,9 +81,12 @@ export const StudentUIKiPadhai = ({ batch, subject }: StudentUIKiPadhaiProps) =>
         {/* Section Header */}
         <header className="flex flex-col md:flex-row justify-between items-end mb-8 border-b border-slate-100 pb-6">
             <div className="mb-2 md:mb-0">
-                <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
-                    UI Ki Padhai
-                </h1>
+                <div className="flex items-center gap-3">
+                    {onBack && <StudentBackButton onClick={onBack} />}
+                    <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+                        UI Ki Padhai
+                    </h1>
+                </div>
                 <p className="text-sm text-gray-500 mt-1">
                     Exclusive high-quality resources and premium content.
                 </p>

@@ -1,5 +1,3 @@
-import { HugeiconsIcon } from '@hugeicons/react';
-import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { StudentSchedule } from './StudentSchedule';
 import { StudentRecordings } from './StudentRecordings';
 import { StudentNotes } from './StudentNotes';
@@ -26,17 +24,17 @@ export const StudentBlockContent = ({
   const renderContent = () => {
     switch (blockId) {
       case 'live-class':
-        return <div className="p-4 md:p-6"><StudentLiveClass batch={batch} subject={subject} /></div>;
+        return <div className="p-4 md:p-6"><StudentLiveClass batch={batch} subject={subject} onBack={onBack} /></div>;
       case 'recordings':
-        return <StudentRecordings batch={batch} subject={subject} />;
+        return <StudentRecordings batch={batch} subject={subject} onBack={onBack} />;
       case 'notes':
-        return <StudentNotes batch={batch} subject={subject} />;
+        return <StudentNotes batch={batch} subject={subject} onBack={onBack} />;
       case 'dpps':
-        return <StudentDPP batch={batch} subject={subject} />;
+        return <StudentDPP batch={batch} subject={subject} onBack={onBack} />;
       case 'ui-ki-padhai':
-        return <StudentUIKiPadhai batch={batch} subject={subject} />;
+        return <StudentUIKiPadhai batch={batch} subject={subject} onBack={onBack} />;
       case 'announcements':
-        return <StudentAnnouncements batch={batch} subject={subject} />;
+        return <StudentAnnouncements batch={batch} subject={subject} onBack={onBack} />;
       case 'community':
         return <StudentCommunity />;
       case 'connect':
@@ -53,20 +51,8 @@ export const StudentBlockContent = ({
   return (
     <div className="w-full max-w-[1840px] mx-auto px-4 md:px-6 py-6 font-sans">
 
-      {/* Single framed content card with 1px black border */}
-      <div className="w-full bg-white rounded-lg border border-black shadow-sm overflow-hidden min-h-[400px]">
-
-        {/* Back arrow inside the frame */}
-        <div className="px-6 pt-5">
-          <button
-            onClick={onBack}
-            aria-label="Back"
-            className="shrink-0 text-[#1e293b] hover:opacity-70 transition-opacity"
-          >
-            <HugeiconsIcon icon={ArrowLeft01Icon} size={26} strokeWidth={2} />
-          </button>
-        </div>
-
+      {/* Single framed content card (border matches sidebar) */}
+      <div className="w-full bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden min-h-[400px]">
         {renderContent()}
       </div>
     </div>
