@@ -31,6 +31,24 @@ export const isStandalone = () =>
     // iOS Safari
     (window.navigator as unknown as { standalone?: boolean }).standalone === true);
 
+/**
+ * Open an internal (same-origin) route. In the installed PWA (standalone),
+ * `window.open(_, '_blank')` breaks out into the system browser and loses the
+ * app — so navigate in-place instead. In a normal browser tab, keep the
+ * existing new-tab behaviour.
+ */
+export function openInternalRoute(
+  url: string,
+  navigate?: (to: string) => void,
+) {
+  if (isStandalone()) {
+    if (navigate) navigate(url);
+    else window.location.assign(url);
+  } else {
+    window.open(url, '_blank');
+  }
+}
+
 export const isIOS = () => {
   if (typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent;

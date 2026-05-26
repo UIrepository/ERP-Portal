@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -42,6 +42,7 @@ const StudentMainContent = () => {
   const { profile, user } = useAuth();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('classes');
   const [isInitialized, setIsInitialized] = useState(false);
   const { openSupportDrawer } = useChatDrawer();
@@ -205,7 +206,8 @@ const StudentMainContent = () => {
 
   const handleSelectBlock = (block: string) => {
     if (block === 'community') {
-      window.open('/portal/student/community', '_blank');
+      // Always navigate in-place so the PWA never breaks out into the browser.
+      navigate('/portal/student/community');
       return;
     }
     const newNav: NavigationState = { ...navigation, level: 'block', block };
@@ -316,7 +318,7 @@ const StudentMainContent = () => {
 
   const handleTabClick = (tabId: string) => {
     if (tabId === 'community') {
-      window.open('/portal/student/community', '_blank');
+      navigate('/portal/student/community');
     } else {
       setActiveTab(tabId as TabType);
     }

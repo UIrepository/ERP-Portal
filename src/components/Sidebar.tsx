@@ -44,6 +44,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useInstallApp } from '@/hooks/useInstallApp';
+import { useNavigate } from 'react-router-dom';
 
 interface SidebarProps {
   activeTab: string;
@@ -62,6 +63,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
   const { profile, user, signOut, resolvedRole } = useAuth();
   const queryClient = useQueryClient();
   const { standalone: appInstalled, installOrShowHelp } = useInstallApp();
+  const navigate = useNavigate();
 
   const ADMIN_WHATSAPP_NUMBER = '916297143798'; 
   const WHATSAPP_MESSAGE_TEMPLATE = "Hello Sir, this is (NAME) from the (BATCH_NAME). I wanted to clarify a few doubts about the class workflow.";
@@ -225,7 +227,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
                     <Button
                       variant="ghost"
                       className={navItemClass(false)}
-                      onClick={() => window.open('/teacher-community', '_blank')}
+                      onClick={() => navigate('/teacher-community')}
                     >
                       {icon(tab.icon)}
                       {!collapsed && label}

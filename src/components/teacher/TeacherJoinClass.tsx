@@ -21,8 +21,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button'; 
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
+import { openInternalRoute } from '@/hooks/useInstallApp';
 
 // --- Types ---
 interface Schedule {
@@ -55,6 +57,7 @@ interface Attendance {
 export const TeacherJoinClass = () => {
   const { profile, user } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [selectedClassForAttendance, setSelectedClassForAttendance] = useState<Schedule | null>(null);
   const { startStream, isStartingStream } = useYoutubeStream();
   const [streamKey, setStreamKey] = useState<string>("");
@@ -553,7 +556,7 @@ export const TeacherJoinClass = () => {
 
                   <button onClick={() => setSelectedClassForAttendance(cls)} className={styles.btn}>Attendance</button>
                   <button
-                    onClick={() => window.open(`/whiteboard/${cls.id}`, '_blank', 'noopener')}
+                    onClick={() => openInternalRoute(`/whiteboard/${cls.id}`, navigate)}
                     className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded text-sm font-semibold cursor-pointer transition-all border border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100"
                     title="Open whiteboard in new tab"
                   >
@@ -597,7 +600,7 @@ export const TeacherJoinClass = () => {
                 <div className={styles.actionsWrapper}>
                   <button onClick={() => setSelectedClassForAttendance(cls)} className={styles.btn}>Attendance</button>
                   <button
-                    onClick={() => window.open(`/whiteboard/${cls.id}`, '_blank', 'noopener')}
+                    onClick={() => openInternalRoute(`/whiteboard/${cls.id}`, navigate)}
                     className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded text-sm font-semibold cursor-pointer transition-all border border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100"
                     title="Open whiteboard in new tab"
                   >
@@ -634,7 +637,7 @@ export const TeacherJoinClass = () => {
                 <div className={styles.actionsWrapper}>
                   <button onClick={() => setSelectedClassForAttendance(cls)} className={styles.btn}>View Attendance</button>
                   <button
-                    onClick={() => window.open(`/whiteboard/${cls.id}`, '_blank', 'noopener')}
+                    onClick={() => openInternalRoute(`/whiteboard/${cls.id}`, navigate)}
                     className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded text-sm font-semibold cursor-pointer transition-all border border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100"
                     title="Open whiteboard in new tab"
                   >

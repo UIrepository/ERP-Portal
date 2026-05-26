@@ -12,6 +12,8 @@ import { cn } from '@/lib/utils';
 import { FullScreenVideoPlayer } from '@/components/video-player';
 import { Lecture, Doubt as PlayerDoubt } from '@/components/video-player/types';
 import { StudentBackButton } from './StudentBackButton';
+import { useNavigate } from 'react-router-dom';
+import { openInternalRoute } from '@/hooks/useInstallApp';
 
 // Interfaces
 interface RecordingContent {
@@ -64,6 +66,7 @@ const RecordingSkeleton = () => (
 export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsProps) => {
     const { user, profile } = useAuth();
     const queryClient = useQueryClient();
+    const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedRecording, setSelectedRecording] = useState<RecordingContent | null>(null);
     
@@ -175,8 +178,10 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
             topic: recording.topic,
             playMode: 'new-tab'
         });
-        window.open(`/lecture/${recording.id}`, '_blank', 'noopener,noreferrer');
-    }, [logActivity]);
+        // In the installed PWA, navigate in-place (a `_blank` would pop the
+        // system browser); in a normal tab, keep opening a new tab.
+        openInternalRoute(`/lecture/${recording.id}`, navigate);
+    }, [logActivity, navigate]);
 
     // Handle closing the player (legacy — kept for safety)
     const handleClosePlayer = useCallback(() => {

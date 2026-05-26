@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Tldraw,
   Editor,
@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ChevronDown, ChevronLeft, ChevronRight, CloudUpload, EyeOff, FileStack, ImagePlus, Loader2, Palette, PenLine, Plus, Square, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, CloudUpload, EyeOff, FileStack, ImagePlus, Loader2, LogOut, Palette, PenLine, Plus, Square, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -55,7 +55,16 @@ const EXPORT_SCALE = 1.5;
 const Whiteboard = () => {
   const { scheduleId } = useParams<{ scheduleId: string }>();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+
+  // Leave the whiteboard. When it was opened in its own browser tab,
+  // window.close() works; in the installed PWA (navigated in-place, no tab to
+  // close) we fall back to returning to the dashboard.
+  const handleExit = useCallback(() => {
+    window.close();
+    setTimeout(() => navigate('/'), 100);
+  }, [navigate]);
 
   const [editor, setEditor] = useState<Editor | null>(null);
   const [startMode, setStartMode] = useState<StartMode>('choose');
@@ -602,6 +611,14 @@ const Whiteboard = () => {
             className="h-8 w-8 inline-flex items-center justify-center rounded-md bg-white/5 border border-white/10 text-white/80 hover:bg-white/15 hover:text-white transition-colors"
           >
             <EyeOff className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handleExit}
+            title="Exit whiteboard"
+            className="h-8 w-8 inline-flex items-center justify-center rounded-md bg-white/5 border border-white/10 text-white/80 hover:bg-rose-500/30 hover:border-rose-400/40 hover:text-white transition-colors"
+          >
+            <LogOut className="h-4 w-4" />
           </button>
         </div>
       </header>
