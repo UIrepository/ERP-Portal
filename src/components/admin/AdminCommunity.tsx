@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { uploadImageToCloudinary } from '@/lib/cloudinary';
 import { useAuth } from '@/hooks/useAuth';
 import { useMergedSubjects } from '@/hooks/useMergedSubjects';
 import { Button } from '@/components/ui/button';
@@ -375,9 +376,11 @@ export const AdminCommunity = () => {
         .from('community_messages')
         .select(`*, profiles:profile_basics (name, email), message_likes ( user_id, reaction_type )`)
         .or(orFilter)
-        .order('created_at', { ascending: true });
+        // Latest 80 only (newest first) then flip to chronological (egress).
+        .order('created_at', { ascending: false })
+        .limit(80);
       if (error) throw error;
-      return (data || []) as CommunityMessage[];
+      return ((data || []) as CommunityMessage[]).reverse();
     },
     enabled: !!selectedGroup && !!orFilter
   });
@@ -439,13 +442,11 @@ export const AdminCommunity = () => {
       let imageUrl: string | null = null;
       if (image) {
         setIsUploading(true);
-        const fileExt = image.name.split('.').pop();
-        const fileName = `${Math.random()}.${fileExt}`;
-        const filePath = `${profile.user_id}/${fileName}`;
-        await supabase.storage.from('chat_uploads').upload(filePath, image);
-        const { data } = supabase.storage.from('chat_uploads').getPublicUrl(filePath);
-        imageUrl = data.publicUrl;
-        setIsUploading(false);
+        try {
+          imageUrl = await uploadImageToCloudinary(image);
+        } finally {
+          setIsUploading(false);
+        }
       }
       const insertData = {
         content: text,

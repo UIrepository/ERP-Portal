@@ -24,5 +24,8 @@ verify_jwt = false
 [functions.send-push]
 verify_jwt = false
 
+[functions.cloudinary-sign]
+verify_jwt = true
+
 [functions.upload-whiteboard-pdf]
 verify_jwt = true

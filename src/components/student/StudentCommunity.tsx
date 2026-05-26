@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { uploadImageToCloudinary } from '@/lib/cloudinary';
 import { useAuth } from '@/hooks/useAuth';
 import { useMergedSubjects } from '@/hooks/useMergedSubjects';
 import { useSearchParams, useNavigate } from 'react-router-dom'; // 🟢 Added useSearchParams
@@ -412,7 +413,7 @@ export const StudentCommunity = () => {
       return result;
     },
     enabled: enrollments.length > 0 && !!profile?.user_id,
-    refetchInterval: 10000,
+    refetchInterval: 30000, // realtime channel already keeps this fresh
   });
 
   const sortedEnrollments = useMemo(() => {
@@ -466,10 +467,13 @@ export const StudentCommunity = () => {
           message_likes ( user_id, reaction_type )
         `)
         .or(orFilter)
-        .order('created_at', { ascending: true });
+        // Only the latest 80 messages (newest first) then flip to chronological —
+        // avoids re-downloading the entire thread on every fetch (egress).
+        .order('created_at', { ascending: false })
+        .limit(80);
 
       if (error) throw error;
-      return (data || []) as CommunityMessage[];
+      return ((data || []) as CommunityMessage[]).reverse();
     },
     enabled: !!selectedGroup && !!orFilter
   });
@@ -556,14 +560,11 @@ export const StudentCommunity = () => {
       let imageUrl: string | null = null;
       if (image) {
         setIsUploading(true);
-        const fileExt = image.name.split('.').pop();
-        const fileName = `${Math.random()}.${fileExt}`;
-        const filePath = `${profile.user_id}/${fileName}`;
-        const { error: uploadError } = await supabase.storage.from('chat_uploads').upload(filePath, image);
-        if (uploadError) throw uploadError;
-        const { data: { publicUrl } } = supabase.storage.from('chat_uploads').getPublicUrl(filePath);
-        imageUrl = publicUrl;
-        setIsUploading(false);
+        try {
+          imageUrl = await uploadImageToCloudinary(image);
+        } finally {
+          setIsUploading(false);
+        }
       }
       const insertData = {
         content: text,
