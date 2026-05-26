@@ -276,7 +276,7 @@ export const StudentNotes = ({ batch, subject }: StudentNotesProps) => {
   return (
     <div className="p-6 space-y-6 bg-[#fcfcfd] min-h-full font-sans">
       {/* Main Section Holding Container */}
-      <div className="bg-white border border-slate-200 rounded-lg p-6 md:p-8 shadow-sm max-w-7xl mx-auto">
+      <div className="bg-white p-6 md:p-8">
           {/* Header Section */}
           <div className="mb-8 border-b border-slate-100 pb-6">
             <h1 className="text-2xl font-bold text-gray-900 tracking-tight">

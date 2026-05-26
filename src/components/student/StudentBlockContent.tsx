@@ -1,4 +1,5 @@
-import { ChevronLeft } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { StudentSchedule } from './StudentSchedule';
 import { StudentRecordings } from './StudentRecordings';
 import { StudentNotes } from './StudentNotes';
@@ -52,17 +53,20 @@ export const StudentBlockContent = ({
   return (
     <div className="w-full max-w-[1840px] mx-auto px-4 md:px-6 py-6 font-sans">
 
-      {/* Back */}
-      <button
-        onClick={onBack}
-        className="flex items-center gap-2 text-[#1e293b] font-medium text-[15px] hover:opacity-80 transition-opacity mb-4"
-      >
-        <ChevronLeft className="h-5 w-5" />
-        Back
-      </button>
+      {/* Single framed content card with 1px black border */}
+      <div className="w-full bg-white rounded-lg border border-black shadow-sm overflow-hidden min-h-[400px]">
 
-      {/* Framed content card (matches dashboard frame) */}
-      <div className="w-full bg-white rounded-lg border border-slate-100 shadow-sm overflow-hidden min-h-[400px]">
+        {/* Back arrow inside the frame */}
+        <div className="px-6 pt-5">
+          <button
+            onClick={onBack}
+            aria-label="Back"
+            className="shrink-0 text-[#1e293b] hover:opacity-70 transition-opacity"
+          >
+            <HugeiconsIcon icon={ArrowLeft01Icon} size={26} strokeWidth={2} />
+          </button>
+        </div>
+
         {renderContent()}
       </div>
     </div>

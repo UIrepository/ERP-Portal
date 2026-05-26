@@ -74,7 +74,7 @@ export const StudentUIKiPadhai = ({ batch, subject }: StudentUIKiPadhaiProps) =>
   return (
     <div className="p-6 md:p-8 bg-[#fcfcfd] min-h-full font-sans">
       {/* Main Section Holding Container */}
-      <div className="bg-white border border-slate-200 rounded-lg p-6 md:p-8 shadow-sm max-w-7xl mx-auto">
+      <div className="bg-white p-6 md:p-8">
         
         {/* Section Header */}
         <header className="flex flex-col md:flex-row justify-between items-end mb-8 border-b border-slate-100 pb-6">

@@ -1,16 +1,5 @@
-import { 
-  Video, 
-  Calendar, 
-  FileText, 
-  Crown, 
-  Megaphone, 
-  Users, 
-  UserCog,
-  PlayCircle,
-  Radio,
-  ChevronLeft,
-  MessageCircle
-} from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
@@ -128,22 +117,22 @@ export const StudentSubjectBlocks = ({
   return (
     <div className="w-full max-w-[1840px] mx-auto px-4 md:px-6 py-6 font-sans">
 
-      {/* Back */}
-      <button
-        onClick={onBack}
-        className="flex items-center gap-2 text-[#1e293b] font-medium text-[15px] hover:opacity-80 transition-opacity mb-4"
-      >
-        <ChevronLeft className="h-5 w-5" />
-        Back
-      </button>
+      {/* Single framed content card with 1px black border */}
+      <div className="w-full bg-white rounded-lg border border-black shadow-sm p-6 md:p-8 min-h-[400px]">
 
-      {/* Framed content card (matches dashboard frame) */}
-      <div className="w-full bg-white rounded-lg border border-slate-100 shadow-sm p-6 md:p-8 min-h-[400px]">
-
-          {/* Subject Title */}
-          <h2 className="text-xl md:text-2xl font-bold text-[#1e293b] mb-8 tracking-tight whitespace-normal break-words leading-tight">
-            {subject}
-          </h2>
+          {/* Back arrow beside the subject title */}
+          <div className="flex items-center gap-3 mb-8">
+            <button
+              onClick={onBack}
+              aria-label="Back"
+              className="shrink-0 text-[#1e293b] hover:opacity-70 transition-opacity"
+            >
+              <HugeiconsIcon icon={ArrowLeft01Icon} size={26} strokeWidth={2} />
+            </button>
+            <h2 className="text-xl md:text-2xl font-bold text-[#1e293b] tracking-tight whitespace-normal break-words leading-tight">
+              {subject}
+            </h2>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {blocks.map((block) => (

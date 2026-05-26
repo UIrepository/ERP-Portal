@@ -186,7 +186,7 @@ export const StudentRecordings = ({ batch, subject }: StudentRecordingsProps) =>
     return (
         <div className="p-6 bg-white min-h-full font-sans">
             {/* Unified White Section for Header + Content */}
-            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+            <div className="bg-white p-6">
                 
                 {/* Header Section */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
