@@ -10,6 +10,7 @@ import ClassSession from "./pages/ClassSession";
 import LecturePlayer from "./pages/LecturePlayer";
 import Whiteboard from "./pages/Whiteboard";
 import { ScreenRecordingProtection } from "@/components/ScreenRecordingProtection";
+import { InstallAppBanner } from "@/components/InstallAppBanner";
 
 // Import Community Components
 import { StudentCommunity } from "@/components/student/StudentCommunity";
@@ -24,6 +25,7 @@ const App = () => (
         <ScreenRecordingProtection>
           <Toaster />
           <Sonner />
+          <InstallAppBanner />
           <BrowserRouter>
             <Routes>
               {/* Root Route - Index will redirect to default tab */}

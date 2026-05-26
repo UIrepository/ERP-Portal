@@ -28,6 +28,7 @@ import {
   Message01Icon,
   InboxIcon,
   Quiz01Icon,
+  Download04Icon,
 } from '@hugeicons/core-free-icons';
 
 import {
@@ -42,6 +43,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useInstallApp } from '@/hooks/useInstallApp';
 
 interface SidebarProps {
   activeTab: string;
@@ -59,6 +61,7 @@ interface UserEnrollment {
 export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = false }: SidebarProps) => {
   const { profile, user, signOut, resolvedRole } = useAuth();
   const queryClient = useQueryClient();
+  const { standalone: appInstalled, installOrShowHelp } = useInstallApp();
 
   const ADMIN_WHATSAPP_NUMBER = '916297143798'; 
   const WHATSAPP_MESSAGE_TEMPLATE = "Hello Sir, this is (NAME) from the (BATCH_NAME). I wanted to clarify a few doubts about the class workflow.";
@@ -294,6 +297,27 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
             );
           })}
       </nav>
+
+      {/* Get the app (PWA install) - hidden once installed/standalone */}
+      {!appInstalled && (
+        <div className={cn('px-3 pt-3 shrink-0', collapsed ? '' : 'border-t border-slate-200 bg-white')}>
+          {withTooltip('Get the app',
+            <Button
+              variant="ghost"
+              className={cn(
+                'text-sm font-normal transition-colors',
+                collapsed
+                  ? 'h-10 w-10 mx-auto justify-center p-0 rounded-md text-indigo-600 hover:bg-brand/5 hover:text-brand'
+                  : 'w-full justify-start gap-3 h-9 px-3 text-indigo-600 hover:bg-brand/5 hover:text-brand',
+              )}
+              onClick={() => { void installOrShowHelp(); }}
+            >
+              <HugeiconsIcon icon={Download04Icon} size={18} strokeWidth={1.8} className="shrink-0" />
+              {!collapsed && 'Get the app'}
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Logout Button - pinned at the bottom of the dock */}
       <div className={cn('p-3 shrink-0', collapsed ? '' : 'border-t border-slate-200 bg-white')}>

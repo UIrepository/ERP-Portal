@@ -7,6 +7,13 @@ import './index.css'
 
 inject()
 
+// Register the service worker so the app is installable (PWA).
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+
 createRoot(document.getElementById("root")!).render(
   <GoogleOAuthProvider clientId="30618354424-bvvml6gfui5fmtnn6fdh6nbf51fb3tcr.apps.googleusercontent.com">
     <App />
