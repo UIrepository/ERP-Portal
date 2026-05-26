@@ -19,15 +19,16 @@ import { useChatDrawer } from '@/hooks/useChatDrawer';
 import { NotificationCenter } from './NotificationCenter';
 import { NotificationListener } from './NotificationListener';
 import { PushManager } from './PushManager';
-import { DashboardSquare01Icon, Calendar03Icon, Message01Icon, Quiz01Icon } from '@hugeicons/core-free-icons';
+import { Home09Icon, Appointment01Icon, Comment01Icon, Mortarboard01Icon } from '@hugeicons/core-free-icons';
 
 // Mobile bottom-nav for students — Support and Contact Admin are intentionally
-// left out (they live on desktop only); short labels suit the compact bar.
+// left out (they live on desktop only). Labels feed the accessible name; the
+// bar itself is icon-only.
 const STUDENT_BOTTOM_TABS: BottomNavTab[] = [
-  { id: 'dashboard', label: 'Home', icon: DashboardSquare01Icon },
-  { id: 'schedule', label: 'Schedule', icon: Calendar03Icon },
-  { id: 'feedback', label: 'Feedback', icon: Message01Icon },
-  { id: 'exams', label: 'Exams', icon: Quiz01Icon },
+  { id: 'dashboard', label: 'Home', icon: Home09Icon },
+  { id: 'schedule', label: 'Schedule', icon: Appointment01Icon },
+  { id: 'feedback', label: 'Feedback', icon: Comment01Icon },
+  { id: 'exams', label: 'Exams', icon: Mortarboard01Icon },
 ];
 
 interface LayoutProps {
@@ -162,7 +163,7 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
         <main className="flex-1 overflow-y-auto min-w-0 md:pl-24">
           <div className="min-h-full flex flex-col">
             {/* Bottom padding on mobile keeps content clear of the bottom nav */}
-            <div className={isStudent ? 'flex-1 pb-20 md:pb-0' : 'flex-1'}>
+            <div className={isStudent ? 'flex-1 pb-24 md:pb-0' : 'flex-1'}>
               {children}
             </div>
           </div>

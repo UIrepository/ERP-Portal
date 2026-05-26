@@ -492,7 +492,9 @@ export const StudentChatbot = () => {
       <button
         onClick={toggleChatbot}
         className={cn(
-          "fixed bottom-6 right-6 w-14 h-14 bg-slate-900 hover:bg-slate-800 text-white rounded-full flex items-center justify-center shadow-xl transition-all hover:scale-105 active:scale-95 z-50",
+          // Sits above the mobile bottom-nav (incl. the iOS safe-area); drops to
+          // the corner on desktop where there is no bottom bar.
+          "fixed right-6 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] md:bottom-6 w-14 h-14 bg-slate-900 hover:bg-slate-800 text-white rounded-full flex items-center justify-center shadow-xl transition-all hover:scale-105 active:scale-95 z-50",
           state.isOpen && !isMobile ? "rotate-0" : "" // Rotate animation mostly for desktop X icon
         )}
       >
