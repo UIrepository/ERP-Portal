@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { DownloadCircle01Icon, Cancel01Icon, Share01Icon, AddSquareIcon, More01Icon } from '@hugeicons/core-free-icons';
+import { DownloadCircle01Icon, ArrowDown01Icon, Share01Icon, AddSquareIcon, More01Icon } from '@hugeicons/core-free-icons';
 import { useInstallApp } from '@/hooks/useInstallApp';
 import {
   Dialog,
@@ -73,30 +73,22 @@ export const InstallAppBanner = () => {
                   </p>
                 </div>
 
-                {/* Close */}
-                <button
-                  onClick={() => setVisible(false)}
-                  aria-label="Dismiss"
-                  className="shrink-0 self-start -mr-1 -mt-1 rounded-md p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                >
-                  <HugeiconsIcon icon={Cancel01Icon} size={18} strokeWidth={2} />
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2 px-4 pb-4">
-                <button
-                  onClick={handleInstall}
-                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 active:scale-[0.98] transition-colors"
-                >
-                  <HugeiconsIcon icon={DownloadCircle01Icon} size={18} strokeWidth={2} />
-                  Install app
-                </button>
-                <button
-                  onClick={() => setVisible(false)}
-                  className="rounded-md border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-                >
-                  Not now
-                </button>
+                {/* Actions - stacked vertically beside the content */}
+                <div className="shrink-0 flex flex-col gap-2 w-32">
+                  <button
+                    onClick={handleInstall}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-sm bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 active:scale-[0.98] transition-colors"
+                  >
+                    <HugeiconsIcon icon={ArrowDown01Icon} size={22} strokeWidth={2.5} />
+                    Install
+                  </button>
+                  <button
+                    onClick={() => setVisible(false)}
+                    className="rounded-sm border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    Not now
+                  </button>
+                </div>
               </div>
             </div>
           </motion.div>
