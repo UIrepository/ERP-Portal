@@ -1,11 +1,10 @@
-import { HugeiconsIcon } from '@hugeicons/react';
 import { cn } from '@/lib/utils';
 
 export interface BottomNavTab {
   id: string;
   /** Used for the accessible label only — the bar is icon-only on screen. */
   label: string;
-  icon: Parameters<typeof HugeiconsIcon>[0]['icon'];
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
 }
 
 interface BottomNavProps {
@@ -15,10 +14,9 @@ interface BottomNavProps {
 }
 
 /**
- * App-style bottom navigation — mobile only. Icon-only; the active tab lifts
- * into a solid brand-violet squircle with a white glyph (the same solid-violet
- * active treatment as the desktop sidebar), rather than a generic tinted pill.
- * Pads for the iOS home indicator via the safe-area inset.
+ * App-style bottom navigation — mobile only. Icon-only, no background blocks:
+ * the active tab is simply shown in brand violet (slightly larger, crisp
+ * stroke), inactive tabs in muted slate. Pads for the iOS home indicator.
  */
 export const BottomNav = ({ tabs, activeTab, onTabChange }: BottomNavProps) => {
   return (
@@ -37,18 +35,15 @@ export const BottomNav = ({ tabs, activeTab, onTabChange }: BottomNavProps) => {
               onClick={() => onTabChange(tab.id)}
               aria-label={tab.label}
               aria-current={active ? 'page' : undefined}
-              className="flex-1 flex items-center justify-center"
+              className={cn(
+                'flex-1 flex items-center justify-center transition-transform duration-200 ease-out active:scale-90',
+                active ? 'text-brand' : 'text-slate-400',
+              )}
             >
-              <span
-                className={cn(
-                  'flex items-center justify-center h-12 w-12 rounded-[15px] transition-all duration-200 ease-out',
-                  active
-                    ? 'bg-brand text-white shadow-lg shadow-brand/30 -translate-y-1'
-                    : 'text-slate-400 active:scale-90',
-                )}
-              >
-                <HugeiconsIcon icon={tab.icon} size={24} strokeWidth={active ? 2 : 1.8} />
-              </span>
+              <tab.icon
+                className={active ? 'h-7 w-7' : 'h-[26px] w-[26px]'}
+                strokeWidth={active ? 2.2 : 1.8}
+              />
             </button>
           );
         })}

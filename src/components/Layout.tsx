@@ -19,16 +19,16 @@ import { useChatDrawer } from '@/hooks/useChatDrawer';
 import { NotificationCenter } from './NotificationCenter';
 import { NotificationListener } from './NotificationListener';
 import { PushManager } from './PushManager';
-import { Home09Icon, Appointment01Icon, Comment01Icon, Mortarboard01Icon } from '@hugeicons/core-free-icons';
+import { HomeNavIcon, ScheduleNavIcon, FeedbackNavIcon, ExamsNavIcon } from './icons/NavIcons';
 
 // Mobile bottom-nav for students — Support and Contact Admin are intentionally
 // left out (they live on desktop only). Labels feed the accessible name; the
-// bar itself is icon-only.
+// bar itself is icon-only, using our bespoke glyphs (see NavIcons).
 const STUDENT_BOTTOM_TABS: BottomNavTab[] = [
-  { id: 'dashboard', label: 'Home', icon: Home09Icon },
-  { id: 'schedule', label: 'Schedule', icon: Appointment01Icon },
-  { id: 'feedback', label: 'Feedback', icon: Comment01Icon },
-  { id: 'exams', label: 'Exams', icon: Mortarboard01Icon },
+  { id: 'dashboard', label: 'Home', icon: HomeNavIcon },
+  { id: 'schedule', label: 'Schedule', icon: ScheduleNavIcon },
+  { id: 'feedback', label: 'Feedback', icon: FeedbackNavIcon },
+  { id: 'exams', label: 'Exams', icon: ExamsNavIcon },
 ];
 
 interface LayoutProps {
