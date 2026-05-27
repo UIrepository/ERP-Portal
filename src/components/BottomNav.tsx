@@ -4,7 +4,7 @@ export interface BottomNavTab {
   id: string;
   /** Used for the accessible label only — the bar is icon-only on screen. */
   label: string;
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  icon: React.ComponentType<{ className?: string; filled?: boolean }>;
 }
 
 interface BottomNavProps {
@@ -42,7 +42,7 @@ export const BottomNav = ({ tabs, activeTab, onTabChange }: BottomNavProps) => {
             >
               <tab.icon
                 className={active ? 'h-7 w-7' : 'h-[26px] w-[26px]'}
-                strokeWidth={active ? 2.2 : 1.8}
+                filled={active}
               />
             </button>
           );
