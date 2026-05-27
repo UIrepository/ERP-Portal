@@ -70,6 +70,23 @@ export const FeedbackNavIcon = ({ className, filled }: NavIconProps) =>
     </svg>
   );
 
+/** WhatsApp — rounded chat bubble with a phone handset (contact admin). */
+export const WhatsAppNavIcon = ({ className, filled }: NavIconProps) =>
+  filled ? (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M12 2.2a9.8 9.8 0 0 0-8.4 14.8L2.3 21.8l4.9-1.3A9.8 9.8 0 1 0 12 2.2Zm-3 5.6c.2 0 .4 0 .5.4l.8 1.9c.1.2 0 .4-.1.6l-.5.6c-.2.2-.2.4-.1.6.5.9 1.3 1.7 2.2 2.2.2.1.4.1.6-.1l.6-.6c.2-.2.4-.2.6-.1l1.8.8c.4.2.4.4.4.6 0 1.1-1.1 2-2 2-3.6 0-7-3.5-7-7 0-.9.9-2 2-2Z"
+      />
+    </svg>
+  ) : (
+    <svg className={className} viewBox="0 0 24 24" {...outline} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3.5 20.5l1.4-4.1a8.5 8.5 0 1 1 3.2 3.1l-4.6 1Z" />
+      <path d="M9 8.5c-.9 0-1.6.9-1.6 1.7 0 2.9 2.8 5.6 5.7 5.6.8 0 1.7-.7 1.7-1.6 0-.2-.1-.3-.3-.4l-1.6-.7c-.2-.1-.4 0-.5.1l-.5.6c-.8-.4-1.6-1.2-2-2l.6-.5c.1-.1.2-.3.1-.5l-.7-1.6c-.1-.2-.2-.3-.4-.3Z" />
+    </svg>
+  );
+
 /** Exams — answer sheet with a folded corner and graded lines. */
 export const ExamsNavIcon = ({ className, filled }: NavIconProps) =>
   filled ? (

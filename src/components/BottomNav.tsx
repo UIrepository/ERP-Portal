@@ -5,6 +5,8 @@ export interface BottomNavTab {
   /** Used for the accessible label only — the bar is icon-only on screen. */
   label: string;
   icon: React.ComponentType<{ className?: string; filled?: boolean }>;
+  /** Action tabs (e.g. open WhatsApp) run this instead of switching tab. */
+  onSelect?: () => void;
 }
 
 interface BottomNavProps {
@@ -32,7 +34,7 @@ export const BottomNav = ({ tabs, activeTab, onTabChange }: BottomNavProps) => {
             <button
               key={tab.id}
               type="button"
-              onClick={() => onTabChange(tab.id)}
+              onClick={() => (tab.onSelect ? tab.onSelect() : onTabChange(tab.id))}
               aria-label={tab.label}
               aria-current={active ? 'page' : undefined}
               className={cn(

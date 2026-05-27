@@ -1,5 +1,7 @@
 
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -12,6 +14,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from './Sidebar';
 import { BottomNav, type BottomNavTab } from './BottomNav';
@@ -19,17 +31,9 @@ import { useChatDrawer } from '@/hooks/useChatDrawer';
 import { NotificationCenter } from './NotificationCenter';
 import { NotificationListener } from './NotificationListener';
 import { PushManager } from './PushManager';
-import { HomeNavIcon, ScheduleNavIcon, FeedbackNavIcon, ExamsNavIcon } from './icons/NavIcons';
+import { HomeNavIcon, ScheduleNavIcon, FeedbackNavIcon, ExamsNavIcon, WhatsAppNavIcon } from './icons/NavIcons';
 
-// Mobile bottom-nav for students — Support and Contact Admin are intentionally
-// left out (they live on desktop only). Labels feed the accessible name; the
-// bar itself is icon-only, using our bespoke glyphs (see NavIcons).
-const STUDENT_BOTTOM_TABS: BottomNavTab[] = [
-  { id: 'dashboard', label: 'Home', icon: HomeNavIcon },
-  { id: 'schedule', label: 'Schedule', icon: ScheduleNavIcon },
-  { id: 'feedback', label: 'Feedback', icon: FeedbackNavIcon },
-  { id: 'exams', label: 'Exams', icon: ExamsNavIcon },
-];
+const ADMIN_WHATSAPP_NUMBER = '916297143798';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -38,13 +42,46 @@ interface LayoutProps {
 }
 
 export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
-  const { profile, signOut, resolvedRole } = useAuth();
+  const { profile, user, signOut, resolvedRole } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [contactAdminOpen, setContactAdminOpen] = useState(false);
   // Students navigate via the app-style bottom bar on mobile, so they don't
   // get the hamburger sidebar there. Other roles have too many tabs for a
   // bottom bar and keep the slide-out menu.
   const isStudent = resolvedRole === 'student';
-  
+
+  // First enrolled batch — used to personalise the Contact-Admin WhatsApp note.
+  const { data: studentBatches = [] } = useQuery<string[]>({
+    queryKey: ['layoutStudentBatches', user?.id ?? profile?.user_id],
+    queryFn: async () => {
+      const uid = user?.id ?? profile?.user_id;
+      if (!uid) return [];
+      const { data } = await supabase
+        .from('user_enrollments')
+        .select('batch_name')
+        .eq('user_id', uid);
+      return Array.from(new Set((data || []).map((e) => e.batch_name))).sort();
+    },
+    enabled: isStudent && !!(user?.id ?? profile?.user_id),
+  });
+
+  const handleContactAdmin = () => {
+    const name = profile?.name || 'Student';
+    const batch = studentBatches[0] || 'your batch';
+    const message = `Hello Sir, this is ${name} from the ${batch}. I wanted to clarify a few doubts about the class workflow.`;
+    window.open(`https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
+  // Mobile bottom-nav for students — icon-only bespoke glyphs (see NavIcons).
+  // Contact Admin is an action tab that opens WhatsApp (via a confirm dialog).
+  const studentBottomTabs: BottomNavTab[] = [
+    { id: 'dashboard', label: 'Home', icon: HomeNavIcon },
+    { id: 'schedule', label: 'Schedule', icon: ScheduleNavIcon },
+    { id: 'feedback', label: 'Feedback', icon: FeedbackNavIcon },
+    { id: 'exams', label: 'Exams', icon: ExamsNavIcon },
+    { id: 'contact-admin', label: 'Contact Admin', icon: WhatsAppNavIcon, onSelect: () => setContactAdminOpen(true) },
+  ];
+
   // Only try to use chat drawer for students (it's wrapped in provider only for students)
   let openSupportDrawer: (() => void) | undefined;
   try {
@@ -173,11 +210,27 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
       {/* App-style bottom navigation — students, mobile only */}
       {isStudent && (
         <BottomNav
-          tabs={STUDENT_BOTTOM_TABS}
+          tabs={studentBottomTabs}
           activeTab={activeTab}
           onTabChange={onTabChange}
         />
       )}
+
+      {/* Contact-Admin confirm (from the bottom-nav WhatsApp tab) */}
+      <AlertDialog open={contactAdminOpen} onOpenChange={setContactAdminOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Contact Admin on WhatsApp</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to proceed and open a new WhatsApp chat with the Admin?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleContactAdmin}>Proceed to WhatsApp</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
