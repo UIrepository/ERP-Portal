@@ -7,6 +7,8 @@ export interface BottomNavTab {
   icon: React.ComponentType<{ className?: string; filled?: boolean }>;
   /** Action tabs (e.g. open WhatsApp) run this instead of switching tab. */
   onSelect?: () => void;
+  /** Unread count shown as a small red bubble on the icon (0/undefined hides it). */
+  badge?: number;
 }
 
 interface BottomNavProps {
@@ -42,10 +44,17 @@ export const BottomNav = ({ tabs, activeTab, onTabChange }: BottomNavProps) => {
                 active ? 'text-brand' : 'text-slate-400',
               )}
             >
-              <tab.icon
-                className={active ? 'h-7 w-7' : 'h-[26px] w-[26px]'}
-                filled={active}
-              />
+              <span className="relative inline-flex">
+                <tab.icon
+                  className={active ? 'h-7 w-7' : 'h-[26px] w-[26px]'}
+                  filled={active}
+                />
+                {tab.badge && tab.badge > 0 ? (
+                  <span className="absolute -top-1.5 -right-2.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white">
+                    {tab.badge > 9 ? '9+' : tab.badge}
+                  </span>
+                ) : null}
+              </span>
             </button>
           );
         })}

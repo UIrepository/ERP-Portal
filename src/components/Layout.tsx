@@ -25,13 +25,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { BottomNav, type BottomNavTab } from './BottomNav';
 import { useChatDrawer } from '@/hooks/useChatDrawer';
+import { useCommunityUnread } from '@/hooks/useCommunityUnread';
 import { NotificationCenter } from './NotificationCenter';
 import { NotificationListener } from './NotificationListener';
 import { PushManager } from './PushManager';
-import { HomeNavIcon, ScheduleNavIcon, FeedbackNavIcon, ExamsNavIcon, WhatsAppNavIcon } from './icons/NavIcons';
+import { HomeNavIcon, ScheduleNavIcon, FeedbackNavIcon, ExamsNavIcon, CommunityNavIcon, WhatsAppGlyph } from './icons/NavIcons';
 
 const ADMIN_WHATSAPP_NUMBER = '916297143798';
 
@@ -43,8 +45,10 @@ interface LayoutProps {
 
 export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
   const { profile, user, signOut, resolvedRole } = useAuth();
+  const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [contactAdminOpen, setContactAdminOpen] = useState(false);
+  const communityUnread = useCommunityUnread();
   // Students navigate via the app-style bottom bar on mobile, so they don't
   // get the hamburger sidebar there. Other roles have too many tabs for a
   // bottom bar and keep the slide-out menu.
@@ -73,13 +77,14 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
   };
 
   // Mobile bottom-nav for students — icon-only bespoke glyphs (see NavIcons).
-  // Contact Admin is an action tab that opens WhatsApp (via a confirm dialog).
+  // Community is an action tab that opens the community page (separate route),
+  // badged with the total unread across all enrolled batch+subject groups.
   const studentBottomTabs: BottomNavTab[] = [
     { id: 'dashboard', label: 'Home', icon: HomeNavIcon },
     { id: 'schedule', label: 'Schedule', icon: ScheduleNavIcon },
     { id: 'feedback', label: 'Feedback', icon: FeedbackNavIcon },
     { id: 'exams', label: 'Exams', icon: ExamsNavIcon },
-    { id: 'contact-admin', label: 'Contact Admin', icon: WhatsAppNavIcon, onSelect: () => setContactAdminOpen(true) },
+    { id: 'community', label: 'Community', icon: CommunityNavIcon, onSelect: () => navigate('/portal/student/community'), badge: communityUnread },
   ];
 
   // Only try to use chat drawer for students (it's wrapped in provider only for students)
@@ -147,10 +152,24 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
             />
           </div>
           
-          <div className="flex items-center space-x-3 md:space-x-4">
-            
-            {/* 2. Notification Bell Icon 
-               Placed right before the profile dropdown 
+          <div className="flex items-center space-x-2 md:space-x-4">
+
+            {/* Contact Admin on WhatsApp — mobile only (desktop has it in the
+               sidebar). The bottom nav now hosts Community instead. */}
+            {isStudent && (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setContactAdminOpen(true)}
+                className="md:hidden h-9 w-9 text-[#25D366] hover:bg-emerald-50"
+                aria-label="Contact Admin on WhatsApp"
+              >
+                <WhatsAppGlyph className="h-6 w-6" />
+              </Button>
+            )}
+
+            {/* 2. Notification Bell Icon
+               Placed right before the profile dropdown
             */}
             <NotificationCenter />
 

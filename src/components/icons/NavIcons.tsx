@@ -87,6 +87,31 @@ export const WhatsAppNavIcon = ({ className, filled }: NavIconProps) =>
     </svg>
   );
 
+/** Community — a group of people (front figure + one behind). */
+export const CommunityNavIcon = ({ className, filled }: NavIconProps) =>
+  filled ? (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="9" cy="7.5" r="3.6" />
+      <path d="M9 13.4c-3.6 0-6.4 2.3-6.4 5.8 0 .45.35.8.8.8h11.2c.45 0 .8-.35.8-.8 0-3.5-2.8-5.8-6.4-5.8Z" />
+      <circle cx="17.1" cy="7.9" r="2.9" />
+      <path d="M17.1 13.2c-.5 0-1 .05-1.45.16 1.65 1.3 2.65 3.25 2.65 5.84h3.6c.45 0 .8-.35.8-.8 0-2.9-2.3-5.2-5.6-5.2Z" />
+    </svg>
+  ) : (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="9" cy="7.5" r="3.3" />
+      <path d="M2.8 19.2c0-3.4 2.8-5.6 6.2-5.6s6.2 2.2 6.2 5.6" />
+      <path d="M16.5 4.6a3.3 3.3 0 0 1 0 6.4" />
+      <path d="M18.2 14c2.4.5 3.8 2.5 3.8 5.2" />
+    </svg>
+  );
+
+/** WhatsApp brand glyph for the header — always the recognisable green logo. */
+export const WhatsAppGlyph = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M12 2.2a9.8 9.8 0 0 0-8.4 14.8L2.3 21.8l4.9-1.3A9.8 9.8 0 1 0 12 2.2Zm-3 5.6c.2 0 .4 0 .5.4l.8 1.9c.1.2 0 .4-.1.6l-.5.6c-.2.2-.2.4-.1.6.5.9 1.3 1.7 2.2 2.2.2.1.4.1.6-.1l.6-.6c.2-.2.4-.2.6-.1l1.8.8c.4.2.4.4.4.6 0 1.1-1.1 2-2 2-3.6 0-7-3.5-7-7 0-.9.9-2 2-2Z" />
+  </svg>
+);
+
 /** Exams — answer sheet with a folded corner and graded lines. */
 export const ExamsNavIcon = ({ className, filled }: NavIconProps) =>
   filled ? (

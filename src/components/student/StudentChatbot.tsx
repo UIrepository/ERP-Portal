@@ -241,6 +241,40 @@ export const StudentChatbot = () => {
     },
   });
 
+  // Unread support replies (from admin/manager) — badges the floating button.
+  const { data: supportUnread = 0 } = useQuery({
+    queryKey: ['support-unread', profile?.user_id],
+    queryFn: async () => {
+      if (!profile?.user_id) return 0;
+      const { count } = await supabase
+        .from('direct_messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('receiver_id', profile.user_id)
+        .eq('is_read', false)
+        .in('context', ['support_admin', 'support_manager']);
+      return count ?? 0;
+    },
+    enabled: !!profile?.user_id,
+    refetchInterval: 15000,
+  });
+
+  // Once the student opens a support thread, mark those replies read so the
+  // badge (and the header bell) clears.
+  useEffect(() => {
+    if (!profile?.user_id || !state.isOpen || state.mode !== 'support' || !state.supportRole) return;
+    const ctx = state.supportRole === 'admin' ? 'support_admin' : 'support_manager';
+    (async () => {
+      await supabase
+        .from('direct_messages')
+        .update({ is_read: true })
+        .eq('receiver_id', profile.user_id)
+        .eq('context', ctx)
+        .eq('is_read', false);
+      queryClient.invalidateQueries({ queryKey: ['support-unread'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-standard'] });
+    })();
+  }, [state.isOpen, state.mode, state.supportRole, messages, profile?.user_id, queryClient]);
+
   // Auto-scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
@@ -502,6 +536,11 @@ export const StudentChatbot = () => {
           <HugeiconsIcon icon={Cancel01Icon} size={24} strokeWidth={2} />
         ) : (
           <HugeiconsIcon icon={BubbleChatIcon} size={24} strokeWidth={2} />
+        )}
+        {!state.isOpen && supportUnread > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold leading-none text-white ring-2 ring-white">
+            {supportUnread > 9 ? '9+' : supportUnread}
+          </span>
         )}
       </button>
 
