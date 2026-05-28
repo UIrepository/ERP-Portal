@@ -186,6 +186,21 @@ export const StudentSchedule = () => {
     return visibleSlots.sort();
   }, [schedules, weekDates]);
 
+  // Per-day class list for the mobile agenda view (no horizontal scrolling).
+  const weekAgenda = useMemo(() => {
+    return weekDates.map((date) => {
+      const dayNum = getDay(date);
+      const dayClasses = (schedules || [])
+        .filter((s) => {
+          const isRecurring = !s.date && s.day_of_week === dayNum;
+          const isDateSpecific = s.date && isSameDay(new Date(s.date), date);
+          return isRecurring || isDateSpecific;
+        })
+        .sort((a, b) => a.start_time.localeCompare(b.start_time));
+      return { date, dayClasses };
+    });
+  }, [weekDates, schedules]);
+
   const subjectColorMap = useMemo(() => {
     if (!schedules) return new Map();
     const uniqueSubjects = Array.from(new Set(schedules.map(s => s.subject))).sort();
@@ -232,7 +247,7 @@ export const StudentSchedule = () => {
           {/* Row 1 — batch picker, full width */}
           {studentBatches.length > 0 && selectedBatchFilter && (
             <Select value={selectedBatchFilter} onValueChange={handleBatchChange}>
-              <SelectTrigger className="h-auto min-h-[44px] w-full rounded-xl border border-slate-200 bg-gray-50/80 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm focus:ring-0 [&>span]:flex-1 [&>span]:min-w-0 [&>span]:line-clamp-2 [&>span]:whitespace-normal [&>span]:text-left [&>span]:leading-snug">
+              <SelectTrigger className="h-auto min-h-[44px] w-full rounded-lg border border-slate-200 bg-gray-50/80 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm focus:ring-0 [&>span]:flex-1 [&>span]:min-w-0 [&>span]:line-clamp-2 [&>span]:whitespace-normal [&>span]:text-left [&>span]:leading-snug">
                 <SelectValue placeholder="All My Batches" />
               </SelectTrigger>
               <SelectContent>
@@ -246,7 +261,7 @@ export const StudentSchedule = () => {
 
           {/* Row 2 — week scroller (grows) + live timer beside it */}
           <div className="flex items-stretch gap-2">
-            <div className="flex flex-1 items-center justify-between rounded-xl border border-slate-200 bg-gray-50/80 px-1 shadow-sm">
+            <div className="flex flex-1 items-center justify-between rounded-lg border border-slate-200 bg-gray-50/80 px-1 shadow-sm">
               <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 hover:text-slate-900 hover:bg-white" onClick={handlePreviousWeek}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -257,7 +272,7 @@ export const StudentSchedule = () => {
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
-            <div className="flex shrink-0 items-center gap-2 rounded-xl bg-slate-900 px-3.5 text-white shadow-sm">
+            <div className="flex shrink-0 items-center gap-2 rounded-lg bg-slate-900 px-3.5 text-white shadow-sm">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400"></span>
@@ -318,9 +333,11 @@ export const StudentSchedule = () => {
         </div>
       </header>
 
-      {/* CALENDAR GRID */}
+      {/* CALENDAR */}
       {isLoading ? <ScheduleSkeleton /> : (
-      <div className="border border-slate-100 rounded-md overflow-hidden bg-white shadow-sm overflow-x-auto relative">
+      <>
+      {/* ───────── Desktop: full 7-day grid ───────── */}
+      <div className="hidden md:block border border-slate-100 rounded-md overflow-hidden bg-white shadow-sm overflow-x-auto relative">
           <div className="grid min-w-[900px] grid-cols-[80px_repeat(7,1fr)] bg-white">
             
             {/* Header Row */}
@@ -419,6 +436,81 @@ export const StudentSchedule = () => {
             ) : null}
           </div>
       </div>
+
+      {/* ───────── Mobile: vertical agenda (no horizontal scroll) ───────── */}
+      <div className="md:hidden">
+        {studentBatches.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 py-16 px-6 text-center text-sm text-slate-400">
+            You are not currently enrolled in any batches. Please contact administration.
+          </div>
+        ) : weekAgenda.every((d) => d.dayClasses.length === 0) ? (
+          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 py-16 px-6 text-center text-sm text-slate-400">
+            No classes scheduled for this week.
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {weekAgenda
+              .filter((d) => d.dayClasses.length > 0)
+              .map(({ date, dayClasses }) => {
+                const isToday = isSameDay(date, currentTime);
+                return (
+                  <section key={date.toISOString()}>
+                    {/* Day header */}
+                    <div className="mb-2.5 flex items-center gap-2.5">
+                      <div className={cn(
+                        "flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg leading-none",
+                        isToday ? "bg-brand text-white" : "bg-slate-100 text-slate-700"
+                      )}>
+                        <span className="text-[9px] font-bold uppercase tracking-wider opacity-80">{format(date, 'EEE')}</span>
+                        <span className="text-base font-bold tabular-nums">{format(date, 'dd')}</span>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-slate-900">{format(date, 'EEEE')}</div>
+                        <div className="text-xs text-slate-400">{format(date, 'd MMMM')}{isToday && ' · Today'}</div>
+                      </div>
+                      <div className="ml-auto text-[11px] font-medium text-slate-400">
+                        {dayClasses.length} {dayClasses.length === 1 ? 'class' : 'classes'}
+                      </div>
+                    </div>
+
+                    {/* Class cards */}
+                    <div className="space-y-2">
+                      {dayClasses.map((classInfo) => {
+                        const isLive = isClassLive(classInfo, date);
+                        return (
+                          <div key={classInfo.id} className={cn(
+                            "relative flex items-center gap-3 overflow-hidden rounded-lg border bg-white p-3 shadow-sm",
+                            isLive ? "border-brand/30 ring-1 ring-brand/10" : "border-slate-100"
+                          )}>
+                            {/* Accent left border */}
+                            <div className={cn("absolute left-0 top-2 bottom-2 w-1 rounded-r-sm", getSubjectBorderColor(classInfo.subject))} />
+                            <div className="min-w-0 flex-1 pl-2.5">
+                              <div className="flex items-center gap-2">
+                                {isLive && (
+                                  <span className="relative flex h-2 w-2 shrink-0">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+                                  </span>
+                                )}
+                                <h3 className="truncate text-sm font-semibold text-slate-900">{classInfo.subject}</h3>
+                              </div>
+                              <div className="mt-0.5 truncate text-xs text-slate-400">{classInfo.batch}</div>
+                            </div>
+                            <div className="shrink-0 text-right tabular-nums">
+                              <div className="text-xs font-semibold text-slate-700">{formatTime(classInfo.start_time)}</div>
+                              <div className="text-[11px] text-slate-400">{formatTime(classInfo.end_time)}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                );
+              })}
+          </div>
+        )}
+      </div>
+      </>
       )}
     </div>
   );
