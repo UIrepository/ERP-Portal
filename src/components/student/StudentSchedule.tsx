@@ -225,12 +225,14 @@ export const StudentSchedule = () => {
     <div className="p-4 sm:p-8 bg-white min-h-screen font-sans text-slate-900 max-w-[1840px] mx-auto">
       
       {/* TOOLBAR */}
-      <header className="flex md:justify-end mb-6">
-        <div className="flex flex-wrap items-center gap-3 bg-gray-50/80 p-1.5 rounded-lg border border-slate-100 shadow-sm w-full md:w-auto">
-          {/* Dynamic Dropdown showing ONLY enrolled batches */}
+      <header className="mb-6">
+
+        {/* ── Mobile toolbar: batch on its own row, then week-scroller + timer ── */}
+        <div className="flex flex-col gap-2.5 md:hidden">
+          {/* Row 1 — batch picker, full width */}
           {studentBatches.length > 0 && selectedBatchFilter && (
             <Select value={selectedBatchFilter} onValueChange={handleBatchChange}>
-              <SelectTrigger className="h-8 w-[180px] border-none bg-transparent shadow-none focus:ring-0 text-xs font-semibold text-slate-700">
+              <SelectTrigger className="h-auto min-h-[44px] w-full rounded-xl border border-slate-200 bg-gray-50/80 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm focus:ring-0 [&>span]:flex-1 [&>span]:min-w-0 [&>span]:line-clamp-2 [&>span]:whitespace-normal [&>span]:text-left [&>span]:leading-snug">
                 <SelectValue placeholder="All My Batches" />
               </SelectTrigger>
               <SelectContent>
@@ -241,33 +243,77 @@ export const StudentSchedule = () => {
               </SelectContent>
             </Select>
           )}
-          
-          {studentBatches.length > 0 && <div className="h-5 w-px bg-gray-300 mx-1 hidden sm:block"></div>}
 
-          {/* Navigation */}
-          <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500 hover:text-slate-900 hover:bg-white" onClick={handlePreviousWeek}>
-                  <ChevronLeft className="h-4 w-4" />
+          {/* Row 2 — week scroller (grows) + live timer beside it */}
+          <div className="flex items-stretch gap-2">
+            <div className="flex flex-1 items-center justify-between rounded-xl border border-slate-200 bg-gray-50/80 px-1 shadow-sm">
+              <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 hover:text-slate-900 hover:bg-white" onClick={handlePreviousWeek}>
+                <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="text-xs font-semibold text-slate-700 min-w-[100px] text-center tabular-nums">
-                  {format(weekDates[0], 'd MMM')} — {format(weekDates[6], 'd MMM')}
+              <span className="text-[13px] font-semibold text-slate-700 tabular-nums">
+                {format(weekDates[0], 'd MMM')} — {format(weekDates[6], 'd MMM')}
               </span>
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500 hover:text-slate-900 hover:bg-white" onClick={handleNextWeek}>
-                  <ChevronRight className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-500 hover:text-slate-900 hover:bg-white" onClick={handleNextWeek}>
+                <ChevronRight className="h-4 w-4" />
               </Button>
-          </div>
-
-          <div className="h-5 w-px bg-gray-300 mx-1 hidden sm:block"></div>
-
-          {/* Real-time Timer - premium dark pill with a live pulse dot, Inter tabular */}
-          <div className="px-3 flex items-center gap-2 bg-slate-900 text-white rounded-md h-7 shadow-sm">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400"></span>
-            </span>
-            <span className="text-xs font-semibold tabular-nums tracking-wider">
+            </div>
+            <div className="flex shrink-0 items-center gap-2 rounded-xl bg-slate-900 px-3.5 text-white shadow-sm">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400"></span>
+              </span>
+              <span className="text-[13px] font-semibold tabular-nums tracking-wider">
                 {format(currentTime, 'h:mm:ss a')}
-            </span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Desktop toolbar (single right-aligned compact bar) ── */}
+        <div className="hidden md:flex md:justify-end">
+          <div className="flex flex-wrap items-center gap-3 bg-gray-50/80 p-1.5 rounded-lg border border-slate-100 shadow-sm w-auto">
+            {/* Dynamic Dropdown showing ONLY enrolled batches */}
+            {studentBatches.length > 0 && selectedBatchFilter && (
+              <Select value={selectedBatchFilter} onValueChange={handleBatchChange}>
+                <SelectTrigger className="h-8 w-[180px] border-none bg-transparent shadow-none focus:ring-0 text-xs font-semibold text-slate-700">
+                  <SelectValue placeholder="All My Batches" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All My Batches</SelectItem>
+                  {studentBatches.map((batch) => (
+                    <SelectItem key={batch} value={batch}>{batch}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {studentBatches.length > 0 && <div className="h-5 w-px bg-gray-300 mx-1"></div>}
+
+            {/* Navigation */}
+            <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500 hover:text-slate-900 hover:bg-white" onClick={handlePreviousWeek}>
+                    <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-xs font-semibold text-slate-700 min-w-[100px] text-center tabular-nums">
+                    {format(weekDates[0], 'd MMM')} — {format(weekDates[6], 'd MMM')}
+                </span>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500 hover:text-slate-900 hover:bg-white" onClick={handleNextWeek}>
+                    <ChevronRight className="h-4 w-4" />
+                </Button>
+            </div>
+
+            <div className="h-5 w-px bg-gray-300 mx-1"></div>
+
+            {/* Real-time Timer - premium dark pill with a live pulse dot, Inter tabular */}
+            <div className="px-3 flex items-center gap-2 bg-slate-900 text-white rounded-md h-7 shadow-sm">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400"></span>
+              </span>
+              <span className="text-xs font-semibold tabular-nums tracking-wider">
+                  {format(currentTime, 'h:mm:ss a')}
+              </span>
+            </div>
           </div>
         </div>
       </header>
