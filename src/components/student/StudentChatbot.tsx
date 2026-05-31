@@ -255,7 +255,7 @@ export const StudentChatbot = () => {
       return count ?? 0;
     },
     enabled: !!profile?.user_id,
-    refetchInterval: 15000,
+    refetchInterval: 60000, // badge only — keep the poll light (was 15s)
   });
 
   // Once the student opens a support thread, mark those replies read so the
