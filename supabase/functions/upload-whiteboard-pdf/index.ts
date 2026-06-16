@@ -70,6 +70,49 @@ function base64ToBytes(b64: string): Uint8Array {
   return bytes;
 }
 
+type BatchSubjectPair = {
+  batch: string;
+  subject: string;
+};
+
+function uniquePairs(pairs: BatchSubjectPair[]): BatchSubjectPair[] {
+  const seen = new Set<string>();
+  return pairs.filter((pair) => {
+    const key = `${pair.batch}|${pair.subject}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function getActiveMergePairs(
+  admin: any,
+  batch: string,
+  subject: string,
+): Promise<BatchSubjectPair[]> {
+  const fallback = [{ batch, subject }];
+  const { data, error } = await admin.rpc('get_merged_pairs', {
+    p_batch: batch,
+    p_subject: subject,
+  });
+
+  if (error || !Array.isArray(data)) {
+    if (error) console.error('get_merged_pairs failed:', error);
+    return fallback;
+  }
+
+  const pairs = uniquePairs(
+    data
+      .map((pair: Record<string, unknown>) => ({
+        batch: typeof pair.batch === 'string' ? pair.batch : '',
+        subject: typeof pair.subject === 'string' ? pair.subject : '',
+      }))
+      .filter((pair: BatchSubjectPair) => pair.batch && pair.subject),
+  );
+
+  return pairs.length > 0 ? pairs : fallback;
+}
+
 Deno.serve(async (req) => {
   const origin = req.headers.get('Origin');
   const cors = corsHeaders(origin);
@@ -145,7 +188,11 @@ Deno.serve(async (req) => {
       `\r\n--${boundary}\r\n` +
       'Content-Type: application/pdf\r\n\r\n';
     const post = `\r\n--${boundary}--`;
-    const multipartBody = new Blob([pre, pdfBytes, post]);
+    const pdfPart = pdfBytes.buffer.slice(
+      pdfBytes.byteOffset,
+      pdfBytes.byteOffset + pdfBytes.byteLength,
+    ) as ArrayBuffer;
+    const multipartBody = new Blob([pre, pdfPart, post]);
 
     const uploadRes = await fetch(
       'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink',
@@ -168,24 +215,29 @@ Deno.serve(async (req) => {
     const fileUrl: string = uploaded.webViewLink || `https://drive.google.com/file/d/${uploaded.id}/view`;
 
     let noteInserted = false;
+    let noteInsertCount = 0;
     if (postToNotes) {
-      const { error: noteErr } = await admin.from('notes').insert({
+      const notePairs = await getActiveMergePairs(admin, schedule.batch, schedule.subject);
+      const noteRows = notePairs.map((pair) => ({
         filename: fileName,
         title: title || safeTitle,
-        subject: schedule.subject,
-        batch: schedule.batch,
+        subject: pair.subject,
+        batch: pair.batch,
         file_url: fileUrl,
         tags: ['Whiteboard'],
-      });
+      }));
+
+      const { error: noteErr } = await admin.from('notes').insert(noteRows);
       if (noteErr) {
         // Upload still succeeded — report partial success so the client can
         // surface the link and let the teacher retry the attach.
-        return json({ success: true, fileUrl, fileId: uploaded.id, noteInserted: false, noteError: noteErr.message });
+        return json({ success: true, fileUrl, fileId: uploaded.id, noteInserted: false, noteInsertCount, noteError: noteErr.message });
       }
       noteInserted = true;
+      noteInsertCount = noteRows.length;
     }
 
-    return json({ success: true, fileUrl, fileId: uploaded.id, noteInserted });
+    return json({ success: true, fileUrl, fileId: uploaded.id, noteInserted, noteInsertCount });
   } catch (e) {
     console.error('upload-whiteboard-pdf error:', e);
     return json({ error: e instanceof Error ? e.message : 'Unknown error' }, 500);
