@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 // Public VAPID key (safe to ship to the client). The matching private key
 // lives only as the VAPID_PRIVATE_KEY secret on the Supabase project.
 export const VAPID_PUBLIC_KEY =
-  'BL1hSOX3_eiLiTAIfGR7gmorcyGf1_p2Bd-2D0LdSksylqxPbugIEm_DniaEf_z4QYzrN3SiWBfTNtkgbRATn8A';
+  'BIikKmURexpi1Lf2NQEWA0lO0HyKXOE5BAISLAZ2ZWY0C79w3NeDOjIDtBy-hfc-x3q_1EjbuSgY8wuxKvkamq8';
 
 export const pushSupported = () =>
   typeof window !== 'undefined' &&
