@@ -1,22 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { StudentBackButton } from './StudentBackButton';
-import { 
-  FileText, 
-  Download, 
-  ArrowLeft, 
-  FileSpreadsheet, 
-  FileCode, 
-  File,
-  Eye
-} from 'lucide-react';
+import { FileText, Download, FileSpreadsheet, FileCode, File } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface NotesContent {
   id: string;
@@ -107,79 +96,9 @@ const NotesSkeleton = () => (
   </div>
 );
 
-const NoteViewer = ({ note, onBack, onDownload, allNotes, onNoteSelect }: { note: NotesContent, onBack: () => void, onDownload: (note: NotesContent) => void, allNotes: NotesContent[], onNoteSelect: (note: NotesContent) => void }) => {
-    const otherNotes = allNotes.filter(n => n.id !== note.id);
-  
-    return (
-      <div className="p-4 md:p-6 space-y-6 bg-slate-50 min-h-full">
-        <Button variant="ghost" onClick={onBack} className="mb-4 hover:bg-slate-200">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to References
-        </Button>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="md:col-span-2">
-                <Card className="bg-white rounded-lg overflow-hidden shadow-sm border-slate-200">
-                    <CardHeader className="p-6 border-b bg-white">
-                        <div className="flex justify-between items-center">
-                            <CardTitle className="text-xl font-semibold text-slate-800">{note.title}</CardTitle>
-                            <Button onClick={() => onDownload(note)} variant="outline" size="sm">
-                                <Download className="h-4 w-4 mr-2" />
-                                Download
-                            </Button>
-                        </div>
-                    </CardHeader>
-                    <Alert className="mx-6 mt-4 mb-2 p-3 bg-blue-50 border-blue-100 text-blue-800 text-sm [&>svg]:hidden">
-                      <AlertDescription>
-                        If content isn't viewing correctly, please use the <strong>Download</strong> button.
-                      </AlertDescription>
-                    </Alert>
-                    <CardContent className="p-0">
-                    <div className="w-full h-[60vh] md:h-[75vh] bg-slate-50">
-                        <iframe
-                        src={note.file_url}
-                        className="w-full h-full"
-                        title={note.title}
-                        />
-                    </div>
-                    </CardContent>
-                </Card>
-            </div>
-            <div className="md:col-span-1">
-                <Card className="bg-white rounded-lg shadow-sm border-slate-200">
-                    <CardHeader>
-                        <CardTitle className="text-lg">Other Files</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-2">
-                            {otherNotes.map(otherNote => {
-                                const meta = getFileMetadata(otherNote.file_url, otherNote.filename);
-                                return (
-                                <div key={otherNote.id} className="p-3 border border-slate-100 rounded-lg hover:bg-slate-50 transition-all duration-200 cursor-pointer flex items-center gap-3" onClick={() => onNoteSelect(otherNote)}>
-                                    <div className={`p-1.5 rounded-md ${meta.bg} ${meta.color}`}>
-                                        {meta.icon}
-                                    </div>
-                                    <div className="overflow-hidden">
-                                        <p className="font-medium text-sm text-slate-700 truncate">{otherNote.title}</p>
-                                        <p className="text-xs text-slate-400 truncate">{otherNote.filename}</p>
-                                    </div>
-                                </div>
-                            )})}
-                            {otherNotes.length === 0 && (
-                                <p className="text-sm text-muted-foreground text-center py-4">No other notes available</p>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-        </div>
-      </div>
-    );
-};
-
 export const StudentNotes = ({ batch, subject, onBack }: StudentNotesProps) => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
-  const [selectedNote, setSelectedNote] = useState<NotesContent | null>(null);
 
   const { data: notes, isLoading } = useQuery<NotesContent[]>({
     queryKey: ['student-notes', batch, subject],
@@ -271,10 +190,6 @@ export const StudentNotes = ({ batch, subject, onBack }: StudentNotesProps) => {
     }, 1000);
   };
 
-  if (selectedNote) {
-    return <NoteViewer note={selectedNote} onBack={() => setSelectedNote(null)} onDownload={(n) => handleDownload({ stopPropagation: () => {} } as any, n)} allNotes={notes || []} onNoteSelect={setSelectedNote} />;
-  }
-
   return (
     <div className="p-6 space-y-6 bg-[#fcfcfd] min-h-full font-sans">
       {/* Main Section Holding Container */}
@@ -300,9 +215,9 @@ export const StudentNotes = ({ batch, subject, onBack }: StudentNotesProps) => {
                   const meta = getFileMetadata(note.file_url, note.filename);
                   
                   return (
-                    <div 
-                      key={note.id} 
-                      onClick={() => setSelectedNote(note)}
+                    <div
+                      key={note.id}
+                      onClick={(e) => handleDownload(e, note)}
                       className="
                         group relative bg-white 
                         border border-slate-200 
