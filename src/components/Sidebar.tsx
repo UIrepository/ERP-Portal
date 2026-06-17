@@ -29,6 +29,7 @@ import {
   InboxIcon,
   Quiz01Icon,
   Download01Icon,
+  FolderLibraryIcon,
 } from '@hugeicons/core-free-icons';
 
 import {
@@ -131,6 +132,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
     { id: 'teacher-join-class', label: 'Join Class', icon: Video01Icon },
     { id: 'teacher-community', label: 'Community', icon: UserGroupIcon },
     { id: 'teacher-recordings', label: 'My Recordings', icon: VideoReplayIcon },
+    { id: 'teacher-resources', label: 'Resources', icon: FolderLibraryIcon },
     { id: 'teacher-schedule-requests', label: 'Schedule Requests', icon: TaskDaily01Icon },
     { id: 'teacher-feedback', label: 'Feedback', icon: FavouriteIcon },
     { id: 'teacher-messages', label: 'Messages', icon: Message01Icon },

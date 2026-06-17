@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { TeacherSchedule } from './TeacherSchedule';
 import { TeacherRecordings } from './TeacherRecordings';
+import { TeacherResources } from './TeacherResources';
 import { TeacherScheduleRequests } from './TeacherScheduleRequests';
 import { StaffInbox } from '@/components/shared/StaffInbox';
 import { TeacherFeedbackViewer } from './TeacherFeedbackViewer';
@@ -48,6 +49,8 @@ export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardPro
         return <TeacherCommunity />;
       case 'teacher-recordings':
         return <TeacherRecordings />;
+      case 'teacher-resources':
+        return <TeacherResources />;
       case 'teacher-schedule-requests':
         return <TeacherScheduleRequests />;
       case 'teacher-messages':
