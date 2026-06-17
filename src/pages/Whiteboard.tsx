@@ -67,6 +67,9 @@ const Whiteboard = () => {
   }, [navigate]);
 
   const [editor, setEditor] = useState<Editor | null>(null);
+  // null = still checking; true/false = server's verdict on whether this user
+  // may open this class's whiteboard.
+  const [accessAllowed, setAccessAllowed] = useState<boolean | null>(null);
   const [startMode, setStartMode] = useState<StartMode>('choose');
   const [scheduleCtx, setScheduleCtx] = useState<ScheduleContext | null>(null);
   const [title, setTitle] = useState('');
@@ -116,6 +119,30 @@ const Whiteboard = () => {
       cancelled = true;
     };
   }, [scheduleId]);
+
+  // Authorization gate: only the staff in charge of this class may open the
+  // whiteboard — admins/managers, or the teacher assigned to this schedule's
+  // batch+subject. Enforced server-side (can_open_whiteboard RPC); the client
+  // just reflects the verdict so unauthorized users never see the board.
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user || !scheduleId) {
+      setAccessAllowed(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).rpc('can_open_whiteboard', {
+        p_schedule_id: scheduleId,
+      });
+      if (cancelled) return;
+      setAccessAllowed(error ? false : data === true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, scheduleId, authLoading]);
 
   const handleMount = useCallback((ed: Editor) => {
     setEditor(ed);
@@ -511,6 +538,39 @@ const Whiteboard = () => {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-slate-950 text-white">
         <p>You must be signed in to use the whiteboard.</p>
+      </div>
+    );
+  }
+
+  // Still verifying authorization.
+  if (accessAllowed === null) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-slate-950 text-white">
+        <Loader2 className="h-6 w-6 animate-spin" />
+      </div>
+    );
+  }
+
+  // Not the teacher in charge / not an admin or manager.
+  if (!accessAllowed) {
+    return (
+      <div className="h-screen w-screen flex flex-col items-center justify-center gap-4 bg-slate-950 px-6 text-center text-white">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full border border-rose-500/30 bg-rose-500/15">
+          <EyeOff className="h-6 w-6 text-rose-300" />
+        </div>
+        <div>
+          <p className="text-base font-semibold">This whiteboard is restricted</p>
+          <p className="mt-1 max-w-sm text-sm text-white/60">
+            Only the teacher in charge of this class — and admins — can open it.
+          </p>
+        </div>
+        <Button
+          variant="ghost"
+          className="border border-white/10 bg-white/5 hover:bg-white/15"
+          onClick={() => navigate('/')}
+        >
+          Go back
+        </Button>
       </div>
     );
   }
