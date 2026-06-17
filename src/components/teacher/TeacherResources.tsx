@@ -6,7 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Filter, X, ExternalLink, Target, Crown, StickyNote, FolderOpen } from 'lucide-react';
+import { Search, Filter, X, ExternalLink, FolderOpen } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { AssignmentsIcon, Crown02Icon, Note01Icon } from '@hugeicons/core-free-icons';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -23,11 +25,11 @@ interface ResourceItem {
   created_at: string;
 }
 
-// Per-type visual treatment for the card badge/icon.
-const TYPE_META: Record<ResourceType, { icon: JSX.Element; color: string; bg: string; border: string }> = {
-  DPP: { icon: <Target className="h-3.5 w-3.5" />, color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-100' },
-  'UI ki Padhai': { icon: <Crown className="h-3.5 w-3.5 fill-current" />, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
-  Notes: { icon: <StickyNote className="h-3.5 w-3.5" />, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+// Per-type visual treatment for the card badge/icon (Hugeicons glyphs).
+const TYPE_META: Record<ResourceType, { icon: typeof AssignmentsIcon; color: string; bg: string; border: string }> = {
+  DPP: { icon: AssignmentsIcon, color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-100' },
+  'UI ki Padhai': { icon: Crown02Icon, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
+  Notes: { icon: Note01Icon, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
 };
 
 const ResourceSkeleton = () => (
@@ -215,7 +217,7 @@ export const TeacherResources = () => {
                 >
                   <div className="flex items-center justify-between">
                     <span className={cn('inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-sm border w-fit', meta.bg, meta.color, meta.border)}>
-                      {meta.icon}{r.type}
+                      <HugeiconsIcon icon={meta.icon} className="h-3.5 w-3.5" strokeWidth={2} />{r.type}
                     </span>
                     <span className="text-[11px] text-slate-400 shrink-0">{r.created_at ? format(new Date(r.created_at), 'dd MMM yyyy') : ''}</span>
                   </div>
