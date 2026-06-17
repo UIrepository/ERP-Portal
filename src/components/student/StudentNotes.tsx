@@ -217,13 +217,12 @@ export const StudentNotes = ({ batch, subject, onBack }: StudentNotesProps) => {
                   return (
                     <div
                       key={note.id}
-                      onClick={(e) => handleDownload(e, note)}
                       className="
-                        group relative bg-white 
-                        border border-slate-200 
+                        group relative bg-white
+                        border border-slate-200
                         rounded-lg
                         p-6 flex flex-col justify-between gap-6
-                        hover:bg-slate-50 transition-all duration-300 cursor-pointer
+                        transition-all duration-300
                       "
                     >
                       {/* Title Section (Semi Bold) */}
