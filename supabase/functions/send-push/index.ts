@@ -1,5 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { sendPushToUserIds, sendPushToBatchSubject, type PushPayload } from '../_shared/push.ts';
+import {
+  sendPushToUserIds,
+  sendPushToAllStudents,
+  sendPushToStudents,
+  type PushPayload,
+} from '../_shared/push.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,7 +13,7 @@ const corsHeaders = {
 };
 
 // Generic push sender.
-// Body: { title, body, url?, tag?, user_ids?: string[], batch?, subject? }
+// Body: { title, body, url?, tag?, user_ids?: string[], batch?, subject?, all_students?: boolean }
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -20,7 +25,7 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    const { title, body, url, tag, user_ids, batch, subject } = await req.json();
+    const { title, body, url, tag, user_ids, batch, subject, all_students } = await req.json();
 
     if (!title || !body) {
       return new Response(JSON.stringify({ error: 'Missing title or body' }), {
@@ -34,11 +39,15 @@ Deno.serve(async (req) => {
     let result;
     if (Array.isArray(user_ids) && user_ids.length > 0) {
       result = await sendPushToUserIds(supabase, user_ids, payload);
+    } else if (all_students) {
+      result = await sendPushToAllStudents(supabase, payload);
     } else if (batch && subject) {
-      result = await sendPushToBatchSubject(supabase, batch, subject, payload);
+      result = await sendPushToStudents(supabase, { batch, subject }, payload);
+    } else if (batch || subject) {
+      result = await sendPushToStudents(supabase, { batch: batch ?? null, subject: subject ?? null }, payload);
     } else {
       return new Response(
-        JSON.stringify({ error: 'Provide user_ids[] or batch + subject' }),
+        JSON.stringify({ error: 'Provide user_ids[], all_students, or batch/subject filters' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }

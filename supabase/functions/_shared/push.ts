@@ -104,6 +104,59 @@ export async function resolveBatchSubjectUserIds(
   return Array.from(ids);
 }
 
+/** Resolve all enrolled students who currently have a push subscription. */
+export async function resolveAllStudentUserIds(supabase: SupabaseClient): Promise<string[]> {
+  const { data: enrollments } = await supabase
+    .from('user_enrollments')
+    .select('user_id');
+
+  return Array.from(
+    new Set((enrollments ?? []).map((row: { user_id?: string }) => row.user_id).filter(Boolean) as string[]),
+  );
+}
+
+type StudentTargetFilters = {
+  batch?: string | null;
+  subject?: string | null;
+  allStudents?: boolean;
+};
+
+async function resolveStudentTargetUserIds(
+  supabase: SupabaseClient,
+  filters: StudentTargetFilters,
+): Promise<string[]> {
+  if (filters.allStudents) {
+    return await resolveAllStudentUserIds(supabase);
+  }
+
+  const ids = new Set<string>();
+  let query = supabase.from('user_enrollments').select('user_id');
+
+  if (filters.batch) query = query.eq('batch_name', filters.batch);
+  if (filters.subject) query = query.eq('subject_name', filters.subject);
+
+  const { data } = await query;
+  (data ?? []).forEach((row: { user_id?: string }) => {
+    if (row.user_id) ids.add(row.user_id);
+  });
+  return Array.from(ids);
+}
+
+export async function sendPushToStudents(
+  supabase: SupabaseClient,
+  filters: StudentTargetFilters,
+  payload: PushPayload,
+) {
+  try {
+    const ids = await resolveStudentTargetUserIds(supabase, filters);
+    if (ids.length === 0) return { sent: 0, failed: 0 };
+    return await sendPushToUserIds(supabase, ids, payload);
+  } catch (err) {
+    console.error('sendPushToStudents error:', (err as Error)?.message);
+    return { sent: 0, failed: 0 };
+  }
+}
+
 /** Convenience: push to everyone in a batch + subject. Never throws. */
 export async function sendPushToBatchSubject(
   supabase: SupabaseClient,
@@ -116,6 +169,25 @@ export async function sendPushToBatchSubject(
     return await sendPushToUserIds(supabase, ids, payload);
   } catch (err) {
     console.error('sendPushToBatchSubject error:', (err as Error)?.message);
+    return { sent: 0, failed: 0 };
+  }
+}
+
+/** Convenience: push to every student. Never throws. */
+export async function sendPushToAllStudents(
+  supabase: SupabaseClient,
+  payload: PushPayload,
+) {
+  try {
+    const ids = await resolveAllStudentUserIds(supabase);
+    if (ids.length === 0) return { sent: 0, failed: 0 };
+    const { data: subscriptionRows } = await supabase
+      .from('push_subscriptions')
+      .select('endpoint, p256dh, auth')
+      .in('user_id', ids);
+    return await sendToSubs(supabase, (subscriptionRows ?? []) as SubRow[], payload);
+  } catch (err) {
+    console.error('sendPushToAllStudents error:', (err as Error)?.message);
     return { sent: 0, failed: 0 };
   }
 }

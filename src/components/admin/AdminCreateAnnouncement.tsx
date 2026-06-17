@@ -18,6 +18,16 @@ interface TargetCombination {
   subject: string | null;
 }
 
+interface AnnouncementPayload {
+  title: string;
+  message: string;
+  target_batch: string | null;
+  target_subject: string | null;
+  created_by: string | null;
+  is_active: boolean;
+  target_role: 'student';
+}
+
 export const AdminCreateAnnouncement = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
@@ -28,6 +38,25 @@ export const AdminCreateAnnouncement = () => {
   // State for the current selection in the dropdowns
   const [currentBatch, setCurrentBatch] = useState<string | null>(null);
   const [currentSubject, setCurrentSubject] = useState<string | null>(null);
+
+  const sendAnnouncementPush = async (announcement: AnnouncementPayload) => {
+    const { error } = await supabase.functions.invoke('send-push', {
+      body: {
+        title: announcement.title,
+        body: announcement.message,
+        all_students: !announcement.target_batch && !announcement.target_subject,
+        batch: announcement.target_batch ?? undefined,
+        subject: announcement.target_subject ?? undefined,
+      },
+    });
+
+    if (error) {
+      console.warn('Announcement push failed:', error);
+      return false;
+    }
+
+    return true;
+  };
 
   // Fetch all enrollments to understand batch-subject relationships
   const { data: enrollments = [] } = useQuery({
@@ -59,21 +88,23 @@ export const AdminCreateAnnouncement = () => {
 
 
   const createAnnouncementMutation = useMutation({
-    mutationFn: async (announcementData: any) => {
-        // The announcements are now inserted as an array
+    mutationFn: async (announcementData: AnnouncementPayload[]) => {
       const { error } = await supabase.from('notifications').insert(announcementData);
       if (error) throw error;
+
+      await Promise.all(announcementData.map((announcement) => sendAnnouncementPush(announcement)));
     },
     onSuccess: () => {
-      toast({ title: "Success", description: "Announcement has been sent." });
+      toast({ title: "Success", description: "Announcement has been sent and push delivery has started." });
       setTitle('');
       setMessage('');
       setTargets([]);
       setCurrentBatch(null);
       setCurrentSubject(null);
     },
-    onError: (error: any) => {
-      toast({ title: "Error", description: `Failed to send announcement: ${error.message}`, variant: "destructive" });
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast({ title: "Error", description: `Failed to send announcement: ${message}`, variant: "destructive" });
     },
   });
 
@@ -106,7 +137,7 @@ export const AdminCreateAnnouncement = () => {
       return;
     }
 
-    let announcementsToSend = [];
+    let announcementsToSend: AnnouncementPayload[] = [];
     // If no specific targets, send a single global announcement.
     if (targets.length === 0) {
         announcementsToSend.push({
