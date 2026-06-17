@@ -25,8 +25,13 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { WhiteboardStylePanel } from '@/components/whiteboard/WhiteboardStylePanel';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+
+// Swap tldraw's default style panel for ours (pen-width slider instead of the
+// S/M/L size buttons). Module-level for a stable reference across renders.
+const WB_COMPONENTS = { StylePanel: WhiteboardStylePanel };
 
 type StartMode = 'choose' | 'blank' | 'pdf';
 
@@ -366,14 +371,14 @@ const Whiteboard = () => {
       x: 0,
       y: 0,
       isLocked: true,
-      opacity: 0.45,
+      opacity: 0.7,
       props: {
         geo: 'rectangle',
         w: BLANK_PAGE_W,
         h: BLANK_PAGE_H,
         color: 'white',
         fill: 'none',
-        dash: 'solid',
+        dash: 'dashed',
         size: 'm',
       },
     });
@@ -586,6 +591,17 @@ const Whiteboard = () => {
       <style>{`
         .wb-canvas.wb-offset .tlui-layout__top { padding-top: 52px; }
         .wb-canvas.wb-hide-style .tlui-style-panel__wrapper { display: none !important; }
+        /* Pen width is shown as a slider (below), so hide tldraw's S/M/L size buttons. */
+        .wb-canvas .tlui-style-panel [data-testid="style.size"] { display: none !important; }
+        .wb-pen-width {
+          display: flex; flex-direction: column; gap: 2px;
+          padding: 4px 4px 8px; margin-bottom: 2px;
+          border-bottom: 1px solid var(--color-divider, rgba(255,255,255,0.1));
+        }
+        .wb-pen-width__label {
+          font-size: 12px; font-weight: 500; color: var(--color-text-1, #fff);
+          opacity: 0.7; padding: 0 4px;
+        }
       `}</style>
 
       {/* Canvas — fills the whole viewport so collapsing chrome reclaims real estate */}
@@ -593,12 +609,15 @@ const Whiteboard = () => {
         className={cn(
           'absolute inset-0 wb-canvas',
           !chromeHidden && 'wb-offset',
-          (stylePanelHidden || chromeHidden) && 'wb-hide-style',
+          // Keep the style panel (colour / pen width / fill) available even when
+          // auto-focus hides the header — only the explicit toggle hides it.
+          stylePanelHidden && 'wb-hide-style',
         )}
       >
         <Tldraw
           onMount={handleMount}
           inferDarkMode
+          components={WB_COMPONENTS}
           persistenceKey={scheduleId ? `wb-${scheduleId}` : undefined}
         />
       </div>
@@ -666,7 +685,7 @@ const Whiteboard = () => {
           </button>
           <button
             type="button"
-            onClick={() => setChromeHidden(true)}
+            onClick={() => { setChromeHidden(true); setStylePanelHidden(true); }}
             title="Focus mode — hide everything"
             className="h-8 w-8 inline-flex items-center justify-center rounded-md bg-white/5 border border-white/10 text-white/80 hover:bg-white/15 hover:text-white transition-colors"
           >
