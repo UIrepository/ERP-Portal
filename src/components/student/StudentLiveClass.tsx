@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { format, addMinutes, isWithinInterval, differenceInMinutes } from 'date-fns';
+import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { generateJitsiRoomName } from '@/lib/jitsiUtils';
 import { useAuth } from '@/hooks/useAuth';
@@ -38,9 +38,17 @@ interface ScheduleWithLink {
 export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: StudentLiveClassProps) => {
   const { profile, user } = useAuth();
   const { mergedPairs, orFilter, primaryPair } = useMergedSubjects(batch, subject);
-  const today = new Date();
-  const currentDayOfWeek = today.getDay();
-  const todayDateStr = format(today, 'yyyy-MM-dd');
+  // Pin "today" and the live/upcoming window to IST (Asia/Kolkata = fixed
+  // UTC+5:30) so it works regardless of the student's device timezone. Reads the
+  // device's absolute clock (assumed time-synced) but interprets the wall clock
+  // as IST. Previously this used the browser's local timezone, so a device on a
+  // non-IST timezone computed the window in the wrong zone and showed
+  // "no live classes" even when one was scheduled and live.
+  const IST_OFFSET_MIN = 330;
+  const istNow = new Date(Date.now() + IST_OFFSET_MIN * 60000); // read via getUTC* = IST wall clock
+  const currentDayOfWeek = istNow.getUTCDay();
+  const todayDateStr = istNow.toISOString().slice(0, 10);
+  const istMinutesNow = istNow.getUTCHours() * 60 + istNow.getUTCMinutes();
 
   // Fetch all active merges so we can resolve primary pairs for ANY schedule
   const { data: activeMerges = [], isLoading: isMergesLoading } = useQuery<MergeRow[]>({
@@ -168,29 +176,22 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
     refetchInterval: 20000
   });
 
-  const now = new Date();
-
-  // Logic to separate "Live Now" from "Upcoming"
+  // Logic to separate "Live Now" from "Upcoming" — all compared in IST
+  // minutes-of-day so it's independent of the device timezone.
   const liveClasses: ScheduleWithLink[] = [];
   const upcomingClasses: ScheduleWithLink[] = [];
 
   schedules?.forEach(schedule => {
     const [startHour, startMin] = schedule.start_time.split(':').map(Number);
     const [endHour, endMin] = schedule.end_time.split(':').map(Number);
-    
-    const startTime = new Date(today);
-    startTime.setHours(startHour, startMin, 0, 0);
-    
-    const endTime = new Date(today);
-    endTime.setHours(endHour, endMin, 0, 0);
-    
-    const bufferStart = addMinutes(startTime, -15);
-    const bufferEnd = addMinutes(endTime, 15);
-    
-    if (isWithinInterval(now, { start: bufferStart, end: bufferEnd })) {
+    const startMinutes = startHour * 60 + startMin;
+    const endMinutes = endHour * 60 + endMin;
+
+    // Live within a ±15 min buffer around the slot; upcoming if it starts
+    // within the next 4 hours.
+    if (istMinutesNow >= startMinutes - 15 && istMinutesNow <= endMinutes + 15) {
       liveClasses.push(schedule);
-    } 
-    else if (now < startTime && differenceInMinutes(startTime, now) < 240) {
+    } else if (istMinutesNow < startMinutes && startMinutes - istMinutesNow < 240) {
       upcomingClasses.push(schedule);
     }
   });

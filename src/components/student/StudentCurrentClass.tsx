@@ -100,8 +100,13 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     return () => clearInterval(interval);
   }, []);
 
-  const currentTimeStr = format(now, 'HH:mm:ss');
-  const todayDateStr = format(now, 'yyyy-MM-dd');
+  // Pin to IST (Asia/Kolkata = fixed UTC+5:30) so "today" and "now" don't depend
+  // on the student's device timezone — a non-IST device used to fetch the wrong
+  // day's schedules and never detect a class as live.
+  const IST_OFFSET_MIN = 330;
+  const istNow = new Date(now.getTime() + IST_OFFSET_MIN * 60000); // ISO/getUTC* fields = IST wall clock
+  const currentTimeStr = istNow.toISOString().slice(11, 19);
+  const todayDateStr = istNow.toISOString().slice(0, 10);
 
   // --- 1. Fetch ALL Schedules ---
   const { data: allSchedules, isLoading: isLoadingAllSchedules, isError: isAllSchedulesError } = useQuery<Schedule[]>({
@@ -126,22 +131,22 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
       const { data, error } = await supabase.rpc('get_schedules_with_links_filtered_by_enrollment', {
         p_user_id: profile.user_id,
         p_target_date: todayDateStr, 
-        p_current_time: format(new Date(), 'HH:mm:ss'),
+        p_current_time: currentTimeStr,
         p_is_active_link: true
       });
 
       if (error) throw error;
       if (!data || data.length === 0) return null;
 
-      const nowTime = new Date();
-      const bufferMinutes = 15; 
-      
+      const bufferMinutes = 15;
+      // IST minutes-of-day "now" — independent of the device timezone.
+      const istMins = new Date(Date.now() + IST_OFFSET_MIN * 60000);
+      const nowMins = istMins.getUTCHours() * 60 + istMins.getUTCMinutes();
+
       const validClasses = data.filter((schedule: any) => {
-          const [h, m] = schedule.start_time.split(':');
-          const startTime = new Date(nowTime);
-          startTime.setHours(Number(h), Number(m), 0, 0);
-          const validJoinTime = new Date(startTime.getTime() - bufferMinutes * 60000);
-          return nowTime >= validJoinTime; 
+          const [h, m] = schedule.start_time.split(':').map(Number);
+          const startMins = h * 60 + m;
+          return nowMins >= startMins - bufferMinutes;
       });
 
       const uniqueMap = new Map();
