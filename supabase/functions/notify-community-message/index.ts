@@ -31,6 +31,27 @@ Deno.serve(async (req) => {
       ? (String(content).length > 80 ? `${String(content).slice(0, 80)}…` : String(content))
       : 'Sent an attachment';
 
+    // Is the sender staff (admin / manager / teacher)? Staff announcements always
+    // notify everyone — a student's mute only silences PEER (student) messages.
+    let senderIsStaff = false;
+    if (sender_id) {
+      for (const table of ['admins', 'managers', 'teachers']) {
+        const { data } = await supabase.from(table).select('user_id').eq('user_id', sender_id).limit(1);
+        if (data && data.length > 0) { senderIsStaff = true; break; }
+      }
+    }
+
+    // For peer messages, drop students who muted this community.
+    let mutedIds: string[] = [];
+    if (!senderIsStaff) {
+      const { data: mutes } = await supabase
+        .from('community_mutes')
+        .select('user_id')
+        .eq('batch', batch)
+        .eq('subject', subject);
+      mutedIds = (mutes ?? []).map((m: { user_id?: string }) => m.user_id).filter(Boolean) as string[];
+    }
+
     // WhatsApp group style: the subject is the "group" title, each line is
     // "Sender: message". The service worker stacks unseen lines into one
     // notification (data.stack) and threads them by the community tag.
@@ -48,6 +69,7 @@ Deno.serve(async (req) => {
         stack: true,
       },
       sender_id || undefined,
+      mutedIds,
     );
 
     return new Response(JSON.stringify({ success: true, ...result }), {

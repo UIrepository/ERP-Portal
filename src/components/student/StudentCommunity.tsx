@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Bell, BellOff } from 'lucide-react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
   Sent02Icon,
@@ -385,6 +385,55 @@ export const StudentCommunity = () => {
     queryClient.invalidateQueries({ queryKey: ['community-overview'] });
   };
 
+  // --- Per-community mute (push notifications) ---
+  // A row in community_mutes = this student muted that batch+subject. Muting
+  // only silences peer (student) messages; staff (admin/teacher) posts still
+  // notify (enforced server-side in notify-community-message).
+  const { data: mutedSet = new Set<string>() } = useQuery<Set<string>>({
+    queryKey: ['community-mutes', profile?.user_id],
+    enabled: !!profile?.user_id,
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from('community_mutes')
+        .select('batch, subject')
+        .eq('user_id', profile!.user_id);
+      return new Set((data ?? []).map((r: { batch: string; subject: string }) => `${r.batch}|${r.subject}`));
+    },
+  });
+
+  const isMuted = (g: { batch_name: string; subject_name: string }) =>
+    mutedSet.has(`${g.batch_name}|${g.subject_name}`);
+
+  const toggleMuteMutation = useMutation({
+    mutationFn: async (g: { batch_name: string; subject_name: string }) => {
+      if (!profile?.user_id) return;
+      const currentlyMuted = isMuted(g);
+      if (currentlyMuted) {
+        await (supabase as any).from('community_mutes').delete()
+          .eq('user_id', profile.user_id).eq('batch', g.batch_name).eq('subject', g.subject_name);
+      } else {
+        await (supabase as any).from('community_mutes')
+          .insert({ user_id: profile.user_id, batch: g.batch_name, subject: g.subject_name });
+      }
+      return !currentlyMuted;
+    },
+    onSuccess: (nowMuted, g) => {
+      queryClient.invalidateQueries({ queryKey: ['community-mutes'] });
+      toast({
+        title: nowMuted ? `Muted ${g.subject_name}` : `Unmuted ${g.subject_name}`,
+        description: nowMuted
+          ? "You won't get notifications from students here. Teacher & admin messages still come through."
+          : 'Notifications are back on for this community.',
+      });
+    },
+    onError: () => toast({ title: 'Could not update notifications', variant: 'destructive' }),
+  });
+
+  const toggleMute = (g: { batch_name: string; subject_name: string }, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    toggleMuteMutation.mutate(g);
+  };
+
   const { data: overview = {} } = useQuery<Record<string, { lastAt: string | null; unread: number }>>({
     queryKey: ['community-overview', profile?.user_id, enrollments.map(e => `${e.batch_name}|${e.subject_name}`).join(',')],
     queryFn: async () => {
@@ -668,16 +717,28 @@ export const StudentCommunity = () => {
              sortedEnrollments.map((group) => {
               const isActive = selectedGroup?.batch_name === group.batch_name && selectedGroup?.subject_name === group.subject_name;
               const unread = overview[`${group.batch_name}|${group.subject_name}`]?.unread || 0;
+              const muted = isMuted(group);
               return (
               <div key={`${group.batch_name}-${group.subject_name}`} onClick={() => { setSelectedGroup(group); markGroupSeen(group); }}
-                className={`p-3 rounded-lg cursor-pointer transition-colors flex items-center gap-3 ${isActive ? 'bg-indigo-50 border-indigo-200 border' : 'hover:bg-gray-100 border border-transparent'}`}>
+                className={`p-3 rounded-lg cursor-pointer transition-colors flex items-center gap-2 ${isActive ? 'bg-indigo-50 border-indigo-200 border' : 'hover:bg-gray-100 border border-transparent'}`}>
                 <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold shrink-0">{group.subject_name[0]}</div>
-                <div className="overflow-hidden text-left flex-1 min-w-0"><p className="font-semibold text-gray-900 truncate">{group.subject_name}</p><p className="text-xs text-gray-500 truncate">{group.batch_name}</p></div>
+                <div className="overflow-hidden text-left flex-1 min-w-0">
+                  <p className="font-semibold text-gray-900 truncate flex items-center gap-1.5">{group.subject_name}{muted && <BellOff className="h-3 w-3 text-gray-400 shrink-0" />}</p>
+                  <p className="text-xs text-gray-500 truncate">{group.batch_name}</p>
+                </div>
                 {unread > 0 && !isActive && (
-                  <span className="ml-auto shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-brand text-white text-[11px] font-semibold flex items-center justify-center">
+                  <span className="shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-brand text-white text-[11px] font-semibold flex items-center justify-center">
                     {unread > 99 ? '99+' : unread}
                   </span>
                 )}
+                <button
+                  type="button"
+                  onClick={(e) => toggleMute(group, e)}
+                  title={muted ? 'Notifications muted — tap to unmute' : 'Mute notifications for this community'}
+                  className={`shrink-0 h-7 w-7 inline-flex items-center justify-center rounded-full transition-colors ${muted ? 'text-gray-400 hover:bg-gray-200' : 'text-indigo-500 hover:bg-indigo-100'}`}
+                >
+                  {muted ? <BellOff className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
+                </button>
               </div>
               );
             })}
@@ -713,6 +774,14 @@ export const StudentCommunity = () => {
                 <p className="text-xs text-gray-500 font-medium mt-0.5">{selectedGroup.batch_name}</p>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={(e) => toggleMute(selectedGroup, e)}
+              title={isMuted(selectedGroup) ? 'Notifications muted — tap to unmute' : 'Mute notifications for this community'}
+              className={`shrink-0 inline-flex items-center gap-1.5 h-8 px-2.5 rounded-full text-xs font-medium transition-colors ${isMuted(selectedGroup) ? 'bg-gray-100 text-gray-500 hover:bg-gray-200' : 'text-indigo-600 hover:bg-indigo-50'}`}
+            >
+              {isMuted(selectedGroup) ? <><BellOff className="h-4 w-4" /> Muted</> : <Bell className="h-4 w-4" />}
+            </button>
           </div>
 
           {/* WATERMARK LAYER */}

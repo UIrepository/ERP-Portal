@@ -160,17 +160,24 @@ export async function sendPushToStudents(
   }
 }
 
-/** Convenience: push to everyone in a batch + subject. Never throws. */
+/** Convenience: push to everyone in a batch + subject. Never throws.
+ * excludeUserIds drops additional recipients (e.g. students who muted the
+ * community) on top of the single excludeUserId (usually the sender). */
 export async function sendPushToBatchSubject(
   supabase: SupabaseClient,
   batch: string,
   subject: string,
   payload: PushPayload,
   excludeUserId?: string,
+  excludeUserIds?: string[],
 ) {
   try {
     let ids = await resolveBatchSubjectUserIds(supabase, batch, subject);
     if (excludeUserId) ids = ids.filter((id) => id !== excludeUserId);
+    if (excludeUserIds && excludeUserIds.length > 0) {
+      const muted = new Set(excludeUserIds);
+      ids = ids.filter((id) => !muted.has(id));
+    }
     return await sendPushToUserIds(supabase, ids, payload);
   } catch (err) {
     console.error('sendPushToBatchSubject error:', (err as Error)?.message);
