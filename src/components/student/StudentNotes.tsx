@@ -210,15 +210,15 @@ export const StudentNotes = ({ batch, subject, onBack }: StudentNotesProps) => {
             {isLoading ? (
               <NotesSkeleton />
             ) : notes && notes.length > 0 ? (
-              <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3">
                 {notes.map((note) => {
                   const meta = getFileMetadata(note.file_url, note.filename);
-                  
+
                   return (
                     <div
                       key={note.id}
                       className="
-                        group relative bg-white
+                        group relative bg-white min-w-0 w-full
                         border border-slate-200
                         rounded-lg
                         p-4 sm:p-6 flex flex-col justify-between gap-4 sm:gap-6
@@ -226,8 +226,8 @@ export const StudentNotes = ({ batch, subject, onBack }: StudentNotesProps) => {
                       "
                     >
                       {/* Title Section (Semi Bold) */}
-                      <div>
-                        <h3 className="font-semibold text-slate-900 text-lg leading-snug line-clamp-2">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-slate-900 text-base sm:text-lg leading-snug line-clamp-2 break-words">
                           {note.title}
                         </h3>
                       </div>
