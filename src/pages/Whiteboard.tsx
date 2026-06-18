@@ -154,6 +154,10 @@ const Whiteboard = () => {
     ed.user.updateUserPreferences({ colorScheme: 'dark' });
     setPageCount(ed.getPages().length);
     setCurrentPage(1);
+    // Start on the pen, not tldraw's default Select tool — otherwise dragging
+    // on the board just draws a selection box and the teacher sees "the pen
+    // doesn't work". They can still switch tools from the toolbar.
+    ed.setCurrentTool('draw');
 
     // Resume detection: if this device already has a persisted session
     // (more than one page, or any shapes anywhere), skip the start chooser.
@@ -282,6 +286,7 @@ const Whiteboard = () => {
 
         editor.setCurrentPage(editor.getPages()[0].id);
         editor.zoomToFit();
+        editor.setCurrentTool('draw');
         toast.success(`Imported ${pdf.numPages} page${pdf.numPages > 1 ? 's' : ''}`);
       } catch (e) {
         console.error(e);
@@ -389,6 +394,7 @@ const Whiteboard = () => {
     if (editor) {
       ensureFrameOnCurrentPage(editor);
       focusPage(editor);
+      editor.setCurrentTool('draw');
     }
   };
 
