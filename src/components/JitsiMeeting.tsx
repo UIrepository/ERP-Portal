@@ -329,6 +329,17 @@ export const JitsiMeeting = ({
       scheduleResumeRetry();
   };
 
+  // Auto-resume the instant a drop is detected, so the teacher never has to
+  // find/tap the button mid-class (it may be hidden behind Jitsi's fullscreen).
+  // The amber "Resume Recording" button stays as a manual retry. Only hosts
+  // stream, and resume needs a key from a prior Go Live.
+  useEffect(() => {
+      if (isHost && streamDropped && isStreaming && lastStreamKey) {
+          handleResume();
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streamDropped, isStreaming]);
+
   // --- Core Player Logic: Embeds Jitsi ---
   const initializeJitsi = useCallback(async () => {
     if (isInitializingRef.current || apiRef.current) return;
@@ -480,9 +491,9 @@ export const JitsiMeeting = ({
             if (!isIntentionalHangupRef.current && isStreamingRef.current) {
                 setStreamDropped(true);
                 streamDroppedRef.current = true;
-                toast.warning("Stream disconnected. Reconnect, then tap 'Resume Recording' to continue the same recording.", {
+                toast.warning("Stream disconnected — trying to reconnect the same recording. If it doesn't, tap 'Resume Recording' after you rejoin.", {
                     id: "stream-dropped",
-                    duration: 600000,
+                    duration: 30000,
                 });
             } else if (!isIntentionalHangupRef.current) {
                 toast.warning("Connection dropped. Please refresh.");
@@ -504,12 +515,13 @@ export const JitsiMeeting = ({
                      isStoppingRef.current = false;
                  } else if (isStreamingRef.current) {
                      // Recorder dropped on its own (meet.jit.si's ~1h Jibri limit).
-                     // Keep the broadcast live and offer a one-tap resume.
+                     // Keep the broadcast live; the auto-resume effect reconnects
+                     // the SAME recording (amber button is a manual retry).
                      setStreamDropped(true);
                      streamDroppedRef.current = true;
-                     toast.warning("Recording stopped (meet.jit.si's ~1-hour limit). Tap 'Resume Recording' to continue the same recording.", {
+                     toast.warning("Recording dropped (meet.jit.si's ~1-hour limit). Reconnecting the same recording…", {
                          id: "stream-dropped",
-                         duration: 600000,
+                         duration: 8000,
                      });
                  }
              }
