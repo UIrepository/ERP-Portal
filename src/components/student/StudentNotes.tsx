@@ -77,9 +77,9 @@ const getFileMetadata = (url: string, filename: string) => {
 };
 
 const NotesSkeleton = () => (
-  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+  <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
     {[...Array(6)].map((_, i) => (
-      <div key={i} className="bg-white p-6 rounded-lg border border-slate-100 space-y-4 h-[180px] flex flex-col justify-between">
+      <div key={i} className="bg-white p-4 sm:p-6 rounded-lg border border-slate-100 space-y-4 h-[160px] sm:h-[180px] flex flex-col justify-between">
         <Skeleton className="h-6 w-3/4 rounded-md" />
         <div className="flex justify-between items-end">
            <div className="flex gap-3 items-center">
@@ -191,11 +191,11 @@ export const StudentNotes = ({ batch, subject, onBack }: StudentNotesProps) => {
   };
 
   return (
-    <div className="p-6 space-y-6 bg-[#fcfcfd] min-h-full font-sans">
+    <div className="p-3 sm:p-6 space-y-6 bg-[#fcfcfd] min-h-full font-sans">
       {/* Main Section Holding Container */}
-      <div className="bg-white p-6 md:p-8">
+      <div className="bg-white p-4 sm:p-6 md:p-8 rounded-lg">
           {/* Header Section */}
-          <div className="mb-8 border-b border-slate-100 pb-6">
+          <div className="mb-6 sm:mb-8 border-b border-slate-100 pb-5 sm:pb-6">
             <div className="flex items-center gap-3">
               {onBack && <StudentBackButton onClick={onBack} />}
               <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
@@ -221,7 +221,7 @@ export const StudentNotes = ({ batch, subject, onBack }: StudentNotesProps) => {
                         group relative bg-white
                         border border-slate-200
                         rounded-lg
-                        p-6 flex flex-col justify-between gap-6
+                        p-4 sm:p-6 flex flex-col justify-between gap-4 sm:gap-6
                         transition-all duration-300
                       "
                     >
