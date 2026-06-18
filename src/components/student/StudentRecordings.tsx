@@ -33,8 +33,8 @@ interface StudentRecordingsProps {
 }
 
 
-// Fixed card dimensions for zoom stability
-const CARD_WIDTH = 280;
+// Fixed card dimensions for zoom stability (width is responsive: full-width on
+// mobile via Tailwind, fixed 280px from sm+ — see the card classNames below).
 const CARD_HEIGHT = 280;
 const BANNER_HEIGHT = 160;
 
@@ -42,10 +42,10 @@ const BANNER_HEIGHT = 160;
 const RecordingSkeleton = () => (
     <div className="flex flex-wrap gap-5">
         {[...Array(8)].map((_, i) => (
-            <div 
-                key={i} 
-                className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 animate-pulse flex flex-col"
-                style={{ width: CARD_WIDTH, height: CARD_HEIGHT, flexShrink: 0 }}
+            <div
+                key={i}
+                className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 animate-pulse flex flex-col w-full sm:w-[280px] sm:min-w-[280px] sm:max-w-[280px]"
+                style={{ height: CARD_HEIGHT, flexShrink: 0 }}
             >
                 <div className="bg-slate-100 rounded-lg w-full" style={{ height: BANNER_HEIGHT, flexShrink: 0 }} />
                 <div className="space-y-2 px-1 pt-3 flex-1">
@@ -191,12 +191,12 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
     // Inline player no longer used — recordings now open in a new tab.
 
     return (
-        <div className="p-6 bg-white min-h-full font-sans">
+        <div className="p-3 sm:p-6 bg-white min-h-full font-sans">
             {/* Unified White Section for Header + Content */}
-            <div className="bg-white p-6">
-                
+            <div className="bg-white p-4 sm:p-6">
+
                 {/* Header Section */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 sm:mb-8">
                     <div className="flex items-center gap-3">
                         {onBack && <StudentBackButton onClick={onBack} />}
                         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
@@ -235,13 +235,13 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
                                             "border border-slate-200",
                                             "cursor-pointer",
                                             "flex flex-col",
+                                            // Full width on mobile (so it can't overflow the screen),
+                                            // fixed 280px from sm+ to keep the zoom-stable desktop grid.
+                                            "w-full sm:w-[280px] sm:min-w-[280px] sm:max-w-[280px]",
                                             "hover:border-indigo-200 transition-colors duration-200"
                                         )}
                                         style={{
-                                            width: CARD_WIDTH,
                                             height: CARD_HEIGHT,
-                                            minWidth: CARD_WIDTH,
-                                            maxWidth: CARD_WIDTH,
                                             minHeight: CARD_HEIGHT,
                                             maxHeight: CARD_HEIGHT,
                                             flexShrink: 0,
@@ -293,7 +293,7 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
                                                 </div>
                                             </div>
                                             {/* Topic Title */}
-                                            <h2 className="text-base font-semibold text-slate-900 tracking-tight leading-snug line-clamp-2" style={{ flexShrink: 0 }}>
+                                            <h2 className="text-base font-semibold text-slate-900 tracking-tight leading-snug line-clamp-2 break-words" style={{ flexShrink: 0 }}>
                                                 {recording.topic}
                                             </h2>
                                         </div>
