@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
@@ -424,24 +424,40 @@ export const StaffInbox = () => {
             <div className="flex-1 overflow-y-auto px-3 py-4 md:px-6 space-y-2 bg-slate-50/40" ref={scrollRef}>
               {loadingMessages ? (
                 <div className="flex justify-center mt-10"><Loader2 className="h-6 w-6 animate-spin text-slate-300"/></div>
-              ) : messages?.map((msg) => {
+              ) : messages?.map((msg, i) => {
                 const isMe = msg.sender_id === profile?.user_id;
+                const msgDate = msg.created_at ? new Date(msg.created_at) : null;
+                const prevMsg = i > 0 ? messages[i - 1] : null;
+                const prevDate = prevMsg?.created_at ? new Date(prevMsg.created_at) : null;
+                const showDate = !!msgDate && (!prevDate || msgDate.toDateString() !== prevDate.toDateString());
+                const dateLabel = msgDate
+                  ? (isToday(msgDate) ? 'Today' : isYesterday(msgDate) ? 'Yesterday' : format(msgDate, 'MMMM d, yyyy'))
+                  : '';
                 return (
-                  <div key={msg.id} className={cn('flex', isMe ? 'justify-end' : 'justify-start')}>
-                    <div
-                      className={cn(
-                        'max-w-[82%] sm:max-w-[70%] px-3.5 py-2 text-sm shadow-sm',
-                        isMe
-                          ? 'bg-brand text-white rounded-2xl rounded-br-md'
-                          : 'bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-bl-md',
-                      )}
-                    >
-                      <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
-                      <p className={cn('mt-1 text-right text-[10px]', isMe ? 'text-white/70' : 'text-slate-400')}>
-                        {msg.created_at ? format(new Date(msg.created_at), 'h:mm a') : ''}
-                      </p>
+                  <Fragment key={msg.id}>
+                    {showDate && (
+                      <div className="flex justify-center py-2">
+                        <span className="rounded-full bg-slate-200/70 px-3 py-0.5 text-[11px] font-medium text-slate-500">
+                          {dateLabel}
+                        </span>
+                      </div>
+                    )}
+                    <div className={cn('flex', isMe ? 'justify-end' : 'justify-start')}>
+                      <div
+                        className={cn(
+                          'max-w-[82%] sm:max-w-[70%] px-3.5 py-2 text-sm shadow-sm',
+                          isMe
+                            ? 'bg-brand text-white rounded-2xl rounded-br-md'
+                            : 'bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-bl-md',
+                        )}
+                      >
+                        <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
+                        <p className={cn('mt-1 text-right text-[10px]', isMe ? 'text-white/70' : 'text-slate-400')}>
+                          {msgDate ? format(msgDate, 'h:mm a') : ''}
+                        </p>
+                      </div>
                     </div>
-                  </div>
+                  </Fragment>
                 );
               })}
             </div>
