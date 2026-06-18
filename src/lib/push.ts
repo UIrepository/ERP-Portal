@@ -21,6 +21,22 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 /**
+ * True when an existing subscription was created with the SAME VAPID key we use
+ * now. Used to auto-migrate devices that subscribed under a previous key (the
+ * server can't deliver to those — FCM returns a 403 VAPID mismatch). Returns
+ * true when the existing key can't be read, so we never needlessly churn
+ * subscriptions on browsers that don't expose it.
+ */
+function subscriptionKeyMatches(sub: PushSubscription, expected: Uint8Array): boolean {
+  const existing = sub.options?.applicationServerKey;
+  if (!existing) return true; // can't read it → assume fine, don't churn
+  const a = new Uint8Array(existing as ArrayBuffer);
+  if (a.length !== expected.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== expected[i]) return false;
+  return true;
+}
+
+/**
  * Ensure the browser is subscribed to push and the subscription is stored
  * against the user. Requests notification permission if not yet decided.
  * Returns true when a subscription is active and saved.
@@ -36,11 +52,25 @@ export async function subscribeToPush(userId?: string | null): Promise<boolean> 
 
   try {
     const reg = await navigator.serviceWorker.ready;
+    const appServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
     let sub = await reg.pushManager.getSubscription();
+
+    // Auto-migrate a subscription made with an older VAPID key: drop it (and its
+    // stale stored row) so a fresh one is created with the current key. Silent —
+    // permission is already granted, so no prompt appears.
+    if (sub && !subscriptionKeyMatches(sub, appServerKey)) {
+      const oldEndpoint = sub.endpoint;
+      try { await sub.unsubscribe(); } catch { /* ignore */ }
+      try {
+        await (supabase as unknown as { from: (t: string) => any }).from('push_subscriptions').delete().eq('endpoint', oldEndpoint);
+      } catch { /* ignore */ }
+      sub = null;
+    }
+
     if (!sub) {
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        applicationServerKey: appServerKey,
       });
     }
 
