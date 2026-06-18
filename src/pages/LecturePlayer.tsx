@@ -12,6 +12,7 @@ import { FullScreenVideoPlayer } from '@/components/video-player';
 import { Lecture, Doubt as PlayerDoubt } from '@/components/video-player/types';
 import { Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { saveProgress, getResumeSeconds } from '@/lib/videoProgress';
 
 interface RecordingRow {
   id: string;
@@ -159,6 +160,29 @@ const LecturePlayer = () => {
     [user, currentRecording, queryClient]
   );
 
+  // Persist watch progress on-device (localStorage) for the "Continue watching" strip.
+  const handleProgress = useCallback(
+    (seconds: number, duration: number) => {
+      if (!user || !currentRecording) return;
+      saveProgress(user.id, {
+        videoId: currentRecording.id,
+        title: currentRecording.topic,
+        subject: currentRecording.subject,
+        batch: currentRecording.batch,
+        videoUrl: currentRecording.embed_link,
+        seconds,
+        duration,
+      });
+    },
+    [user, currentRecording]
+  );
+
+  // Where to resume this lecture from (captured per lecture id).
+  const resumeAt = useMemo(
+    () => (user && currentId ? getResumeSeconds(user.id, currentId) : 0),
+    [user, currentId]
+  );
+
   const handleClose = useCallback(() => {
     // Try to close the tab; if blocked, navigate home
     window.close();
@@ -190,6 +214,8 @@ const LecturePlayer = () => {
       onDoubtSubmit={handleDoubtSubmit}
       onClose={handleClose}
       userName={profile?.name || user.email}
+      onProgress={handleProgress}
+      resumeAt={resumeAt}
     />
   );
 };

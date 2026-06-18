@@ -28,6 +28,8 @@ export const FullScreenVideoPlayer = ({
   onDoubtSubmit,
   onClose,
   userName,
+  onProgress,
+  resumeAt,
 }: VideoPlayerProps) => {
   // Sidebar state
   const [activeSidebar, setActiveSidebar] = useState<SidebarTab>(null);
@@ -68,6 +70,43 @@ export const FullScreenVideoPlayer = ({
 
   // Parse video URL
   const videoSource = parseVideoUrl(currentLecture.videoUrl);
+
+  // --- Watch-progress tracking (throttled emit + resume) ---
+  const lastEmitRef = useRef(0);
+  const resumedLectureRef = useRef<string | null>(null);
+  const progressRef = useRef({ t: 0, d: 0 });
+  const onProgressRef = useRef(onProgress);
+  useEffect(() => { onProgressRef.current = onProgress; }, [onProgress]);
+  useEffect(() => { progressRef.current = { t: currentTime, d: duration }; }, [currentTime, duration]);
+
+  // New lecture → allow one resume.
+  useEffect(() => { resumedLectureRef.current = null; }, [currentLecture.id]);
+
+  // Resume to the saved position once the duration is known for this lecture
+  // (and we're not basically at the end).
+  useEffect(() => {
+    if (!resumeAt || resumeAt < 5 || duration <= 0) return;
+    if (resumedLectureRef.current === currentLecture.id) return;
+    if (resumeAt < duration - 5) seek(resumeAt);
+    resumedLectureRef.current = currentLecture.id;
+  }, [resumeAt, duration, currentLecture.id, seek]);
+
+  // Throttled progress emit (~every 10s of real time).
+  useEffect(() => {
+    if (currentTime > 0 && duration > 0) {
+      const now = Date.now();
+      if (now - lastEmitRef.current > 10000) {
+        lastEmitRef.current = now;
+        onProgressRef.current?.(currentTime, duration);
+      }
+    }
+  }, [currentTime, duration]);
+
+  // Final emit on unmount so the last position isn't lost.
+  useEffect(() => () => {
+    const { t, d } = progressRef.current;
+    if (t > 0 && d > 0) onProgressRef.current?.(t, d);
+  }, []);
 
   // Compute vignette visibility - show during first 1 sec and last 1 sec
   const shouldShowVignette = showVignette || (duration > 0 && currentTime > 0 && (duration - currentTime) <= 1);

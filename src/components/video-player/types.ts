@@ -37,6 +37,11 @@ export interface VideoPlayerProps {
   onClose?: () => void;
   /** User name for doubt submissions */
   userName?: string;
+  /** Called ~every 10s while playing and once on close, with the latest
+   *  position. Used to persist watch progress (e.g. to localStorage). */
+  onProgress?: (currentTime: number, duration: number) => void;
+  /** Resume the current lecture from this position in seconds (0 = start). */
+  resumeAt?: number;
 }
 
 export interface VideoControlsProps {

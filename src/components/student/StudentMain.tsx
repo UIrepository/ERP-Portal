@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { StudentSubjectCard } from './StudentSubjectCard';
 import { StudentSubjectBlocks } from './StudentSubjectBlocks';
 import { StudentBlockContent } from './StudentBlockContent';
+import { ContinueWatchingStrip } from './ContinueWatchingStrip';
 import { StudentAnnouncements } from './StudentAnnouncements';
 import { StudentConnect } from './StudentConnect';
 import { StudentLiveClass } from './StudentLiveClass';
@@ -257,6 +258,9 @@ const StudentMainContent = () => {
       case 'classes':
         return (
           <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-300">
+            {/* Continue watching — on-device, batch-specific; hidden when empty */}
+            <ContinueWatchingStrip userId={user?.id} batch={navigation.batch} />
+
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-[#1e293b] mb-0.5">Subjects</h2>
               <p className="text-[13px] text-[#64748b]">Select your subjects & start learning</p>
