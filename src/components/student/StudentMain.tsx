@@ -258,9 +258,6 @@ const StudentMainContent = () => {
       case 'classes':
         return (
           <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-300">
-            {/* Continue watching — on-device, batch-specific; hidden when empty */}
-            <ContinueWatchingStrip userId={user?.id} batch={navigation.batch} />
-
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-[#1e293b] mb-0.5">Subjects</h2>
               <p className="text-[13px] text-[#64748b]">Select your subjects & start learning</p>
@@ -473,6 +470,10 @@ const StudentMainContent = () => {
           </button>
         </div>
       </header>
+
+      {/* CONTINUE WATCHING — its own section between the header and the content
+          card. On-device (localStorage), batch-specific, hidden when empty. */}
+      <ContinueWatchingStrip userId={user?.id} batch={navigation.batch} />
 
       {/* CONTENT SECTION */}
       <div className="w-full bg-white rounded-t-none rounded-b-lg shadow-sm border border-slate-100 p-6 md:p-8 h-auto min-h-[400px]">

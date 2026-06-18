@@ -22,7 +22,7 @@ export const ContinueWatchingStrip = ({ userId, batch }: ContinueWatchingStripPr
   if (items.length === 0) return null;
 
   return (
-    <section className="mb-8">
+    <section>
       <div className="mb-3">
         <h2 className="text-lg font-semibold text-[#1e293b]">Continue watching</h2>
         <p className="text-[13px] text-[#64748b]">Pick up where you left off</p>
