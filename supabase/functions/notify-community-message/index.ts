@@ -31,16 +31,21 @@ Deno.serve(async (req) => {
       ? (String(content).length > 80 ? `${String(content).slice(0, 80)}…` : String(content))
       : 'Sent an attachment';
 
+    // WhatsApp group style: the subject is the "group" title, each line is
+    // "Sender: message". The service worker stacks unseen lines into one
+    // notification (data.stack) and threads them by the community tag.
+    const sender = sender_name || 'New message';
     const result = await sendPushToBatchSubject(
       supabase,
       batch,
       subject,
       {
-        title: `${sender_name || 'New message'} · ${subject}`,
-        body: preview,
+        title: subject,
+        body: `${sender}: ${preview}`,
         url: `/portal/student/community?batch=${encodeURIComponent(batch)}&subject=${encodeURIComponent(subject)}`,
-        // Thread by community: repeated messages update one notification.
+        // Thread by community: repeated messages compile into one notification.
         tag: `community-${batch}-${subject}`,
+        stack: true,
       },
       sender_id || undefined,
     );

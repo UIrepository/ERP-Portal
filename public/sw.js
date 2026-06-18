@@ -1,6 +1,6 @@
 // Minimal service worker — enables PWA installability, push notifications,
 // and a tiny offline app-shell cache.
-const CACHE = 'ui-portal-v3';
+const CACHE = 'ui-portal-v4';
 const APP_SHELL = ['/', '/icon-192.png', '/icon-512.png', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
@@ -55,16 +55,51 @@ self.addEventListener('push', (event) => {
   } catch (e) {
     data = { title: 'Unknown IITians', body: event.data ? event.data.text() : '' };
   }
-  const title = data.title || 'Unknown IITians';
-  const options = {
-    body: data.body || '',
-    icon: data.icon || '/icon-192.png',
-    badge: '/icon-192.png',
-    tag: data.tag,
-    renotify: !!data.tag,
-    data: { url: data.url || '/' },
-  };
-  event.waitUntil(self.registration.showNotification(title, options));
+
+  const baseTitle = data.title || 'Unknown IITians';
+  const tag = data.tag;
+  const newLine = data.body || '';
+
+  event.waitUntil((async () => {
+    let lines = newLine ? [newLine] : [];
+    let count = 1;
+
+    // WhatsApp-style threading: when a chat push (data.stack) arrives for a
+    // thread that still has an unseen notification, COMPILE the messages into
+    // one notification instead of replacing it with only the latest line.
+    // Once the user opens/taps it the notification is cleared, so the next
+    // message starts a fresh stack.
+    if (data.stack && tag) {
+      try {
+        const existing = await self.registration.getNotifications({ tag });
+        if (existing.length > 0) {
+          const prev = existing[0].data || {};
+          const prevLines = Array.isArray(prev.lines)
+            ? prev.lines
+            : (existing[0].body ? existing[0].body.split('\n') : []);
+          const prevCount = typeof prev.count === 'number' ? prev.count : prevLines.length;
+          lines = prevLines.concat(newLine).filter(Boolean).slice(-10);
+          count = prevCount + 1;
+        }
+      } catch (e) { /* getNotifications unsupported — fall back to single line */ }
+    }
+
+    // Show the most recent 6 lines; note how many older ones are folded away.
+    const shown = lines.slice(-6);
+    const hidden = count - shown.length;
+    const body = (hidden > 0 ? `+${hidden} earlier\n` : '') + shown.join('\n');
+    const title = (data.stack && count > 1) ? `${baseTitle} (${count} new)` : baseTitle;
+
+    const options = {
+      body: body,
+      icon: data.icon || '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: tag,
+      renotify: !!tag,
+      data: { url: data.url || '/', lines: lines, count: count },
+    };
+    await self.registration.showNotification(title, options);
+  })());
 });
 
 self.addEventListener('notificationclick', (event) => {

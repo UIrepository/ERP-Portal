@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { uploadImageToCloudinary } from '@/lib/cloudinary';
+import { clearCommunityNotifications } from '@/lib/push';
 import { useAuth } from '@/hooks/useAuth';
 import { useMergedSubjects } from '@/hooks/useMergedSubjects';
 import { Button } from '@/components/ui/button';
@@ -507,6 +508,8 @@ export const TeacherCommunity = () => {
     setMessageText('');
     setSelectedImage(null);
     setReplyingTo(null);
+    // Opening a community clears its stacked push (WhatsApp "seen" behaviour).
+    clearCommunityNotifications(selectedGroup?.batch_name, selectedGroup?.subject_name);
   }, [selectedGroup]);
 
   // Merged batch/subject pairs: read across all of them, write to the canonical primary

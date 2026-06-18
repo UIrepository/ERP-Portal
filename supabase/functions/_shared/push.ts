@@ -25,6 +25,9 @@ export interface PushPayload {
   url?: string;
   tag?: string;
   icon?: string;
+  // When true, the service worker compiles repeated pushes sharing this tag
+  // into one WhatsApp-style threaded notification instead of replacing it.
+  stack?: boolean;
 }
 
 interface SubRow {

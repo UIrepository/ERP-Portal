@@ -120,6 +120,25 @@ export async function unsubscribeFromPush(): Promise<boolean> {
   }
 }
 
+/**
+ * Dismiss any stacked push notification for a community once the user opens it
+ * (WhatsApp's "seen → cleared" behaviour). The next message then starts a fresh
+ * stack instead of piling onto a thread the user has already read.
+ */
+export async function clearCommunityNotifications(
+  batch?: string | null,
+  subject?: string | null,
+): Promise<void> {
+  if (!batch || !subject) return;
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const tag = `community-${batch}-${subject}`;
+    const notes = await reg.getNotifications({ tag });
+    notes.forEach((n) => n.close());
+  } catch { /* getNotifications unsupported — ignore */ }
+}
+
 /** True when this browser currently has an active push subscription. */
 export async function isPushSubscribed(): Promise<boolean> {
   if (!pushSupported() || Notification.permission !== 'granted') return false;

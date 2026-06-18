@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { uploadImageToCloudinary } from '@/lib/cloudinary';
+import { clearCommunityNotifications } from '@/lib/push';
 import { useAuth } from '@/hooks/useAuth';
 import { useMergedSubjects } from '@/hooks/useMergedSubjects';
 import { useSearchParams, useNavigate } from 'react-router-dom'; // 🟢 Added useSearchParams
@@ -449,6 +450,9 @@ export const StudentCommunity = () => {
     setMessageText('');
     setSelectedImage(null);
     setReplyingTo(null);
+    // Opening a community counts as "seen" — clear its stacked push so the
+    // next message starts a fresh WhatsApp-style notification thread.
+    clearCommunityNotifications(selectedGroup?.batch_name, selectedGroup?.subject_name);
   }, [selectedGroup]);
 
   // Merged batch/subject pairs: read messages across all of them, write to the canonical primary
