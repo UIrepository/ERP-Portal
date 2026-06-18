@@ -13,8 +13,7 @@ import { Lecture, Doubt as PlayerDoubt } from '@/components/video-player/types';
 import { Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { saveProgress, getResumeSeconds } from '@/lib/videoProgress';
-import { useDriveSync } from '@/hooks/useDriveSync';
-import { isDriveConnected, hasValidToken, pushToDrive, syncWithDrive } from '@/lib/driveProgressSync';
+import { pushProgressRow, pullOneProgress } from '@/lib/videoProgressSync';
 
 interface RecordingRow {
   id: string;
@@ -37,34 +36,11 @@ const LecturePlayer = () => {
     setCurrentId(recordingId);
   }, [recordingId]);
 
-  // --- Drive cross-device sync (opt-in via on-leave dialog) ---
-  const watchedRef = useRef(false);
-  const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const closingAfterConnectRef = useRef(false);
-  const [saveDialog, setSaveDialog] = useState<null | 'ask' | 'connecting'>(null);
-
-  const { connect } = useDriveSync({
-    userId: user?.id,
-    onDone: (ok) => {
-      setSaveDialog(null);
-      if (ok) toast({ title: 'Synced', description: 'Your progress will now follow you across devices.' });
-      if (closingAfterConnectRef.current) {
-        closingAfterConnectRef.current = false;
-        finishClose();
-      }
-    },
-  });
-
-  // Same-session pull (e.g. another tab updated Drive). No popup — only runs if a
-  // valid token is already in memory.
-  useEffect(() => {
-    if (user && isDriveConnected() && hasValidToken()) {
-      syncWithDrive(user.id).catch(() => { /* keep local */ });
-    }
-  }, [user?.id]);
-
-  // Clean up the debounced push timer.
-  useEffect(() => () => { if (pushTimerRef.current) clearTimeout(pushTimerRef.current); }, []);
+  // --- Cross-device progress sync (tiny video_progress table, light usage) ---
+  const lastSecondsRef = useRef(0);
+  const lastDurationRef = useRef(0);
+  const lastDbPushRef = useRef(0); // throttle DB writes to ~once/90s while watching
+  const [progressVersion, setProgressVersion] = useState(0);
 
   // Load the recording row to discover batch/subject
   const { data: currentRecording, isLoading: loadingCurrent } = useQuery<RecordingRow | null>({
@@ -191,7 +167,8 @@ const LecturePlayer = () => {
     [user, currentRecording, queryClient]
   );
 
-  // Persist watch progress on-device (localStorage) for the "Continue watching" strip.
+  // Persist watch progress: localStorage immediately (source of truth), plus a
+  // throttled cross-device DB write (~once every 90s while watching).
   const handleProgress = useCallback(
     (seconds: number, duration: number) => {
       if (!user || !currentRecording) return;
@@ -204,52 +181,44 @@ const LecturePlayer = () => {
         seconds,
         duration,
       });
-      watchedRef.current = true;
-      // If Drive is connected and we have a live token, debounce a push.
-      if (isDriveConnected() && hasValidToken()) {
-        if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
-        pushTimerRef.current = setTimeout(() => { if (user) pushToDrive(user.id); }, 20000);
+      lastSecondsRef.current = seconds;
+      lastDurationRef.current = duration;
+      const now = Date.now();
+      if (now - lastDbPushRef.current > 90000) {
+        lastDbPushRef.current = now;
+        pushProgressRow(user.id, currentRecording.id, seconds, duration);
       }
     },
     [user, currentRecording]
   );
 
-  // Where to resume this lecture from (captured per lecture id).
+  // Pull this lecture's saved position from the DB once it loads, so it resumes
+  // even on a device that hasn't opened the dashboard yet.
+  useEffect(() => {
+    if (!user || !currentRecording) return;
+    pullOneProgress(user.id, currentRecording.id, {
+      topic: currentRecording.topic,
+      subject: currentRecording.subject,
+      batch: currentRecording.batch,
+      embed_link: currentRecording.embed_link,
+    }).then((merged) => { if (merged) setProgressVersion((v) => v + 1); });
+  }, [user, currentRecording]);
+
+  // Where to resume this lecture from (re-reads after a cross-device pull).
   const resumeAt = useMemo(
     () => (user && currentId ? getResumeSeconds(user.id, currentId) : 0),
-    [user, currentId]
+    [user, currentId, progressVersion]
   );
 
-  const finishClose = useCallback(() => {
-    if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
-    if (user && isDriveConnected() && hasValidToken()) pushToDrive(user.id);
+  const handleClose = useCallback(() => {
+    // Final cross-device push of the latest position before leaving.
+    if (user && currentRecording && lastDurationRef.current > 0) {
+      pushProgressRow(user.id, currentRecording.id, lastSecondsRef.current, lastDurationRef.current);
+    }
     // Try to close the tab; if blocked, navigate home
     window.close();
     setTimeout(() => navigate('/'), 100);
-  }, [user, navigate]);
-
-  const handleClose = useCallback(() => {
-    const dismissed = sessionStorage.getItem('ui_video_save_dismissed') === '1';
-    // First time on this device + actually watched + not connected → offer to
-    // save progress across devices before leaving.
-    if (watchedRef.current && !isDriveConnected() && !dismissed) {
-      setSaveDialog('ask');
-      return;
-    }
-    finishClose();
-  }, [finishClose]);
-
-  const handleGivePermission = useCallback(() => {
-    closingAfterConnectRef.current = true;
-    setSaveDialog('connecting');
-    connect();
-  }, [connect]);
-
-  const handleNotNow = useCallback(() => {
-    try { sessionStorage.setItem('ui_video_save_dismissed', '1'); } catch { /* ignore */ }
-    setSaveDialog(null);
-    finishClose();
-  }, [finishClose]);
+  }, [user, currentRecording, navigate]);
 
   if (authLoading || loadingCurrent || !playerLecture) {
     return (
@@ -268,54 +237,17 @@ const LecturePlayer = () => {
   }
 
   return (
-    <>
-      <FullScreenVideoPlayer
-        currentLecture={playerLecture}
-        lectures={allLectures}
-        doubts={playerDoubts}
-        onLectureChange={handleLectureChange}
-        onDoubtSubmit={handleDoubtSubmit}
-        onClose={handleClose}
-        userName={profile?.name || user.email}
-        onProgress={handleProgress}
-        resumeAt={resumeAt}
-      />
-
-      {saveDialog && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6 text-white shadow-2xl">
-            <h3 className="text-lg font-semibold">Save your progress?</h3>
-            <p className="mt-2 text-sm leading-relaxed text-white/70">
-              Connect Google Drive to pick up where you left off on any device.
-              We only keep a tiny progress file in your own Drive — nothing else,
-              and you can disconnect anytime.
-            </p>
-            {saveDialog === 'connecting' ? (
-              <div className="mt-6 flex items-center justify-center gap-3 text-white/80">
-                <Loader2 className="h-5 w-5 animate-spin" /> Connecting…
-              </div>
-            ) : (
-              <div className="mt-6 flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={handleNotNow}
-                  className="rounded-lg px-4 py-2 text-sm text-white/70 hover:bg-white/10 hover:text-white transition-colors"
-                >
-                  Not now
-                </button>
-                <button
-                  type="button"
-                  onClick={handleGivePermission}
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors"
-                >
-                  Give permission
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </>
+    <FullScreenVideoPlayer
+      currentLecture={playerLecture}
+      lectures={allLectures}
+      doubts={playerDoubts}
+      onLectureChange={handleLectureChange}
+      onDoubtSubmit={handleDoubtSubmit}
+      onClose={handleClose}
+      userName={profile?.name || user.email}
+      onProgress={handleProgress}
+      resumeAt={resumeAt}
+    />
   );
 };
 

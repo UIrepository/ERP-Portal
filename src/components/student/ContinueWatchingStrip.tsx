@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Play } from 'lucide-react';
 import { listForBatch } from '@/lib/videoProgress';
+import { pullProgress } from '@/lib/videoProgressSync';
 import { parseVideoUrl } from '@/components/video-player/useVideoPlayer';
 
 interface ContinueWatchingStripProps {
@@ -16,8 +17,16 @@ interface ContinueWatchingStripProps {
  */
 export const ContinueWatchingStrip = ({ userId, batch }: ContinueWatchingStripProps) => {
   const navigate = useNavigate();
-  // Re-read on each render; cheap and keeps it fresh when returning to the page.
-  const items = useMemo(() => listForBatch(userId, batch), [userId, batch]);
+  const [version, setVersion] = useState(0);
+
+  // One cheap cross-device pull when the dashboard mounts (merges the DB rows
+  // into localStorage), then re-read.
+  useEffect(() => {
+    if (!userId) return;
+    pullProgress(userId).then((merged) => { if (merged) setVersion((v) => v + 1); });
+  }, [userId]);
+
+  const items = useMemo(() => listForBatch(userId, batch), [userId, batch, version]);
 
   if (items.length === 0) return null;
 
