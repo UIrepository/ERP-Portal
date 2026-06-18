@@ -84,9 +84,9 @@ const getFileMetadata = (url: string) => {
 };
 
 const DPPSkeleton = () => (
-  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+  <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3">
     {[...Array(6)].map((_, i) => (
-      <div key={i} className="bg-white p-6 rounded-lg border border-slate-100 space-y-4 h-[180px] flex flex-col justify-between">
+      <div key={i} className="bg-white p-4 sm:p-6 rounded-lg border border-slate-100 space-y-4 h-[160px] sm:h-[180px] flex flex-col justify-between">
         <Skeleton className="h-6 w-3/4 rounded-md" />
         <div className="flex justify-between items-end">
            <div className="flex gap-3 items-center">
@@ -177,11 +177,11 @@ export const StudentDPP = ({ batch, subject, onBack }: StudentDPPProps) => {
   // Removed iframe viewer - files open directly in new tab on click
 
   return (
-    <div className="p-6 space-y-6 bg-[#fcfcfd] min-h-full font-sans">
+    <div className="p-3 sm:p-6 space-y-6 bg-[#fcfcfd] min-h-full font-sans">
       {/* Main Section Holding Container */}
-      <div className="bg-white p-6 md:p-8">
+      <div className="bg-white p-4 sm:p-6 md:p-8 rounded-lg">
           {/* Header Section */}
-          <div className="mb-8 border-b border-slate-100 pb-6">
+          <div className="mb-6 sm:mb-8 border-b border-slate-100 pb-5 sm:pb-6">
             <div className="flex items-center gap-3">
               {onBack && <StudentBackButton onClick={onBack} />}
               <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
@@ -196,25 +196,25 @@ export const StudentDPP = ({ batch, subject, onBack }: StudentDPPProps) => {
             {isLoading ? (
               <DPPSkeleton />
             ) : dpps && dpps.length > 0 ? (
-              <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3">
                 {dpps.map((dpp) => {
                   const meta = getFileMetadata(dpp.link);
-                  
+
                   return (
-                    <div 
-                      key={dpp.id} 
+                    <div
+                      key={dpp.id}
                       onClick={(e) => handleDownload(e, dpp)}
                       className="
-                        group relative bg-white 
-                        border border-slate-200 
+                        group relative bg-white min-w-0 w-full
+                        border border-slate-200
                         rounded-lg
-                        p-6 flex flex-col justify-between gap-6
+                        p-4 sm:p-6 flex flex-col justify-between gap-4 sm:gap-6
                         hover:bg-slate-50 transition-all duration-300 cursor-pointer
                       "
                     >
                       {/* Title Section (Semi Bold) */}
-                      <div>
-                        <h3 className="font-semibold text-slate-900 text-lg leading-snug line-clamp-2">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-slate-900 text-base sm:text-lg leading-snug line-clamp-2 break-words">
                           {dpp.title}
                         </h3>
                       </div>

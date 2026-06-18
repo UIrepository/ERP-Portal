@@ -27,9 +27,9 @@ interface StudentUIKiPadhaiProps {
 }
 
 const PremiumContentSkeleton = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
         {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-white p-5 rounded-lg border border-slate-200 shadow-sm h-[140px] flex flex-col justify-between">
+            <div key={i} className="bg-white p-4 sm:p-5 rounded-lg border border-slate-200 shadow-sm h-[140px] flex flex-col justify-between">
                 <div className="flex justify-between gap-4">
                     <div className="space-y-3 w-full">
                          <Skeleton className="h-4 w-16 rounded-sm" />
@@ -74,12 +74,12 @@ export const StudentUIKiPadhai = ({ batch, subject, onBack }: StudentUIKiPadhaiP
 
 
   return (
-    <div className="p-6 md:p-8 bg-[#fcfcfd] min-h-full font-sans">
+    <div className="p-3 sm:p-6 md:p-8 bg-[#fcfcfd] min-h-full font-sans">
       {/* Main Section Holding Container */}
-      <div className="bg-white p-6 md:p-8">
-        
+      <div className="bg-white p-4 sm:p-6 md:p-8 rounded-lg">
+
         {/* Section Header */}
-        <header className="flex flex-col md:flex-row justify-between items-end mb-8 border-b border-slate-100 pb-6">
+        <header className="flex flex-col md:flex-row justify-between items-end mb-6 sm:mb-8 border-b border-slate-100 pb-5 sm:pb-6">
             <div className="mb-2 md:mb-0">
                 <div className="flex items-center gap-3">
                     {onBack && <StudentBackButton onClick={onBack} />}
@@ -94,7 +94,7 @@ export const StudentUIKiPadhai = ({ batch, subject, onBack }: StudentUIKiPadhaiP
         </header>
 
         {/* Content Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {isLoading ? (
             <PremiumContentSkeleton />
           ) : premiumContent && premiumContent.length > 0 ? (
@@ -103,10 +103,10 @@ export const StudentUIKiPadhai = ({ batch, subject, onBack }: StudentUIKiPadhaiP
                     key={content.id} 
                     onClick={() => handleAccessContent(content)}
                     className="
-                        group relative bg-white 
-                        border border-slate-200 
-                        rounded-lg 
-                        p-5 
+                        group relative bg-white min-w-0 w-full
+                        border border-slate-200
+                        rounded-lg
+                        p-4 sm:p-5
                         transition-colors duration-200
                         hover:border-black /* Grey default, Black on hover */
                         cursor-pointer overflow-hidden
@@ -122,7 +122,7 @@ export const StudentUIKiPadhai = ({ batch, subject, onBack }: StudentUIKiPadhaiP
 
                     {/* Title and Action Button Row */}
                     <div className="flex justify-between items-start gap-4">
-                        <h2 className="font-normal text-base text-gray-900 leading-snug tracking-normal line-clamp-3">
+                        <h2 className="font-normal text-base text-gray-900 leading-snug tracking-normal line-clamp-3 min-w-0 break-words">
                             {content.title}
                         </h2>
 
