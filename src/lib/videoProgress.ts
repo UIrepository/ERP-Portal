@@ -15,7 +15,7 @@ export interface VideoProgressEntry {
   updatedAt: number;  // epoch ms
 }
 
-type ProgressMap = Record<string, VideoProgressEntry>;
+export type ProgressMap = Record<string, VideoProgressEntry>;
 
 const keyFor = (userId: string) => `ui_video_progress_${userId}`;
 
@@ -89,4 +89,28 @@ export function removeProgress(userId: string | null | undefined, videoId: strin
     delete map[videoId];
     writeMap(userId, map);
   }
+}
+
+/** The full local progress map (used by the optional Drive cross-device sync). */
+export function getAllProgress(userId: string | null | undefined): ProgressMap {
+  if (!userId) return {};
+  return readMap(userId);
+}
+
+/**
+ * Merge a remote map (e.g. from Google Drive) into local storage: per video,
+ * keep whichever entry has the newer updatedAt. Writes the merged result and
+ * returns it. Used for cross-device sync.
+ */
+export function mergeProgress(userId: string | null | undefined, incoming: ProgressMap | null): ProgressMap {
+  if (!userId) return {};
+  const local = readMap(userId);
+  const merged: ProgressMap = { ...local };
+  for (const [id, remote] of Object.entries(incoming || {})) {
+    if (!remote || !remote.videoId) continue;
+    const cur = merged[id];
+    if (!cur || (remote.updatedAt ?? 0) > cur.updatedAt) merged[id] = remote;
+  }
+  writeMap(userId, merged);
+  return merged;
 }
