@@ -6,7 +6,11 @@ import { toast } from 'sonner';
 export const useYoutubeStream = () => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isStartingStream, setIsStartingStream] = useState(false);
-  
+  // True when the recorder dropped mid-class (e.g. meet.jit.si's ~1h Jibri
+  // limit) but the broadcast was NOT intentionally ended. The SAME broadcast is
+  // kept live so re-issuing the SAME stream key resumes the SAME recording.
+  const [streamDropped, setStreamDropped] = useState(false);
+
   // Store the Broadcast ID so we can stop it later
   const broadcastIdRef = useRef<string | null>(null);
 
@@ -14,9 +18,9 @@ export const useYoutubeStream = () => {
    * Creates a YouTube Broadcast via Edge Function and saves the link to the database.
    */
   const startStream = async (
-    batch: string, 
-    subject: string, 
-    primaryBatch?: string, 
+    batch: string,
+    subject: string,
+    primaryBatch?: string,
     primarySubject?: string,
     allMergedPairs?: Array<{ batch: string; subject: string }>
   ) => {
@@ -40,7 +44,7 @@ export const useYoutubeStream = () => {
       }
 
       console.log("Stream created:", streamData.videoUrl);
-      
+
       // SAVE THE ID FOR STOPPING LATER
       broadcastIdRef.current = streamData.videoId;
 
@@ -66,8 +70,9 @@ export const useYoutubeStream = () => {
         toast.success("Live Stream Started! Link saved to Recordings.");
       }
 
+      setStreamDropped(false);
       setIsStreaming(true);
-      
+
       return {
         streamKey: streamData.streamKey as string,
         broadcastId: streamData.videoId as string
@@ -83,9 +88,13 @@ export const useYoutubeStream = () => {
   };
 
   /**
-   * Stops the YouTube Broadcast via Edge Function.
+   * Stops the YouTube Broadcast via Edge Function. Only called on an EXPLICIT
+   * end-of-class — never on a mere drop, because completing the broadcast makes
+   * resuming with the same key impossible.
    */
   const stopStream = async () => {
+    setStreamDropped(false);
+
     if (!broadcastIdRef.current) {
         console.warn("No active broadcast ID to stop.");
         // If we don't have an ID, just reset the UI
@@ -115,8 +124,10 @@ export const useYoutubeStream = () => {
 
   return {
     startStream,
-    stopStream, // <--- Exported now
+    stopStream,
     isStreaming,
-    isStartingStream
+    isStartingStream,
+    streamDropped,
+    setStreamDropped,
   };
 };

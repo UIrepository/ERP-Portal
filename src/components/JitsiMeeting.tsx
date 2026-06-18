@@ -122,9 +122,10 @@ export const JitsiMeeting = ({
   const [loadingMessage, setLoadingMessage] = useState('Initializing Player...');
   const [showFallbackPrompt, setShowFallbackPrompt] = useState(false);
   const [lastStreamKey, setLastStreamKey] = useState<string | null>(null);
+  const [lastBroadcastId, setLastBroadcastId] = useState<string | null>(null);
 
   // Hook for YouTube logic
-  const { startStream, stopStream, isStreaming, isStartingStream } = useYoutubeStream();
+  const { startStream, stopStream, isStreaming, isStartingStream, streamDropped, setStreamDropped } = useYoutubeStream();
 
   // Auth & Logic Refs
   const { profile, resolvedRole } = useAuth();
@@ -138,6 +139,16 @@ export const JitsiMeeting = ({
   
   // Ref for the 10-minute safety timer
   const autoStopTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Track an intentional stop so the recorder's "off" event isn't mistaken for
+  // a 1-hour-limit drop; mirror isStreaming into a ref for the Jitsi listeners
+  // (which are registered once and would otherwise capture a stale value).
+  const isStoppingRef = useRef(false);
+  const isStreamingRef = useRef(false);
+  const streamDroppedRef = useRef(false);
+  // Resume retry: a dropped stream often can't reconnect for the first ~30-60s
+  // (YouTube key still "active" / no free Jibri), so we re-issue periodically.
+  const resumeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const resumeTriesRef = useRef(0);
 
   const propsRef = useRef({ displayName, userEmail, subject, batch, scheduleId, onClose, resolvedRole, profile, userRole });
   const isHost = userRole === 'teacher' || userRole === 'admin' || userRole === 'manager';
@@ -148,6 +159,9 @@ export const JitsiMeeting = ({
         try { apiRef.current.executeCommand('displayName', displayName); } catch (e) { console.warn('[Jitsi] Failed to update display name', e); }
     }
   }, [displayName, userEmail, subject, batch, scheduleId, onClose, resolvedRole, profile, userRole]);
+
+  useEffect(() => { isStreamingRef.current = isStreaming; }, [isStreaming]);
+  useEffect(() => { streamDroppedRef.current = streamDropped; }, [streamDropped]);
 
   useEffect(() => {
     const originalUrl = window.location.href;
@@ -224,15 +238,16 @@ export const JitsiMeeting = ({
 
     if (streamDetails && apiRef.current) {
          setLastStreamKey(streamDetails.streamKey);
+         setLastBroadcastId(streamDetails.broadcastId);
          try {
             console.log("Starting Jitsi stream with key:", streamDetails.streamKey);
             apiRef.current.executeCommand('startRecording', {
                 mode: 'stream',
                 rtmpStreamKey: streamDetails.streamKey,
-                youtubeStreamKey: streamDetails.streamKey, 
+                youtubeStreamKey: streamDetails.streamKey,
                 rtmpBroadcastID: streamDetails.broadcastId
             });
-            
+
             toast.success("Command sent. Waiting for YouTube...");
 
             setTimeout(() => {
@@ -256,9 +271,62 @@ export const JitsiMeeting = ({
     }
   };
 
+  const clearResumeRetry = () => {
+      if (resumeTimerRef.current) { clearTimeout(resumeTimerRef.current); resumeTimerRef.current = null; }
+      resumeTriesRef.current = 0;
+  };
+
   const handleStopStream = async () => {
-      // Manual stop by user (Red Button)
+      // Explicit end-of-class by the host (red button). Flag it so the
+      // recorder's "off" event isn't treated as a 1-hour-limit drop, and stop
+      // any pending resume retries.
+      isStoppingRef.current = true;
+      clearResumeRetry();
       await stopStream();
+      // Safety: clear the flag in case the "off" event never arrives.
+      setTimeout(() => { isStoppingRef.current = false; }, 15000);
+  };
+
+  // Resume the SAME broadcast/recording by re-issuing the Jitsi stream command
+  // with the SAME stream key. Reusing the key only works while the broadcast is
+  // still live (we never auto-complete on a drop). YouTube often refuses the
+  // first reconnect for ~30-60s and meet.jit.si may need a free Jibri, so we
+  // retry a few times automatically.
+  const issueResumeCommand = () => {
+      if (!apiRef.current || !lastStreamKey) return;
+      try {
+          apiRef.current.executeCommand('startRecording', {
+              mode: 'stream',
+              rtmpStreamKey: lastStreamKey,
+              youtubeStreamKey: lastStreamKey,
+              rtmpBroadcastID: lastBroadcastId || undefined,
+          });
+      } catch (e) {
+          console.error("Jitsi Command Error (resume):", e);
+      }
+  };
+
+  const scheduleResumeRetry = () => {
+      resumeTimerRef.current = setTimeout(() => {
+          // Still dropped and still under the retry cap → try again.
+          if (isStreamingRef.current && streamDroppedRef.current && resumeTriesRef.current < 4) {
+              resumeTriesRef.current += 1;
+              toast.loading(`Reconnecting the stream… (attempt ${resumeTriesRef.current + 1})`, { id: "resuming" });
+              issueResumeCommand();
+              scheduleResumeRetry();
+          } else if (streamDroppedRef.current) {
+              toast.error("Couldn't reconnect automatically. Tap Resume to try again, or it may be a meet.jit.si capacity limit.", { id: "resuming", duration: 12000 });
+          }
+      }, 22000);
+  };
+
+  const handleResume = () => {
+      if (!isHost) { toast.error("Only teachers can start the live stream."); return; }
+      if (!lastStreamKey) { toast.error("No stream to resume. Start a new one with Go Live."); return; }
+      clearResumeRetry();
+      toast.loading("Reconnecting the stream… (same recording)", { id: "resuming" });
+      issueResumeCommand();
+      scheduleResumeRetry();
   };
 
   // --- Core Player Logic: Embeds Jitsi ---
@@ -394,37 +462,28 @@ export const JitsiMeeting = ({
           isInitializingRef.current = false;
           recordAttendance();
 
-          // RECONNECTION SUCCESS: Cancel the auto-stop timer
-          if (autoStopTimerRef.current) {
-              console.log("Reconnected! Auto-stop timer cancelled.");
-              clearTimeout(autoStopTimerRef.current);
-              autoStopTimerRef.current = null;
-              toast.dismiss("autostop-warning");
-              toast.success("Reconnected. Recording continues.");
+          // Reconnected after a mid-stream drop — prompt to resume the SAME
+          // recording (the YouTube broadcast was kept live, so the same key
+          // continues the same video).
+          if (streamDroppedRef.current && isStreamingRef.current) {
+              toast.dismiss("stream-dropped");
+              toast.info("Reconnected. Tap 'Resume Recording' to continue the same recording.", { duration: 8000 });
           }
         },
         videoConferenceLeft: () => {
             updateAttendanceOnLeave();
-            
-            // DISCONNECTION DETECTED: Start safety timer if streaming
-            if (!isIntentionalHangupRef.current && isStreaming) {
-                console.log("Disconnected while streaming. Starting 10-minute safety timer.");
-                
-                // Show a persistent warning toast
-                toast.warning("Stream disconnected! Reconnect within 10 mins or recording will end.", {
-                    id: "autostop-warning",
-                    duration: 600000 // Show for 10 mins
+
+            // Meeting/recorder dropped (e.g. meet.jit.si's ~1h limit). We do NOT
+            // stop the YouTube broadcast — it stays live so the SAME key resumes
+            // the SAME recording. Auto-completing here is exactly what made
+            // re-pasting the key fail before.
+            if (!isIntentionalHangupRef.current && isStreamingRef.current) {
+                setStreamDropped(true);
+                streamDroppedRef.current = true;
+                toast.warning("Stream disconnected. Reconnect, then tap 'Resume Recording' to continue the same recording.", {
+                    id: "stream-dropped",
+                    duration: 600000,
                 });
-
-                // Clear any existing timer just in case
-                if (autoStopTimerRef.current) clearTimeout(autoStopTimerRef.current);
-
-                // --- CHANGED TO 10 MINUTES (600,000 ms) ---
-                autoStopTimerRef.current = setTimeout(() => {
-                    console.log("10 minutes passed. Stopping stream now.");
-                    stopStream();
-                    toast.error("Stream auto-stopped due to inactivity.");
-                }, 10 * 60 * 1000); 
             } else if (!isIntentionalHangupRef.current) {
                 toast.warning("Connection dropped. Please refresh.");
             }
@@ -432,9 +491,27 @@ export const JitsiMeeting = ({
         recordingStatusChanged: (payload: any) => {
              console.log("Jitsi Recording Status Changed:", payload);
              if (payload.on) {
-                 toast.success("Stream is now LIVE on YouTube!");
-             } else if (payload.error) {
-                 toast.error(`Stream Error: ${payload.error}`);
+                 // Streaming (re)started successfully — stop any resume retries.
+                 if (resumeTimerRef.current) { clearTimeout(resumeTimerRef.current); resumeTimerRef.current = null; }
+                 resumeTriesRef.current = 0;
+                 setStreamDropped(false);
+                 streamDroppedRef.current = false;
+                 toast.success("Stream is now LIVE on YouTube!", { id: "resuming" });
+             } else {
+                 if (payload.error) toast.error(`Stream Error: ${payload.error}`);
+                 if (isStoppingRef.current) {
+                     // This "off" is our own explicit stop — consume it.
+                     isStoppingRef.current = false;
+                 } else if (isStreamingRef.current) {
+                     // Recorder dropped on its own (meet.jit.si's ~1h Jibri limit).
+                     // Keep the broadcast live and offer a one-tap resume.
+                     setStreamDropped(true);
+                     streamDroppedRef.current = true;
+                     toast.warning("Recording stopped (meet.jit.si's ~1-hour limit). Tap 'Resume Recording' to continue the same recording.", {
+                         id: "stream-dropped",
+                         duration: 600000,
+                     });
+                 }
              }
         },
         readyToClose: () => { 
@@ -454,7 +531,7 @@ export const JitsiMeeting = ({
       setLoadingState(false);
       isInitializingRef.current = false;
     }
-  }, [getSanitizedRoomName, recordAttendance, updateAttendanceOnLeave, setLoadingState, isHost, isStreaming, stopStream]);
+  }, [getSanitizedRoomName, recordAttendance, updateAttendanceOnLeave, setLoadingState, isHost, setStreamDropped]);
 
   useEffect(() => {
     if (!hasJoined) return;
@@ -464,7 +541,8 @@ export const JitsiMeeting = ({
       if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
       if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current);
       if (autoStopTimerRef.current) clearTimeout(autoStopTimerRef.current); // Stop timer on unmount
-      
+      if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current); // Stop resume retries on unmount
+
       if (apiRef.current) { updateAttendanceOnLeave(); try { apiRef.current.dispose(); } catch (e) {} apiRef.current = null; }
       isInitializingRef.current = false;
     };
@@ -503,27 +581,52 @@ export const JitsiMeeting = ({
               <p className="text-gray-400 text-xs">{batch}</p>
             </div>
             
-            {/* STREAMING BUTTON (Go Live / STOP REC) */}
+            {/* STREAMING BUTTON (Go Live / Resume / STOP REC) */}
             {hasJoined && !isLoading && isHost && (
-                <Button 
-                    variant={isStreaming ? "destructive" : "outline"} 
-                    size="sm"
-                    onClick={isStreaming ? handleStopStream : handleGoLive} 
-                    disabled={isStartingStream}
-                    className={`h-8 font-bold ${isStreaming 
-                        ? 'bg-red-600 hover:bg-red-700 border-red-500 text-white animate-pulse' 
-                        : 'border-red-500/50 text-red-500 hover:bg-red-500/10'}`}
-                >
-                    {isStartingStream ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : isStreaming ? (
-                        <Square className="h-4 w-4 mr-2 fill-current" />
-                    ) : (
-                        <Youtube className="h-4 w-4 mr-2" />
-                    )}
-                    {/* BUTTON TEXT CHANGED TO STOP REC */}
-                    {isStreaming ? "STOP REC" : "Go Live"}
-                </Button>
+                streamDropped && isStreaming ? (
+                    <div className="flex items-center gap-2">
+                        <Button
+                            size="sm"
+                            onClick={handleResume}
+                            disabled={isStartingStream}
+                            className="h-8 font-bold bg-amber-500 hover:bg-amber-600 border border-amber-400 text-white"
+                            title="Reconnect the same key — continues the same recording"
+                        >
+                            <Play className="h-4 w-4 mr-2 fill-current" />
+                            Resume Recording
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleStopStream}
+                            disabled={isStartingStream}
+                            className="h-8 border-red-500/50 text-red-500 hover:bg-red-500/10"
+                            title="End the recording for good"
+                        >
+                            <Square className="h-4 w-4 mr-1 fill-current" /> End
+                        </Button>
+                    </div>
+                ) : (
+                    <Button
+                        variant={isStreaming ? "destructive" : "outline"}
+                        size="sm"
+                        onClick={isStreaming ? handleStopStream : handleGoLive}
+                        disabled={isStartingStream}
+                        className={`h-8 font-bold ${isStreaming
+                            ? 'bg-red-600 hover:bg-red-700 border-red-500 text-white animate-pulse'
+                            : 'border-red-500/50 text-red-500 hover:bg-red-500/10'}`}
+                    >
+                        {isStartingStream ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : isStreaming ? (
+                            <Square className="h-4 w-4 mr-2 fill-current" />
+                        ) : (
+                            <Youtube className="h-4 w-4 mr-2" />
+                        )}
+                        {/* BUTTON TEXT CHANGED TO STOP REC */}
+                        {isStreaming ? "STOP REC" : "Go Live"}
+                    </Button>
+                )
             )}
         </div>
 
