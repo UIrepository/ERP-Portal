@@ -25,6 +25,27 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
+    // AUTHORIZATION: this endpoint can broadcast push to all students, so it must
+    // be restricted to authenticated admins/managers. (The email functions call
+    // the push helper directly and don't hit this HTTP endpoint.)
+    const jwt = (req.headers.get('Authorization') ?? '').replace('Bearer ', '');
+    const { data: authData, error: authErr } = await supabase.auth.getUser(jwt);
+    const caller = authData?.user;
+    if (authErr || !caller) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const [{ data: adminRow }, { data: managerRow }] = await Promise.all([
+      supabase.from('admins').select('user_id').eq('user_id', caller.id).maybeSingle(),
+      supabase.from('managers').select('user_id').eq('user_id', caller.id).maybeSingle(),
+    ]);
+    if (!adminRow && !managerRow) {
+      return new Response(JSON.stringify({ error: 'Forbidden — staff only' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { title, body, url, tag, user_ids, batch, subject, all_students } = await req.json();
 
     if (!title || !body) {

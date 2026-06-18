@@ -68,6 +68,10 @@ export const StudentChatTeacher = () => {
         .select('*')
         .eq('subject', selectedSubject)
         .eq('batch', batchForSubject)
+        // NOTE: chat_messages has no per-recipient column (only receiver_role),
+        // so teacher replies can't be isolated to one student here. Read access
+        // is scoped to the caller's enrolled batch+subject by RLS; true 1:1
+        // privacy needs a recipient_id column on chat_messages.
         .or(`sender_id.eq.${profile?.user_id},receiver_role.eq.student`)
         .order('created_at', { ascending: true });
       
@@ -86,7 +90,7 @@ export const StudentChatTeacher = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['student-teacher-chat', selectedSubject] });
+      queryClient.invalidateQueries({ queryKey: ['student-teacher-chat', selectedSubject, batchForSubject] });
       setMessage('');
     },
   });

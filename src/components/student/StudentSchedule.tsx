@@ -12,7 +12,8 @@ const mkIcon = (icon: typeof ArrowLeft01Icon) =>
   ({ className }: { className?: string }) => <HugeiconsIcon icon={icon} className={className} strokeWidth={1.8} />;
 const ChevronLeft = mkIcon(ArrowLeft01Icon);
 const ChevronRight = mkIcon(ArrowRight01Icon);
-import { format, getDay, startOfWeek, addDays, isSameDay, subDays, isWithinInterval } from 'date-fns';
+import { format, getDay, startOfWeek, addDays, isSameDay, subDays } from 'date-fns';
+import { istTodayStr, istMinutesNow, timeToMinutes } from '@/lib/timezone';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -223,14 +224,12 @@ export const StudentSchedule = () => {
   };
 
   const isClassLive = (schedule: Schedule, classDate: Date) => {
-    if (!isSameDay(classDate, currentTime)) return false;
-    const [startH, startM] = schedule.start_time.split(':').map(Number);
-    const [endH, endM] = schedule.end_time.split(':').map(Number);
-    const startTime = new Date(currentTime);
-    startTime.setHours(startH, startM, 0);
-    const endTime = new Date(currentTime);
-    endTime.setHours(endH, endM, 0);
-    return isWithinInterval(currentTime, { start: startTime, end: endTime });
+    // "Live" only in the column that represents IST today; compare IST minutes.
+    if (format(classDate, 'yyyy-MM-dd') !== istTodayStr()) return false;
+    const startMin = timeToMinutes(schedule.start_time);
+    const endMin = timeToMinutes(schedule.end_time);
+    const nowMin = istMinutesNow();
+    return nowMin >= startMin && nowMin <= endMin;
   };
 
   const handlePreviousWeek = () => setDisplayDate(subDays(displayDate, 7));
@@ -343,7 +342,7 @@ export const StudentSchedule = () => {
             {/* Header Row */}
             <div className="p-4 border-b border-r border-slate-100 bg-gray-50/50 sticky left-0 z-20"></div>
             {weekDates.map((date, index) => {
-                const isToday = isSameDay(date, currentTime);
+                const isToday = format(date, 'yyyy-MM-dd') === istTodayStr();
                 return (
                     <div key={index} className={cn(
                         "p-3 text-center border-b border-r border-slate-100 last:border-r-0 transition-colors",
@@ -381,7 +380,7 @@ export const StudentSchedule = () => {
                         return (
                             <div key={`cell-${dayIndex}-${timeIndex}`} className={cn(
                               "p-2 border-r border-b border-slate-100 last:border-r-0 min-h-[120px] hover:bg-slate-50/40 transition-colors relative",
-                              isSameDay(date, currentTime) ? "bg-indigo-50/20" : "bg-white"
+                              format(date, 'yyyy-MM-dd') === istTodayStr() ? "bg-indigo-50/20" : "bg-white"
                             )}>
                                 {cellClasses.map(classInfo => {
                                     const isLive = isClassLive(classInfo, date);
@@ -452,7 +451,7 @@ export const StudentSchedule = () => {
             {weekAgenda
               .filter((d) => d.dayClasses.length > 0)
               .map(({ date, dayClasses }) => {
-                const isToday = isSameDay(date, currentTime);
+                const isToday = format(date, 'yyyy-MM-dd') === istTodayStr();
                 return (
                   <section key={date.toISOString()}>
                     {/* Day header */}

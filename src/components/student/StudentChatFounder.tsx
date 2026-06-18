@@ -45,7 +45,7 @@ export const StudentChatFounder = () => {
   );
 
   const { data: chatMessages } = useQuery({
-    queryKey: ['student-founder-chat'],
+    queryKey: ['student-founder-chat', profile?.user_id],
     queryFn: async (): Promise<FounderChatMessage[]> => {
       const { data, error } = await (supabase as any)
         .from('founder_chat_messages')
@@ -68,7 +68,7 @@ export const StudentChatFounder = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['student-founder-chat'] });
+      queryClient.invalidateQueries({ queryKey: ['student-founder-chat', profile?.user_id] });
       setMessage('');
     },
   });

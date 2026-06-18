@@ -50,9 +50,26 @@ export const StudentChatbot = () => {
   const premiumShadowClass = "shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_-1px_rgba(0,0,0,0.1)]";
   const chatWindowShadowClass = "shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1),0_0_0_1px_rgba(0,0,0,0.05)]";
 
-  // Pre-fetch available staff using security definer function
+  // Student's batches — needed by the staff lookups below, so it must be
+  // declared first and included in the availableStaff key/gate.
+  const { data: studentBatches } = useQuery({
+    queryKey: ['studentBatches', profile?.user_id],
+    queryFn: async () => {
+      if (!profile?.user_id) return [];
+      const { data } = await supabase
+        .from('user_enrollments')
+        .select('batch_name')
+        .eq('user_id', profile.user_id);
+      return [...new Set(data?.map(e => e.batch_name) || [])];
+    },
+    enabled: !!profile?.user_id && state.isOpen,
+  });
+
+  // Pre-fetch available staff using security definer function. Keyed on
+  // studentBatches and gated until it resolves, so the Manager button isn't
+  // permanently disabled by an early call with an empty batch list.
   const { data: availableStaff } = useQuery({
-    queryKey: ['available-support-staff', profile?.user_id],
+    queryKey: ['available-support-staff', profile?.user_id, studentBatches],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_available_support_staff', {
         p_student_batches: studentBatches || []
@@ -65,7 +82,7 @@ export const StudentChatbot = () => {
         hasManager: data[0].has_manager,
       };
     },
-    enabled: !!profile?.user_id && state.isOpen,
+    enabled: !!profile?.user_id && state.isOpen && studentBatches !== undefined,
   });
 
   // Fetch admin for support using RPC
@@ -98,20 +115,6 @@ export const StudentChatbot = () => {
     }
     return data[0];
   };
-
-  // Fetch student batches for manager lookup
-  const { data: studentBatches } = useQuery({
-    queryKey: ['studentBatches', profile?.user_id],
-    queryFn: async () => {
-      if (!profile?.user_id) return [];
-      const { data } = await supabase
-        .from('user_enrollments')
-        .select('batch_name')
-        .eq('user_id', profile.user_id);
-      return [...new Set(data?.map(e => e.batch_name) || [])];
-    },
-    enabled: !!profile?.user_id && state.isOpen,
-  });
 
   // Handle role selection for support mode
   const handleRoleSelect = async (role: 'admin' | 'manager') => {

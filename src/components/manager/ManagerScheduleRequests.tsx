@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { CheckCircle, XCircle, Clock, Calendar, User, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
+import { istDayOfWeekForDate } from '@/lib/timezone';
 
 export const ManagerScheduleRequests = () => {
   const { user } = useAuth();
@@ -80,8 +81,9 @@ export const ManagerScheduleRequests = () => {
                 date: request.new_date,
                 start_time: request.new_start_time,
                 end_time: request.new_end_time,
-                // Recalculate day of week in case the date changed (0=Sun, 6=Sat)
-                day_of_week: new Date(request.new_date).getDay()
+                // Recalculate day of week in case the date changed (0=Sun, 6=Sat).
+                // Use IST so west-of-UTC reviewers don't write the wrong day.
+                day_of_week: istDayOfWeekForDate(request.new_date)
               })
               .eq('id', request.schedule_id)
               .select();

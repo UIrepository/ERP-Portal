@@ -9,11 +9,12 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { format, getDay, startOfWeek, addDays, isSameDay, subDays, parseISO, isWithinInterval } from 'date-fns';
+import { format, getDay, startOfWeek, addDays, isSameDay, subDays, parseISO } from 'date-fns';
 import { ChevronLeft, ChevronRight, Clock, Video, Plus, Loader2, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { istTodayStr, istMinutesNow, timeToMinutes } from '@/lib/timezone';
 
 // --- Interfaces ---
 
@@ -418,18 +419,14 @@ export const TeacherSchedule = () => {
   };
 
   const isClassLive = (schedule: Schedule, classDate: Date) => {
-    if (!isSameDay(classDate, currentTime)) return false;
+    // "Live" is only possible in the column representing IST today.
+    if (format(classDate, 'yyyy-MM-dd') !== istTodayStr()) return false;
 
-    const [startH, startM] = schedule.start_time.split(':').map(Number);
-    const [endH, endM] = schedule.end_time.split(':').map(Number);
-    
-    const startTime = new Date(currentTime);
-    startTime.setHours(startH, startM, 0);
-    
-    const endTime = new Date(currentTime);
-    endTime.setHours(endH, endM, 0);
+    const startMin = timeToMinutes(schedule.start_time);
+    const endMin = timeToMinutes(schedule.end_time);
+    const nowMin = istMinutesNow();
 
-    return isWithinInterval(currentTime, { start: startTime, end: endTime });
+    return nowMin >= startMin && nowMin <= endMin;
   };
 
   const handlePreviousWeek = () => setDisplayDate(subDays(displayDate, 7));
@@ -504,7 +501,7 @@ export const TeacherSchedule = () => {
             {/* Header Row */}
             <div className="p-4 border-b border-r border-gray-200 bg-gray-50/50 sticky left-0 z-20"></div>
             {weekDates.map((date, index) => {
-                const isToday = isSameDay(date, currentTime);
+                const isToday = format(date, 'yyyy-MM-dd') === istTodayStr();
                 return (
                     <div key={index} className={cn(
                         "p-3 text-center border-b border-r border-gray-200 last:border-r-0 transition-colors",

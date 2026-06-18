@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Video, Clock, Calendar, Users, UserCheck, Eye } from 'lucide-react';
-import { format, isToday, parse, isBefore, isAfter } from 'date-fns';
+import { format, parse } from 'date-fns';
+import { istDayOfWeek, istTodayStr, istMinutesNow, timeToMinutes } from '@/lib/timezone';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { generateJitsiRoomName } from '@/lib/jitsiUtils';
@@ -79,7 +80,7 @@ export const ManagerJoinClass = () => {
     queryKey: ['classAttendanceManager', selectedClassForAttendance?.id],
     queryFn: async () => {
       if (!selectedClassForAttendance) return [];
-      const today = format(new Date(), 'yyyy-MM-dd');
+      const today = istTodayStr();
       const { data, error } = await supabase
         .from('class_attendance')
         .select('id, user_name, user_role, joined_at, left_at')
@@ -114,17 +115,17 @@ export const ManagerJoinClass = () => {
   const todaysClasses = useMemo(() => {
     if (!schedules || !manager) return [];
     
-    const today = new Date();
-    const todayDayOfWeek = today.getDay();
+    const todayDayOfWeek = istDayOfWeek();
+    const todayDateStr = istTodayStr();
     const assignedBatches = manager.assigned_batches || [];
-    
+
     return schedules.filter(schedule => {
       // Check if manager is assigned to this batch
       if (!assignedBatches.includes(schedule.batch)) return false;
-      
-      // Check if this schedule is for today
+
+      // Check if this schedule is for today (IST)
       if (schedule.date) {
-        return isToday(new Date(schedule.date));
+        return schedule.date === todayDateStr;
       } else {
         return schedule.day_of_week === todayDayOfWeek;
       }
@@ -133,18 +134,18 @@ export const ManagerJoinClass = () => {
 
   // Categorize classes
   const { liveClasses, upcomingClasses, completedClasses } = useMemo(() => {
-    const now = new Date();
+    const nowMin = istMinutesNow();
     const live: Schedule[] = [];
     const upcoming: Schedule[] = [];
     const completed: Schedule[] = [];
 
     todaysClasses.forEach(cls => {
-      const startTime = parse(cls.start_time, 'HH:mm:ss', now);
-      const endTime = parse(cls.end_time, 'HH:mm:ss', now);
-      
-      if (isBefore(now, startTime)) {
+      const startMin = timeToMinutes(cls.start_time);
+      const endMin = timeToMinutes(cls.end_time);
+
+      if (nowMin < startMin) {
         upcoming.push(cls);
-      } else if (isAfter(now, endTime)) {
+      } else if (nowMin > endMin) {
         completed.push(cls);
       } else {
         live.push(cls);

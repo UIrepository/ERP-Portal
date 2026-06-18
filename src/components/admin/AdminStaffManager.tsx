@@ -161,6 +161,10 @@ export const AdminStaffManager = () => {
   const [newStaffRole, setNewStaffRole] = useState<'teacher' | 'manager'>('teacher');
   const [selectedBatches, setSelectedBatches] = useState<string[]>([]);
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+  // The teacher's existing DB subjects at edit time. Subjects that can't be
+  // represented as a current UI option (no matching enrollment) are preserved
+  // on save so editing the name/batches never silently drops them.
+  const [originalSubjects, setOriginalSubjects] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 1. Fetch Staff List (Combined Teachers & Managers)
@@ -252,11 +256,22 @@ export const AdminStaffManager = () => {
       // --- CLEAN SUBJECTS BEFORE SAVING ---
       // Strip " (Batch Name)" from the UI strings to save only strict subject names
       // e.g. "Physics (Batch A)" -> "Physics"
-      const subjectsToSave = newStaffRole === 'teacher' 
+      const subjectsToSave = newStaffRole === 'teacher'
         ? Array.from(new Set(
             selectedSubjects.map(s => s.replace(/\s*\(.*?\)\s*$/, '').trim())
           ))
         : [];
+
+      // Preserve existing DB subjects that have no selectable UI option (e.g.
+      // their enrollment was removed) so editing the name/batches can't silently
+      // drop them. Subjects that ARE options but were deselected are still removed.
+      const availableCleaned = new Set(
+        availableSubjects.map(o => o.replace(/\s*\(.*?\)\s*$/, '').trim())
+      );
+      const preservedSubjects = (newStaffRole === 'teacher' && editingId)
+        ? originalSubjects.filter(s => s && !availableCleaned.has(s))
+        : [];
+      const finalSubjects = Array.from(new Set([...subjectsToSave, ...preservedSubjects]));
 
       if (editingId) {
         // Update existing staff
@@ -264,7 +279,7 @@ export const AdminStaffManager = () => {
           const { error } = await supabase.from('teachers').update({
             name: newStaffName,
             assigned_batches: selectedBatches,
-            assigned_subjects: subjectsToSave, // Save cleaned subjects
+            assigned_subjects: finalSubjects,
           }).eq('id', editingId);
           if (error) throw error;
         } else {
@@ -282,7 +297,7 @@ export const AdminStaffManager = () => {
             name: newStaffName,
             email: newStaffEmail,
             assigned_batches: selectedBatches,
-            assigned_subjects: subjectsToSave, // Save cleaned subjects
+            assigned_subjects: finalSubjects,
           });
           if (error) throw error;
         } else {
@@ -336,6 +351,7 @@ export const AdminStaffManager = () => {
     // Set Batches
     const batches = member.batches || [];
     setSelectedBatches(batches);
+    setOriginalSubjects(member.role === 'teacher' && member.subjects ? (member.subjects as string[]) : []);
 
     // --- HYDRATE SUBJECTS FOR UI ---
     // Match DB subjects (e.g. "Physics") to UI strings (e.g. "Physics (Batch A)")
@@ -369,6 +385,7 @@ export const AdminStaffManager = () => {
     setNewStaffRole('teacher');
     setSelectedBatches([]);
     setSelectedSubjects([]);
+    setOriginalSubjects([]);
   };
 
   const openAddDialog = () => {

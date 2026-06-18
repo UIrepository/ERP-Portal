@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Video, Clock, Calendar, Users } from 'lucide-react';
-import { format, isToday, parse, isBefore, isAfter } from 'date-fns';
+import { format, parse } from 'date-fns';
+import { istDayOfWeek, istTodayStr, istMinutesNow, timeToMinutes } from '@/lib/timezone';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { generateJitsiRoomName } from '@/lib/jitsiUtils';
 import { useMergedSubjects } from '@/hooks/useMergedSubjects';
@@ -98,19 +99,19 @@ export const StudentJoinClass = () => {
   const todaysClasses = useMemo(() => {
     if (!schedules || !enrollments || enrollments.length === 0) return [];
     
-    const today = new Date();
-    const todayDayOfWeek = today.getDay();
-    
+    const todayDayOfWeek = istDayOfWeek();
+    const todayDateStr = istTodayStr();
+
     const enrolledCombinations = new Set(
       enrollments.map(e => `${e.batch_name}|${e.subject_name}`)
     );
-    
+
     return schedules.filter(schedule => {
       const isEnrolled = enrolledCombinations.has(`${schedule.batch}|${schedule.subject}`);
       if (!isEnrolled) return false;
-      
+
       if (schedule.date) {
-        return isToday(new Date(schedule.date));
+        return schedule.date === todayDateStr;
       } else {
         return schedule.day_of_week === todayDayOfWeek;
       }
@@ -119,18 +120,18 @@ export const StudentJoinClass = () => {
 
   // Categorize classes
   const { liveClasses, upcomingClasses, completedClasses } = useMemo(() => {
-    const now = new Date();
+    const nowMin = istMinutesNow();
     const live: Schedule[] = [];
     const upcoming: Schedule[] = [];
     const completed: Schedule[] = [];
 
     todaysClasses.forEach(cls => {
-      const startTime = parse(cls.start_time, 'HH:mm:ss', now);
-      const endTime = parse(cls.end_time, 'HH:mm:ss', now);
-      
-      if (isBefore(now, startTime)) {
+      const startMin = timeToMinutes(cls.start_time);
+      const endMin = timeToMinutes(cls.end_time);
+
+      if (nowMin < startMin) {
         upcoming.push(cls);
-      } else if (isAfter(now, endTime)) {
+      } else if (nowMin > endMin) {
         completed.push(cls);
       } else {
         live.push(cls);
@@ -149,7 +150,7 @@ export const StudentJoinClass = () => {
     // 1. Mark Attendance
     try {
       if (profile?.user_id) {
-        const today = format(new Date(), 'yyyy-MM-dd');
+        const today = istTodayStr();
         await supabase.from('class_attendance').upsert({
           user_id: profile.user_id,
           user_name: profile.name || user?.email || 'Student',

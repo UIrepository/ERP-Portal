@@ -23,7 +23,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { Plus, Clock, Calendar, CheckCircle, XCircle, Loader2, ArrowRight, AlertCircle, Filter, Trash2 } from 'lucide-react';
-import { format, isSameDay, parseISO, getDay } from 'date-fns';
+import { format, isSameDay, parseISO } from 'date-fns';
+import { istDayOfWeekForDate } from '@/lib/timezone';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -107,7 +108,7 @@ export const TeacherScheduleRequests = () => {
     if (!mySchedules || !filterDate) return [];
 
     const selectedDateObj = parseISO(filterDate);
-    const selectedDayOfWeek = getDay(selectedDateObj); // 0 = Sunday, 1 = Monday...
+    const selectedDayOfWeek = istDayOfWeekForDate(filterDate); // 0 = Sunday, 1 = Monday...
 
     return mySchedules.filter(schedule => {
       // Case A: Specific Date Schedule (e.g., Extra Class, Exam)

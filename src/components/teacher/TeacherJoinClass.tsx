@@ -3,7 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Clock, Key, Copy, Merge, X, Loader2, Square, PenLine } from 'lucide-react';
-import { format, isToday, parse, isBefore, isAfter } from 'date-fns';
+import { format, parse } from 'date-fns';
+import { istDayOfWeek, istTodayStr, istMinutesNow, timeToMinutes } from '@/lib/timezone';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { generateJitsiRoomName, subjectsMatch } from '@/lib/jitsiUtils';
 import { useYoutubeStream } from '@/hooks/useYoutubeStream';
@@ -175,7 +176,7 @@ export const TeacherJoinClass = () => {
     queryKey: ['classAttendance', selectedClassForAttendance?.id],
     queryFn: async () => {
       if (!selectedClassForAttendance) return [];
-      const today = format(new Date(), 'yyyy-MM-dd');
+      const today = istTodayStr();
       const { data, error } = await supabase
         .from('class_attendance')
         .select('id, user_name, user_role, joined_at, left_at')
@@ -207,22 +208,22 @@ export const TeacherJoinClass = () => {
   const todaysClasses = useMemo(() => {
     if (!schedules || !teacher) return [];
     
-    const today = new Date();
-    const todayDayOfWeek = today.getDay();
+    const todayDayOfWeek = istDayOfWeek();
+    const todayDateStr = istTodayStr();
     const assignedBatches = teacher.assigned_batches || [];
     const assignedSubjects = teacher.assigned_subjects || [];
-    
+
     const filtered = schedules.filter(schedule => {
       const isAssignedBatch = assignedBatches.includes(schedule.batch);
       if (!isAssignedBatch) return false;
-      
-      const isAssignedSubject = assignedSubjects.some(assigned => 
+
+      const isAssignedSubject = assignedSubjects.some(assigned =>
         subjectsMatch(assigned, schedule.subject)
       );
       if (!isAssignedSubject) return false;
-      
+
       if (schedule.date) {
-        return isToday(new Date(schedule.date));
+        return schedule.date === todayDateStr;
       } else {
         return schedule.day_of_week === todayDayOfWeek;
       }
@@ -275,20 +276,20 @@ export const TeacherJoinClass = () => {
   }, [schedules, teacher, mergeGroups]);
 
   const { liveClasses, upcomingClasses, completedClasses } = useMemo(() => {
-    const now = new Date();
+    const nowMin = istMinutesNow();
     const live: Schedule[] = [];
     const upcoming: Schedule[] = [];
     const completed: Schedule[] = [];
 
     todaysClasses.forEach(cls => {
-      const startTime = parse(cls.start_time, 'HH:mm:ss', now);
-      const endTime = parse(cls.end_time, 'HH:mm:ss', now);
-      
+      const startMin = timeToMinutes(cls.start_time);
+      const endMin = timeToMinutes(cls.end_time);
+
       if (cls.stream_key) {
         live.push(cls);
-      } else if (isBefore(now, startTime)) {
+      } else if (nowMin < startMin) {
         upcoming.push(cls);
-      } else if (isAfter(now, endTime)) {
+      } else if (nowMin > endMin) {
         completed.push(cls);
       } else {
         live.push(cls);
@@ -313,7 +314,7 @@ export const TeacherJoinClass = () => {
 
     try {
       if (profile?.user_id) {
-        const today = format(new Date(), 'yyyy-MM-dd');
+        const today = istTodayStr();
         const primary = getPrimaryPair(cls.batch, cls.subject);
         const roomName = generateJitsiRoomName(primary.batch, primary.subject);
         const roomUrl = `https://meet.jit.si/${encodeURIComponent(roomName)}`;

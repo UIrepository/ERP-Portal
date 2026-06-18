@@ -44,11 +44,12 @@ export const NotificationListener = () => {
           description: "Click to view chat",
           action: {
             label: "Open Chat",
-            // 🟢 Opens the specific chat
-            onClick: () => navigate(`/student/messages?chatId=${newMsg.sender_id}`) 
+            onClick: () => navigate('/'),
           }
         });
-        queryClient.invalidateQueries({ queryKey: ['virtual-notifications'] });
+        // Refresh the bell (it reads unread DMs) and the support-FAB badge.
+        queryClient.invalidateQueries({ queryKey: ['notifications-standard'] });
+        queryClient.invalidateQueries({ queryKey: ['support-unread'] });
       })
       .subscribe();
 
@@ -75,11 +76,11 @@ export const NotificationListener = () => {
             description: newMsg.content ? (newMsg.content.length > 40 ? newMsg.content.substring(0,40)+'...' : newMsg.content) : "Sent an attachment",
             action: {
               label: "View",
-              // 🟢 Just opens the Community page (Normal Link)
-              onClick: () => navigate('/student/community') 
+              onClick: () => navigate('/portal/student/community'),
             }
           });
-          queryClient.invalidateQueries({ queryKey: ['virtual-notifications'] });
+          // Refresh the community unread badge.
+          queryClient.invalidateQueries({ queryKey: ['community-unread-total'] });
         }
       })
       .subscribe();

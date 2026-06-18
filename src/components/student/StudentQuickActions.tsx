@@ -2,7 +2,8 @@ import { Video, Clock, Megaphone } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { format, getDay, isToday, parseISO } from 'date-fns';
+import { format } from 'date-fns';
+import { istDayOfWeek, istTodayStr, istTimeStr } from '@/lib/timezone';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface StudentQuickActionsProps {
@@ -22,9 +23,10 @@ interface Schedule {
 
 export const StudentQuickActions = ({ batch, subjects }: StudentQuickActionsProps) => {
   const { profile } = useAuth();
-  const today = new Date();
-  const currentDayOfWeek = getDay(today);
-  const currentTimeStr = format(today, 'HH:mm:ss');
+  // Pin "today"/"now"/day-of-week to IST so it's correct regardless of device timezone.
+  const currentDayOfWeek = istDayOfWeek();
+  const todayDateStr = istTodayStr();
+  const currentTimeStr = istTimeStr();
 
   // Fetch today's classes
   const { data: todayClasses, isLoading } = useQuery<Schedule[]>({
@@ -37,14 +39,14 @@ export const StudentQuickActions = ({ batch, subjects }: StudentQuickActionsProp
         .select('*')
         .eq('batch', batch)
         .in('subject', subjects)
-        .or(`day_of_week.eq.${currentDayOfWeek},date.eq.${format(today, 'yyyy-MM-dd')}`);
-      
+        .or(`day_of_week.eq.${currentDayOfWeek},date.eq.${todayDateStr}`);
+
       if (error) return [];
-      
-      // Filter to only today's classes
+
+      // Filter to only today's classes (IST)
       return (data || []).filter(schedule => {
         if (schedule.date) {
-          return isToday(parseISO(schedule.date));
+          return schedule.date === todayDateStr;
         }
         return schedule.day_of_week === currentDayOfWeek;
       });
