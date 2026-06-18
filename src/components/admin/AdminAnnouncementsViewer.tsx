@@ -72,9 +72,9 @@ export const AdminAnnouncementsViewer = () => {
     });
 
     return (
-        <div className="p-6 space-y-8 bg-gray-50/50 min-h-full">
+        <div className="p-3 sm:p-6 space-y-8 bg-gray-50/50 min-h-full">
             <div>
-                <h1 className="text-3xl font-bold text-gray-800 flex items-center">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center">
                     <History className="mr-3 h-8 w-8 text-primary" />
                     Sent Announcements
                 </h1>
@@ -112,7 +112,7 @@ export const AdminAnnouncementsViewer = () => {
                                     </AlertDialogContent>
                                 </AlertDialog>
                              </CardHeader>
-                            <CardContent className="p-6">
+                            <CardContent className="p-4 sm:p-6">
                                 <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">{announcement.message}</p>
                             </CardContent>
                             <div className="bg-slate-50 px-6 py-3 border-t flex flex-col sm:flex-row justify-between items-start sm:items-center text-sm text-slate-500 gap-2">

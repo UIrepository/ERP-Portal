@@ -157,7 +157,7 @@ export const AdminFeedbackViewer = () => {
     <div className="p-4 md:p-6 space-y-6 bg-slate-100 min-h-full">
       {/* Header and Filters */}
       <div className="px-1">
-        <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Feedback Viewer</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">Feedback Viewer</h1>
         <p className="text-slate-500 mt-1">Review and analyze all feedback submitted by students.</p>
       </div>
 
@@ -220,7 +220,7 @@ export const AdminFeedbackViewer = () => {
                         </div>
                     </div>
                 </CardHeader>
-              <CardContent className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <CardContent className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                     <h4 className="font-semibold text-slate-700">Ratings</h4>
                     <Separator/>

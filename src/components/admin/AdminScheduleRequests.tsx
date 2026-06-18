@@ -146,7 +146,7 @@ export const AdminScheduleRequests = () => {
         <div className="grid gap-4">
           {requests.map((request: any) => (
             <Card key={request.id} className={request.status === 'pending' ? 'border-l-4 border-l-yellow-400' : ''}>
-              <CardContent className="p-6">
+              <CardContent className="p-4 sm:p-6">
                 <div className="flex flex-col md:flex-row gap-6 justify-between">
                   <div className="space-y-4 flex-1">
                     <div className="flex items-center gap-3">

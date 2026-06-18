@@ -126,7 +126,7 @@ export const AdminMaintenanceManager = () => {
   }
 
   return (
-    <div className="space-y-6 p-6" style={{ fontFamily: 'Inter, sans-serif' }}>
+    <div className="space-y-6 p-3 sm:p-6" style={{ fontFamily: 'Inter, sans-serif' }}>
       <div className="flex items-center gap-3">
         <Settings className="h-6 w-6 text-primary" />
         <h1 className="text-2xl font-semibold tracking-tight">Maintenance Mode</h1>
@@ -218,7 +218,7 @@ export const AdminMaintenanceManager = () => {
           {usersLoading ? (
             <div className="text-center py-4 text-muted-foreground text-sm">Loading users...</div>
           ) : verifiedUsers && verifiedUsers.length > 0 ? (
-            <div className="border rounded-md">
+            <div className="border rounded-md overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>

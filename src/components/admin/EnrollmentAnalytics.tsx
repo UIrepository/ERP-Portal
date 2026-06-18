@@ -182,7 +182,7 @@ export const EnrollmentAnalytics = () => {
   }
   if (isError) {
     return (
-      <div className="w-full max-w-[1840px] mx-auto p-6 font-sans">
+      <div className="w-full max-w-[1840px] mx-auto p-3 sm:p-6 font-sans">
         <Card className="border border-dashed border-rose-300 text-center py-16">
           <HugeiconsIcon icon={Alert02Icon} size={40} className="text-rose-500 mx-auto mb-3" />
           <h3 className="text-lg font-semibold text-slate-900">Failed to load enrollment data</h3>

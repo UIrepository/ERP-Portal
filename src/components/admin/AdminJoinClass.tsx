@@ -164,7 +164,7 @@ export const AdminJoinClass = () => {
 
   if (isLoadingSchedules) {
     return (
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         <Skeleton className="h-8 w-64" />
         <div className="grid gap-4">
           <Skeleton className="h-32 w-full" />
@@ -175,7 +175,7 @@ export const AdminJoinClass = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">All Classes</h1>
         <p className="text-muted-foreground">Today's classes • {format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
@@ -266,7 +266,7 @@ export const AdminJoinClass = () => {
             {liveClasses.map((cls) => (
               <Card key={cls.id} className="border-green-500 bg-green-50 dark:bg-green-950">
                 <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                       <h3 className="text-xl font-bold">{cls.subject}</h3>
                       <p className="text-muted-foreground">{cls.batch}</p>
@@ -275,7 +275,7 @@ export const AdminJoinClass = () => {
                         {formatTime(cls.start_time)} - {formatTime(cls.end_time)}
                       </p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <Button 
                         variant="outline"
                         onClick={() => setSelectedClassForAttendance(cls)}
@@ -395,6 +395,7 @@ export const AdminJoinClass = () => {
             {isLoadingAttendance ? (
               <Skeleton className="h-32 w-full" />
             ) : attendance && attendance.length > 0 ? (
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -424,6 +425,7 @@ export const AdminJoinClass = () => {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             ) : (
               <p className="text-center text-muted-foreground py-8">No attendance records yet.</p>
             )}

@@ -168,7 +168,7 @@ export const AdminCreateAnnouncement = () => {
   return (
     <div className="p-4 md:p-6 space-y-8 bg-slate-50 min-h-full animate-fade-in-up">
         <div className="flex flex-col space-y-1">
-            <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Broadcast Center</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">Broadcast Center</h1>
             <p className="text-slate-500">Compose and dispatch announcements to your students.</p>
         </div>
       

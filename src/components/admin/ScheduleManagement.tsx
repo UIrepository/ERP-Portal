@@ -187,7 +187,7 @@ export const ScheduleManagement = () => {
     <div className="p-4 md:p-6 bg-gray-50 min-h-screen">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900">Full Class Schedule</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Full Class Schedule</h2>
           <p className="text-gray-600 mt-1">A real-time overview of all scheduled classes and exams.</p>
         </div>
         <div className="flex flex-col items-end gap-2">

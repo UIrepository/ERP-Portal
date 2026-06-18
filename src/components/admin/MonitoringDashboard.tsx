@@ -141,7 +141,7 @@ export const MonitoringDashboard = () => {
 
   if (overallLoading) {
     return (
-      <div className="p-6 space-y-8 bg-gray-50/50 min-h-full flex items-center justify-center">
+      <div className="p-3 sm:p-6 space-y-8 bg-gray-50/50 min-h-full flex items-center justify-center">
         <div className="flex flex-col items-center space-y-4">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
           <p className="text-xl text-gray-700">Loading Monitoring Data...</p>
@@ -153,8 +153,8 @@ export const MonitoringDashboard = () => {
   if (overallError) {
     const errorMessage = errorActiveUsers?.message || errorFeedback?.message || errorStudentActivities?.message || 'Unknown error occurred.';
     return (
-      <div className="p-6 space-y-8 bg-gray-50/50 min-h-full flex items-center justify-center text-center">
-        <Card className="p-8 rounded-3xl shadow-xl border-red-400 border-2 bg-white">
+      <div className="p-3 sm:p-6 space-y-8 bg-gray-50/50 min-h-full flex items-center justify-center text-center">
+        <Card className="p-4 sm:p-8 rounded-3xl shadow-xl border-red-400 border-2 bg-white">
           <AlertTriangle className="h-16 w-16 text-red-600 mx-auto mb-4" />
           <h3 className="text-2xl font-bold text-gray-800 mb-2">Error Loading Monitoring Data</h3>
           <p className="text-gray-600 mb-4">
@@ -172,7 +172,7 @@ export const MonitoringDashboard = () => {
   }
 
   return (
-    <div className="space-y-6 p-6 bg-gray-50/50 min-h-full">
+    <div className="space-y-6 p-3 sm:p-6 bg-gray-50/50 min-h-full">
       <h2 className="text-2xl font-bold flex items-center">
         <Monitor className="mr-2 h-7 w-7 text-primary" />
         Monitoring Dashboard

@@ -87,9 +87,9 @@ export const AdminMeetingManager = () => {
   };
   
   return (
-    <div className="space-y-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 min-h-full">
+    <div className="space-y-8 p-3 sm:p-6 bg-gradient-to-br from-blue-50 to-indigo-50 min-h-full">
       {/* Header Section - Enhanced Design */}
-      <div className="relative p-8 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-r from-blue-600 to-indigo-700 text-white animate-fade-in-up">
+      <div className="relative p-4 sm:p-8 rounded-3xl overflow-hidden shadow-2xl bg-gradient-to-r from-blue-600 to-indigo-700 text-white animate-fade-in-up">
         {/* Animated background circles */}
         <div className="absolute -top-16 -left-16 w-48 h-48 bg-white/10 rounded-full animate-pulse-slow"></div>
         <div className="absolute -bottom-16 -right-16 w-64 h-64 bg-white/10 rounded-full animate-pulse-slow animation-delay-500"></div>
@@ -99,10 +99,10 @@ export const AdminMeetingManager = () => {
             <div className="flex items-center justify-center mb-4">
                 <CalendarCheck className="h-16 w-16 text-blue-100 drop-shadow-md" />
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-2 tracking-tight drop-shadow-lg">
+            <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold mb-2 tracking-tight drop-shadow-lg">
                 Manage Online Sessions
             </h1>
-            <p className="text-xl md:text-2xl text-blue-100 drop-shadow-sm font-semibold">
+            <p className="text-base sm:text-xl md:text-2xl text-blue-100 drop-shadow-sm font-semibold">
                 Central hub for all class session links.
             </p>
         </div>

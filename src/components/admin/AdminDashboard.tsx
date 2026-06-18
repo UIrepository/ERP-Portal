@@ -72,8 +72,11 @@ export const AdminDashboard = ({ activeTab, onTabChange }: AdminDashboardProps) 
     }
   };
 
+  // Chat-style tabs fill the whole area (their own full-height layout), so they
+  // render without the page padding; everything else gets compact mobile padding.
+  const fullBleed = activeTab === 'community-admin' || activeTab === 'admin-messages';
   return (
-    <div className="p-6">
+    <div className={fullBleed ? 'max-w-full overflow-x-hidden' : 'p-2 sm:p-4 md:p-6 max-w-full overflow-x-hidden'}>
       {renderTabContent()}
     </div>
   );
