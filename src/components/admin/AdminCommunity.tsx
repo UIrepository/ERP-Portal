@@ -548,7 +548,7 @@ export const AdminCommunity = () => {
   };
 
   return (
-    <div className="flex h-[100dvh] w-full bg-[#fdfbf7] relative overflow-hidden">
+    <div className="flex h-[calc(100dvh-64px)] w-full bg-[#fdfbf7] relative overflow-hidden">
       <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
         <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
           <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Megaphone className="h-5 w-5 text-red-600" /> Admin Chat</h2>

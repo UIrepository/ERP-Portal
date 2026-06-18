@@ -311,7 +311,7 @@ export const StaffInbox = () => {
   };
 
   return (
-    <div className="flex h-[calc(100vh-130px)] min-h-[480px] border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm font-sans">
+    <div className="flex h-[calc(100dvh-64px)] min-h-[420px] border-0 sm:border border-slate-200 rounded-none sm:rounded-xl overflow-hidden bg-white shadow-sm font-sans">
       {/* LEFT: Contact list — full width on mobile, hidden once a chat is open */}
       <div
         className={cn(
