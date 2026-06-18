@@ -134,15 +134,9 @@ export const StaffInbox = () => {
         }
 
         if (!contactMap.has(otherId)) {
-          const { data: userProfile } = await supabase
-            .from('profiles')
-            .select('name')
-            .eq('user_id', otherId)
-            .single();
-
           contactMap.set(otherId, {
             user_id: otherId,
-            name: userProfile?.name || 'Unknown User',
+            name: 'Unknown User',
             lastMessage: msg.content || 'Attachment',
             lastMessageTime: msg.created_at || new Date().toISOString(),
             unreadCount: 0,
@@ -161,6 +155,21 @@ export const StaffInbox = () => {
            const contact = contactMap.get(otherId)!;
            contact.unreadCount += 1;
         }
+      }
+
+      // Batch-fetch all contact names in ONE query instead of an N+1 sequential
+      // lookup per contact — with a shared support inbox this is ~190 contacts,
+      // and the old per-contact awaits made the inbox hang on "loading".
+      const ids = Array.from(contactMap.keys()).filter(Boolean);
+      if (ids.length > 0) {
+        const { data: profs } = await supabase
+          .from('profiles')
+          .select('user_id, name')
+          .in('user_id', ids);
+        (profs || []).forEach((p: { user_id: string; name: string | null }) => {
+          const c = contactMap.get(p.user_id);
+          if (c && p.name) c.name = p.name;
+        });
       }
 
       return Array.from(contactMap.values());
