@@ -12,6 +12,13 @@ import { UserGroupIcon, ChartColumnStackedIcon } from '@hugeicons/core-free-icon
 // Refined, muted categorical palette (matches Enrollment Analytics)
 const TA_COLORS = ['#4f46e5', '#0ea5e9', '#14b8a6', '#f59e0b', '#e11d48', '#8b5cf6', '#10b981', '#64748b'];
 
+// Batch names are long and collide on the X-axis; truncate for the tick, the
+// full name still shows in the tooltip.
+const shortLabel = (s: unknown, n = 16) => {
+  const v = String(s ?? '');
+  return v.length > n ? `${v.slice(0, n - 1).trimEnd()}…` : v;
+};
+
 interface TeacherProfile {
   batch: string | string[] | null;
   subjects: string[] | null;
@@ -155,7 +162,7 @@ export const TeacherAnalytics = () => {
           <ResponsiveContainer width="100%" height={400}>
             <BarChart data={analyticsData.chartData} barCategoryGap="22%">
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-              <XAxis dataKey="batch" tick={{ fontSize: 12, fill: '#475569', fontWeight: 500 }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
+              <XAxis dataKey="batch" interval={0} angle={-35} textAnchor="end" height={96} tickMargin={8} tickFormatter={(v) => shortLabel(v, 16)} tick={{ fontSize: 10, fill: '#475569', fontWeight: 500 }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
               <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={false} />
               <Tooltip cursor={{ fill: 'rgba(99, 102, 241, 0.06)' }} contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', boxShadow: '0 10px 25px rgba(0,0,0,0.08)', fontSize: 12 }} />
               <Legend iconType="circle" wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />

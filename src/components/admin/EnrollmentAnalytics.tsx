@@ -37,6 +37,13 @@ interface StudentEnrollmentInfo {
 // Refined, muted categorical palette (no neon, no gradients).
 const COLORS = ['#4f46e5', '#0ea5e9', '#14b8a6', '#f59e0b', '#e11d48', '#8b5cf6', '#10b981', '#64748b'];
 
+// Batch/subject names are long ("Foundation Quiz 1 - May 26 Data Science") and
+// collide on axes/legends. Truncate for display; full names stay in tooltips.
+const shortLabel = (s: unknown, n = 16) => {
+  const v = String(s ?? '');
+  return v.length > n ? `${v.slice(0, n - 1).trimEnd()}…` : v;
+};
+
 const ChartTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   const rows = payload.filter((e: any) => e.value > 0);
@@ -239,7 +246,7 @@ export const EnrollmentAnalytics = () => {
               <BarChart data={d.stacked} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 4 }} barCategoryGap="28%">
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                 <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
-                <YAxis type="category" dataKey="name" width={92} tick={{ fontSize: 12, fill: '#475569', fontWeight: 500 }} tickLine={false} axisLine={false} />
+                <YAxis type="category" dataKey="name" width={134} tickMargin={6} tickFormatter={(v) => shortLabel(v, 18)} tick={{ fontSize: 11, fill: '#475569', fontWeight: 500 }} tickLine={false} axisLine={false} />
                 <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(99,102,241,0.05)' }} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
                 {visibleSubjects.map((subject, i, arr) => (
@@ -258,7 +265,7 @@ export const EnrollmentAnalytics = () => {
                   {d.subjectTotals.map((s, i) => <Cell key={i} fill={COLORS[d.allSubjects.indexOf(s.name) % COLORS.length]} />)}
                 </Pie>
                 <Tooltip content={<ChartTooltip />} />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 11, paddingTop: 8, lineHeight: '18px' }} formatter={(value) => <span style={{ color: '#475569' }}>{shortLabel(value, 18)}</span>} />
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ top: '-28px' }}>
@@ -272,10 +279,10 @@ export const EnrollmentAnalytics = () => {
       {/* Row 2: per-batch bar + directory */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <ChartCard icon={ChartColumnIcon} title="Students per batch" subtitle="Distinct students enrolled in each batch">
-          <ResponsiveContainer width="100%" height={320}>
+          <ResponsiveContainer width="100%" height={360}>
             <BarChart data={d.batchTotals} margin={{ top: 8, right: 12, left: 0, bottom: 4 }} barCategoryGap="30%">
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#475569' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} interval={0} angle={-12} textAnchor="end" height={50} />
+              <XAxis dataKey="name" interval={0} angle={-35} textAnchor="end" height={96} tickMargin={8} tickFormatter={(v) => shortLabel(v, 16)} tick={{ fontSize: 10, fill: '#475569' }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
               <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
               <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(99,102,241,0.05)' }} />
               <Bar dataKey="value" name="Students" radius={[4, 4, 0, 0]} maxBarSize={46}>
