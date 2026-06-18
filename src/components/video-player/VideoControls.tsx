@@ -66,6 +66,7 @@ export const VideoControls = ({
   onMuteToggle,
   onSpeedChange,
   onFullscreenToggle,
+  onLandscape,
   onSkipForward,
   onSkipBackward,
   onToggleDoubts,
@@ -267,6 +268,17 @@ export const VideoControls = ({
               title="Doubts & Notes"
             >
               <FileText className="w-5 h-5" />
+            </button>
+          )}
+
+          {/* Landscape mode (mobile only) — fullscreen + lock to landscape, beside Settings */}
+          {isMobile && onLandscape && (
+            <button
+              onClick={onLandscape}
+              className="text-white/70 hover:text-white transition-colors"
+              aria-label="Landscape mode"
+            >
+              <Maximize className="w-6 h-6" />
             </button>
           )}
 

@@ -65,6 +65,7 @@ export const FullScreenVideoPlayer = ({
     toggleMute,
     changeSpeed,
     toggleFullscreen,
+    enterLandscape,
     showControlsTemporarily,
   } = useVideoPlayer();
 
@@ -406,6 +407,7 @@ export const FullScreenVideoPlayer = ({
               onMuteToggle={toggleMute}
               onSpeedChange={changeSpeed}
               onFullscreenToggle={toggleFullscreen}
+              onLandscape={enterLandscape}
               onSkipForward={skipForward}
               onSkipBackward={skipBackward}
               onToggleDoubts={() => toggleSidebar('doubts')}

@@ -176,6 +176,22 @@ export const useVideoPlayer = () => {
     }
   }, []);
 
+  // Mobile "landscape mode": go fullscreen and lock the screen to landscape.
+  // Orientation lock works on Android (Chrome) in fullscreen; iOS Safari has no
+  // such API, so it falls back to the user rotating the device manually.
+  const enterLandscape = useCallback(async () => {
+    try {
+      if (containerRef.current && !document.fullscreenElement) {
+        await containerRef.current.requestFullscreen();
+        setIsFullscreen(true);
+      }
+    } catch { /* ignore */ }
+    try {
+      const orientation = (screen as unknown as { orientation?: { lock?: (s: string) => Promise<void> } }).orientation;
+      if (orientation?.lock) await orientation.lock('landscape');
+    } catch { /* unsupported (iOS) — user rotates manually */ }
+  }, []);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -269,6 +285,7 @@ export const useVideoPlayer = () => {
     toggleMute,
     changeSpeed,
     toggleFullscreen,
+    enterLandscape,
     showControlsTemporarily,
   };
 };

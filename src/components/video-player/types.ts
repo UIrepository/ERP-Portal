@@ -59,6 +59,8 @@ export interface VideoControlsProps {
   onMuteToggle: () => void;
   onSpeedChange: (speed: number) => void;
   onFullscreenToggle: () => void;
+  /** Mobile: enter fullscreen + lock to landscape. */
+  onLandscape?: () => void;
   onSkipForward: () => void;
   onSkipBackward: () => void;
   onToggleDoubts?: () => void;

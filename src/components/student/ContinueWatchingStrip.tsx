@@ -4,6 +4,8 @@ import { Play } from 'lucide-react';
 import { listForBatch } from '@/lib/videoProgress';
 import { pullProgress } from '@/lib/videoProgressSync';
 import { parseVideoUrl } from '@/components/video-player/useVideoPlayer';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { openInternalRoute } from '@/hooks/useInstallApp';
 
 interface ContinueWatchingStripProps {
   userId?: string | null;
@@ -12,15 +14,15 @@ interface ContinueWatchingStripProps {
 
 /**
  * Horizontal, single-row strip of partially-watched videos for the current
- * batch, read entirely from on-device localStorage (no DB/egress). Renders
- * nothing when there's no in-progress video. Tapping a card resumes playback.
+ * batch. localStorage is the source of truth; one cheap pull merges cross-device
+ * progress. Renders nothing when there's no in-progress video.
  */
 export const ContinueWatchingStrip = ({ userId, batch }: ContinueWatchingStripProps) => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [version, setVersion] = useState(0);
 
-  // One cheap cross-device pull when the dashboard mounts (merges the DB rows
-  // into localStorage), then re-read.
+  // One cheap cross-device pull when the dashboard mounts, then re-read.
   useEffect(() => {
     if (!userId) return;
     pullProgress(userId).then((merged) => { if (merged) setVersion((v) => v + 1); });
@@ -30,14 +32,19 @@ export const ContinueWatchingStrip = ({ userId, batch }: ContinueWatchingStripPr
 
   if (items.length === 0) return null;
 
-  return (
-    <section>
-      <div className="mb-3">
-        <h2 className="text-lg font-semibold text-[#1e293b]">Continue watching</h2>
-        <p className="text-[13px] text-[#64748b]">Pick up where you left off</p>
-      </div>
+  // Desktop opens in the same tab; mobile keeps the existing behaviour
+  // (same tab inside the installed PWA, new tab in a mobile browser).
+  const openLecture = (videoId: string) => {
+    const url = `/lecture/${videoId}`;
+    if (isMobile) openInternalRoute(url, navigate);
+    else navigate(url);
+  };
 
-      <div className="flex gap-4 overflow-x-auto pb-2 -mx-1 px-1" style={{ scrollbarWidth: 'thin' }}>
+  return (
+    <section className="bg-white rounded-lg border border-slate-100 shadow-sm p-5 md:p-6">
+      <h2 className="text-lg font-semibold text-[#1e293b] mb-4">Continue watching</h2>
+
+      <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'thin' }}>
         {items.map((it) => {
           const parsed = parseVideoUrl(it.videoUrl);
           const thumb =
@@ -48,8 +55,8 @@ export const ContinueWatchingStrip = ({ userId, batch }: ContinueWatchingStripPr
             <button
               key={it.videoId}
               type="button"
-              onClick={() => navigate(`/lecture/${it.videoId}`)}
-              className="group relative shrink-0 w-[230px] text-left rounded-xl overflow-hidden border border-slate-200 bg-white shadow-sm hover:shadow-md hover:border-indigo-200 transition-all"
+              onClick={() => openLecture(it.videoId)}
+              className="group relative shrink-0 w-[150px] sm:w-[168px] text-left rounded-lg overflow-hidden border border-slate-200 bg-white hover:shadow-md hover:border-violet-200 transition-all"
             >
               <div className="relative aspect-video bg-gradient-to-br from-slate-800 to-slate-900">
                 {thumb && (
@@ -60,16 +67,13 @@ export const ContinueWatchingStrip = ({ userId, batch }: ContinueWatchingStripPr
                     <Play className="h-5 w-5 text-slate-900 ml-0.5" fill="currentColor" />
                   </div>
                 </div>
-                {/* watched progress */}
                 <div className="absolute bottom-0 inset-x-0 h-1 bg-black/40">
-                  <div className="h-full bg-indigo-500" style={{ width: `${it.percent}%` }} />
+                  <div className="h-full bg-violet-600" style={{ width: `${it.percent}%` }} />
                 </div>
               </div>
-              <div className="p-3">
-                <p className="text-sm font-semibold text-slate-900 line-clamp-2 leading-snug">{it.title}</p>
-                <p className="mt-1 text-[11px] text-slate-400 truncate">
-                  {it.subject ? `${it.subject} · ` : ''}{it.percent}% watched
-                </p>
+              <div className="p-2.5">
+                <p className="text-[13px] font-semibold text-slate-900 line-clamp-2 leading-snug">{it.title}</p>
+                <p className="mt-1 text-[11px] font-semibold text-violet-700">{it.percent}% complete</p>
               </div>
             </button>
           );
