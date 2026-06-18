@@ -163,9 +163,11 @@ export async function sendPushToBatchSubject(
   batch: string,
   subject: string,
   payload: PushPayload,
+  excludeUserId?: string,
 ) {
   try {
-    const ids = await resolveBatchSubjectUserIds(supabase, batch, subject);
+    let ids = await resolveBatchSubjectUserIds(supabase, batch, subject);
+    if (excludeUserId) ids = ids.filter((id) => id !== excludeUserId);
     return await sendPushToUserIds(supabase, ids, payload);
   } catch (err) {
     console.error('sendPushToBatchSubject error:', (err as Error)?.message);

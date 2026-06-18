@@ -42,7 +42,7 @@ export const ContinueWatchingStrip = ({ userId, batch }: ContinueWatchingStripPr
 
   return (
     <section className="bg-white rounded-lg border border-slate-100 shadow-sm p-5 md:p-6">
-      <h2 className="text-lg font-semibold text-[#1e293b] mb-4">Continue watching</h2>
+      <h2 className="text-xl font-semibold text-[#1e293b] mb-4">Continue watching</h2>
 
       <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'thin' }}>
         {items.map((it) => {
