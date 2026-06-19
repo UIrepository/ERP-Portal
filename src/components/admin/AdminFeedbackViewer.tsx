@@ -82,12 +82,20 @@ export const AdminFeedbackViewer = () => {
       }
       if (!feedbackData) return [];
 
-      // Step 2: Fetch all student profiles
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('user_id, name, email')
-        .eq('role', 'student');
-      
+      // Step 2: Fetch the profiles of everyone who submitted feedback. We look
+      // them up by submitter id (not by role) so a submitter who happens to be
+      // staff — e.g. an admin/teacher test submission — still shows their name
+      // instead of falling back to "Anonymous".
+      const submitterIds = Array.from(
+        new Set(feedbackData.map((fb) => fb.submitted_by).filter(Boolean)),
+      );
+      const { data: profilesData, error: profilesError } = submitterIds.length
+        ? await supabase
+            .from('profiles')
+            .select('user_id, name, email')
+            .in('user_id', submitterIds)
+        : { data: [], error: null };
+
       if (profilesError) {
         console.error("Error fetching profiles:", profilesError);
         throw profilesError;
