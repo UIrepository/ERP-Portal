@@ -125,9 +125,15 @@ export const EnrollmentAnalytics = () => {
         .select('batch_name, subject_name, user_id, email');
       if (enrollError) throw enrollError;
 
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('user_id, name, email');
+      // Look up names only for the enrolled users (scoped by id) rather than
+      // fetching every profile — avoids Supabase's 1000-row cap silently
+      // dropping enrollments whose student fell outside the first 1000.
+      const enrolledIds = Array.from(
+        new Set((enrollmentData || []).map((e) => e.user_id).filter(Boolean)),
+      );
+      const { data: profilesData, error: profilesError } = enrolledIds.length
+        ? await supabase.from('profiles').select('user_id, name, email').in('user_id', enrolledIds)
+        : { data: [], error: null };
       if (profilesError) throw profilesError;
 
       const profilesMap = new Map<string, { name: string; email: string }>();

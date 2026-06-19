@@ -19,8 +19,21 @@ export const AdminBatchAllocation = () => {
   const { data: users = [] } = useQuery({
     queryKey: ['admin-users-allocation'],
     queryFn: async () => {
-        const { data } = await supabase.from('profiles').select('*');
-        return data || [];
+        // Supabase caps each request at 1000 rows; page through so every user is
+        // selectable for allocation (there are 1000+ profiles).
+        const PAGE = 1000;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let all: any[] = [];
+        for (let from = 0; ; from += PAGE) {
+            const { data, error } = await supabase
+                .from('profiles').select('*')
+                .order('user_id', { ascending: true })
+                .range(from, from + PAGE - 1);
+            if (error) throw error;
+            all = all.concat(data ?? []);
+            if (!data || data.length < PAGE) break;
+        }
+        return all;
     }
   });
 
