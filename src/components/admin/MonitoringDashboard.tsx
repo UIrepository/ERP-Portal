@@ -8,6 +8,22 @@ import { Users, Monitor, MessageSquare, Activity, Loader2, AlertTriangle } from 
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton'; // Assuming Skeleton is used for loading states if needed elsewhere
 
+// Supabase returns at most 1000 rows per request. Page through with .range()
+// so large tables (e.g. 1000+ student profiles) aren't silently truncated.
+// makeQuery() must return a fresh builder each call and include an .order().
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function fetchAllPaged<T = any>(makeQuery: () => any): Promise<T[]> {
+  const PAGE = 1000;
+  let all: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await makeQuery().range(from, from + PAGE - 1);
+    if (error) throw error;
+    all = all.concat((data ?? []) as T[]);
+    if (!data || data.length < PAGE) break;
+  }
+  return all;
+}
+
 export const MonitoringDashboard = () => {
   const queryClient = useQueryClient(); // Initialize useQueryClient
 
@@ -65,14 +81,14 @@ export const MonitoringDashboard = () => {
   const { data: activeUsers = [], isLoading: isLoadingActiveUsers, isError: isErrorActiveUsers, error: errorActiveUsers } = useQuery({
     queryKey: ['active-users'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('is_active', true)
-        .order('updated_at', { ascending: false });
-      
-      if (error) throw error;
-      return data || [];
+      // Page through so all active users are counted, not just the first 1000.
+      return await fetchAllPaged(() =>
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('is_active', true)
+          .order('updated_at', { ascending: false }),
+      );
     },
   });
 
@@ -98,16 +114,15 @@ export const MonitoringDashboard = () => {
   const { data: studentActivitiesData = [], isLoading: isLoadingStudentActivities, isError: isErrorStudentActivities, error: errorStudentActivities } = useQuery({
     queryKey: ['student-activities-monitoring'],
     queryFn: async () => {
-      // Fetch all students (profiles with role 'student')
-      const { data: students, error: studentsError } = await supabase
-        .from('profiles')
-        .select('id, user_id, name, email') // Select user_id to match student_activities
-        .eq('role', 'student');
-
-      if (studentsError) {
-        console.error("Error fetching students for activity monitoring:", studentsError);
-        throw studentsError;
-      }
+      // Fetch ALL students (profiles with role 'student'), paging past the
+      // 1000-row cap so students beyond the first 1000 aren't dropped.
+      const students = await fetchAllPaged<{ id: string; user_id: string; name: string; email: string }>(() =>
+        supabase
+          .from('profiles')
+          .select('id, user_id, name, email') // Select user_id to match student_activities
+          .eq('role', 'student')
+          .order('user_id', { ascending: true }),
+      );
 
       // If no students, return empty array immediately
       if (!students || students.length === 0) {
