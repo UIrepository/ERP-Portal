@@ -37,7 +37,9 @@ const App = () => (
         <ScreenRecordingProtection>
           <Toaster />
           <Sonner />
-          <InstallAppBanner />
+          {/* The whiteboard opens in its own full-screen tab — never show the
+              install banner there. */}
+          {!window.location.pathname.startsWith('/whiteboard') && <InstallAppBanner />}
           <BrowserRouter>
             <Routes>
               {/* Root Route - Index will redirect to default tab */}

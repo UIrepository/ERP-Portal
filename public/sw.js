@@ -1,6 +1,6 @@
 // Minimal service worker — enables PWA installability, push notifications,
 // and a tiny offline app-shell cache.
-const CACHE = 'ui-portal-v4';
+const CACHE = 'ui-portal-v5';
 const APP_SHELL = ['/', '/icon-192.png', '/icon-512.png', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
@@ -27,24 +27,32 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-first for our own static assets.
   const url = new URL(req.url);
-  if (url.origin === self.location.origin) {
+  if (url.origin !== self.location.origin) return;
+
+  const cacheOk = (res) => {
+    if (res && res.ok && res.type === 'basic') {
+      const copy = res.clone();
+      caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+    }
+    return res;
+  };
+
+  // Hashed, immutable build assets (Vite emits these under /assets/) are safe to
+  // serve cache-first — the filename changes on every build.
+  if (url.pathname.startsWith('/assets/')) {
     event.respondWith(
-      caches.match(req).then((cached) =>
-        cached ||
-        fetch(req).then((res) => {
-          // Only cache successful, basic (same-origin, non-opaque) responses so
-          // a 404/redirect can't poison the cache and white-screen the app.
-          if (res.ok && res.type === 'basic') {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
-          }
-          return res;
-        }).catch(() => cached)
-      )
+      caches.match(req).then((cached) => cached || fetch(req).then(cacheOk).catch(() => cached)),
     );
+    return;
   }
+
+  // Everything else same-origin (dev modules with stable URLs, icons, manifest)
+  // is NETWORK-FIRST so a stale cache can never mask updated code; fall back to
+  // cache only when offline.
+  event.respondWith(
+    fetch(req).then(cacheOk).catch(() => caches.match(req)),
+  );
 });
 
 // --- Push notifications ---
