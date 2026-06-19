@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.notify-direct-message]
 verify_jwt = false
 
+[functions.notify-schedule-change]
+verify_jwt = false
+
 [functions.youtube-broadcast-status]
 verify_jwt = false
 
