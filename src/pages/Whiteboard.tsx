@@ -15,7 +15,7 @@ import {
 import 'tldraw/tldraw.css';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, rgb } from 'pdf-lib';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -30,8 +30,9 @@ import { WhiteboardStylePanel } from '@/components/whiteboard/WhiteboardStylePan
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 // Swap tldraw's default style panel for ours (pen-width slider instead of the
-// S/M/L size buttons). Module-level for a stable reference across renders.
-const WB_COMPONENTS = { StylePanel: WhiteboardStylePanel };
+// S/M/L size buttons), and remove the zoom/minimap control — the board is a
+// fixed "slide" view with no zooming. Module-level for a stable reference.
+const WB_COMPONENTS = { StylePanel: WhiteboardStylePanel, NavigationPanel: null };
 
 type StartMode = 'choose' | 'blank' | 'pdf';
 
@@ -50,12 +51,29 @@ interface ScheduleContext {
 const PDF_RENDER_SCALE = 1.5;
 const PDF_JPEG_QUALITY = 0.85;
 
-// Default "slide" size for blank whiteboard pages — 16:9 at a comfortable
-// resolution. Exports are pinned to this box (or the PDF image's box on
-// imported pages) so every page in the final PDF has the same dimensions.
+// Default "slide" size for blank whiteboard pages — 16:9 widescreen, the same
+// proportions PowerPoint/Google Slides use. The slide fills the screen and
+// exports edge-to-edge as a 16:9 page (what you write is what you get).
 const BLANK_PAGE_W = 1920;
-const BLANK_PAGE_H = 1080;
+const BLANK_PAGE_H = 1080; // 16:9
 const EXPORT_SCALE = 1.5;
+
+// Each exported PDF page is sized to its own content (no letterboxing): the
+// longest side is normalised to this many points (1pt = 1/72"). 960pt = 13.33"
+// — the width of a standard PowerPoint 16:9 slide, so a blank board exports as
+// a normal 13.33"×7.5" widescreen PDF page.
+const PDF_LONG_SIDE_PT = 960;
+
+// Ray-casting point-in-polygon test (page-space) for the freehand lasso select.
+const pointInPolygon = (pt: { x: number; y: number }, poly: { x: number; y: number }[]) => {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x, yi = poly[i].y, xj = poly[j].x, yj = poly[j].y;
+    const intersect = yi > pt.y !== yj > pt.y && pt.x < ((xj - xi) * (pt.y - yi)) / (yj - yi) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+};
 
 const Whiteboard = () => {
   const { scheduleId } = useParams<{ scheduleId: string }>();
@@ -72,6 +90,10 @@ const Whiteboard = () => {
   }, [navigate]);
 
   const [editor, setEditor] = useState<Editor | null>(null);
+  // Screen-space rectangle of the current blank page, used to paint the slate
+  // "sheet" behind the canvas. null on PDF-imported pages (the image is the
+  // page) or before the camera is positioned.
+  const [sheetRect, setSheetRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
   // null = still checking; true/false = server's verdict on whether this user
   // may open this class's whiteboard.
   const [accessAllowed, setAccessAllowed] = useState<boolean | null>(null);
@@ -89,6 +111,11 @@ const Whiteboard = () => {
   const [stylePanelHidden, setStylePanelHidden] = useState(false);
   // Focus mode — hide all chrome (header, navigator, style panel) at once.
   const [chromeHidden, setChromeHidden] = useState(false);
+  // Freehand "lasso" select — draw a loop to select whatever it encircles.
+  const [lassoActive, setLassoActive] = useState(false);
+  const [lassoScreenPath, setLassoScreenPath] = useState('');
+  const lassoPtsRef = useRef<{ x: number; y: number }[]>([]);
+  const lassoDrawingRef = useRef(false);
 
   const showAllChrome = () => {
     setChromeHidden(false);
@@ -124,6 +151,17 @@ const Whiteboard = () => {
       cancelled = true;
     };
   }, [scheduleId]);
+
+  // The locked camera doesn't re-fit on its own, so on a window resize re-fit
+  // the page and re-align the slate sheet behind it.
+  useEffect(() => {
+    if (!editor) return;
+    const onResize = () => requestAnimationFrame(() => focusPage(editor));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+    // focusPage is stable enough for this purpose; only re-bind when editor changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor]);
 
   // Authorization gate: only the staff in charge of this class may open the
   // whiteboard — admins/managers, or the teacher assigned to this schedule's
@@ -169,6 +207,8 @@ const Whiteboard = () => {
     if (totalShapes > 0 || pages.length > 1) {
       setStartMode('blank');
     }
+    // Fit + lock the camera to the current page (fixed "slide" view).
+    focusPage(ed);
 
     ed.store.listen(() => {
       const ps = ed.getPages();
@@ -176,6 +216,17 @@ const Whiteboard = () => {
       const idx = ps.findIndex((p) => p.id === ed.getCurrentPageId());
       if (idx >= 0) setCurrentPage(idx + 1);
     });
+
+    // The Select tool IS the free-select: whenever it's active with nothing
+    // selected, the lasso overlay is armed. Picking up a selection (or another
+    // tool) disarms it so the teacher can move/resize normally.
+    ed.store.listen(
+      () => {
+        const armed = ed.getCurrentToolId() === 'select' && ed.getSelectedShapeIds().length === 0;
+        setLassoActive(armed);
+      },
+      { scope: 'session' },
+    );
 
     // Auto-enter focus mode the moment the teacher starts drawing/writing —
     // a pointer-down on the canvas with any content tool (pen, text, shapes,
@@ -285,7 +336,7 @@ const Whiteboard = () => {
         }
 
         editor.setCurrentPage(editor.getPages()[0].id);
-        editor.zoomToFit();
+        focusPage(editor);
         editor.setCurrentTool('draw');
         toast.success(`Imported ${pdf.numPages} page${pdf.numPages > 1 ? 's' : ''}`);
       } catch (e) {
@@ -339,60 +390,101 @@ const Whiteboard = () => {
     }
   };
 
-  // Re-center / zoom the current page to its canonical bounds — so flipping
-  // between pages always lands the teacher on the slide area, even if they
-  // scrolled away on a previous visit to that page.
-  const focusPage = (ed: Editor) => {
+  // The drawable bounds of the current page. A PDF-imported page uses its
+  // locked background image's box. A blank page fills the WHOLE screen — its
+  // box matches the viewport's aspect ratio so the slide covers the entire
+  // writing area edge-to-edge (no wasted dark margins on the sides).
+  const currentPageBox = (ed: Editor): Box => {
     const shapes = ed.getCurrentPageShapes();
     const pageBg = shapes.find(
       (s): s is TLImageShape => s.type === 'image' && s.isLocked && s.x === 0 && s.y === 0,
     );
-    const bounds = pageBg
-      ? new Box(0, 0, pageBg.props.w, pageBg.props.h)
-      : new Box(0, 0, BLANK_PAGE_W, BLANK_PAGE_H);
-    ed.zoomToBounds(bounds, { animation: { duration: 220 }, inset: 24 });
+    if (pageBg) return new Box(0, 0, pageBg.props.w, pageBg.props.h);
+    const vp = ed.getViewportScreenBounds();
+    const ratio = vp.height > 0 && vp.width > 0 ? vp.height / vp.width : BLANK_PAGE_H / BLANK_PAGE_W;
+    return new Box(0, 0, BLANK_PAGE_W, Math.round(BLANK_PAGE_W * ratio));
   };
 
-  // Drop a faint locked rectangle at (0,0,BLANK_PAGE_W,BLANK_PAGE_H) so the
-  // teacher can see where the exported slide actually ends. Strokes drawn
-  // outside this rectangle get clipped on export.
-  const ensureFrameOnCurrentPage = (ed: Editor) => {
+  // Recompute the screen rectangle for the slate "sheet" we paint behind the
+  // canvas, from the (now fixed) camera. Cleared on PDF-imported pages, where
+  // the imported image already shows the page.
+  const updateSheetRect = (ed: Editor) => {
     const shapes = ed.getCurrentPageShapes();
-    const alreadyHasFrame = shapes.some(
-      (s) =>
-        s.type === 'geo' &&
-        s.isLocked &&
-        s.x === 0 &&
-        s.y === 0 &&
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (s as any).props?.w === BLANK_PAGE_W &&
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (s as any).props?.h === BLANK_PAGE_H,
+    const hasImageBg = shapes.some(
+      (s) => s.type === 'image' && s.isLocked && s.x === 0 && s.y === 0,
     );
-    if (alreadyHasFrame) return;
-    ed.createShape({
-      id: createShapeId(),
-      type: 'geo',
-      x: 0,
-      y: 0,
-      isLocked: true,
-      opacity: 0.7,
-      props: {
-        geo: 'rectangle',
-        w: BLANK_PAGE_W,
-        h: BLANK_PAGE_H,
-        color: 'white',
-        fill: 'none',
-        dash: 'dashed',
-        size: 'm',
-      },
-    });
+    if (hasImageBg) {
+      setSheetRect(null);
+      return;
+    }
+    const box = currentPageBox(ed);
+    const tl = ed.pageToViewport({ x: 0, y: 0 });
+    const br = ed.pageToViewport({ x: box.w, y: box.h });
+    setSheetRect({ left: tl.x, top: tl.y, width: br.x - tl.x, height: br.y - tl.y });
+  };
+
+  // Fit the current page to the viewport and LOCK the camera there — a fixed
+  // "slide" view (PowerPoint-style): no zoom, no panning. To make content fit,
+  // the teacher selects a stroke / image / text and resizes it with the
+  // selection handles instead of zooming the board.
+  const focusPage = (ed: Editor) => {
+    const box = currentPageBox(ed);
+    ed.setCameraOptions({ isLocked: false });
+    // inset 0 so a blank page fills the entire screen with no margin.
+    ed.zoomToBounds(box, { inset: 0, force: true });
+    ed.setCameraOptions({ isLocked: true, wheelBehavior: 'none', panSpeed: 0, zoomSpeed: 0 });
+    updateSheetRect(ed);
+  };
+
+  // ---- Freehand lasso select -------------------------------------------------
+  // A transparent overlay captures the drag, we trace the loop, then select
+  // every shape whose centre falls inside it and hand off to the Select tool
+  // so the teacher can move/resize the selection.
+  const onLassoDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!editor) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    lassoDrawingRef.current = true;
+    lassoPtsRef.current = [{ x: e.clientX, y: e.clientY }];
+    setLassoScreenPath(`${e.clientX},${e.clientY}`);
+  };
+  const onLassoMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!lassoDrawingRef.current) return;
+    lassoPtsRef.current.push({ x: e.clientX, y: e.clientY });
+    setLassoScreenPath((prev) => `${prev} ${e.clientX},${e.clientY}`);
+  };
+  const onLassoUp = () => {
+    if (!editor || !lassoDrawingRef.current) return;
+    lassoDrawingRef.current = false;
+    const pts = lassoPtsRef.current;
+    setLassoScreenPath('');
+    const shapes = editor.getCurrentPageShapes();
+    // A tap (barely moved) → select the topmost shape under the point, or clear.
+    if (pts.length < 3) {
+      const pp = editor.screenToPage(pts[0] ?? { x: 0, y: 0 });
+      const hits = shapes.filter((s) => {
+        const b = editor.getShapePageBounds(s.id);
+        return !!b && pp.x >= b.minX && pp.x <= b.maxX && pp.y >= b.minY && pp.y <= b.maxY;
+      });
+      if (hits.length) editor.select(hits[hits.length - 1].id);
+      else editor.selectNone();
+      return;
+    }
+    // A loop → select every shape whose centre falls inside it.
+    const poly = pts.map((p) => editor.screenToPage({ x: p.x, y: p.y }));
+    const ids = shapes
+      .filter((s) => {
+        const b = editor.getShapePageBounds(s.id);
+        return b ? pointInPolygon({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 }, poly) : false;
+      })
+      .map((s) => s.id);
+    if (ids.length) editor.select(...ids);
+    else editor.selectNone();
+    // The session listener disarms the lasso now that a selection exists.
   };
 
   const startBlank = () => {
     setStartMode('blank');
     if (editor) {
-      ensureFrameOnCurrentPage(editor);
       focusPage(editor);
       editor.setCurrentTool('draw');
     }
@@ -403,7 +495,6 @@ const Whiteboard = () => {
     editor.createPage({ name: `Page ${editor.getPages().length + 1}` });
     const last = editor.getPages()[editor.getPages().length - 1];
     editor.setCurrentPage(last.id);
-    ensureFrameOnCurrentPage(editor);
     focusPage(editor);
   };
 
@@ -438,18 +529,26 @@ const Whiteboard = () => {
       const p = pages[i];
       editor.setCurrentPage(p.id);
 
-      // Pin the export to a fixed rectangle so every page in the final
-      // PDF has uniform dimensions. PDF-imported pages reuse the locked
-      // image's bounds; blank pages use the default 16:9 slide.
+      // Export the same region the teacher was drawing on: the imported PDF
+      // image for imported pages, or the full-screen slide box for blank pages.
       const shapes = editor.getCurrentPageShapes();
       const pageBg = shapes.find(
         (s): s is TLImageShape => s.type === 'image' && s.isLocked && s.x === 0 && s.y === 0,
       );
-      const bounds = pageBg
-        ? new Box(0, 0, pageBg.props.w, pageBg.props.h)
-        : new Box(0, 0, BLANK_PAGE_W, BLANK_PAGE_H);
+      const bounds = currentPageBox(editor);
 
       const ids = shapes.map((s) => s.id);
+
+      // A page with nothing drawn on it — emit a blank sheet matching the slide
+      // shape rather than asking tldraw to export zero shapes.
+      if (ids.length === 0) {
+        const w = PDF_LONG_SIDE_PT;
+        const h = PDF_LONG_SIDE_PT * (bounds.h / bounds.w);
+        const page = pdfDoc.addPage([w, h]);
+        page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(0.06, 0.06, 0.07) });
+        continue;
+      }
+
       const blob = await exportToBlob({
         editor,
         ids,
@@ -459,8 +558,15 @@ const Whiteboard = () => {
 
       const bytes = new Uint8Array(await blob.arrayBuffer());
       const img = await pdfDoc.embedPng(bytes);
-      const page = pdfDoc.addPage([img.width, img.height]);
-      page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+
+      // Size the PDF page to the content's own aspect ratio (no letterboxing),
+      // normalising the longest side to a normal document size. A blank 16:9
+      // board becomes a 13.33"×7.5" widescreen page — exactly what you drew.
+      const ptScale = PDF_LONG_SIDE_PT / Math.max(img.width, img.height);
+      const pageW = img.width * ptScale;
+      const pageH = img.height * ptScale;
+      const page = pdfDoc.addPage([pageW, pageH]);
+      page.drawImage(img, { x: 0, y: 0, width: pageW, height: pageH });
     }
     editor.setCurrentPage(startedFrom);
     return pdfDoc.save();
@@ -595,6 +701,9 @@ const Whiteboard = () => {
       {/* Scoped CSS: shift tldraw's top UI below our header so the style
           panel never sits under the Insert/Save buttons; allow hiding it. */}
       <style>{`
+        /* Make tldraw's own background transparent so the slate "sheet" we
+           paint behind the canvas shows through, with strokes drawn on top. */
+        .wb-canvas .tl-background { background: transparent !important; }
         .wb-canvas.wb-offset .tlui-layout__top { padding-top: 52px; }
         .wb-canvas.wb-hide-style .tlui-style-panel__wrapper { display: none !important; }
         /* Pen width is shown as a slider (below), so hide tldraw's S/M/L size buttons. */
@@ -610,7 +719,9 @@ const Whiteboard = () => {
         }
       `}</style>
 
-      {/* Canvas — fills the whole viewport so collapsing chrome reclaims real estate */}
+      {/* Canvas — fills the whole viewport so collapsing chrome reclaims real estate.
+          The dark workspace ("void") colour lives here; tldraw's own background is
+          transparent so the slate sheet below shows through. */}
       <div
         className={cn(
           'absolute inset-0 wb-canvas',
@@ -619,7 +730,24 @@ const Whiteboard = () => {
           // auto-focus hides the header — only the explicit toggle hides it.
           stylePanelHidden && 'wb-hide-style',
         )}
+        style={{ background: '#060608' }}
       >
+        {/* Slate "sheet" — the slide surface, painted behind the transparent
+            tldraw canvas. Non-interactive so it never blocks drawing/selecting. */}
+        {sheetRect && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute rounded-[3px]"
+            style={{
+              left: sheetRect.left,
+              top: sheetRect.top,
+              width: sheetRect.width,
+              height: sheetRect.height,
+              background: '#15171c',
+              boxShadow: '0 10px 50px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.04)',
+            }}
+          />
+        )}
         <Tldraw
           onMount={handleMount}
           inferDarkMode
@@ -627,6 +755,34 @@ const Whiteboard = () => {
           persistenceKey={scheduleId ? `wb-${scheduleId}` : undefined}
         />
       </div>
+
+      {/* Freehand lasso-select overlay — armed automatically whenever the Select
+          tool is active with nothing selected. Captures the drag, traces the
+          loop (open path — no start↔end line), and selects whatever it
+          encircles. Inset above the bottom toolbar so tools stay reachable. */}
+      {lassoActive && startMode !== 'choose' && (
+        <div
+          className="absolute inset-x-0 top-0 bottom-16 z-[15] cursor-crosshair"
+          style={{ touchAction: 'none' }}
+          onPointerDown={onLassoDown}
+          onPointerMove={onLassoMove}
+          onPointerUp={onLassoUp}
+          onPointerCancel={onLassoUp}
+        >
+          <svg className="absolute inset-0 h-full w-full pointer-events-none">
+            {lassoScreenPath && (
+              <polyline
+                points={lassoScreenPath}
+                fill="rgba(217,70,239,0.10)"
+                stroke="#e879f9"
+                strokeWidth={2}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+            )}
+          </svg>
+        </div>
+      )}
 
       {/* Top header (overlay, slides up on collapse) */}
       <header
@@ -720,6 +876,7 @@ const Whiteboard = () => {
           <span className="text-xs font-medium">Show controls</span>
         </button>
       )}
+
 
       {/* Bottom-right page navigator (collapsible) */}
       {startMode !== 'choose' && navVisible && !chromeHidden && (

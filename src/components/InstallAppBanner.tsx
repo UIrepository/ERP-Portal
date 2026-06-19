@@ -25,12 +25,17 @@ export const InstallAppBanner = () => {
   const [visible, setVisible] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
 
+  // Don't interrupt the full-screen whiteboard (it opens in its own tab) with
+  // the install banner.
+  const onWhiteboard =
+    typeof window !== 'undefined' && window.location.pathname.startsWith('/whiteboard');
+
   // Slide up shortly after load, every reload.
   useEffect(() => {
-    if (standalone) return;
+    if (standalone || onWhiteboard) return;
     const t = setTimeout(() => setVisible(true), 1400);
     return () => clearTimeout(t);
-  }, [standalone]);
+  }, [standalone, onWhiteboard]);
 
   // Sidebar "Get App" button can ask us to show the manual steps.
   useEffect(() => {
@@ -39,7 +44,7 @@ export const InstallAppBanner = () => {
     return () => window.removeEventListener('pwa:show-help', handler);
   }, []);
 
-  if (standalone) return null;
+  if (standalone || onWhiteboard) return null;
 
   const handleInstall = async () => {
     // This is a user gesture — also a good moment to enable notifications.
