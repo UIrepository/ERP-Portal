@@ -446,13 +446,15 @@ const Whiteboard = () => {
         panSpeed: 1,
         zoomSpeed: 1,
         wheelBehavior: 'pan',
+        // Absolute zoom levels (baseZoom 'default' = 1.0 is 100%). Step 0 is the
+        // whole-page fit, which becomes the hard zoom-OUT floor.
         zoomSteps: [1, 1.5, 2, 3, 4, 6, 8].map((m) => minZoom * m),
         constraints: {
           bounds: { x: 0, y: 0, w: box.w, h: box.h },
           padding: { x: 0, y: 0 },
           origin: { x: 0.5, y: 0.5 },
           initialZoom: 'fit-max',
-          baseZoom: 'fit-max',
+          baseZoom: 'default',
           behavior: 'contain',
         },
       });
