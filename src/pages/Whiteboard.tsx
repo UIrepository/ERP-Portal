@@ -423,16 +423,46 @@ const Whiteboard = () => {
     setSheetRect({ left: tl.x, top: tl.y, width: br.x - tl.x, height: br.y - tl.y });
   };
 
-  // Fit the current page to the viewport and LOCK the camera there — a fixed
-  // "slide" view (PowerPoint-style): no zoom, no panning. To make content fit,
-  // the teacher selects a stroke / image / text and resizes it with the
-  // selection handles instead of zooming the board.
+  // Position the camera for the current page.
+  //  • PDF-imported page → fit the page, but allow zooming IN to annotate fine
+  //    detail. Zoom-OUT is floored at "whole page fits" (the current limit) so
+  //    the teacher can't shrink the page below full view, and panning is kept
+  //    inside the page.
+  //  • Blank page → fixed full-screen slide: no zoom, no pan (resize content
+  //    with the Select tool instead).
   const focusPage = (ed: Editor) => {
+    const shapes = ed.getCurrentPageShapes();
+    const pageBg = shapes.find(
+      (s): s is TLImageShape => s.type === 'image' && s.isLocked && s.x === 0 && s.y === 0,
+    );
     const box = currentPageBox(ed);
-    ed.setCameraOptions({ isLocked: false });
-    // inset 0 so a blank page fills the entire screen with no margin.
-    ed.zoomToBounds(box, { inset: 0, force: true });
-    ed.setCameraOptions({ isLocked: true, wheelBehavior: 'none', panSpeed: 0, zoomSpeed: 0 });
+
+    if (pageBg) {
+      const vp = ed.getViewportScreenBounds();
+      const fit = Math.min(vp.width / box.w, vp.height / box.h);
+      const minZoom = Math.max(0.02, fit); // can't zoom out past whole-page fit
+      ed.setCameraOptions({
+        isLocked: false,
+        panSpeed: 1,
+        zoomSpeed: 1,
+        wheelBehavior: 'pan',
+        zoomSteps: [1, 1.5, 2, 3, 4, 6, 8].map((m) => minZoom * m),
+        constraints: {
+          bounds: { x: 0, y: 0, w: box.w, h: box.h },
+          padding: { x: 0, y: 0 },
+          origin: { x: 0.5, y: 0.5 },
+          initialZoom: 'fit-max',
+          baseZoom: 'fit-max',
+          behavior: 'contain',
+        },
+      });
+      ed.zoomToBounds(box, { inset: 0 });
+    } else {
+      ed.setCameraOptions({ isLocked: false });
+      // inset 0 so a blank page fills the entire screen with no margin.
+      ed.zoomToBounds(box, { inset: 0, force: true });
+      ed.setCameraOptions({ isLocked: true, wheelBehavior: 'none', panSpeed: 0, zoomSpeed: 0 });
+    }
     updateSheetRect(ed);
   };
 
