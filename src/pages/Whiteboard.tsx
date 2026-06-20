@@ -89,6 +89,12 @@ const Whiteboard = () => {
   const fileMode = !!fileId;
   const fileContentUrlRef = useRef<string | null>(null);
   const fileLoadedRef = useRef(false);
+  // Realtime autosave (file mode): debounce after edits, no manual button.
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const savingRef = useRef(false);
+  const dirtyRef = useRef(false);
+  const autosaveReadyRef = useRef(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   // Leave the whiteboard. When it was opened in its own browser tab,
   // window.close() works; in the installed PWA (navigated in-place, no tab to
@@ -239,9 +245,13 @@ const Whiteboard = () => {
     const totalShapes = pages.reduce((acc, p) => acc + editor.getPageShapeIds(p.id).size, 0);
     if (totalShapes > 0 || pages.length > 1) {
       setStartMode('blank'); // local copy exists — use it
+      autosaveReadyRef.current = true;
       return;
     }
-    if (!fileContentUrlRef.current) return; // brand-new empty file → show the chooser
+    if (!fileContentUrlRef.current) {
+      autosaveReadyRef.current = true; // brand-new empty file → show the chooser
+      return;
+    }
     (async () => {
       setBusy(true);
       setBusyLabel('Loading whiteboard…');
@@ -257,10 +267,35 @@ const Whiteboard = () => {
       } finally {
         setBusy(false);
         setBusyLabel('');
+        // Arm autosave only after the load settles, so it doesn't immediately
+        // re-save the freshly-loaded content.
+        setTimeout(() => { autosaveReadyRef.current = true; }, 300);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, fileMode, accessAllowed]);
+
+  // Realtime autosave (file mode): persist a debounced snapshot whenever the
+  // board changes — no manual Save button. Armed a moment after load so that
+  // loading a snapshot doesn't trigger a redundant save.
+  useEffect(() => {
+    if (!editor || !fileMode) return;
+    const unlisten = editor.store.listen(
+      () => {
+        if (!autosaveReadyRef.current) return;
+        dirtyRef.current = true;
+        if (!savingRef.current) setSaveState('idle');
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(() => { void runAutosave(); }, 2500);
+      },
+      { scope: 'document' },
+    );
+    return () => {
+      clearTimeout(saveTimerRef.current);
+      unlisten();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, fileMode]);
 
   const handleMount = useCallback((ed: Editor) => {
     setEditor(ed);
@@ -697,10 +732,8 @@ const Whiteboard = () => {
   };
 
   // A small PNG preview of the first page, for the history card.
+  // Thumbnail of the CURRENT page (no page switch → no flicker during autosave).
   const makeThumbnail = async (ed: Editor): Promise<Blob | null> => {
-    const first = ed.getPages()[0];
-    if (!first) return null;
-    ed.setCurrentPage(first.id);
     const shapes = ed.getCurrentPageShapes();
     if (shapes.length === 0) return null;
     const pageBg = shapes.find(
@@ -720,13 +753,12 @@ const Whiteboard = () => {
   };
 
   // File mode: persist the whole editable board (snapshot + thumbnail) to
-  // Cloudinary and update the file row. This is the "workspace save" — separate
-  // from the PDF download. Never touches any batch/subject.
-  const saveToCloud = async () => {
-    if (!editor || !fileId) return;
-    setBusy(true);
-    setBusyLabel('Saving whiteboard…');
-    const startedFrom = editor.getCurrentPageId();
+  // Cloudinary and update the file row. Runs silently in the background for
+  // autosave — never touches any batch/subject. Returns true on success.
+  const persistToCloud = async (): Promise<boolean> => {
+    if (!editor || !fileId || savingRef.current) return false;
+    savingRef.current = true;
+    setSaveState('saving');
     try {
       const snap = getSnapshot(editor.store);
       const snapBlob = new Blob([JSON.stringify(snap)], { type: 'application/json' });
@@ -736,10 +768,9 @@ const Whiteboard = () => {
         fileName: `wb-${fileId}.json`,
       });
 
-      let thumbUrl: string | null = null;
-      let thumbPid: string | null = null;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const patch: any = { content_url: contentUrl, content_public_id: contentPid };
       const thumbBlob = await makeThumbnail(editor);
-      editor.setCurrentPage(startedFrom);
       if (thumbBlob) {
         try {
           const up = await uploadBlobToCloudinary(thumbBlob, {
@@ -747,29 +778,44 @@ const Whiteboard = () => {
             resourceType: 'image',
             fileName: `thumb-${fileId}.png`,
           });
-          thumbUrl = up.url;
-          thumbPid = up.publicId;
+          patch.thumbnail_url = up.url;
+          patch.thumbnail_public_id = up.publicId;
         } catch { /* thumbnail is best-effort */ }
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const patch: any = { content_url: contentUrl, content_public_id: contentPid };
-      if (thumbUrl) {
-        patch.thumbnail_url = thumbUrl;
-        patch.thumbnail_public_id = thumbPid;
-      }
       const { error } = await supabase.from('whiteboard_files').update(patch).eq('id', fileId);
       if (error) throw error;
       fileContentUrlRef.current = contentUrl;
-      toast.success('Whiteboard saved');
+      setSaveState('saved');
+      return true;
     } catch (e) {
-      console.error('saveToCloud failed', e);
-      toast.error('Could not save the whiteboard');
+      console.error('persistToCloud failed', e);
+      setSaveState('error');
+      return false;
     } finally {
-      editor.setCurrentPage(startedFrom);
-      setBusy(false);
-      setBusyLabel('');
+      savingRef.current = false;
     }
+  };
+
+  // Debounced autosave runner: persist if dirty; if it failed or more edits
+  // arrived while saving, try again shortly.
+  const runAutosave = async () => {
+    if (!dirtyRef.current || savingRef.current) return;
+    dirtyRef.current = false;
+    const ok = await persistToCloud();
+    if (!ok) {
+      dirtyRef.current = true; // retry on the next change
+    } else if (dirtyRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => { void runAutosave(); }, 2500);
+    }
+  };
+
+  // Save the file's title (editable in the header, file mode only).
+  const commitTitle = async () => {
+    if (!fileId) return;
+    const t = title.trim() || 'Untitled whiteboard';
+    await supabase.from('whiteboard_files').update({ title: t }).eq('id', fileId);
   };
 
   const bytesToBase64 = (bytes: Uint8Array): string => {
@@ -983,13 +1029,30 @@ const Whiteboard = () => {
         <div className="flex items-center gap-3 min-w-0">
           <PenLine className="h-5 w-5 text-fuchsia-200 shrink-0" />
           <div className="min-w-0">
-            <div className="text-sm font-semibold truncate">
-              {scheduleCtx ? `${scheduleCtx.subject} — ${scheduleCtx.batch}` : fileMode ? title || 'Whiteboard' : 'Whiteboard'}
-            </div>
-            <div className="text-[11px] text-white/60 truncate">
+            {fileMode ? (
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onBlur={commitTitle}
+                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                placeholder="Untitled whiteboard"
+                title="Click to rename"
+                className="w-[44vw] max-w-[420px] bg-transparent text-sm font-semibold text-white outline-none rounded px-1 -ml-1 border border-transparent hover:border-white/15 focus:border-white/40 focus:bg-white/5 truncate transition-colors"
+              />
+            ) : (
+              <div className="text-sm font-semibold truncate">
+                {scheduleCtx ? `${scheduleCtx.subject} — ${scheduleCtx.batch}` : 'Whiteboard'}
+              </div>
+            )}
+            <div className="text-[11px] text-white/60 truncate px-1">
               {scheduleCtx
                 ? `${scheduleCtx.start_time?.slice(0, 5)} – ${scheduleCtx.end_time?.slice(0, 5)}`
-                : fileMode ? 'General whiteboard' : 'No class context'}
+                : fileMode
+                  ? saveState === 'saving' ? 'Saving…'
+                    : saveState === 'saved' ? 'All changes saved'
+                    : saveState === 'error' ? 'Save failed — will retry'
+                    : 'General whiteboard · autosaves'
+                  : 'No class context'}
             </div>
           </div>
         </div>
@@ -1015,16 +1078,21 @@ const Whiteboard = () => {
             Insert image
           </Button>
           {fileMode && (
-            <Button
-              size="sm"
-              className="h-8 bg-emerald-600 text-white border border-emerald-500 hover:bg-emerald-500 hover:border-emerald-400 transition-colors"
-              onClick={saveToCloud}
-              disabled={busy || startMode === 'choose'}
-              title="Save this whiteboard to your history"
+            <span
+              className={cn(
+                'h-8 px-2.5 inline-flex items-center gap-1.5 rounded-md border text-xs font-medium select-none',
+                saveState === 'saving' ? 'bg-white/5 border-white/10 text-white/70'
+                  : saveState === 'error' ? 'bg-rose-500/15 border-rose-400/30 text-rose-200'
+                  : 'bg-emerald-500/15 border-emerald-400/30 text-emerald-200',
+              )}
+              title={saveState === 'error' ? 'Will retry automatically' : 'Your whiteboard saves automatically'}
             >
-              <Save className="h-3.5 w-3.5 mr-1.5" />
-              Save
-            </Button>
+              {saveState === 'saving'
+                ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…</>
+                : saveState === 'error'
+                  ? <><CloudUpload className="h-3.5 w-3.5" /> Retry pending</>
+                  : <><Save className="h-3.5 w-3.5" /> Saved</>}
+            </span>
           )}
           <Button
             size="sm"
