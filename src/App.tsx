@@ -52,6 +52,8 @@ const App = () => (
               <Route path="/lecture/:recordingId" element={<LecturePlayer />} />
 
               {/* WHITEBOARD (opens in new tab) */}
+              {/* General-purpose teacher whiteboard "file" (own tab) */}
+              <Route path="/whiteboard/file/:fileId" element={<Whiteboard />} />
               <Route path="/whiteboard/:scheduleId" element={<Whiteboard />} />
               
               {/* COMMUNITY ROUTES (Open in new tabs) */}

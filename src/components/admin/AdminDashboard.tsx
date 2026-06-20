@@ -3,6 +3,7 @@ import { ScheduleManagement } from './ScheduleManagement';
 import { MonitoringDashboard } from './MonitoringDashboard';
 import { AdminMeetingManager } from './AdminMeetingManager';
 import { AdminFeedbackViewer } from './AdminFeedbackViewer';
+import { WhiteboardHub } from '@/components/whiteboard/WhiteboardHub';
 import { EnrollmentAnalytics } from './EnrollmentAnalytics';
 import { TeacherAnalytics } from './TeacherAnalytics';
 import { AdminCreateAnnouncement } from './AdminCreateAnnouncement';
@@ -49,6 +50,8 @@ export const AdminDashboard = ({ activeTab, onTabChange }: AdminDashboardProps) 
         return <AdminMeetingManager />;
       case 'feedback-viewer':
         return <AdminFeedbackViewer />;
+      case 'admin-whiteboard':
+        return <WhiteboardHub />;
       case 'create-announcement':
         return <AdminCreateAnnouncement />;
       case 'announcement-history':

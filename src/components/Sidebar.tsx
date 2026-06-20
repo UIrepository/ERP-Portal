@@ -30,6 +30,7 @@ import {
   Quiz01Icon,
   Download01Icon,
   FolderLibraryIcon,
+  BoardMathIcon,
 } from '@hugeicons/core-free-icons';
 
 import {
@@ -132,6 +133,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
     { id: 'teacher-join-class', label: 'Join Class', icon: Video01Icon },
     { id: 'teacher-community', label: 'Community', icon: UserGroupIcon },
     { id: 'teacher-recordings', label: 'My Recordings', icon: VideoReplayIcon },
+    { id: 'teacher-whiteboard', label: 'Whiteboard', icon: BoardMathIcon },
     { id: 'teacher-resources', label: 'Resources', icon: FolderLibraryIcon },
     { id: 'teacher-schedule-requests', label: 'Schedule Requests', icon: TaskDaily01Icon },
     { id: 'teacher-feedback', label: 'Feedback', icon: FavouriteIcon },
@@ -160,6 +162,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
     { id: 'schedule-requests', label: 'Schedule Requests', icon: TaskDaily01Icon },
     { id: 'meeting-manager', label: 'Meeting Links', icon: Link01Icon },
     { id: 'feedback-viewer', label: 'Feedback Viewer', icon: Message01Icon },
+    { id: 'admin-whiteboard', label: 'Whiteboard', icon: BoardMathIcon },
     { id: 'create-announcement', label: 'Create Announcement', icon: Megaphone01Icon },
     { id: 'announcement-history', label: 'Announcement History', icon: WorkHistoryIcon },
     { id: 'maintenance', label: 'Maintenance Mode', icon: Wrench01Icon },

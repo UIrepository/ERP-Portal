@@ -7,7 +7,8 @@ import { TeacherScheduleRequests } from './TeacherScheduleRequests';
 import { StaffInbox } from '@/components/shared/StaffInbox';
 import { TeacherFeedbackViewer } from './TeacherFeedbackViewer';
 import { TeacherJoinClass } from './TeacherJoinClass';
-import { TeacherCommunity } from './TeacherCommunity'; 
+import { TeacherCommunity } from './TeacherCommunity';
+import { WhiteboardHub } from '@/components/whiteboard/WhiteboardHub';
 import { Button } from '@/components/ui/button';
 import { FullScreenVideoPlayer } from '@/components/video-player/FullScreenVideoPlayer';
 import { Lecture } from '@/components/video-player/types';
@@ -49,6 +50,8 @@ export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardPro
         return <TeacherCommunity />;
       case 'teacher-recordings':
         return <TeacherRecordings />;
+      case 'teacher-whiteboard':
+        return <WhiteboardHub />;
       case 'teacher-resources':
         return <TeacherResources />;
       case 'teacher-schedule-requests':

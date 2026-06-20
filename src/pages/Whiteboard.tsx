@@ -10,6 +10,8 @@ import {
   TLPageId,
   TLImageShape,
   getHashForString,
+  getSnapshot,
+  loadSnapshot,
   Box,
 } from 'tldraw';
 import 'tldraw/tldraw.css';
@@ -20,11 +22,12 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ChevronDown, ChevronLeft, ChevronRight, CloudUpload, EyeOff, FileStack, ImagePlus, Loader2, LogOut, Palette, PenLine, Plus, Square, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, CloudUpload, Download, EyeOff, FileStack, ImagePlus, Loader2, LogOut, Palette, PenLine, Plus, Save, Square, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { uploadBlobToCloudinary } from '@/lib/cloudinary';
 import { WhiteboardStylePanel } from '@/components/whiteboard/WhiteboardStylePanel';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
@@ -76,10 +79,16 @@ const pointInPolygon = (pt: { x: number; y: number }, poly: { x: number; y: numb
 };
 
 const Whiteboard = () => {
-  const { scheduleId } = useParams<{ scheduleId: string }>();
+  const { scheduleId, fileId } = useParams<{ scheduleId?: string; fileId?: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+
+  // "File mode" = a general-purpose teacher whiteboard (not a class). Saved as a
+  // workspace file (cloud snapshot + thumbnail), never tied to a batch/subject.
+  const fileMode = !!fileId;
+  const fileContentUrlRef = useRef<string | null>(null);
+  const fileLoadedRef = useRef(false);
 
   // Leave the whiteboard. When it was opened in its own browser tab,
   // window.close() works; in the installed PWA (navigated in-place, no tab to
@@ -169,6 +178,7 @@ const Whiteboard = () => {
   // just reflects the verdict so unauthorized users never see the board.
   useEffect(() => {
     if (authLoading) return;
+    if (fileMode) return; // file mode is gated by the file-load effect below
     if (!user || !scheduleId) {
       setAccessAllowed(false);
       return;
@@ -185,7 +195,72 @@ const Whiteboard = () => {
     return () => {
       cancelled = true;
     };
-  }, [user, scheduleId, authLoading]);
+  }, [user, scheduleId, authLoading, fileMode]);
+
+  // File mode: load the file's row. RLS only returns it to the owner (teacher)
+  // or an admin, so a readable row IS the access check. Also sets the title and
+  // remembers the cloud snapshot URL for loading.
+  useEffect(() => {
+    if (authLoading) return;
+    if (!fileId) return;
+    if (!user) {
+      setAccessAllowed(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('whiteboard_files')
+        .select('id, title, content_url')
+        .eq('id', fileId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error || !data) {
+        setAccessAllowed(false);
+        return;
+      }
+      setTitle(data.title);
+      fileContentUrlRef.current = data.content_url;
+      document.title = `Whiteboard — ${data.title}`;
+      setAccessAllowed(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fileId, user, authLoading]);
+
+  // File mode: once the editor is ready and we have access, if this device has
+  // no local copy yet, pull the saved snapshot from Cloudinary. If local already
+  // has content (resume / unsaved edits), we keep that and don't overwrite.
+  useEffect(() => {
+    if (!editor || !fileMode || accessAllowed !== true || fileLoadedRef.current) return;
+    fileLoadedRef.current = true;
+    const pages = editor.getPages();
+    const totalShapes = pages.reduce((acc, p) => acc + editor.getPageShapeIds(p.id).size, 0);
+    if (totalShapes > 0 || pages.length > 1) {
+      setStartMode('blank'); // local copy exists — use it
+      return;
+    }
+    if (!fileContentUrlRef.current) return; // brand-new empty file → show the chooser
+    (async () => {
+      setBusy(true);
+      setBusyLabel('Loading whiteboard…');
+      try {
+        const res = await fetch(fileContentUrlRef.current!, { cache: 'no-store' });
+        const snap = await res.json();
+        loadSnapshot(editor.store, snap);
+        setStartMode('blank');
+        focusPage(editor);
+      } catch (e) {
+        console.error('load whiteboard snapshot failed', e);
+        toast.error('Could not load this whiteboard');
+      } finally {
+        setBusy(false);
+        setBusyLabel('');
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, fileMode, accessAllowed]);
 
   const handleMount = useCallback((ed: Editor) => {
     setEditor(ed);
@@ -621,6 +696,82 @@ const Whiteboard = () => {
     URL.revokeObjectURL(url);
   };
 
+  // A small PNG preview of the first page, for the history card.
+  const makeThumbnail = async (ed: Editor): Promise<Blob | null> => {
+    const first = ed.getPages()[0];
+    if (!first) return null;
+    ed.setCurrentPage(first.id);
+    const shapes = ed.getCurrentPageShapes();
+    if (shapes.length === 0) return null;
+    const pageBg = shapes.find(
+      (s): s is TLImageShape => s.type === 'image' && s.isLocked && s.x === 0 && s.y === 0,
+    );
+    const bounds = pageBg ? ed.getCurrentPageBounds() ?? currentPageBox(ed) : currentPageBox(ed);
+    try {
+      return await exportToBlob({
+        editor: ed,
+        ids: shapes.map((s) => s.id),
+        format: 'png',
+        opts: { background: true, darkMode: !pageBg, bounds, padding: 0, scale: 0.35 },
+      });
+    } catch {
+      return null;
+    }
+  };
+
+  // File mode: persist the whole editable board (snapshot + thumbnail) to
+  // Cloudinary and update the file row. This is the "workspace save" — separate
+  // from the PDF download. Never touches any batch/subject.
+  const saveToCloud = async () => {
+    if (!editor || !fileId) return;
+    setBusy(true);
+    setBusyLabel('Saving whiteboard…');
+    const startedFrom = editor.getCurrentPageId();
+    try {
+      const snap = getSnapshot(editor.store);
+      const snapBlob = new Blob([JSON.stringify(snap)], { type: 'application/json' });
+      const { url: contentUrl, publicId: contentPid } = await uploadBlobToCloudinary(snapBlob, {
+        folder: 'whiteboards',
+        resourceType: 'raw',
+        fileName: `wb-${fileId}.json`,
+      });
+
+      let thumbUrl: string | null = null;
+      let thumbPid: string | null = null;
+      const thumbBlob = await makeThumbnail(editor);
+      editor.setCurrentPage(startedFrom);
+      if (thumbBlob) {
+        try {
+          const up = await uploadBlobToCloudinary(thumbBlob, {
+            folder: 'whiteboard_thumbs',
+            resourceType: 'image',
+            fileName: `thumb-${fileId}.png`,
+          });
+          thumbUrl = up.url;
+          thumbPid = up.publicId;
+        } catch { /* thumbnail is best-effort */ }
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const patch: any = { content_url: contentUrl, content_public_id: contentPid };
+      if (thumbUrl) {
+        patch.thumbnail_url = thumbUrl;
+        patch.thumbnail_public_id = thumbPid;
+      }
+      const { error } = await supabase.from('whiteboard_files').update(patch).eq('id', fileId);
+      if (error) throw error;
+      fileContentUrlRef.current = contentUrl;
+      toast.success('Whiteboard saved');
+    } catch (e) {
+      console.error('saveToCloud failed', e);
+      toast.error('Could not save the whiteboard');
+    } finally {
+      editor.setCurrentPage(startedFrom);
+      setBusy(false);
+      setBusyLabel('');
+    }
+  };
+
   const bytesToBase64 = (bytes: Uint8Array): string => {
     let binary = '';
     const chunk = 0x8000;
@@ -790,7 +941,7 @@ const Whiteboard = () => {
           onMount={handleMount}
           inferDarkMode
           components={WB_COMPONENTS}
-          persistenceKey={scheduleId ? `wb-${scheduleId}` : undefined}
+          persistenceKey={fileId ? `wb-file-${fileId}` : scheduleId ? `wb-${scheduleId}` : undefined}
         />
       </div>
 
@@ -833,10 +984,12 @@ const Whiteboard = () => {
           <PenLine className="h-5 w-5 text-fuchsia-200 shrink-0" />
           <div className="min-w-0">
             <div className="text-sm font-semibold truncate">
-              {scheduleCtx ? `${scheduleCtx.subject} — ${scheduleCtx.batch}` : 'Whiteboard'}
+              {scheduleCtx ? `${scheduleCtx.subject} — ${scheduleCtx.batch}` : fileMode ? title || 'Whiteboard' : 'Whiteboard'}
             </div>
             <div className="text-[11px] text-white/60 truncate">
-              {scheduleCtx ? `${scheduleCtx.start_time?.slice(0, 5)} – ${scheduleCtx.end_time?.slice(0, 5)}` : 'No class context'}
+              {scheduleCtx
+                ? `${scheduleCtx.start_time?.slice(0, 5)} – ${scheduleCtx.end_time?.slice(0, 5)}`
+                : fileMode ? 'General whiteboard' : 'No class context'}
             </div>
           </div>
         </div>
@@ -861,14 +1014,26 @@ const Whiteboard = () => {
             <ImagePlus className="h-3.5 w-3.5 mr-1.5" />
             Insert image
           </Button>
+          {fileMode && (
+            <Button
+              size="sm"
+              className="h-8 bg-emerald-600 text-white border border-emerald-500 hover:bg-emerald-500 hover:border-emerald-400 transition-colors"
+              onClick={saveToCloud}
+              disabled={busy || startMode === 'choose'}
+              title="Save this whiteboard to your history"
+            >
+              <Save className="h-3.5 w-3.5 mr-1.5" />
+              Save
+            </Button>
+          )}
           <Button
             size="sm"
             className="h-8 bg-fuchsia-600 text-white border border-fuchsia-500 hover:bg-fuchsia-500 hover:border-fuchsia-400 transition-colors"
             onClick={() => setSaveOpen(true)}
             disabled={busy || startMode === 'choose'}
           >
-            <CloudUpload className="h-3.5 w-3.5 mr-1.5" />
-            End & Save
+            {fileMode ? <Download className="h-3.5 w-3.5 mr-1.5" /> : <CloudUpload className="h-3.5 w-3.5 mr-1.5" />}
+            {fileMode ? 'Download PDF' : 'End & Save'}
           </Button>
           <button
             type="button"
@@ -1018,9 +1183,9 @@ const Whiteboard = () => {
       <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>End class & save whiteboard</DialogTitle>
+            <DialogTitle>{fileMode ? 'Download whiteboard PDF' : 'End class & save whiteboard'}</DialogTitle>
             <DialogDescription>
-              Exports all {pageCount} page{pageCount === 1 ? '' : 's'} as a single PDF.
+              Exports all {pageCount} page{pageCount === 1 ? '' : 's'} as a single PDF{fileMode ? ' to this device' : ''}.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -1029,39 +1194,37 @@ const Whiteboard = () => {
               <Input id="wb-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Kinematics — 2026-05-17" />
             </div>
 
-            <label className={cn(
-              'flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors',
-              scheduleCtx ? 'border-slate-200 hover:bg-slate-50' : 'border-slate-100 opacity-60 cursor-not-allowed',
-            )}>
-              <input
-                type="checkbox"
-                className="mt-0.5 h-4 w-4 accent-fuchsia-600"
-                checked={postToNotes && !!scheduleCtx}
-                disabled={!scheduleCtx}
-                onChange={(e) => setPostToNotes(e.target.checked)}
-              />
-              <span className="text-sm">
-                <span className="font-medium text-slate-900">Upload to Drive &amp; add to Notes</span>
-                <span className="block text-xs text-slate-500">
-                  {scheduleCtx
-                    ? `Saves to Google Drive and posts to ${scheduleCtx.batch} — ${scheduleCtx.subject}. Students see it in References.`
-                    : 'Unavailable — this whiteboard has no class context.'}
+            {scheduleCtx && (
+              <label className="flex items-start gap-3 rounded-md border border-slate-200 p-3 cursor-pointer hover:bg-slate-50 transition-colors">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 accent-fuchsia-600"
+                  checked={postToNotes}
+                  onChange={(e) => setPostToNotes(e.target.checked)}
+                />
+                <span className="text-sm">
+                  <span className="font-medium text-slate-900">Upload to Drive &amp; add to Notes</span>
+                  <span className="block text-xs text-slate-500">
+                    Saves to Google Drive and posts to {scheduleCtx.batch} — {scheduleCtx.subject}. Students see it in References.
+                  </span>
                 </span>
-              </span>
-            </label>
+              </label>
+            )}
 
-            <label className="flex items-start gap-3 rounded-md border border-slate-200 p-3 cursor-pointer hover:bg-slate-50 transition-colors">
-              <input
-                type="checkbox"
-                className="mt-0.5 h-4 w-4 accent-fuchsia-600"
-                checked={alsoDownload}
-                onChange={(e) => setAlsoDownload(e.target.checked)}
-              />
-              <span className="text-sm">
-                <span className="font-medium text-slate-900">Also download a copy</span>
-                <span className="block text-xs text-slate-500">Saves the PDF to this device as well.</span>
-              </span>
-            </label>
+            {!fileMode && (
+              <label className="flex items-start gap-3 rounded-md border border-slate-200 p-3 cursor-pointer hover:bg-slate-50 transition-colors">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 accent-fuchsia-600"
+                  checked={alsoDownload}
+                  onChange={(e) => setAlsoDownload(e.target.checked)}
+                />
+                <span className="text-sm">
+                  <span className="font-medium text-slate-900">Also download a copy</span>
+                  <span className="block text-xs text-slate-500">Saves the PDF to this device as well.</span>
+                </span>
+              </label>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSaveOpen(false)} disabled={busy}>
