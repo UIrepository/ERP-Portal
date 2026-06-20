@@ -59,33 +59,50 @@ export async function uploadImageToCloudinary(file: File, folder = 'chat_uploads
   return json.secure_url as string;
 }
 
+// Cloudinary cloud name (public). Used to build deterministic raw delivery URLs.
+export const CLOUDINARY_CLOUD = 'drrits4mq';
+
 /**
  * Upload an arbitrary blob to Cloudinary and return its URL + public_id.
- * Used by the general whiteboard to store a tldraw snapshot (resourceType
- * 'raw') and its thumbnail ('image'). The signature only covers folder +
- * timestamp, so the same signed request works for either resource type.
+ * Used by the whiteboard to store tldraw snapshots ('raw') and thumbnails
+ * ('image'). Pass a fixed `publicId` + `overwrite` to deterministically
+ * overwrite one object (e.g. a class whiteboard's recovery snapshot — no
+ * orphans). The edge function signs exactly the params it returns.
  */
 export async function uploadBlobToCloudinary(
   blob: Blob,
-  opts: { folder: string; resourceType?: 'image' | 'raw'; fileName?: string },
+  opts: {
+    folder?: string;
+    resourceType?: 'image' | 'raw';
+    fileName?: string;
+    publicId?: string;
+    overwrite?: boolean;
+    invalidate?: boolean;
+  },
 ): Promise<{ url: string; publicId: string }> {
-  const { folder, resourceType = 'raw', fileName } = opts;
-  const { data, error } = await supabase.functions.invoke('cloudinary-sign', { body: { folder } });
+  const { folder, resourceType = 'raw', fileName, publicId, overwrite, invalidate } = opts;
+  const signBody: Record<string, unknown> = {};
+  if (folder) signBody.folder = folder;
+  if (publicId) signBody.public_id = publicId;
+  if (overwrite) signBody.overwrite = true;
+  if (invalidate) signBody.invalidate = true;
+
+  const { data, error } = await supabase.functions.invoke('cloudinary-sign', { body: signBody });
   if (error || !data) throw new Error('Could not sign upload');
 
-  const { signature, timestamp, api_key, cloud_name } = data as {
+  const { signature, api_key, cloud_name, params } = data as {
     signature: string;
-    timestamp: number;
     api_key: string;
     cloud_name: string;
+    params: Record<string, string>;
   };
 
   const form = new FormData();
   form.append('file', blob, fileName);
   form.append('api_key', api_key);
-  form.append('timestamp', String(timestamp));
   form.append('signature', signature);
-  form.append('folder', folder);
+  // Append exactly the params the function signed (timestamp + folder/public_id/...).
+  for (const [k, v] of Object.entries(params)) form.append(k, String(v));
 
   const res = await fetch(`https://api.cloudinary.com/v1_1/${cloud_name}/${resourceType}/upload`, {
     method: 'POST',

@@ -306,6 +306,10 @@ Deno.serve(async (req) => {
       noteInsertCount = noteRows.length;
     }
 
+    // The notes are saved — drop this class's editable recovery snapshot
+    // (the permanent record is now the PDF in Drive). Best-effort.
+    try { await deleteCloudinaryRaw(`class_wb/${scheduleId}.txt`); } catch (e) { console.error('class snapshot cleanup failed:', e); }
+
     return json({ success: true, fileUrl, fileId: uploaded.id, noteInserted, noteInsertCount });
   } catch (e) {
     console.error('upload-whiteboard-pdf error:', e);

@@ -27,16 +27,26 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const folder = typeof body?.folder === 'string' ? body.folder : 'chat_uploads';
     const timestamp = Math.floor(Date.now() / 1000);
 
-    // Cloudinary signs the sent params (except file/api_key/cloud_name/resource_type),
-    // sorted alphabetically, with the secret appended.
-    const toSign = `folder=${folder}&timestamp=${timestamp}`;
+    // Build the params Cloudinary must sign (all sent params except
+    // file/api_key/cloud_name/resource_type/signature), sorted alphabetically.
+    // folder for normal uploads; public_id + overwrite + invalidate for
+    // deterministic "overwrite the same object" uploads (e.g. class whiteboard
+    // snapshots — one file per board, no orphans).
+    const signed: Record<string, string> = { timestamp: String(timestamp) };
+    if (typeof body?.folder === 'string') signed.folder = body.folder;
+    if (typeof body?.public_id === 'string') signed.public_id = body.public_id;
+    if (body?.overwrite) signed.overwrite = 'true';
+    if (body?.invalidate) signed.invalidate = 'true';
+    // Back-compat: when neither folder nor public_id is given, default the folder.
+    if (!signed.folder && !signed.public_id) signed.folder = 'chat_uploads';
+
+    const toSign = Object.keys(signed).sort().map((k) => `${k}=${signed[k]}`).join('&');
     const signature = await sha1Hex(toSign + API_SECRET);
 
     return new Response(
-      JSON.stringify({ signature, timestamp, api_key: API_KEY, cloud_name: CLOUD_NAME, folder }),
+      JSON.stringify({ signature, timestamp, api_key: API_KEY, cloud_name: CLOUD_NAME, folder: signed.folder ?? null, params: signed }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (error) {

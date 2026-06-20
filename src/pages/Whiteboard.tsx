@@ -27,7 +27,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { uploadBlobToCloudinary } from '@/lib/cloudinary';
+import { uploadBlobToCloudinary, CLOUDINARY_CLOUD } from '@/lib/cloudinary';
 import { WhiteboardStylePanel } from '@/components/whiteboard/WhiteboardStylePanel';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
@@ -95,6 +95,12 @@ const Whiteboard = () => {
   const dirtyRef = useRef(false);
   const autosaveReadyRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  // CLASS-mode recovery: autosave the editable board to a deterministic Cloudinary
+  // object so it can be reopened on any device if a save is abandoned.
+  const classSavingRef = useRef(false);
+  const classLoadedRef = useRef(false);
+  const classAutosaveReadyRef = useRef(false);
+  const classSaveTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   // Leave the whiteboard. When it was opened in its own browser tab,
   // window.close() works; in the installed PWA (navigated in-place, no tab to
@@ -296,6 +302,56 @@ const Whiteboard = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, fileMode]);
+
+  // CLASS mode: on a device with no local copy, pull this class's cloud recovery
+  // snapshot so the board can be resumed cross-device. (Local IndexedDB wins on
+  // the same device.)
+  useEffect(() => {
+    if (!editor || !scheduleId || fileMode || accessAllowed !== true || classLoadedRef.current) return;
+    classLoadedRef.current = true;
+    const pages = editor.getPages();
+    const totalShapes = pages.reduce((acc, p) => acc + editor.getPageShapeIds(p.id).size, 0);
+    if (totalShapes > 0 || pages.length > 1) {
+      classAutosaveReadyRef.current = true; // local copy exists — use it
+      return;
+    }
+    if (!classSnapUrl) return;
+    (async () => {
+      try {
+        const res = await fetch(classSnapUrl, { cache: 'no-store' });
+        if (res.ok) {
+          const snap = await res.json();
+          loadSnapshot(editor.store, snap);
+          setStartMode('blank');
+          focusPage(editor);
+        }
+      } catch (e) {
+        console.error('class snapshot load failed', e);
+      } finally {
+        setTimeout(() => { classAutosaveReadyRef.current = true; }, 300);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, scheduleId, fileMode, accessAllowed]);
+
+  // CLASS mode: coarse-debounced autosave of the editable board to the cloud
+  // recovery snapshot (20s after edits settle). Backs up the real End & Save.
+  useEffect(() => {
+    if (!editor || !scheduleId || fileMode) return;
+    const unlisten = editor.store.listen(
+      () => {
+        if (!classAutosaveReadyRef.current) return;
+        clearTimeout(classSaveTimerRef.current);
+        classSaveTimerRef.current = setTimeout(() => { void persistClassSnapshot(); }, 20000);
+      },
+      { scope: 'document' },
+    );
+    return () => {
+      clearTimeout(classSaveTimerRef.current);
+      unlisten();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, scheduleId, fileMode]);
 
   const handleMount = useCallback((ed: Editor) => {
     setEditor(ed);
@@ -818,6 +874,34 @@ const Whiteboard = () => {
     if (!fileId) return;
     const t = title.trim() || 'Untitled whiteboard';
     await supabase.from('whiteboard_files').update({ title: t }).eq('id', fileId);
+  };
+
+  // CLASS mode: overwrite this class's single recovery snapshot on Cloudinary
+  // (deterministic public_id -> no orphans). Lets the board be reopened on any
+  // device if the End & Save was abandoned. The PDF still goes to Drive; this is
+  // just the editable backup, deleted by the function once Notes is saved.
+  const classSnapUrl = scheduleId
+    ? `https://res.cloudinary.com/${CLOUDINARY_CLOUD}/raw/upload/class_wb/${scheduleId}.txt`
+    : null;
+
+  const persistClassSnapshot = async () => {
+    if (!editor || !scheduleId || fileMode || classSavingRef.current) return;
+    classSavingRef.current = true;
+    try {
+      const snap = getSnapshot(editor.store);
+      const blob = new Blob([JSON.stringify(snap)], { type: 'text/plain' });
+      await uploadBlobToCloudinary(blob, {
+        resourceType: 'raw',
+        fileName: 'snap.txt',
+        publicId: `class_wb/${scheduleId}`,
+        overwrite: true,
+        invalidate: true,
+      });
+    } catch (e) {
+      console.error('class snapshot autosave failed', e);
+    } finally {
+      classSavingRef.current = false;
+    }
   };
 
   const exportPdf = async () => {
