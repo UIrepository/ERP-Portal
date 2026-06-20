@@ -567,7 +567,13 @@ const Whiteboard = () => {
       const pageBg = shapes.find(
         (s): s is TLImageShape => s.type === 'image' && s.isLocked && s.x === 0 && s.y === 0,
       );
-      const bounds = currentPageBox(editor);
+      // For a PDF page, export the UNION of the page image and every annotation
+      // (getCurrentPageBounds = bounding box of all shapes) so notes drawn in the
+      // margins — common with portrait PDFs in the landscape frame — aren't
+      // clipped. Blank pages keep their fixed full-screen slide box.
+      const bounds = pageBg
+        ? editor.getCurrentPageBounds() ?? new Box(0, 0, pageBg.props.w, pageBg.props.h)
+        : currentPageBox(editor);
 
       const ids = shapes.map((s) => s.id);
 
