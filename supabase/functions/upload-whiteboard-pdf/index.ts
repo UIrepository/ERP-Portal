@@ -70,6 +70,53 @@ function base64ToBytes(b64: string): Uint8Array {
   return bytes;
 }
 
+// Cloudinary creds are project-wide edge secrets (also used by cloudinary-sign).
+const CLOUDINARY_CLOUD = Deno.env.get('CLOUDINARY_CLOUD_NAME') ?? 'drrits4mq';
+const CLOUDINARY_KEY = Deno.env.get('CLOUDINARY_API_KEY') ?? '819424178256119';
+const CLOUDINARY_SECRET = Deno.env.get('CLOUDINARY_API_SECRET') ?? '';
+
+async function sha1Hex(input: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Fetch the PDF the browser uploaded to Cloudinary (server-to-server, fast).
+// Retries briefly in case it's still propagating; validates the %PDF header.
+async function fetchPdfBytes(url: string): Promise<Uint8Array> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 60000);
+      const res = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(timer);
+      if (!res.ok) throw new Error(`fetch pdf HTTP ${res.status}`);
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      if (bytes.length < 5 || bytes[0] !== 0x25 || bytes[1] !== 0x50 || bytes[2] !== 0x44 || bytes[3] !== 0x46) {
+        throw new Error('fetched file is not a PDF');
+      }
+      return bytes;
+    } catch (e) {
+      lastErr = e;
+      await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+    }
+  }
+  throw new Error('Could not fetch uploaded PDF: ' + (lastErr instanceof Error ? lastErr.message : String(lastErr)));
+}
+
+// Best-effort delete of the temp Cloudinary raw object once Drive has the file.
+async function deleteCloudinaryRaw(publicId: string): Promise<void> {
+  if (!CLOUDINARY_SECRET || !publicId) return;
+  const timestamp = Math.floor(Date.now() / 1000);
+  const signature = await sha1Hex(`public_id=${publicId}&timestamp=${timestamp}${CLOUDINARY_SECRET}`);
+  const form = new FormData();
+  form.append('public_id', publicId);
+  form.append('api_key', CLOUDINARY_KEY);
+  form.append('timestamp', String(timestamp));
+  form.append('signature', signature);
+  await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/raw/destroy`, { method: 'POST', body: form });
+}
+
 type BatchSubjectPair = {
   batch: string;
   subject: string;
@@ -135,8 +182,8 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authError } = await admin.auth.getUser(token);
     if (authError || !user) return json({ error: 'Invalid or expired token' }, 401);
 
-    const { scheduleId, title, pdfBase64, postToNotes = true } = await req.json();
-    if (!scheduleId || !pdfBase64) return json({ error: 'Missing scheduleId or pdfBase64' }, 400);
+    const { scheduleId, title, pdfBase64, pdfUrl, pdfPublicId, postToNotes = true } = await req.json();
+    if (!scheduleId || (!pdfBase64 && !pdfUrl)) return json({ error: 'Missing scheduleId or pdf' }, 400);
 
     // Resolve the class and confirm the caller is its teacher.
     const { data: schedule, error: schedErr } = await admin
@@ -163,7 +210,23 @@ Deno.serve(async (req) => {
       teacher.assigned_batches.includes(schedule.batch) &&
       teacher.assigned_subjects.includes(schedule.subject);
 
+    // Also allow whoever actually TAUGHT this class (recorded as a teacher in
+    // class_attendance), so a co-teacher who took the session isn't falsely
+    // blocked from saving its notes.
+    let taughtThisClass = false;
     if (!teacherAllowed && !isAdmin) {
+      const { data: att } = await admin
+        .from('class_attendance')
+        .select('id')
+        .eq('schedule_id', scheduleId)
+        .eq('user_id', user.id)
+        .eq('user_role', 'teacher')
+        .limit(1)
+        .maybeSingle();
+      taughtThisClass = att != null;
+    }
+
+    if (!teacherAllowed && !isAdmin && !taughtThisClass) {
       return json({ error: 'You are not assigned to this class.' }, 403);
     }
 
@@ -177,8 +240,9 @@ Deno.serve(async (req) => {
     const batchId = await findOrCreateFolder(accessToken, schedule.batch, rootId);
     const subjectId = await findOrCreateFolder(accessToken, schedule.subject, batchId);
 
-    // Multipart upload of the PDF
-    const pdfBytes = base64ToBytes(pdfBase64);
+    // Get the PDF bytes: fetch from Cloudinary (the fast new path) or decode the
+    // legacy base64 body (back-compat for any cached old client).
+    const pdfBytes = pdfUrl ? await fetchPdfBytes(pdfUrl) : base64ToBytes(pdfBase64);
     const boundary = '----whiteboard' + crypto.randomUUID();
     const metadata = JSON.stringify({ name: fileName, parents: [subjectId] });
     const pre =
@@ -213,6 +277,11 @@ Deno.serve(async (req) => {
     });
 
     const fileUrl: string = uploaded.webViewLink || `https://drive.google.com/file/d/${uploaded.id}/view`;
+
+    // Google Drive now owns the PDF — drop the Cloudinary transit copy (best-effort).
+    if (pdfPublicId) {
+      try { await deleteCloudinaryRaw(pdfPublicId); } catch (e) { console.error('temp cleanup failed:', e); }
+    }
 
     let noteInserted = false;
     let noteInsertCount = 0;

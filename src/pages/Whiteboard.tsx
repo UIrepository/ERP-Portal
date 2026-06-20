@@ -59,7 +59,7 @@ const PDF_JPEG_QUALITY = 0.85;
 // exports edge-to-edge as a 16:9 page (what you write is what you get).
 const BLANK_PAGE_W = 1920;
 const BLANK_PAGE_H = 1080; // 16:9
-const EXPORT_SCALE = 1.5;
+const EXPORT_SCALE = 1.25;
 
 // Each exported PDF page is sized to its own content (no letterboxing): the
 // longest side is normalised to this many points (1pt = 1/72"). 960pt = 13.33"
@@ -697,15 +697,17 @@ const Whiteboard = () => {
         continue;
       }
 
+      // JPEG (lossy) instead of PNG — keeps notes legible but makes the PDF
+      // ~3-5x smaller, so render, upload and the Drive write are all much faster.
       const blob = await exportToBlob({
         editor,
         ids,
-        format: 'png',
-        opts: { background: true, darkMode: !pageBg, bounds, padding: 0, scale: EXPORT_SCALE },
+        format: 'jpeg',
+        opts: { background: true, darkMode: !pageBg, bounds, padding: 0, scale: EXPORT_SCALE, quality: 0.82 },
       });
 
       const bytes = new Uint8Array(await blob.arrayBuffer());
-      const img = await pdfDoc.embedPng(bytes);
+      const img = await pdfDoc.embedJpg(bytes);
 
       // Size the PDF page to the content's own aspect ratio (no letterboxing),
       // normalising the longest side to a normal document size. A blank 16:9
@@ -818,15 +820,6 @@ const Whiteboard = () => {
     await supabase.from('whiteboard_files').update({ title: t }).eq('id', fileId);
   };
 
-  const bytesToBase64 = (bytes: Uint8Array): string => {
-    let binary = '';
-    const chunk = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunk) {
-      binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)));
-    }
-    return btoa(binary);
-  };
-
   const exportPdf = async () => {
     if (!editor) return;
     setBusy(true);
@@ -838,26 +831,42 @@ const Whiteboard = () => {
       const wantsDrive = postToNotes && !!scheduleCtx;
 
       if (wantsDrive) {
-        setBusyLabel('Uploading to Drive & Notes…');
+        // Upload the BINARY pdf straight to Cloudinary (fast CDN, no size limit),
+        // then send only the URL to the function — which fetches it and writes to
+        // Google Drive + Notes. This replaces shipping a giant base64 string
+        // through the edge function (the slow/timeout-prone path that silently
+        // failed before).
+        setBusyLabel('Uploading…');
+        let pdfUrl: string;
+        let pdfPublicId: string;
+        try {
+          const pdfBlob = new Blob([bytes], { type: 'application/pdf' });
+          const up = await uploadBlobToCloudinary(pdfBlob, {
+            folder: 'whiteboard_pdf_tmp',
+            resourceType: 'raw',
+            fileName: `${safeTitle}.pdf`,
+          });
+          pdfUrl = up.url;
+          pdfPublicId = up.publicId;
+        } catch (e) {
+          console.error('whiteboard pdf upload failed', e);
+          toast.error('Upload failed — your notes were NOT saved. Check your connection and tap Save again.');
+          return; // keep the dialog open for retry; never silently drop it
+        }
+
+        setBusyLabel('Saving to Drive & Notes…');
         const { data, error } = await supabase.functions.invoke('upload-whiteboard-pdf', {
-          body: {
-            scheduleId,
-            title: title || safeTitle,
-            pdfBase64: bytesToBase64(bytes),
-            postToNotes: true,
-          },
+          body: { scheduleId, title: title || safeTitle, pdfUrl, pdfPublicId, postToNotes: true },
         });
 
         if (error || !data?.success) {
           console.error('upload-whiteboard-pdf failed:', error, data);
-          downloadBytes(bytes, `${safeTitle}.pdf`);
-          toast.error('Could not save to Drive/Notes — downloaded a copy instead.');
-          setSaveOpen(false);
-          return;
+          toast.error('Save to Notes FAILED — your notes were NOT saved. Tap Save to retry, or tick “Also download a copy”.');
+          return; // LOUD failure, dialog stays open — no silent download
         }
 
         if (data.noteInserted === false) {
-          toast.error('Uploaded to Drive, but attaching to Notes failed. Link is in your Drive.');
+          toast.error('Uploaded to Drive, but attaching to Notes failed. The link is in your Drive.');
         } else {
           toast.success(`Saved to Notes for ${scheduleCtx!.batch} — ${scheduleCtx!.subject}`);
         }
@@ -871,7 +880,7 @@ const Whiteboard = () => {
       setSaveOpen(false);
     } catch (e) {
       console.error(e);
-      toast.error('Failed to save whiteboard');
+      toast.error('Failed to build the PDF — nothing was saved. Please try again.');
     } finally {
       setBusy(false);
       setBusyLabel('');
