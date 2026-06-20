@@ -840,11 +840,15 @@ const Whiteboard = () => {
         let pdfUrl: string;
         let pdfPublicId: string;
         try {
+          // Upload with a .txt label: Cloudinary blocks delivery of raw *.pdf
+          // (returns 401), so the server couldn't fetch it back. The bytes are
+          // still a real PDF — the function validates the %PDF header and writes
+          // a proper .pdf to Drive. (Verified: .txt delivers 200, .pdf 401.)
           const pdfBlob = new Blob([bytes], { type: 'application/pdf' });
           const up = await uploadBlobToCloudinary(pdfBlob, {
             folder: 'whiteboard_pdf_tmp',
             resourceType: 'raw',
-            fileName: `${safeTitle}.pdf`,
+            fileName: `${safeTitle}.txt`,
           });
           pdfUrl = up.url;
           pdfPublicId = up.publicId;
