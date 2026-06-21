@@ -383,6 +383,28 @@ const Whiteboard = () => {
       if (idx >= 0) setCurrentPage(idx + 1);
     });
 
+    // Blank slides are now zoomable/pannable, so the slate "sheet" behind the
+    // canvas must follow the camera. Recompute only when the camera actually
+    // moves (not on every pointer event) and coalesce to one update per frame.
+    // PDF pages have a real image background → sheetRect is null, nothing to do.
+    let camKey = '';
+    let rafPending = false;
+    ed.store.listen(
+      () => {
+        const c = ed.getCamera();
+        const key = `${c.x}|${c.y}|${c.z}`;
+        if (key === camKey) return;
+        camKey = key;
+        if (rafPending) return;
+        rafPending = true;
+        requestAnimationFrame(() => {
+          rafPending = false;
+          updateSheetRect(ed);
+        });
+      },
+      { scope: 'session' },
+    );
+
     // The Select tool IS the free-select: whenever it's active with nothing
     // selected, the lasso overlay is armed. Picking up a selection (or another
     // tool) disarms it so the teacher can move/resize normally.
@@ -597,40 +619,31 @@ const Whiteboard = () => {
   //  • Blank page → fixed full-screen slide: no zoom, no pan (resize content
   //    with the Select tool instead).
   const focusPage = (ed: Editor) => {
-    const shapes = ed.getCurrentPageShapes();
-    const pageBg = shapes.find(
-      (s): s is TLImageShape => s.type === 'image' && s.isLocked && s.x === 0 && s.y === 0,
-    );
     const box = currentPageBox(ed);
-
-    if (pageBg) {
-      const vp = ed.getViewportScreenBounds();
-      const fit = Math.min(vp.width / box.w, vp.height / box.h);
-      const minZoom = Math.max(0.02, fit); // can't zoom out past whole-page fit
-      ed.setCameraOptions({
-        isLocked: false,
-        panSpeed: 1,
-        zoomSpeed: 1,
-        wheelBehavior: 'pan',
-        // Absolute zoom levels (baseZoom 'default' = 1.0 is 100%). Step 0 is the
-        // whole-page fit, which becomes the hard zoom-OUT floor.
-        zoomSteps: [1, 1.5, 2, 3, 4, 6, 8].map((m) => minZoom * m),
-        constraints: {
-          bounds: { x: 0, y: 0, w: box.w, h: box.h },
-          padding: { x: 0, y: 0 },
-          origin: { x: 0.5, y: 0.5 },
-          initialZoom: 'fit-max',
-          baseZoom: 'default',
-          behavior: 'contain',
-        },
-      });
-      ed.zoomToBounds(box, { inset: 0 });
-    } else {
-      ed.setCameraOptions({ isLocked: false });
-      // inset 0 so a blank page fills the entire screen with no margin.
-      ed.zoomToBounds(box, { inset: 0, force: true });
-      ed.setCameraOptions({ isLocked: true, wheelBehavior: 'none', panSpeed: 0, zoomSpeed: 0 });
-    }
+    const vp = ed.getViewportScreenBounds();
+    const fit = Math.min(vp.width / box.w, vp.height / box.h);
+    const minZoom = Math.max(0.02, fit); // can't zoom out past whole-page/slide fit
+    // Both blank slides and PDF pages are zoomable in EVERY tool (pen, eraser,
+    // select, …): zoom is a camera setting, not a tool one. Zoom IN is free;
+    // zoom-OUT is floored at "the whole page fits" so the teacher can never
+    // shrink past full view or escape the slide, and panning stays inside it.
+    // Absolute zoom levels (baseZoom 'default' = 1.0 is 100%); step 0 is the fit.
+    ed.setCameraOptions({
+      isLocked: false,
+      panSpeed: 1,
+      zoomSpeed: 1,
+      wheelBehavior: 'pan',
+      zoomSteps: [1, 1.5, 2, 3, 4, 6, 8].map((m) => minZoom * m),
+      constraints: {
+        bounds: { x: 0, y: 0, w: box.w, h: box.h },
+        padding: { x: 0, y: 0 },
+        origin: { x: 0.5, y: 0.5 },
+        initialZoom: 'fit-max',
+        baseZoom: 'default',
+        behavior: 'contain',
+      },
+    });
+    ed.zoomToBounds(box, { inset: 0 });
     updateSheetRect(ed);
   };
 
