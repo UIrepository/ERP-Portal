@@ -341,7 +341,7 @@ const MessageItem = ({
   );
 };
 
-export const StudentCommunity = () => {
+export const StudentCommunity = ({ batch: batchProp }: { batch?: string } = {}) => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
@@ -375,6 +375,18 @@ export const StudentCommunity = () => {
     },
     enabled: !!profile?.user_id
   });
+
+  // Scope the community list to the currently selected batch so a multi-batch
+  // student sees ONLY that batch's communities (not every batch at once). Prefer
+  // the batch passed by the dashboard block; fall back to the one the dashboard
+  // saved in localStorage; if neither resolves to a real enrollment, show all.
+  const activeBatch =
+    batchProp ?? (typeof window !== 'undefined' ? localStorage.getItem('student-selected-batch') : null);
+  const visibleEnrollments = useMemo(() => {
+    if (!activeBatch) return enrollments;
+    const scoped = enrollments.filter((e) => e.batch_name === activeBatch);
+    return scoped.length > 0 ? scoped : enrollments;
+  }, [enrollments, activeBatch]);
 
   // --- Per-community overview: last activity (recent on top) + unread counts (badges) ---
   const seenKey = (g: { batch_name: string; subject_name: string }) =>
@@ -467,12 +479,12 @@ export const StudentCommunity = () => {
   });
 
   const sortedEnrollments = useMemo(() => {
-    return [...enrollments].sort((a, b) => {
+    return [...visibleEnrollments].sort((a, b) => {
       const aAt = overview[`${a.batch_name}|${a.subject_name}`]?.lastAt || '';
       const bAt = overview[`${b.batch_name}|${b.subject_name}`]?.lastAt || '';
       return bAt.localeCompare(aAt); // most recent activity first
     });
-  }, [enrollments, overview]);
+  }, [visibleEnrollments, overview]);
 
   // 🟢 UPDATED: Handle Selection & Deep Linking (Params)
   useEffect(() => {

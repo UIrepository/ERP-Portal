@@ -36,7 +36,7 @@ export const StudentBlockContent = ({
       case 'announcements':
         return <StudentAnnouncements batch={batch} subject={subject} onBack={onBack} />;
       case 'community':
-        return <StudentCommunity />;
+        return <StudentCommunity batch={batch} />;
       case 'connect':
         return <StudentConnect />;
       default:
