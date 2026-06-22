@@ -8,6 +8,7 @@ import { EnrollmentAnalytics } from './EnrollmentAnalytics';
 import { TeacherAnalytics } from './TeacherAnalytics';
 import { AdminCreateAnnouncement } from './AdminCreateAnnouncement';
 import { AdminAnnouncementsViewer } from './AdminAnnouncementsViewer';
+import { AdminTeacherAnnouncement } from './AdminTeacherAnnouncement';
 import { AdminCommunity } from './AdminCommunity';
 import { AdminStaffManager } from './AdminStaffManager';
 import { StaffInbox } from '@/components/shared/StaffInbox';
@@ -56,6 +57,8 @@ export const AdminDashboard = ({ activeTab, onTabChange }: AdminDashboardProps) 
         return <AdminCreateAnnouncement />;
       case 'announcement-history':
         return <AdminAnnouncementsViewer />;
+      case 'teacher-announcement':
+        return <AdminTeacherAnnouncement />;
       case 'community-admin':
         return <AdminCommunity />;
       case 'monitoring':

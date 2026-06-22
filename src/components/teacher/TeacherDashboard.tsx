@@ -9,6 +9,7 @@ import { TeacherFeedbackViewer } from './TeacherFeedbackViewer';
 import { TeacherJoinClass } from './TeacherJoinClass';
 import { TeacherCommunity } from './TeacherCommunity';
 import { WhiteboardHub } from '@/components/whiteboard/WhiteboardHub';
+import { TeacherAnnouncements } from './TeacherAnnouncements';
 import { Button } from '@/components/ui/button';
 import { FullScreenVideoPlayer } from '@/components/video-player/FullScreenVideoPlayer';
 import { Lecture } from '@/components/video-player/types';
@@ -52,6 +53,8 @@ export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardPro
         return <TeacherRecordings />;
       case 'teacher-whiteboard':
         return <WhiteboardHub />;
+      case 'teacher-announcements':
+        return <TeacherAnnouncements />;
       case 'teacher-resources':
         return <TeacherResources />;
       case 'teacher-schedule-requests':

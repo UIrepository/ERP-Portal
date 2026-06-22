@@ -47,6 +47,9 @@ export const AdminAnnouncementsViewer = () => {
             const { data, error } = await supabase
                 .from('notifications')
                 .select('id, title, message, created_at, created_by_name, target_batch, target_subject')
+                // Student/global announcements only — teacher broadcasts live in
+                // their own "Teacher Broadcast" tab (target_role = 'teacher').
+                .or('target_role.is.null,target_role.eq.student')
                 .order('created_at', { ascending: false });
             
             if (error) {

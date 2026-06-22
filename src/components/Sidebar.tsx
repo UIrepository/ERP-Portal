@@ -134,6 +134,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
     { id: 'teacher-community', label: 'Community', icon: UserGroupIcon },
     { id: 'teacher-recordings', label: 'My Recordings', icon: VideoReplayIcon },
     { id: 'teacher-whiteboard', label: 'Whiteboard', icon: BoardMathIcon },
+    { id: 'teacher-announcements', label: 'Announcements', icon: Megaphone01Icon },
     { id: 'teacher-resources', label: 'Resources', icon: FolderLibraryIcon },
     { id: 'teacher-schedule-requests', label: 'Schedule Requests', icon: TaskDaily01Icon },
     { id: 'teacher-feedback', label: 'Feedback', icon: FavouriteIcon },
@@ -165,6 +166,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
     { id: 'admin-whiteboard', label: 'Whiteboard', icon: BoardMathIcon },
     { id: 'create-announcement', label: 'Create Announcement', icon: Megaphone01Icon },
     { id: 'announcement-history', label: 'Announcement History', icon: WorkHistoryIcon },
+    { id: 'teacher-announcement', label: 'Teacher Broadcast', icon: Megaphone01Icon },
     { id: 'maintenance', label: 'Maintenance Mode', icon: Wrench01Icon },
     { id: 'subject-merges', label: 'Subject Merges', icon: GitMergeIcon },
   ];
