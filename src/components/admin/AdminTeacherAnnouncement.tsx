@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -49,15 +49,32 @@ interface AnnouncementGroup {
   recipientIds: string[];
 }
 
+// Draft persists across tab switches (the component unmounts when you leave the
+// tab, which would otherwise wipe the typed announcement).
+const DRAFT_KEY = 'ui-draft-teacher-announcement';
+const loadDraft = (): { title?: string; message?: string; allTeachers?: boolean; selected?: string[] } => {
+  try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}'); } catch { return {}; }
+};
+
 export const AdminTeacherAnnouncement = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
 
-  const [title, setTitle] = useState('');
-  const [message, setMessage] = useState('');
-  const [allTeachers, setAllTeachers] = useState(true);
-  const [selected, setSelected] = useState<Set<string>>(new Set()); // teacher user_ids
+  const [draft] = useState(loadDraft);
+  const [title, setTitle] = useState(draft.title || '');
+  const [message, setMessage] = useState(draft.message || '');
+  const [allTeachers, setAllTeachers] = useState(draft.allTeachers ?? true);
+  const [selected, setSelected] = useState<Set<string>>(new Set(draft.selected || [])); // teacher user_ids
   const [search, setSearch] = useState('');
+
+  // Save the draft whenever the composed content changes; clear it once empty.
+  useEffect(() => {
+    if (!title && !message && selected.size === 0 && allTeachers) {
+      localStorage.removeItem(DRAFT_KEY);
+      return;
+    }
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, message, allTeachers, selected: Array.from(selected) }));
+  }, [title, message, allTeachers, selected]);
 
   const { data: teachers = [], isLoading: teachersLoading } = useQuery({
     queryKey: ['teachers-for-announcements'],
@@ -188,6 +205,7 @@ export const AdminTeacherAnnouncement = () => {
       setMessage('');
       setSelected(new Set());
       setAllTeachers(true);
+      localStorage.removeItem(DRAFT_KEY);
       queryClient.invalidateQueries({ queryKey: ['teacher-announcements-history'] });
     },
     onError: (e: unknown) => {

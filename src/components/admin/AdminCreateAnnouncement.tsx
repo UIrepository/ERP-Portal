@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -28,16 +28,33 @@ interface AnnouncementPayload {
   target_role: 'student';
 }
 
+// Draft persists across tab switches (leaving the tab unmounts this component,
+// which would otherwise wipe the typed announcement).
+const DRAFT_KEY = 'ui-draft-student-announcement';
+const loadDraft = (): { title?: string; message?: string; targets?: TargetCombination[] } => {
+  try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}'); } catch { return {}; }
+};
+
 export const AdminCreateAnnouncement = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
-  const [title, setTitle] = useState('');
-  const [message, setMessage] = useState('');
+  const [draft] = useState(loadDraft);
+  const [title, setTitle] = useState(draft.title || '');
+  const [message, setMessage] = useState(draft.message || '');
   // State to hold multiple target combinations
-  const [targets, setTargets] = useState<TargetCombination[]>([]);
+  const [targets, setTargets] = useState<TargetCombination[]>(draft.targets || []);
   // State for the current selection in the dropdowns
   const [currentBatch, setCurrentBatch] = useState<string | null>(null);
   const [currentSubject, setCurrentSubject] = useState<string | null>(null);
+
+  // Save the draft whenever the composed content changes; clear it once empty.
+  useEffect(() => {
+    if (!title && !message && targets.length === 0) {
+      localStorage.removeItem(DRAFT_KEY);
+      return;
+    }
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, message, targets }));
+  }, [title, message, targets]);
 
   const sendAnnouncementPush = async (announcement: AnnouncementPayload) => {
     const { error } = await supabase.functions.invoke('send-push', {
@@ -101,6 +118,7 @@ export const AdminCreateAnnouncement = () => {
       setTargets([]);
       setCurrentBatch(null);
       setCurrentSubject(null);
+      localStorage.removeItem(DRAFT_KEY);
     },
     onError: (error: unknown) => {
       const message = error instanceof Error ? error.message : 'Unknown error';
