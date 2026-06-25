@@ -159,21 +159,31 @@ export const AdminTeacherAnnouncement = () => {
       const { error } = await supabase.from('notifications').insert(rows);
       if (error) throw error;
 
-      // Push (best-effort — never blocks the announcement itself).
-      const { error: pushErr } = await supabase.functions.invoke('send-push', {
-        body: {
-          title: title.trim(),
-          body: message.trim(),
-          user_ids: recipientIds,
-          tag: 'teacher-announcement',
-        },
-      });
-      if (pushErr) console.warn('Teacher announcement push failed:', pushErr);
+      // Push + email (both best-effort — neither blocks the announcement itself).
+      const [pushRes, emailRes] = await Promise.allSettled([
+        supabase.functions.invoke('send-push', {
+          body: {
+            title: title.trim(),
+            body: message.trim(),
+            user_ids: recipientIds,
+            tag: 'teacher-announcement',
+          },
+        }),
+        supabase.functions.invoke('send-teacher-announcement-email', {
+          body: { title: title.trim(), message: message.trim(), user_ids: recipientIds },
+        }),
+      ]);
+      if (pushRes.status === 'rejected' || (pushRes.value as any)?.error) {
+        console.warn('Teacher announcement push failed:', pushRes);
+      }
+      if (emailRes.status === 'rejected' || (emailRes.value as any)?.error) {
+        console.warn('Teacher announcement email failed:', emailRes);
+      }
 
       return recipientIds.length;
     },
     onSuccess: (count) => {
-      toast({ title: 'Announcement sent', description: `Delivered to ${count} teacher${count === 1 ? '' : 's'} (push started).` });
+      toast({ title: 'Announcement sent', description: `Delivered to ${count} teacher${count === 1 ? '' : 's'} (in-app, push & email).` });
       setTitle('');
       setMessage('');
       setSelected(new Set());
@@ -211,7 +221,7 @@ export const AdminTeacherAnnouncement = () => {
     <div className="p-4 md:p-6 space-y-8 bg-slate-50 min-h-full animate-fade-in-up">
       <div className="flex flex-col space-y-1">
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 tracking-tight">Teacher Broadcast</h1>
-        <p className="text-slate-500">Send an announcement to teachers. They receive it in-app and as a push notification.</p>
+        <p className="text-slate-500">Send an announcement to teachers. They receive it in-app, as a push notification, and by email.</p>
       </div>
 
       {/* Compose */}
