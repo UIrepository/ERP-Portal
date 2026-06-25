@@ -5,7 +5,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { RichTextArea } from '@/components/ui/rich-text-area';
+import { MarkdownText } from '@/components/ui/markdown-text';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -262,7 +263,7 @@ export const AdminTeacherAnnouncement = () => {
           </div>
           <div className="space-y-2">
             <label className="font-medium text-slate-700">Message</label>
-            <Textarea placeholder="Full announcement details…" value={message} onChange={(e) => setMessage(e.target.value)} rows={6} className="text-base" />
+            <RichTextArea value={message} onChange={setMessage} rows={6} placeholder="Full announcement details… Use the toolbar or Ctrl+B / Ctrl+I." />
           </div>
         </CardContent>
       </Card>
@@ -384,7 +385,7 @@ export const AdminTeacherAnnouncement = () => {
                   </AlertDialog>
                 </CardHeader>
                 <CardContent className="p-4">
-                  <p className="text-slate-700 whitespace-pre-wrap text-sm leading-relaxed">{g.message}</p>
+                  <MarkdownText text={g.message} className="text-slate-700 text-sm leading-relaxed" />
                 </CardContent>
                 <div className="bg-slate-50 px-4 py-3 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-500">
                   <span className="flex items-center gap-1.5"><UserCircle className="h-3.5 w-3.5" /> {g.created_by_name || 'Admin'} • {format(new Date(g.created_at), 'PPP, p')}</span>

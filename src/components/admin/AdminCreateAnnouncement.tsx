@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { RichTextArea } from '@/components/ui/rich-text-area';
 import { toast } from '@/hooks/use-toast';
 import { Megaphone, Send, Users, Book, Loader2, Plus, X } from 'lucide-react';
 import { Combobox } from '@/components/ui/combobox';
@@ -216,12 +216,11 @@ export const AdminCreateAnnouncement = () => {
                 </div>
                 <div className="space-y-2">
                     <label className="font-medium text-slate-700">Message</label>
-                    <Textarea 
-                    placeholder="Enter the full announcement details here. You can use markdown for formatting." 
-                    value={message} 
-                    onChange={(e) => setMessage(e.target.value)}
+                    <RichTextArea
+                    value={message}
+                    onChange={setMessage}
                     rows={6}
-                    className="text-base"
+                    placeholder="Enter the full announcement details… Use the toolbar or Ctrl+B / Ctrl+I for bold, italics, and bullets."
                     />
                 </div>
             </CardContent>

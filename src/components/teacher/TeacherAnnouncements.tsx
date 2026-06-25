@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Megaphone } from 'lucide-react';
+import { MarkdownText } from '@/components/ui/markdown-text';
 
 interface Announcement {
   id: string;
@@ -43,7 +44,7 @@ const AnnouncementCard = ({ a }: { a: Announcement }) => (
     </div>
     <h3 className="text-[15px] font-semibold text-black mb-2 leading-snug tracking-tight shrink-0">{a.title}</h3>
     <div className="flex-1 overflow-y-auto pr-2 min-h-0">
-      <p className="text-[13px] text-[#444444] font-normal leading-relaxed whitespace-pre-wrap font-sans">{a.message}</p>
+      <MarkdownText text={a.message} className="text-[13px] text-[#444444] font-normal leading-relaxed font-sans" />
     </div>
   </div>
 );

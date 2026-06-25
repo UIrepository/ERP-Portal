@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { toast } from '@/hooks/use-toast';
+import { MarkdownText } from '@/components/ui/markdown-text';
 
 interface Announcement {
   id: string;
@@ -116,7 +117,7 @@ export const AdminAnnouncementsViewer = () => {
                                 </AlertDialog>
                              </CardHeader>
                             <CardContent className="p-4 sm:p-6">
-                                <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">{announcement.message}</p>
+                                <MarkdownText text={announcement.message} className="text-slate-700 leading-relaxed" />
                             </CardContent>
                             <div className="bg-slate-50 px-6 py-3 border-t flex flex-col sm:flex-row justify-between items-start sm:items-center text-sm text-slate-500 gap-2">
                                 <div className="flex items-center gap-2">

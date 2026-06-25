@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StudentBackButton } from './StudentBackButton';
+import { MarkdownText } from '@/components/ui/markdown-text';
 
 interface Announcement {
   id: string;
@@ -75,9 +76,7 @@ const AnnouncementCard = ({ announcement }: { announcement: Announcement }) => {
 
             {/* Message Content - Scrollable */}
             <div className="flex-1 overflow-y-auto pr-2 min-h-0 custom-scrollbar">
-                <p className="text-[13px] text-[#444444] font-normal leading-relaxed whitespace-pre-wrap font-sans">
-                    {announcement.message}
-                </p>
+                <MarkdownText text={announcement.message} className="text-[13px] text-[#444444] font-normal leading-relaxed font-sans" />
             </div>
 
             {/* Optional Context Badge - Fixed at bottom */}
