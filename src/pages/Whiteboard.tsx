@@ -13,6 +13,7 @@ import {
   getSnapshot,
   loadSnapshot,
   Box,
+  type TLAssetStore,
 } from 'tldraw';
 import 'tldraw/tldraw.css';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -36,6 +37,27 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 // S/M/L size buttons), and remove the zoom/minimap control — the board is a
 // fixed "slide" view with no zooming. Module-level for a stable reference.
 const WB_COMPONENTS = { StylePanel: WhiteboardStylePanel, NavigationPanel: null };
+
+// Store inserted images/files on Cloudinary (a hosted URL) instead of inlining
+// the bytes as base64 in the document. This keeps board snapshots small enough
+// to sync across devices and makes images load on any device — base64-inlined
+// images bloat the snapshot and can silently break the cloud save.
+const cloudinaryAssetStore: TLAssetStore = {
+  async upload(_asset, file) {
+    const isImage = file.type.startsWith('image/');
+    const { url } = await uploadBlobToCloudinary(file, {
+      folder: 'whiteboard_assets',
+      resourceType: isImage ? 'image' : 'raw',
+      fileName: file.name,
+    });
+    return { src: url };
+  },
+  // Display assets straight from their stored URL (Cloudinary URL or, for
+  // PDF-page backgrounds, the embedded data URL).
+  resolve(asset) {
+    return (asset.props as { src?: string }).src ?? null;
+  },
+};
 
 type StartMode = 'choose' | 'blank' | 'pdf';
 
@@ -101,6 +123,12 @@ const Whiteboard = () => {
   const classLoadedRef = useRef(false);
   const classAutosaveReadyRef = useRef(false);
   const classSaveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  // This device has made real (user) edits → it's the editor/source of truth and
+  // must NOT be overwritten by the periodic viewer refresh. A device that only
+  // views stays "clean" and keeps pulling the latest snapshot.
+  const classDirtyRef = useRef(false);
+  // Last snapshot text we loaded — skip re-loading an unchanged snapshot (no flicker).
+  const classSnapTextRef = useRef<string>('');
 
   // Leave the whiteboard. When it was opened in its own browser tab,
   // window.close() works; in the installed PWA (navigated in-place, no tab to
@@ -303,48 +331,51 @@ const Whiteboard = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, fileMode]);
 
-  // CLASS mode: on a device with no local copy, pull this class's cloud recovery
-  // snapshot so the board can be resumed cross-device. (Local IndexedDB wins on
-  // the same device.)
+  // CLASS mode: on open, pull this class's latest cloud snapshot so the board
+  // shows what was drawn on any other device (view-on-open). The device only
+  // overwrites its view until the moment someone edits here (see classDirtyRef).
   useEffect(() => {
     if (!editor || !scheduleId || fileMode || accessAllowed !== true || classLoadedRef.current) return;
     classLoadedRef.current = true;
-    const pages = editor.getPages();
-    const totalShapes = pages.reduce((acc, p) => acc + editor.getPageShapeIds(p.id).size, 0);
-    if (totalShapes > 0 || pages.length > 1) {
-      classAutosaveReadyRef.current = true; // local copy exists — use it
-      return;
-    }
-    if (!classSnapUrl) return;
     (async () => {
-      try {
-        const res = await fetch(classSnapUrl, { cache: 'no-store' });
-        if (res.ok) {
-          const snap = await res.json();
-          loadSnapshot(editor.store, snap);
-          setStartMode('blank');
-          focusPage(editor);
-        }
-      } catch (e) {
-        console.error('class snapshot load failed', e);
-      } finally {
-        setTimeout(() => { classAutosaveReadyRef.current = true; }, 300);
+      const loaded = await loadClassSnapshot();
+      if (loaded) {
+        setStartMode('blank');
+        focusPage(editor);
       }
+      setTimeout(() => { classAutosaveReadyRef.current = true; }, 300);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, scheduleId, fileMode, accessAllowed]);
 
-  // CLASS mode: coarse-debounced autosave of the editable board to the cloud
-  // recovery snapshot (20s after edits settle). Backs up the real End & Save.
+  // CLASS mode: while this device is only viewing (no local edits), keep pulling
+  // the latest snapshot every ~12s so it tracks the editing device. The instant
+  // someone draws here, classDirtyRef flips and refreshing stops so their work
+  // isn't clobbered.
+  useEffect(() => {
+    if (!editor || !scheduleId || fileMode || accessAllowed !== true) return;
+    const id = setInterval(() => {
+      if (classDirtyRef.current || !classAutosaveReadyRef.current) return;
+      void loadClassSnapshot();
+    }, 12000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, scheduleId, fileMode, accessAllowed]);
+
+  // CLASS mode: debounced autosave of the editable board to the cloud snapshot
+  // (~8s after edits settle). Only real USER edits trigger it (so a programmatic
+  // refresh-load never re-saves), and the first user edit marks this device as
+  // the editor so the viewer refresh stops pulling over it.
   useEffect(() => {
     if (!editor || !scheduleId || fileMode) return;
     const unlisten = editor.store.listen(
       () => {
+        classDirtyRef.current = true;
         if (!classAutosaveReadyRef.current) return;
         clearTimeout(classSaveTimerRef.current);
-        classSaveTimerRef.current = setTimeout(() => { void persistClassSnapshot(); }, 20000);
+        classSaveTimerRef.current = setTimeout(() => { void persistClassSnapshot(); }, 8000);
       },
-      { scope: 'document' },
+      { source: 'user', scope: 'document' },
     );
     return () => {
       clearTimeout(classSaveTimerRef.current);
@@ -902,7 +933,8 @@ const Whiteboard = () => {
     classSavingRef.current = true;
     try {
       const snap = getSnapshot(editor.store);
-      const blob = new Blob([JSON.stringify(snap)], { type: 'text/plain' });
+      const text = JSON.stringify(snap);
+      const blob = new Blob([text], { type: 'text/plain' });
       await uploadBlobToCloudinary(blob, {
         resourceType: 'raw',
         fileName: 'snap.txt',
@@ -910,10 +942,32 @@ const Whiteboard = () => {
         overwrite: true,
         invalidate: true,
       });
+      // Remember what we just published so a refresh on this device doesn't reload it.
+      classSnapTextRef.current = text;
     } catch (e) {
       console.error('class snapshot autosave failed', e);
     } finally {
       classSavingRef.current = false;
+    }
+  };
+
+  // Fetch the latest class snapshot and load it, unless it's unchanged from what
+  // we last loaded/saved (avoids needless reloads/flicker). Returns whether the
+  // board was replaced.
+  const loadClassSnapshot = async (): Promise<boolean> => {
+    if (!editor || !classSnapUrl) return false;
+    try {
+      const res = await fetch(classSnapUrl, { cache: 'no-store' });
+      if (!res.ok) return false;
+      const text = await res.text();
+      if (!text || text === classSnapTextRef.current) return false;
+      const snap = JSON.parse(text);
+      classSnapTextRef.current = text;
+      loadSnapshot(editor.store, snap);
+      return true;
+    } catch (e) {
+      console.error('class snapshot load failed', e);
+      return false;
     }
   };
 
@@ -1097,6 +1151,7 @@ const Whiteboard = () => {
           onMount={handleMount}
           inferDarkMode
           components={WB_COMPONENTS}
+          assets={cloudinaryAssetStore}
           persistenceKey={fileId ? `wb-file-${fileId}` : scheduleId ? `wb-${scheduleId}` : undefined}
         />
       </div>
