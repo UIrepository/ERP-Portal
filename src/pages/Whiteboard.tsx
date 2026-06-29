@@ -331,17 +331,47 @@ const Whiteboard = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, fileMode]);
 
-  // CLASS mode: on open, pull this class's latest cloud snapshot so the board
-  // shows what was drawn on any other device (view-on-open). The device only
-  // overwrites its view until the moment someone edits here (see classDirtyRef).
+  // CLASS mode: on open, reconcile this device's local board with the cloud
+  // snapshot. If the cloud is at least as complete, show it (view-on-open). If
+  // this device has MORE content than the cloud (e.g. earlier edits/an image
+  // that never uploaded), keep the local work and push it up — never silently
+  // overwrite un-synced edits.
   useEffect(() => {
     if (!editor || !scheduleId || fileMode || accessAllowed !== true || classLoadedRef.current) return;
     classLoadedRef.current = true;
     (async () => {
-      const loaded = await loadClassSnapshot();
-      if (loaded) {
+      const localShapes = editor
+        .getPages()
+        .reduce((acc, p) => acc + editor.getPageShapeIds(p.id).size, 0);
+
+      let cloud: { text: string; snap: unknown; shapes: number } | null = null;
+      if (classSnapUrl) {
+        try {
+          const res = await fetch(classSnapUrl, { cache: 'no-store' });
+          if (res.ok) {
+            const text = await res.text();
+            if (text) {
+              const snap = JSON.parse(text);
+              const store = (snap?.document?.store ?? snap?.store ?? {}) as Record<string, { typeName?: string }>;
+              const shapes = Object.values(store).filter((r) => r?.typeName === 'shape').length;
+              cloud = { text, snap, shapes };
+            }
+          }
+        } catch (e) {
+          console.error('class open load failed', e);
+        }
+      }
+
+      if (cloud && cloud.shapes >= localShapes) {
+        classSnapTextRef.current = cloud.text;
+        loadSnapshot(editor.store, cloud.snap as Parameters<typeof loadSnapshot>[1]);
         setStartMode('blank');
         focusPage(editor);
+      } else if (localShapes > 0) {
+        // Local is richer than the cloud — keep it, mark this device the editor,
+        // and push the local board up so other devices receive it.
+        classDirtyRef.current = true;
+        setTimeout(() => { void persistClassSnapshot(); }, 1500);
       }
       setTimeout(() => { classAutosaveReadyRef.current = true; }, 300);
     })();
