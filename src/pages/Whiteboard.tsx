@@ -13,7 +13,6 @@ import {
   getSnapshot,
   loadSnapshot,
   Box,
-  type TLAssetStore,
 } from 'tldraw';
 import 'tldraw/tldraw.css';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -37,27 +36,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 // S/M/L size buttons), and remove the zoom/minimap control — the board is a
 // fixed "slide" view with no zooming. Module-level for a stable reference.
 const WB_COMPONENTS = { StylePanel: WhiteboardStylePanel, NavigationPanel: null };
-
-// Store inserted images/files on Cloudinary (a hosted URL) instead of inlining
-// the bytes as base64 in the document. This keeps board snapshots small enough
-// to sync across devices and makes images load on any device — base64-inlined
-// images bloat the snapshot and can silently break the cloud save.
-const cloudinaryAssetStore: TLAssetStore = {
-  async upload(_asset, file) {
-    const isImage = file.type.startsWith('image/');
-    const { url } = await uploadBlobToCloudinary(file, {
-      folder: 'whiteboard_assets',
-      resourceType: isImage ? 'image' : 'raw',
-      fileName: file.name,
-    });
-    return { src: url };
-  },
-  // Display assets straight from their stored URL (Cloudinary URL or, for
-  // PDF-page backgrounds, the embedded data URL).
-  resolve(asset) {
-    return (asset.props as { src?: string }).src ?? null;
-  },
-};
 
 type StartMode = 'choose' | 'blank' | 'pdf';
 
@@ -127,6 +105,10 @@ const Whiteboard = () => {
   // must NOT be overwritten by the periodic viewer refresh. A device that only
   // views stays "clean" and keeps pulling the latest snapshot.
   const classDirtyRef = useRef(false);
+  // This device opened with an EMPTY board → it's a pure viewer and may keep
+  // pulling the latest snapshot. A device that opened with its own content is an
+  // owner and is never reloaded over (would otherwise wipe its images/strokes).
+  const classViewerRef = useRef(false);
   // Last snapshot text we loaded — skip re-loading an unchanged snapshot (no flicker).
   const classSnapTextRef = useRef<string>('');
 
@@ -331,11 +313,11 @@ const Whiteboard = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, fileMode]);
 
-  // CLASS mode: on open, reconcile this device's local board with the cloud
-  // snapshot. If the cloud is at least as complete, show it (view-on-open). If
-  // this device has MORE content than the cloud (e.g. earlier edits/an image
-  // that never uploaded), keep the local work and push it up — never silently
-  // overwrite un-synced edits.
+  // CLASS mode: on open, decide owner vs viewer.
+  //  • Empty board → pure viewer: pull the latest snapshot and keep it fresh.
+  //  • Has its own content → owner: keep the local board exactly as-is (never
+  //    reload over it — that's what was blanking images), and push it up so
+  //    other devices receive it.
   useEffect(() => {
     if (!editor || !scheduleId || fileMode || accessAllowed !== true || classLoadedRef.current) return;
     classLoadedRef.current = true;
@@ -344,32 +326,15 @@ const Whiteboard = () => {
         .getPages()
         .reduce((acc, p) => acc + editor.getPageShapeIds(p.id).size, 0);
 
-      let cloud: { text: string; snap: unknown; shapes: number } | null = null;
-      if (classSnapUrl) {
-        try {
-          const res = await fetch(classSnapUrl, { cache: 'no-store' });
-          if (res.ok) {
-            const text = await res.text();
-            if (text) {
-              const snap = JSON.parse(text);
-              const store = (snap?.document?.store ?? snap?.store ?? {}) as Record<string, { typeName?: string }>;
-              const shapes = Object.values(store).filter((r) => r?.typeName === 'shape').length;
-              cloud = { text, snap, shapes };
-            }
-          }
-        } catch (e) {
-          console.error('class open load failed', e);
+      if (localShapes === 0) {
+        classViewerRef.current = true;
+        const loaded = await loadClassSnapshot();
+        if (loaded) {
+          setStartMode('blank');
+          focusPage(editor);
         }
-      }
-
-      if (cloud && cloud.shapes >= localShapes) {
-        classSnapTextRef.current = cloud.text;
-        loadSnapshot(editor.store, cloud.snap as Parameters<typeof loadSnapshot>[1]);
-        setStartMode('blank');
-        focusPage(editor);
-      } else if (localShapes > 0) {
-        // Local is richer than the cloud — keep it, mark this device the editor,
-        // and push the local board up so other devices receive it.
+      } else {
+        // This device owns content — keep it and sync it up.
         classDirtyRef.current = true;
         setTimeout(() => { void persistClassSnapshot(); }, 1500);
       }
@@ -385,7 +350,9 @@ const Whiteboard = () => {
   useEffect(() => {
     if (!editor || !scheduleId || fileMode || accessAllowed !== true) return;
     const id = setInterval(() => {
-      if (classDirtyRef.current || !classAutosaveReadyRef.current) return;
+      // Only a pure viewer that hasn't started editing refreshes — never pull
+      // over a device that owns content (that blanks its images/strokes).
+      if (!classViewerRef.current || classDirtyRef.current || !classAutosaveReadyRef.current) return;
       void loadClassSnapshot();
     }, 12000);
     return () => clearInterval(id);
@@ -1181,7 +1148,6 @@ const Whiteboard = () => {
           onMount={handleMount}
           inferDarkMode
           components={WB_COMPONENTS}
-          assets={cloudinaryAssetStore}
           persistenceKey={fileId ? `wb-file-${fileId}` : scheduleId ? `wb-${scheduleId}` : undefined}
         />
       </div>
