@@ -137,6 +137,8 @@ const Whiteboard = () => {
   const classViewerRef = useRef(false);
   // Last snapshot text we loaded — skip re-loading an unchanged snapshot (no flicker).
   const classSnapTextRef = useRef<string>('');
+  // One-time self-heal: migrate locally-stored "asset:" images to Cloudinary URLs.
+  const healedRef = useRef(false);
 
   // Leave the whiteboard. When it was opened in its own browser tab,
   // window.close() works; in the installed PWA (navigated in-place, no tab to
@@ -406,6 +408,17 @@ const Whiteboard = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, scheduleId, fileMode]);
+
+  // One-time self-heal of legacy "asset:" images → Cloudinary URLs (runs once
+  // per mount, after the load settles). Only the device holding the bytes acts;
+  // the resulting src rewrite is picked up by the normal autosave and syncs.
+  useEffect(() => {
+    if (!editor || healedRef.current) return;
+    healedRef.current = true;
+    const t = setTimeout(() => { void healAssetUrls(); }, 2500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor]);
 
   const handleMount = useCallback((ed: Editor) => {
     setEditor(ed);
@@ -971,6 +984,39 @@ const Whiteboard = () => {
       console.error('class snapshot autosave failed', e);
     } finally {
       classSavingRef.current = false;
+    }
+  };
+
+  // Self-heal: images inserted before the Cloudinary asset store are stored as
+  // local "asset:<id>" refs (bytes only in this device's IndexedDB), so they
+  // don't sync. On the device that HAS the bytes, re-upload each to Cloudinary
+  // and rewrite the asset's src to the hosted URL — the next autosave then
+  // carries real URLs and the board heals on every other device. A device
+  // without the bytes (a viewer) can't resolve them, so it safely no-ops.
+  const healAssetUrls = async () => {
+    if (!editor) return;
+    const stale = editor
+      .getAssets()
+      .filter((a) => a.type === 'image' && typeof a.props.src === 'string' && a.props.src.startsWith('asset:'));
+    if (stale.length === 0) return;
+    for (const asset of stale) {
+      try {
+        const objUrl = await editor.resolveAssetUrl(asset.id, { screenScale: 1, shouldResolveToOriginal: true });
+        if (!objUrl) continue; // no local bytes on this device — can't heal here
+        const blob = await (await fetch(objUrl)).blob();
+        if (!blob || blob.size === 0) continue;
+        const mime = blob.type || (asset.props as { mimeType?: string }).mimeType || 'image/png';
+        const ext = (mime.split('/')[1] || 'png').split('+')[0];
+        const { url } = await uploadBlobToCloudinary(blob, {
+          folder: 'whiteboard_assets',
+          resourceType: 'image',
+          fileName: `wb-${asset.id.replace(/[^a-z0-9]/gi, '')}.${ext}`,
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        editor.updateAssets([{ ...asset, props: { ...asset.props, src: url } } as any]);
+      } catch (e) {
+        console.error('asset heal failed', asset.id, e);
+      }
     }
   };
 
