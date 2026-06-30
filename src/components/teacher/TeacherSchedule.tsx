@@ -144,10 +144,27 @@ function AddClassForm({
           end_time: newClass.end_time,
           subject: cleanSubject,
           batch: newClass.batch,
-          link: null 
+          link: null
       });
 
       if (error) throw error;
+
+      // Notify the batch's students + assigned teachers (push + email). Best-effort.
+      try {
+        await supabase.functions.invoke('notify-schedule-change', {
+          body: {
+            event: 'added',
+            batch: newClass.batch,
+            subject: cleanSubject,
+            date: newClass.date,
+            day_of_week: dayOfWeek,
+            start_time: newClass.start_time,
+            end_time: newClass.end_time,
+          },
+        });
+      } catch (e) {
+        console.warn('new-class notification failed:', e);
+      }
     },
     onSuccess: () => {
       toast.success("Class added successfully!");

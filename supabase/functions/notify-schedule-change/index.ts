@@ -65,6 +65,7 @@ Deno.serve(async (req) => {
     const when = whenLabel(date, day_of_week);
     const time = `${hhmm(start_time)}${end_time ? `–${hhmm(end_time)}` : ''}`;
     const cancelled = event === 'cancelled';
+    const added = event === 'added';
 
     // ---- assigned teachers (shared by push + email) --------------------------
     const { data: teacherRows } = await supabase
@@ -87,9 +88,11 @@ Deno.serve(async (req) => {
 
     let pushSent = 0, pushFailed = 0;
     if (userIds.length && configurePush()) {
-      const pushTitle = cancelled ? '❌ Class cancelled' : '🗓️ Class rescheduled';
+      const pushTitle = cancelled ? '❌ Class cancelled' : added ? '🆕 New class added' : '🗓️ Class rescheduled';
       const pushBody = cancelled
         ? `${subject} • ${batch}${when ? ` (${when}${time ? `, ${time}` : ''})` : ''} has been cancelled.`
+        : added
+        ? `${subject} • ${batch}${when ? ` on ${when}` : ''}${time ? ` at ${time}` : ''} has been added.`
         : `${subject} • ${batch} is now ${when || 'rescheduled'}${time ? ` at ${time}` : ''}.`;
       const payload = JSON.stringify({
         title: pushTitle, body: pushBody, url: '/schedule',
@@ -124,10 +127,14 @@ Deno.serve(async (req) => {
 
       const subjectLine = cancelled
         ? `Unknown IITians — Class cancelled: ${subject} (${batch})`
+        : added
+        ? `Unknown IITians — New class scheduled: ${subject} (${batch})`
         : `Unknown IITians — Class rescheduled: ${subject} (${batch})`;
 
       const studentBody = cancelled
         ? `Dear Student,\n\nYour ${subject} class for ${batch}${when ? ` scheduled for ${when}${time ? `, ${time}` : ''}` : ''} has been cancelled.\n\nPlease check your dashboard for updates.\n\nRegards,\nUnknown IITians Academic Team`
+        : added
+        ? `Dear Student,\n\nA new ${subject} class has been scheduled for ${batch}.\n\nWhen: ${when || 'see dashboard'}${time ? ` • ${time}` : ''}\n\nPlease check your dashboard for details.\n\nRegards,\nUnknown IITians Academic Team`
         : `Dear Student,\n\nYour ${subject} class for ${batch} has been rescheduled.\n\nNew schedule: ${when || 'see dashboard'}${time ? ` • ${time}` : ''}\n\nPlease check your dashboard for details.\n\nRegards,\nUnknown IITians Academic Team`;
 
       const recipients: string[] = [];
@@ -142,6 +149,8 @@ Deno.serve(async (req) => {
         if (!t.email) continue;
         const teacherBody = cancelled
           ? `Dear ${t.name || 'Teacher'},\n\nThe ${subject} class for ${batch}${when ? ` scheduled for ${when}${time ? `, ${time}` : ''}` : ''} has been cancelled.\n\nRegards,\nUnknown IITians Academic Team`
+          : added
+          ? `Dear ${t.name || 'Teacher'},\n\nA new ${subject} class has been scheduled for ${batch}.\n\nWhen: ${when || 'see dashboard'}${time ? ` • ${time}` : ''}\n\nRegards,\nUnknown IITians Academic Team`
           : `Dear ${t.name || 'Teacher'},\n\nThe ${subject} class for ${batch} has been rescheduled.\n\nNew schedule: ${when || 'see dashboard'}${time ? ` • ${time}` : ''}\n\nRegards,\nUnknown IITians Academic Team`;
         try { await resend.emails.send({ from: FROM, to: [t.email], subject: subjectLine, text: teacherBody }); emailSent++; }
         catch (err) { console.error('schedule email (teacher) failed:', (err as Error)?.message); }
