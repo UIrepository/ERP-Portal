@@ -354,7 +354,22 @@ const Whiteboard = () => {
         .getPages()
         .reduce((acc, p) => acc + editor.getPageShapeIds(p.id).size, 0);
 
-      if (localShapes === 0) {
+      // A device only OWNS its content if it can actually render it. If it holds
+      // image assets it can't resolve (stale "asset:" refs whose bytes live on
+      // another device — e.g. a viewer that earlier pulled the pre-heal board),
+      // it's not the owner; pull the latest cloud snapshot instead.
+      let hasUnresolvableImages = false;
+      if (localShapes > 0) {
+        const refs = editor
+          .getAssets()
+          .filter((a) => a.type === 'image' && typeof a.props.src === 'string' && a.props.src.startsWith('asset:'));
+        for (const a of refs) {
+          const u = await editor.resolveAssetUrl(a.id, { screenScale: 1 });
+          if (!u) { hasUnresolvableImages = true; break; }
+        }
+      }
+
+      if (localShapes === 0 || hasUnresolvableImages) {
         classViewerRef.current = true;
         const loaded = await loadClassSnapshot();
         if (loaded) {
@@ -362,7 +377,7 @@ const Whiteboard = () => {
           focusPage(editor);
         }
       } else {
-        // This device owns content — keep it and sync it up.
+        // This device owns renderable content — keep it and sync it up.
         classDirtyRef.current = true;
         setTimeout(() => { void persistClassSnapshot(); }, 1500);
       }
