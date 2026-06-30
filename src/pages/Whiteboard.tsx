@@ -13,6 +13,7 @@ import {
   getSnapshot,
   loadSnapshot,
   Box,
+  type TLAssetStore,
 } from 'tldraw';
 import 'tldraw/tldraw.css';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -36,6 +37,31 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 // S/M/L size buttons), and remove the zoom/minimap control — the board is a
 // fixed "slide" view with no zooming. Module-level for a stable reference.
 const WB_COMPONENTS = { StylePanel: WhiteboardStylePanel, NavigationPanel: null };
+
+// Host inserted images on Cloudinary and keep only the URL in the board.
+// tldraw's persistenceKey otherwise stashes image bytes in the device's
+// IndexedDB and stores just an "asset:<id>" pointer in the document, so the
+// pixels never travel in the snapshot — pages/strokes synced but images didn't.
+// A Cloudinary URL lives in the document and loads on any device.
+//
+// CRITICAL: provide ONLY `upload`. tldraw (useLocalStore) builds a default
+// asset store whose `resolve` reads "asset:" refs from IndexedDB and passes
+// through normal URLs, then spreads our store over it. Overriding `resolve`
+// here would break those local "asset:" images (they'd render as empty frames).
+// By omitting it, old images keep resolving from IndexedDB and new Cloudinary
+// URLs pass straight through. (Non-animated images display without crossOrigin,
+// and Cloudinary sends ACAO:* anyway, so display + export both work.)
+const cloudinaryAssetStore: TLAssetStore = {
+  async upload(_asset, file) {
+    const isImage = file.type.startsWith('image/');
+    const { url } = await uploadBlobToCloudinary(file, {
+      folder: 'whiteboard_assets',
+      resourceType: isImage ? 'image' : 'raw',
+      fileName: file.name,
+    });
+    return { src: url };
+  },
+};
 
 type StartMode = 'choose' | 'blank' | 'pdf';
 
@@ -1148,6 +1174,7 @@ const Whiteboard = () => {
           onMount={handleMount}
           inferDarkMode
           components={WB_COMPONENTS}
+          assets={cloudinaryAssetStore}
           persistenceKey={fileId ? `wb-file-${fileId}` : scheduleId ? `wb-${scheduleId}` : undefined}
         />
       </div>
