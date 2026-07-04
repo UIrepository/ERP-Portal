@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StudentBackButton } from './StudentBackButton';
 import { MarkdownText } from '@/components/ui/markdown-text';
+import { AnnouncementModal } from '@/components/shared/AnnouncementModal';
 
 interface Announcement {
   id: string;
@@ -44,9 +46,11 @@ const AnnouncementSkeleton = () => (
     </div>
 );
 
-const AnnouncementCard = ({ announcement }: { announcement: Announcement }) => {
+const AnnouncementCard = ({ announcement, onClick }: { announcement: Announcement; onClick: () => void }) => {
     return (
-        <div className="bg-white border border-[#eaebed] rounded-[4px] p-5 hover:border-[#d1d5db] transition-colors duration-200 flex flex-col h-[240px]">
+        <div
+            onClick={onClick}
+            className="cursor-pointer bg-white border border-[#eaebed] rounded-[4px] p-5 hover:border-[#d1d5db] hover:shadow-sm transition-all duration-200 flex flex-col h-[240px]">
             {/* Sender Block */}
             <div className="flex items-center gap-3 mb-3 shrink-0">
                  {/* Avatar - Clean, no background, perfect fit */}
@@ -127,6 +131,8 @@ export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [], on
         enabled: !!batch,
     });
 
+    const [selected, setSelected] = useState<Announcement | null>(null);
+
     return (
         // Container with padding but no background/border
         <div className="w-full font-sans antialiased p-4">
@@ -160,7 +166,7 @@ export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [], on
             ) : announcements && announcements.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {announcements.map((announcement) => (
-                        <AnnouncementCard key={announcement.id} announcement={announcement} />
+                        <AnnouncementCard key={announcement.id} announcement={announcement} onClick={() => setSelected(announcement)} />
                     ))}
                 </div>
             ) : (
@@ -171,6 +177,17 @@ export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [], on
                     <h3 className="text-sm font-bold text-black">No updates yet</h3>
                     <p className="text-xs text-[#888888] mt-1">Check back later for important announcements.</p>
                 </div>
+            )}
+
+            {selected && (
+                <AnnouncementModal
+                    title={selected.title}
+                    message={selected.message}
+                    created_at={selected.created_at}
+                    created_by_name={selected.created_by_name}
+                    context={selected.target_subject ? `For ${selected.target_subject}` : null}
+                    onClose={() => setSelected(null)}
+                />
             )}
         </div>
     );

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -5,6 +6,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Megaphone } from 'lucide-react';
 import { MarkdownText } from '@/components/ui/markdown-text';
+import { AnnouncementModal } from '@/components/shared/AnnouncementModal';
 
 interface Announcement {
   id: string;
@@ -29,8 +31,10 @@ const CardSkeleton = () => (
   </div>
 );
 
-const AnnouncementCard = ({ a }: { a: Announcement }) => (
-  <div className="bg-white border border-[#eaebed] rounded-[4px] p-5 hover:border-[#d1d5db] transition-colors duration-200 flex flex-col h-[240px]">
+const AnnouncementCard = ({ a, onClick }: { a: Announcement; onClick: () => void }) => (
+  <div
+    onClick={onClick}
+    className="cursor-pointer bg-white border border-[#eaebed] rounded-[4px] p-5 hover:border-[#d1d5db] hover:shadow-sm transition-all duration-200 flex flex-col h-[240px]">
     <div className="flex items-center gap-3 mb-3 shrink-0">
       <div className="w-[36px] h-[36px] shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-primary/10 border border-slate-100">
         <Megaphone className="h-4 w-4 text-primary" />
@@ -51,6 +55,7 @@ const AnnouncementCard = ({ a }: { a: Announcement }) => (
 
 export const TeacherAnnouncements = () => {
   const { profile } = useAuth();
+  const [selected, setSelected] = useState<Announcement | null>(null);
 
   const { data: announcements, isLoading } = useQuery({
     queryKey: ['teacher-my-announcements', profile?.user_id],
@@ -85,7 +90,7 @@ export const TeacherAnnouncements = () => {
         <CardSkeleton />
       ) : announcements && announcements.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {announcements.map((a) => <AnnouncementCard key={a.id} a={a} />)}
+          {announcements.map((a) => <AnnouncementCard key={a.id} a={a} onClick={() => setSelected(a)} />)}
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-16 bg-white border border-[#eaebed] rounded-[4px]">
@@ -95,6 +100,16 @@ export const TeacherAnnouncements = () => {
           <h3 className="text-sm font-bold text-black">No announcements yet</h3>
           <p className="text-xs text-[#888888] mt-1">Messages from the admin team will appear here.</p>
         </div>
+      )}
+
+      {selected && (
+        <AnnouncementModal
+          title={selected.title}
+          message={selected.message}
+          created_at={selected.created_at}
+          created_by_name={selected.created_by_name}
+          onClose={() => setSelected(null)}
+        />
       )}
     </div>
   );
