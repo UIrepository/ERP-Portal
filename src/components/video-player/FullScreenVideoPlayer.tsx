@@ -189,6 +189,7 @@ export const FullScreenVideoPlayer = ({
           origin: window.location.origin,
           endscreen: 0,
           autoplay_on_end: 0,
+          cc_load_policy: 0, // captions OFF by default
         },
         events: {
           onReady: (event) => {
@@ -196,12 +197,17 @@ export const FullScreenVideoPlayer = ({
               setDuration(event.target.getDuration());
               event.target.playVideo();
               youtubePlayerRef.current = event.target;
+              // Force captions off — some videos auto-show a caption track.
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              try { const p = event.target as any; p.unloadModule?.('captions'); p.unloadModule?.('cc'); } catch { /* ignore */ }
             }
           },
           onStateChange: (event) => {
             if (event.data === 1) { // PLAYING
               setIsPlaying(true);
               bufferingStuckRef.current = { time: 0, count: 0 };
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              try { const p = youtubePlayerRef.current as any; p?.unloadModule?.('captions'); p?.unloadModule?.('cc'); } catch { /* ignore */ }
             } else if (event.data === 2) { // PAUSED
               setIsPlaying(false);
             } else if (event.data === -1 && youtubePlayerRef.current) {
