@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
-import { X, Megaphone } from 'lucide-react';
+import { X } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Megaphone01Icon } from '@hugeicons/core-free-icons';
 import { formatDistanceToNow } from 'date-fns';
 import { MarkdownText } from '@/components/ui/markdown-text';
 
@@ -39,8 +41,8 @@ export const AnnouncementModal = ({
       role="dialog"
       aria-modal="true"
     >
-      {/* Lightly blurred, gently dimmed backdrop */}
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+      {/* Blurred, gently dimmed backdrop */}
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-md" />
 
       {/* White block — ~70% of the screen, very slightly rounded */}
       <div
@@ -49,8 +51,8 @@ export const AnnouncementModal = ({
       >
         {/* Header */}
         <div className="flex items-start gap-3 px-5 sm:px-7 pt-5 pb-4 border-b border-slate-100 shrink-0">
-          <div className="w-9 h-9 shrink-0 rounded-full bg-primary/10 border border-slate-100 flex items-center justify-center text-primary">
-            <Megaphone className="h-4 w-4" />
+          <div className="w-9 h-9 shrink-0 rounded-full bg-yellow-100 border border-yellow-200 flex items-center justify-center">
+            <HugeiconsIcon icon={Megaphone01Icon} size={18} strokeWidth={1.8} color="#eab308" />
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-base sm:text-lg font-semibold text-slate-900 leading-snug">{title}</h2>
