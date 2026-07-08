@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LogOut, Menu } from 'lucide-react';
 import {
   DropdownMenu,
@@ -177,6 +177,11 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-9 w-9 rounded-full">
                   <Avatar className="h-9 w-9">
+                    <AvatarImage
+                      src={user?.user_metadata?.avatar_url || user?.user_metadata?.picture}
+                      alt={profile?.name || 'Profile'}
+                      referrerPolicy="no-referrer"
+                    />
                     <AvatarFallback className="bg-brand/10 text-brand font-display font-semibold text-sm">
                       {profile?.name?.charAt(0)?.toUpperCase() || 'U'}
                     </AvatarFallback>
