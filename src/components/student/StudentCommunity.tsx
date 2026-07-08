@@ -115,6 +115,7 @@ const MessageItem = ({
   msg,
   isMe,
   isSenderTeacher,
+  isSenderStudent,
   replyData,
   replyText,
   onReply,
@@ -125,6 +126,7 @@ const MessageItem = ({
   msg: CommunityMessage,
   isMe: boolean,
   isSenderTeacher: boolean,
+  isSenderStudent: boolean,
   replyData: any,
   replyText: string | null,
   onReply: (msg: CommunityMessage) => void,
@@ -232,7 +234,7 @@ const MessageItem = ({
 
       {!isMe && (
         <Avatar className="h-8 w-8 mb-1 shadow-sm border border-white ring-2 ring-gray-50">
-            <AvatarImage src={msg.profiles?.avatar_url || undefined} referrerPolicy="no-referrer" />
+            {isSenderStudent && <AvatarImage src={msg.profiles?.avatar_url || undefined} referrerPolicy="no-referrer" />}
             <AvatarFallback className={`${getAvatarColor(msg.profiles?.name || '?')} text-[10px] font-bold`}>
                 {msg.profiles?.name?.substring(0, 2).toUpperCase()}
             </AvatarFallback>
@@ -556,15 +558,15 @@ export const StudentCommunity = ({ batch: batchProp }: { batch?: string } = {}) 
     () => Array.from(new Set(messages.map(m => m.user_id).filter(Boolean))),
     [messages]
   );
-  const { data: teacherIdSet } = useQuery<Set<string>>({
+  const { data: senderRoles } = useQuery<Map<string, string>>({
     queryKey: ['community-sender-roles', senderIds],
     queryFn: async () => {
-      const teachers = new Set<string>();
+      const roles = new Map<string, string>();
       await Promise.all(senderIds.map(async (uid) => {
         const { data } = await supabase.rpc('get_user_role_from_tables', { check_user_id: uid });
-        if ((data as string) === 'teacher') teachers.add(uid);
+        if (data) roles.set(uid, data as string);
       }));
-      return teachers;
+      return roles;
     },
     enabled: senderIds.length > 0,
     staleTime: 5 * 60 * 1000,
@@ -856,7 +858,8 @@ export const StudentCommunity = ({ batch: batchProp }: { batch?: string } = {}) 
                        key={msg.id}
                        msg={msg}
                        isMe={msg.user_id === profile?.user_id}
-                       isSenderTeacher={teacherIdSet?.has(msg.user_id) ?? false}
+                       isSenderTeacher={senderRoles?.get(msg.user_id) === 'teacher'}
+                       isSenderStudent={senderRoles?.get(msg.user_id) === 'student'}
                        replyData={msg.reply_to_id ? messageMap.get(msg.reply_to_id) : null}
                        replyText={msg.reply_to_id ? (messageMap.get(msg.reply_to_id)?.content || 'Message') : null}
                        onReply={setReplyingTo}
