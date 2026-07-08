@@ -10,7 +10,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'; // 🟢 Added u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2, Bell, BellOff } from 'lucide-react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
@@ -81,7 +81,7 @@ interface CommunityMessage {
   created_at: string;
   is_deleted: boolean;
   is_priority: boolean;
-  profiles: { name: string | null; email?: string | null } | null;
+  profiles: { name: string | null; email?: string | null; avatar_url?: string | null } | null;
   message_likes: { user_id: string; reaction_type: string }[];
 }
 
@@ -232,6 +232,7 @@ const MessageItem = ({
 
       {!isMe && (
         <Avatar className="h-8 w-8 mb-1 shadow-sm border border-white ring-2 ring-gray-50">
+            <AvatarImage src={msg.profiles?.avatar_url || undefined} referrerPolicy="no-referrer" />
             <AvatarFallback className={`${getAvatarColor(msg.profiles?.name || '?')} text-[10px] font-bold`}>
                 {msg.profiles?.name?.substring(0, 2).toUpperCase()}
             </AvatarFallback>
@@ -528,7 +529,7 @@ export const StudentCommunity = ({ batch: batchProp }: { batch?: string } = {}) 
         .from('community_messages')
         .select(`
           *,
-          profiles:profile_basics (name, email),
+          profiles:profile_basics (name, email, avatar_url),
           message_likes ( user_id, reaction_type )
         `)
         .or(orFilter)

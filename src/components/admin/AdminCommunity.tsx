@@ -7,7 +7,7 @@ import { useMergedSubjects } from '@/hooks/useMergedSubjects';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   Send, 
   Image as ImageIcon, 
@@ -65,7 +65,7 @@ interface CommunityMessage {
   created_at: string;
   is_deleted: boolean;
   is_priority: boolean;
-  profiles: { name: string | null; email?: string | null } | null;
+  profiles: { name: string | null; email?: string | null; avatar_url?: string | null } | null;
   message_likes: { user_id: string; reaction_type: string }[]; 
 }
 
@@ -216,6 +216,7 @@ const MessageItemAdmin = ({
 
       {!isMe && (
         <Avatar className="h-8 w-8 mb-1 shadow-sm border border-white ring-2 ring-gray-50">
+            <AvatarImage src={msg.profiles?.avatar_url || undefined} referrerPolicy="no-referrer" />
             <AvatarFallback className={`${getAvatarColor(msg.profiles?.name || '?')} text-[10px] font-bold`}>
                 {msg.profiles?.name?.substring(0, 2).toUpperCase()}
             </AvatarFallback>
@@ -374,7 +375,7 @@ export const AdminCommunity = () => {
       if (!selectedGroup || !orFilter) return [];
       const { data, error } = await supabase
         .from('community_messages')
-        .select(`*, profiles:profile_basics (name, email), message_likes ( user_id, reaction_type )`)
+        .select(`*, profiles:profile_basics (name, email, avatar_url), message_likes ( user_id, reaction_type )`)
         .or(orFilter)
         // Latest 80 only (newest first) then flip to chronological (egress).
         .order('created_at', { ascending: false })

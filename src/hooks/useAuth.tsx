@@ -96,6 +96,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } catch {
           // ignore
         }
+
+        // Sync the Google account photo into the profile so it shows across the
+        // community (a user's Google photo is only available in their own
+        // session, so each user writes their own). Best-effort; only when changed.
+        const googleAvatar =
+          (currentUser.user_metadata?.avatar_url as string | undefined) ||
+          (currentUser.user_metadata?.picture as string | undefined);
+        if (googleAvatar && profileData.avatar_url !== googleAvatar) {
+          supabase
+            .from('profiles')
+            .update({ avatar_url: googleAvatar })
+            .eq('user_id', currentUser.id)
+            .then(() => {}, () => {});
+        }
       }
 
       // 2. Role — authoritative resolution (RPC + retry + table fallback)
