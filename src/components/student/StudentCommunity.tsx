@@ -594,12 +594,29 @@ export const StudentCommunity = ({ batch: batchProp }: { batch?: string } = {}) 
       (mergedPairs.length ? mergedPairs : [{ batch: selectedGroup.batch_name, subject: selectedGroup.subject_name }])
         .map((p) => `${p.batch}|${p.subject}`),
     );
+    const msgKey = ['community-messages', selectedGroup.batch_name, selectedGroup.subject_name, orFilter];
     const refresh = () => {
       queryClient.invalidateQueries({ queryKey: ['community-messages', selectedGroup.batch_name, selectedGroup.subject_name] });
     };
-    const onMsg = (payload: { new?: Record<string, unknown>; old?: Record<string, unknown> }) => {
-      const row = (payload.new || payload.old) as { batch?: string; subject?: string } | undefined;
-      if (row && pairSet.has(`${row.batch}|${row.subject}`)) refresh();
+    const onMsg = async (payload: { eventType?: string; new?: Record<string, unknown>; old?: Record<string, unknown> }) => {
+      const row = (payload.new || payload.old) as { id?: string; batch?: string; subject?: string } | undefined;
+      if (!row || !pairSet.has(`${row.batch}|${row.subject}`)) return;
+      // New message: fetch just THAT one row (with sender + reactions) and append
+      // it — instead of re-downloading the latest 80 messages. The big egress win.
+      if (payload.eventType === 'INSERT' && row.id) {
+        const { data } = await supabase
+          .from('community_messages')
+          .select(`*, profiles:profile_basics (name, email, avatar_url), message_likes ( user_id, reaction_type )`)
+          .eq('id', row.id)
+          .maybeSingle();
+        if (!data) return;
+        queryClient.setQueryData<CommunityMessage[]>(msgKey, (old = []) =>
+          old.some((m) => m.id === (data as CommunityMessage).id) ? old : [...old, data as CommunityMessage],
+        );
+        return;
+      }
+      // Edits/deletes are rare — a cheap refetch keeps them correct.
+      refresh();
     };
     const channel = supabase
       .channel(`community-${selectedGroup.batch_name}-${selectedGroup.subject_name}`)
