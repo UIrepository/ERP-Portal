@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Video, Clock, Calendar, Users, UserCheck, Eye, Filter } from 'lucide-react';
+import { ATTENDANCE_ENABLED } from '@/lib/features';
 import { format, parse } from 'date-fns';
 import { istDayOfWeek, istTodayStr, istMinutesNow, timeToMinutes } from '@/lib/timezone';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
@@ -73,7 +74,7 @@ export const AdminJoinClass = () => {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!selectedClassForAttendance,
+    enabled: ATTENDANCE_ENABLED && !!selectedClassForAttendance,
     refetchInterval: 30000
   });
 
@@ -276,13 +277,15 @@ export const AdminJoinClass = () => {
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <Button 
+                      {ATTENDANCE_ENABLED && (
+                      <Button
                         variant="outline"
                         onClick={() => setSelectedClassForAttendance(cls)}
                       >
                         <UserCheck className="mr-2 h-4 w-4" />
                         Attendance
                       </Button>
+                      )}
                       <Button 
                         size="lg" 
                         onClick={() => handleJoinClass(cls)}
@@ -347,7 +350,8 @@ export const AdminJoinClass = () => {
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      <Button 
+                      {ATTENDANCE_ENABLED && (
+                      <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setSelectedClassForAttendance(cls)}
@@ -355,6 +359,7 @@ export const AdminJoinClass = () => {
                         <UserCheck className="mr-2 h-4 w-4" />
                         Attendance
                       </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>

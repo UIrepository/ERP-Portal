@@ -12,6 +12,7 @@ import { istDayOfWeek, istTodayStr, istMinutesNow, timeToMinutes } from '@/lib/t
 import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { generateJitsiRoomName } from '@/lib/jitsiUtils';
+import { ATTENDANCE_ENABLED } from '@/lib/features';
 
 interface Schedule {
   id: string;
@@ -90,7 +91,7 @@ export const ManagerJoinClass = () => {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!selectedClassForAttendance,
+    enabled: ATTENDANCE_ENABLED && !!selectedClassForAttendance,
     refetchInterval: 30000
   });
 
@@ -233,13 +234,15 @@ export const ManagerJoinClass = () => {
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      <Button 
+                      {ATTENDANCE_ENABLED && (
+                      <Button
                         variant="outline"
                         onClick={() => setSelectedClassForAttendance(cls)}
                       >
                         <UserCheck className="mr-2 h-4 w-4" />
                         Attendance
                       </Button>
+                      )}
                       <Button 
                         size="lg" 
                         onClick={() => handleMonitorClass(cls)}
@@ -304,13 +307,15 @@ export const ManagerJoinClass = () => {
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      <Button 
+                      {ATTENDANCE_ENABLED && (
+                      <Button
                         variant="outline"
                         onClick={() => setSelectedClassForAttendance(cls)}
                       >
                         <UserCheck className="mr-2 h-4 w-4" />
                         View Attendance
                       </Button>
+                      )}
                       <Badge variant="outline">Completed</Badge>
                     </div>
                   </div>

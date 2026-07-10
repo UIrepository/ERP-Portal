@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { generateJitsiRoomName } from '@/lib/jitsiUtils';
 import { useYoutubeStream } from '@/hooks/useYoutubeStream';
+import { ATTENDANCE_ENABLED } from '@/lib/features';
 
 interface JitsiMeetingProps {
   roomName: string;
@@ -187,6 +188,7 @@ export const JitsiMeeting = ({
   }, [getSanitizedRoomName]);
 
   const recordAttendance = useCallback(async () => {
+    if (!ATTENDANCE_ENABLED) return; // attendance feature off
     // ... existing attendance logic ...
     const currentProps = propsRef.current;
     if (hasRecordedAttendanceRef.current) return;
@@ -215,6 +217,7 @@ export const JitsiMeeting = ({
   }, []);
 
   const updateAttendanceOnLeave = useCallback(async () => {
+    if (!ATTENDANCE_ENABLED) return; // attendance feature off
     const currentProps = propsRef.current;
     if (!currentProps.profile?.user_id || !joinTimeRef.current) return;
     const safeScheduleId = currentProps.scheduleId && currentProps.scheduleId.trim() !== '' ? currentProps.scheduleId : null;

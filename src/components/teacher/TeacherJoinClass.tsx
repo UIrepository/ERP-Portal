@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { openInternalRoute } from '@/hooks/useInstallApp';
+import { ATTENDANCE_ENABLED } from '@/lib/features';
 
 // --- Types ---
 interface Schedule {
@@ -186,8 +187,8 @@ export const TeacherJoinClass = () => {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!selectedClassForAttendance,
-    refetchInterval: 30000 
+    enabled: ATTENDANCE_ENABLED && !!selectedClassForAttendance,
+    refetchInterval: 30000
   });
 
   useEffect(() => {
@@ -320,16 +321,18 @@ export const TeacherJoinClass = () => {
         const roomUrl = `https://meet.jit.si/${encodeURIComponent(roomName)}`;
 
         for (const pair of allPairs) {
-          await supabase.from('class_attendance').upsert({
-            user_id: profile.user_id,
-            user_name: profile.name || user?.email || 'Teacher',
-            user_role: 'teacher',
-            schedule_id: pair.id,
-            batch: pair.batch,
-            subject: pair.subject,
-            class_date: today,
-            joined_at: new Date().toISOString()
-          }, { onConflict: 'user_id,schedule_id,class_date' });
+          if (ATTENDANCE_ENABLED) {
+            await supabase.from('class_attendance').upsert({
+              user_id: profile.user_id,
+              user_name: profile.name || user?.email || 'Teacher',
+              user_role: 'teacher',
+              schedule_id: pair.id,
+              batch: pair.batch,
+              subject: pair.subject,
+              class_date: today,
+              joined_at: new Date().toISOString()
+            }, { onConflict: 'user_id,schedule_id,class_date' });
+          }
 
           await supabase.from('active_classes').upsert({
             batch: pair.batch,
@@ -555,7 +558,7 @@ export const TeacherJoinClass = () => {
                     </AlertDialog>
                   )}
 
-                  <button onClick={() => setSelectedClassForAttendance(cls)} className={styles.btn}>Attendance</button>
+                  {ATTENDANCE_ENABLED && <button onClick={() => setSelectedClassForAttendance(cls)} className={styles.btn}>Attendance</button>}
                   <button
                     onClick={() => openInternalRoute(`/whiteboard/${cls.id}`, navigate)}
                     className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded text-sm font-semibold cursor-pointer transition-all border border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100"
@@ -599,7 +602,7 @@ export const TeacherJoinClass = () => {
                   </div>
                 </div>
                 <div className={styles.actionsWrapper}>
-                  <button onClick={() => setSelectedClassForAttendance(cls)} className={styles.btn}>Attendance</button>
+                  {ATTENDANCE_ENABLED && <button onClick={() => setSelectedClassForAttendance(cls)} className={styles.btn}>Attendance</button>}
                   <button
                     onClick={() => openInternalRoute(`/whiteboard/${cls.id}`, navigate)}
                     className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded text-sm font-semibold cursor-pointer transition-all border border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100"
@@ -636,7 +639,7 @@ export const TeacherJoinClass = () => {
                   </div>
                 </div>
                 <div className={styles.actionsWrapper}>
-                  <button onClick={() => setSelectedClassForAttendance(cls)} className={styles.btn}>View Attendance</button>
+                  {ATTENDANCE_ENABLED && <button onClick={() => setSelectedClassForAttendance(cls)} className={styles.btn}>View Attendance</button>}
                   <button
                     onClick={() => openInternalRoute(`/whiteboard/${cls.id}`, navigate)}
                     className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded text-sm font-semibold cursor-pointer transition-all border border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100"
