@@ -139,20 +139,17 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
         const activeJitsi = allActiveClasses?.find(ac => ac.subject === schedule.subject && ac.batch === schedule.batch)
           || allActiveClasses?.find(ac => ac.subject === schedule.subject);
 
-        // Always resolve primary pair for consistent room naming (fixes merged batch students landing in different rooms)
+        // Fallback room name — used ONLY when the teacher isn't live yet and no
+        // schedule link is set. Derived from the merge's primary pair.
         const primary = getPrimaryPair(schedule.batch, schedule.subject);
-        const roomBatch = primary.batch;
-        const roomSubject = primary.subject;
+        const generatedJitsiLink = `https://meet.jit.si/${generateJitsiRoomName(primary.batch, primary.subject)}`;
 
-        const generatedJitsiLink = `https://meet.jit.si/${generateJitsiRoomName(roomBatch, roomSubject)}`;
-        const dbLink = activeJitsi?.room_url || schedule.link;
-
-        let finalLink = null;
-        if (dbLink) {
-          finalLink = dbLink.includes('meet.jit.si') ? generatedJitsiLink : dbLink;
-        } else {
-          finalLink = generatedJitsiLink;
-        }
+        // Use the teacher's ACTUAL live room verbatim (already the primary-pair
+        // room, written identically for every merged batch), then the schedule's
+        // own link, and only then the generated fallback. Do NOT re-derive the
+        // room client-side — that sent merged batches into different rooms when
+        // the merge data hadn't loaded (getPrimaryPair fell back to own batch).
+        const finalLink = activeJitsi?.room_url || schedule.link || generatedJitsiLink;
 
         return {
           ...schedule,
