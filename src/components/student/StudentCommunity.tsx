@@ -478,7 +478,7 @@ export const StudentCommunity = ({ batch: batchProp }: { batch?: string } = {}) 
       return result;
     },
     enabled: enrollments.length > 0 && !!profile?.user_id,
-    refetchInterval: 30000, // realtime channel already keeps this fresh
+    refetchInterval: 120000, // realtime keeps this fresh; long poll is just a safety net
   });
 
   const sortedEnrollments = useMemo(() => {
@@ -520,7 +520,7 @@ export const StudentCommunity = ({ batch: batchProp }: { batch?: string } = {}) 
   }, [selectedGroup]);
 
   // Merged batch/subject pairs: read messages across all of them, write to the canonical primary
-  const { orFilter, primaryPair } = useMergedSubjects(selectedGroup?.batch_name, selectedGroup?.subject_name);
+  const { orFilter, primaryPair, mergedPairs } = useMergedSubjects(selectedGroup?.batch_name, selectedGroup?.subject_name);
 
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery({
     queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name, orFilter],
@@ -588,29 +588,45 @@ export const StudentCommunity = ({ batch: batchProp }: { batch?: string } = {}) 
 
   useEffect(() => {
     if (!selectedGroup) return;
+    // Only refetch when a change belongs to THIS community's (merged) pairs, so
+    // an open chat doesn't refetch 80 messages on every OTHER batch's message.
+    const pairSet = new Set(
+      (mergedPairs.length ? mergedPairs : [{ batch: selectedGroup.batch_name, subject: selectedGroup.subject_name }])
+        .map((p) => `${p.batch}|${p.subject}`),
+    );
     const refresh = () => {
       queryClient.invalidateQueries({ queryKey: ['community-messages', selectedGroup.batch_name, selectedGroup.subject_name] });
     };
+    const onMsg = (payload: { new?: Record<string, unknown>; old?: Record<string, unknown> }) => {
+      const row = (payload.new || payload.old) as { batch?: string; subject?: string } | undefined;
+      if (row && pairSet.has(`${row.batch}|${row.subject}`)) refresh();
+    };
     const channel = supabase
       .channel(`community-${selectedGroup.batch_name}-${selectedGroup.subject_name}`)
-      // No batch filter: merged-session messages land in the primary pair's batch, so listen broadly
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'community_messages' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'community_messages' }, onMsg)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_likes' }, refresh)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [selectedGroup, queryClient]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGroup, orFilter, queryClient]);
 
-  // Global listener: keep the community list's order + unread badges fresh in near real-time
+  // Global listener: keep the community list's order + unread badges fresh in near
+  // real-time — but only when a new message lands in one of MY communities.
   useEffect(() => {
     if (enrollments.length === 0) return;
+    const enrollSet = new Set(enrollments.map((e) => `${e.batch_name}|${e.subject_name}`));
     const channel = supabase
       .channel('community-overview-global')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'community_messages' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['community-overview'] });
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'community_messages' }, (payload) => {
+        const row = payload.new as { batch?: string; subject?: string };
+        if (row && enrollSet.has(`${row.batch}|${row.subject}`)) {
+          queryClient.invalidateQueries({ queryKey: ['community-overview'] });
+        }
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [enrollments.length, queryClient]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enrollments, queryClient]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
