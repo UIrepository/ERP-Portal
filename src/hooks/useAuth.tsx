@@ -12,6 +12,7 @@ type AuthContextType = {
   signIn: () => void;
   signUp: () => void;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -223,6 +224,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     await supabase.auth.signOut();
   };
 
+  // Re-fetch the signed-in user's profile (e.g. after they change their name)
+  // so the new value reflects everywhere without a full reload.
+  const refreshProfile = async () => {
+    if (user) await fetchProfileAndRole(user);
+  };
+
   const value = {
     session,
     user,
@@ -232,6 +239,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     signIn: () => {},
     signUp: () => {},
     signOut,
+    refreshProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

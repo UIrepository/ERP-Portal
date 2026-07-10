@@ -33,6 +33,7 @@ import { useCommunityUnread } from '@/hooks/useCommunityUnread';
 import { NotificationCenter } from './NotificationCenter';
 import { NotificationListener } from './NotificationListener';
 import { PushManager } from './PushManager';
+import { NameConfirmGate } from './NameConfirmGate';
 import { HomeNavIcon, ScheduleNavIcon, FeedbackNavIcon, ExamsNavIcon, CommunityNavIcon, WhatsAppGlyph } from './icons/NavIcons';
 
 const ADMIN_WHATSAPP_NUMBER = '916297143798';
@@ -106,6 +107,7 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
       */}
       <NotificationListener />
       <PushManager />
+      <NameConfirmGate />
 
       {/* Full-width Header */}
       <header className="border-b bg-card shrink-0 z-30 w-full">
