@@ -161,7 +161,6 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
     { id: 'community-admin', label: 'Community Chat', icon: UserGroupIcon },
     { id: 'schedules', label: 'Schedules', icon: Calendar03Icon },
     { id: 'schedule-requests', label: 'Schedule Requests', icon: TaskDaily01Icon },
-    { id: 'meeting-manager', label: 'Meeting Links', icon: Link01Icon },
     { id: 'feedback-viewer', label: 'Feedback Viewer', icon: Message01Icon },
     { id: 'admin-whiteboard', label: 'Whiteboard', icon: BoardMathIcon },
     { id: 'create-announcement', label: 'Create Announcement', icon: Megaphone01Icon },

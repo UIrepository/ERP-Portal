@@ -87,7 +87,6 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
       if (!batch) return [];
 
       let allSchedules: any[] = [];
-      let allMeetingLinks: any[] = [];
       let allActiveClasses: any[] = [];
 
       if (isBatchLevel) {
@@ -95,17 +94,14 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
         const subjectsFilter = enrolledSubjects && enrolledSubjects.length > 0 ? enrolledSubjects : [];
         if (subjectsFilter.length === 0) return [];
         
-        const [schedRes, linksRes, activeRes] = await Promise.all([
+        const [schedRes, activeRes] = await Promise.all([
           supabase.from('schedules').select('*').eq('batch', batch)
             .in('subject', subjectsFilter)
             .or(`day_of_week.eq.${currentDayOfWeek},date.eq.${todayDateStr}`),
-          supabase.from('meeting_links').select('*').eq('batch', batch)
-            .in('subject', subjectsFilter).eq('is_active', true),
           supabase.from('active_classes').select('*').eq('batch', batch)
             .in('subject', subjectsFilter).eq('is_active', true),
         ]);
         if (schedRes.data) allSchedules = schedRes.data;
-        if (linksRes.data) allMeetingLinks = linksRes.data;
         if (activeRes.data) allActiveClasses = activeRes.data;
       } else {
         // Subject-level mode: use merged pairs (existing logic)
@@ -116,12 +112,6 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
             .eq('batch', pair.batch).eq('subject', pair.subject)
             .or(`day_of_week.eq.${currentDayOfWeek},date.eq.${todayDateStr}`);
           if (!error && data) allSchedules.push(...data);
-        }
-        for (const pair of mergedPairs) {
-          const { data } = await supabase
-            .from('meeting_links').select('*')
-            .eq('batch', pair.batch).eq('subject', pair.subject).eq('is_active', true);
-          if (data) allMeetingLinks.push(...data);
         }
         for (const pair of mergedPairs) {
           const { data } = await supabase
@@ -148,7 +138,6 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
       return deduped.map(schedule => {
         const activeJitsi = allActiveClasses?.find(ac => ac.subject === schedule.subject && ac.batch === schedule.batch)
           || allActiveClasses?.find(ac => ac.subject === schedule.subject);
-        const subjectLink = allMeetingLinks?.find(l => l.subject === schedule.subject && l.batch === schedule.batch);
 
         // Always resolve primary pair for consistent room naming (fixes merged batch students landing in different rooms)
         const primary = getPrimaryPair(schedule.batch, schedule.subject);
@@ -156,7 +145,7 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
         const roomSubject = primary.subject;
 
         const generatedJitsiLink = `https://meet.jit.si/${generateJitsiRoomName(roomBatch, roomSubject)}`;
-        const dbLink = activeJitsi?.room_url || schedule.link || subjectLink?.link;
+        const dbLink = activeJitsi?.room_url || schedule.link;
 
         let finalLink = null;
         if (dbLink) {

@@ -1,7 +1,6 @@
 import { useAuth } from '@/hooks/useAuth';
 import { ScheduleManagement } from './ScheduleManagement';
 import { MonitoringDashboard } from './MonitoringDashboard';
-import { AdminMeetingManager } from './AdminMeetingManager';
 import { AdminFeedbackViewer } from './AdminFeedbackViewer';
 import { WhiteboardHub } from '@/components/whiteboard/WhiteboardHub';
 import { EnrollmentAnalytics } from './EnrollmentAnalytics';
@@ -47,8 +46,6 @@ export const AdminDashboard = ({ activeTab, onTabChange }: AdminDashboardProps) 
         return <TeacherAnalytics />;
       case 'schedules':
         return <ScheduleManagement />;
-      case 'meeting-manager':
-        return <AdminMeetingManager />;
       case 'feedback-viewer':
         return <AdminFeedbackViewer />;
       case 'admin-whiteboard':
