@@ -159,7 +159,11 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
       });
     },
     enabled: !!batch,
-    refetchInterval: 40000
+    // Live-class join is time-sensitive and has no realtime backup, so keep it
+    // fresh: always refetch on mount (ignore the wider global cache window) and
+    // poll fast so "live now" + the merged room appear promptly.
+    staleTime: 0,
+    refetchInterval: 20000
   });
 
   // Logic to separate "Live Now" from "Upcoming" — all compared in IST
