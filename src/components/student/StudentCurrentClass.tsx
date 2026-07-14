@@ -167,7 +167,7 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
       }));
     },
     enabled: !!profile?.user_id,
-    refetchInterval: 30000 
+    refetchInterval: 45000 
   });
 
   // --- Realtime Sync ---

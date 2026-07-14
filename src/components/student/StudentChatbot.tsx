@@ -209,7 +209,7 @@ export const StudentChatbot = () => {
       return ((data as Message[]) || []).reverse();
     },
     enabled: !!profile?.user_id && !!state.selectedRecipient?.id,
-    refetchInterval: 15000, // was 3s — re-fetched whole thread every poll (egress)
+    refetchInterval: 45000, // was 3s — re-fetched whole thread every poll (egress)
   });
 
   // Send message mutation

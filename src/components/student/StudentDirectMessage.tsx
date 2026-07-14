@@ -36,7 +36,7 @@ export const StudentDirectMessage = ({ receiverId, receiverName }: Props) => {
       return (data || []).reverse();
     },
     // Poll for new messages (raised from 3s to cut egress)
-    refetchInterval: 15000
+    refetchInterval: 45000
   });
 
   // Send Mutation

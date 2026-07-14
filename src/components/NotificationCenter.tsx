@@ -96,7 +96,7 @@ export const NotificationCenter = () => {
       }));
     },
     enabled: !!profile?.user_id,
-    refetchInterval: 30000,
+    refetchInterval: 60000,
   });
 
   // --- 2. Fetch Feedback Notifications (Only for Teachers) ---
@@ -143,7 +143,7 @@ export const NotificationCenter = () => {
         }));
     },
     enabled: !!profile?.user_id && resolvedRole === 'teacher',
-    refetchInterval: 30000,
+    refetchInterval: 60000,
   });
 
   // Combine and Sort

@@ -159,7 +159,7 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
       });
     },
     enabled: !!batch,
-    refetchInterval: 20000
+    refetchInterval: 40000
   });
 
   // Logic to separate "Live Now" from "Upcoming" — all compared in IST

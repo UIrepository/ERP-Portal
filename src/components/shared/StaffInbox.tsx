@@ -175,7 +175,7 @@ export const StaffInbox = () => {
       return Array.from(contactMap.values());
     },
     enabled: !!profile?.user_id && !!staffRole,
-    refetchInterval: 20000
+    refetchInterval: 45000
   });
 
   // Filter contacts based on selected filter + search
@@ -222,7 +222,7 @@ export const StaffInbox = () => {
       return ((data as Message[]) || []).reverse();
     },
     enabled: !!profile?.user_id && !!selectedContactId,
-    refetchInterval: 15000
+    refetchInterval: 45000
   });
 
   useEffect(() => {
