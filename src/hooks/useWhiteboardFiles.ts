@@ -67,6 +67,64 @@ export function useAllWhiteboards(enabled: boolean) {
   });
 }
 
+export interface WhiteboardViewer {
+  id: string;
+  whiteboard_id: string;
+  email: string;
+  created_at: string;
+}
+
+/**
+ * Viewers granted read-only access to one board. RLS restricts this table to
+ * admins, so only they can list, add or revoke — a viewer can never re-share.
+ */
+export function useWhiteboardViewers(whiteboardId: string | null) {
+  return useQuery<WhiteboardViewer[]>({
+    queryKey: ['whiteboard-viewers', whiteboardId],
+    enabled: !!whiteboardId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('whiteboard_viewers')
+        .select('id, whiteboard_id, email, created_at')
+        .eq('whiteboard_id', whiteboardId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      return (data || []) as WhiteboardViewer[];
+    },
+  });
+}
+
+export function useWhiteboardViewerMutations() {
+  const qc = useQueryClient();
+  const { user, profile } = useAuth();
+  const uid = user?.id || profile?.user_id;
+  const invalidate = (whiteboardId: string) =>
+    qc.invalidateQueries({ queryKey: ['whiteboard-viewers', whiteboardId] });
+
+  const addViewer = useMutation({
+    mutationFn: async ({ whiteboardId, email }: { whiteboardId: string; email: string }) => {
+      const clean = email.trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) throw new Error('Enter a valid email address');
+      const { error } = await supabase
+        .from('whiteboard_viewers')
+        .insert({ whiteboard_id: whiteboardId, email: clean, added_by: uid });
+      // 23505 = already a viewer; treat as success so adding twice isn't an error.
+      if (error && error.code !== '23505') throw error;
+    },
+    onSuccess: (_d, v) => invalidate(v.whiteboardId),
+  });
+
+  const removeViewer = useMutation({
+    mutationFn: async ({ id }: { id: string; whiteboardId: string }) => {
+      const { error } = await supabase.from('whiteboard_viewers').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => invalidate(v.whiteboardId),
+  });
+
+  return { addViewer, removeViewer };
+}
+
 export function useWhiteboardMutations() {
   const qc = useQueryClient();
   const { user, profile } = useAuth();

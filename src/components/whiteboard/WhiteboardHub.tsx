@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
-import { Plus, Pencil, Trash2, ExternalLink, Loader2, PenLine, Eye } from 'lucide-react';
+import { Plus, Pencil, Trash2, ExternalLink, Loader2, PenLine, Eye, UserPlus, X, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -11,7 +11,8 @@ import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { openInternalRoute } from '@/hooks/useInstallApp';
 import {
-  useMyWhiteboards, useAllWhiteboards, useWhiteboardMutations, type WhiteboardFile,
+  useMyWhiteboards, useAllWhiteboards, useWhiteboardMutations,
+  useWhiteboardViewers, useWhiteboardViewerMutations, type WhiteboardFile,
 } from '@/hooks/useWhiteboardFiles';
 
 const lastEdited = (iso: string) => {
@@ -19,13 +20,14 @@ const lastEdited = (iso: string) => {
 };
 
 function BoardCard({
-  file, readOnly, onOpen, onRename, onDelete,
+  file, readOnly, onOpen, onRename, onDelete, onShare,
 }: {
   file: WhiteboardFile;
   readOnly?: boolean;
   onOpen: () => void;
   onRename?: () => void;
   onDelete?: () => void;
+  onShare?: () => void;
 }) {
   return (
     <div className="group relative rounded-xl border border-slate-200 bg-white overflow-hidden hover:shadow-md transition-shadow">
@@ -48,6 +50,11 @@ function BoardCard({
         <button onClick={onOpen} title={readOnly ? 'View' : 'Open'} className="h-7 w-7 inline-flex items-center justify-center rounded-md bg-white/90 border border-slate-200 text-slate-600 hover:bg-white shadow-sm">
           {readOnly ? <Eye className="h-3.5 w-3.5" /> : <ExternalLink className="h-3.5 w-3.5" />}
         </button>
+        {onShare && (
+          <button onClick={onShare} title="Share (view only)" className="h-7 w-7 inline-flex items-center justify-center rounded-md bg-white/90 border border-slate-200 text-slate-600 hover:bg-white shadow-sm">
+            <UserPlus className="h-3.5 w-3.5" />
+          </button>
+        )}
         {!readOnly && onRename && (
           <button onClick={onRename} title="Rename" className="h-7 w-7 inline-flex items-center justify-center rounded-md bg-white/90 border border-slate-200 text-slate-600 hover:bg-white shadow-sm">
             <Pencil className="h-3.5 w-3.5" />
@@ -63,6 +70,102 @@ function BoardCard({
   );
 }
 
+/**
+ * Admin-only: grant read-only access to a board by email. The person signs in
+ * with that Google account and opens the link — they can look, but tldraw is
+ * read-only and RLS gives them SELECT only, so they can neither edit nor
+ * re-share. Admins are the only role allowed to manage this list.
+ */
+function ShareDialog({ file, onClose }: { file: WhiteboardFile | null; onClose: () => void }) {
+  const [email, setEmail] = useState('');
+  const { data: viewers = [], isLoading } = useWhiteboardViewers(file?.id ?? null);
+  const { addViewer, removeViewer } = useWhiteboardViewerMutations();
+
+  const link = file ? `${window.location.origin}/whiteboard/file/${file.id}` : '';
+
+  const submit = async () => {
+    if (!file || !email.trim()) return;
+    try {
+      await addViewer.mutateAsync({ whiteboardId: file.id, email });
+      setEmail('');
+      toast.success('Viewer added');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not add viewer');
+    }
+  };
+
+  return (
+    <Dialog open={!!file} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-[480px]">
+        <DialogHeader>
+          <DialogTitle>Share “{file?.title}”</DialogTitle>
+          <DialogDescription>
+            People you add can view this whiteboard only — they cannot edit it or share it with anyone else.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex gap-2">
+          <Input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void submit(); } }}
+            placeholder="name@example.com"
+            type="email"
+            autoFocus
+          />
+          <Button
+            onClick={submit}
+            disabled={addViewer.isPending || !email.trim()}
+            className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white shrink-0"
+          >
+            {addViewer.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add'}
+          </Button>
+        </div>
+
+        <div className="mt-1 max-h-56 overflow-y-auto">
+          {isLoading ? (
+            <div className="py-6 text-center text-slate-400"><Loader2 className="h-4 w-4 animate-spin mx-auto" /></div>
+          ) : viewers.length === 0 ? (
+            <p className="py-4 text-center text-sm text-slate-500">No viewers yet.</p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {viewers.map((v) => (
+                <li key={v.id} className="flex items-center justify-between gap-2 py-2">
+                  <span className="text-sm text-slate-700 truncate">{v.email}</span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[11px] text-slate-400">Viewer</span>
+                    <button
+                      title="Remove access"
+                      onClick={async () => {
+                        if (!file) return;
+                        try { await removeViewer.mutateAsync({ id: v.id, whiteboardId: file.id }); }
+                        catch { toast.error('Could not remove'); }
+                      }}
+                      className="h-6 w-6 inline-flex items-center justify-center rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <DialogFooter className="sm:justify-between gap-2">
+          <Button
+            variant="outline"
+            onClick={() => { void navigator.clipboard.writeText(link); toast.success('Link copied'); }}
+          >
+            <Link2 className="h-4 w-4 mr-2" /> Copy link
+          </Button>
+          <Button variant="outline" onClick={onClose}>Done</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export const WhiteboardHub = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
@@ -75,6 +178,7 @@ export const WhiteboardHub = () => {
   const [renaming, setRenaming] = useState<WhiteboardFile | null>(null);
   const [renameText, setRenameText] = useState('');
   const [deleting, setDeleting] = useState<WhiteboardFile | null>(null);
+  const [sharing, setSharing] = useState<WhiteboardFile | null>(null);
 
   const open = (id: string) => openInternalRoute(`/whiteboard/file/${id}`, navigate);
 
@@ -121,6 +225,7 @@ export const WhiteboardHub = () => {
                 onOpen={() => open(f.id)}
                 onRename={() => { setRenaming(f); setRenameText(f.title); }}
                 onDelete={() => setDeleting(f)}
+                onShare={isAdmin ? () => setSharing(f) : undefined}
               />
             ))}
           </div>
@@ -137,12 +242,15 @@ export const WhiteboardHub = () => {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {othersFiles.map((f) => (
-                <BoardCard key={f.id} file={f} readOnly onOpen={() => open(f.id)} />
+                <BoardCard key={f.id} file={f} readOnly onOpen={() => open(f.id)} onShare={() => setSharing(f)} />
               ))}
             </div>
           )}
         </section>
       )}
+
+      {/* Share (view-only) — admins only */}
+      {isAdmin && <ShareDialog file={sharing} onClose={() => setSharing(null)} />}
 
       {/* Rename dialog */}
       <Dialog open={!!renaming} onOpenChange={(o) => !o && setRenaming(null)}>

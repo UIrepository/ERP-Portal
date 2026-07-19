@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ChevronDown, ChevronLeft, ChevronRight, CloudUpload, Download, EyeOff, FileStack, ImagePlus, Loader2, LogOut, Palette, PenLine, Plus, Save, Square, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, CloudUpload, Download, Eye, EyeOff, FileStack, ImagePlus, Loader2, LogOut, Palette, PenLine, Plus, Save, Square, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -108,11 +108,18 @@ const Whiteboard = () => {
   const { scheduleId, fileId } = useParams<{ scheduleId?: string; fileId?: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
 
   // "File mode" = a general-purpose teacher whiteboard (not a class). Saved as a
   // workspace file (cloud snapshot + thumbnail), never tied to a batch/subject.
   const fileMode = !!fileId;
+  // A board can also be readable because an admin added this email as a viewer.
+  // Those users get look-but-don't-touch: RLS grants them SELECT only, so any
+  // write would fail anyway — this keeps the UI honest instead of silently
+  // dropping their edits. null until the row loads.
+  const [canEdit, setCanEdit] = useState<boolean | null>(null);
+  // Mirror of canEdit for callbacks that must not re-create on every change.
+  const canEditRef = useRef(true);
   const fileContentUrlRef = useRef<string | null>(null);
   const fileLoadedRef = useRef(false);
   // Realtime autosave (file mode): debounce after edits, no manual button.
@@ -261,7 +268,7 @@ const Whiteboard = () => {
     (async () => {
       const { data, error } = await supabase
         .from('whiteboard_files')
-        .select('id, title, content_url')
+        .select('id, title, content_url, owner_id')
         .eq('id', fileId)
         .maybeSingle();
       if (cancelled) return;
@@ -269,6 +276,12 @@ const Whiteboard = () => {
         setAccessAllowed(false);
         return;
       }
+      // Owners edit their own board; admins keep the access they already had.
+      // Anyone else who can read it got here through whiteboard_viewers.
+      const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
+      const editable = data.owner_id === user.id || isAdmin;
+      canEditRef.current = editable;
+      setCanEdit(editable);
       setTitle(data.title);
       fileContentUrlRef.current = data.content_url;
       document.title = `Whiteboard — ${data.title}`;
@@ -277,7 +290,16 @@ const Whiteboard = () => {
     return () => {
       cancelled = true;
     };
-  }, [fileId, user, authLoading]);
+  }, [fileId, user, authLoading, profile?.role]);
+
+  // Put tldraw itself into read-only mode for viewers, so the tools are gone
+  // rather than present-but-useless.
+  useEffect(() => {
+    if (!editor || canEdit === null) return;
+    canEditRef.current = canEdit;
+    editor.updateInstanceState({ isReadonly: !canEdit });
+    if (!canEdit) editor.setCurrentTool('hand');
+  }, [editor, canEdit]);
 
   // File mode: once the editor is ready and we have access, if this device has
   // no local copy yet, pull the saved snapshot from Cloudinary. If local already
@@ -324,6 +346,7 @@ const Whiteboard = () => {
   // loading a snapshot doesn't trigger a redundant save.
   useEffect(() => {
     if (!editor || !fileMode) return;
+    if (canEdit === false) return; // viewers never write back
     const unlisten = editor.store.listen(
       () => {
         if (!autosaveReadyRef.current) return;
@@ -339,7 +362,7 @@ const Whiteboard = () => {
       unlisten();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor, fileMode]);
+  }, [editor, fileMode, canEdit]);
 
   // CLASS mode: on open, decide owner vs viewer.
   //  • Empty board → pure viewer: pull the latest snapshot and keep it fresh.
@@ -910,6 +933,7 @@ const Whiteboard = () => {
   // autosave — never touches any batch/subject. Returns true on success.
   const persistToCloud = async (): Promise<boolean> => {
     if (!editor || !fileId || savingRef.current) return false;
+    if (!canEditRef.current) return false;
     savingRef.current = true;
     setSaveState('saving');
     try {
@@ -966,7 +990,7 @@ const Whiteboard = () => {
 
   // Save the file's title (editable in the header, file mode only).
   const commitTitle = async () => {
-    if (!fileId) return;
+    if (!fileId || !canEditRef.current) return;
     const t = title.trim() || 'Untitled whiteboard';
     await supabase.from('whiteboard_files').update({ title: t }).eq('id', fileId);
   };
@@ -1278,7 +1302,7 @@ const Whiteboard = () => {
         <div className="flex items-center gap-3 min-w-0">
           <PenLine className="h-5 w-5 text-fuchsia-200 shrink-0" />
           <div className="min-w-0">
-            {fileMode ? (
+            {fileMode && canEdit !== false ? (
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -1290,14 +1314,17 @@ const Whiteboard = () => {
               />
             ) : (
               <div className="text-sm font-semibold truncate">
-                {scheduleCtx ? `${scheduleCtx.subject} — ${scheduleCtx.batch}` : 'Whiteboard'}
+                {scheduleCtx
+                  ? `${scheduleCtx.subject} — ${scheduleCtx.batch}`
+                  : fileMode ? title || 'Whiteboard' : 'Whiteboard'}
               </div>
             )}
             <div className="text-[11px] text-white/60 truncate px-1">
               {scheduleCtx
                 ? `${scheduleCtx.start_time?.slice(0, 5)} – ${scheduleCtx.end_time?.slice(0, 5)}`
                 : fileMode
-                  ? saveState === 'saving' ? 'Saving…'
+                  ? canEdit === false ? 'Shared with you · view only'
+                    : saveState === 'saving' ? 'Saving…'
                     : saveState === 'saved' ? 'All changes saved'
                     : saveState === 'error' ? 'Save failed — will retry'
                     : 'General whiteboard · autosaves'
@@ -1306,27 +1333,38 @@ const Whiteboard = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-8 bg-white/5 text-white/90 border border-white/10 hover:bg-white/20 hover:text-white hover:border-white/30 transition-colors"
-            onClick={() => insertPdfInputRef.current?.click()}
-            disabled={busy || startMode === 'choose'}
-          >
-            <FileStack className="h-3.5 w-3.5 mr-1.5" />
-            Insert PDF
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-8 bg-white/5 text-white/90 border border-white/10 hover:bg-white/20 hover:text-white hover:border-white/30 transition-colors"
-            onClick={() => imageInputRef.current?.click()}
-            disabled={busy || startMode === 'choose'}
-          >
-            <ImagePlus className="h-3.5 w-3.5 mr-1.5" />
-            Insert image
-          </Button>
-          {fileMode && (
+          {/* Viewers get a read-only board: no inserting, no export, no save
+              chip — only the content and the page controls. */}
+          {canEdit === false && (
+            <span className="h-8 px-2.5 inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 text-xs font-medium text-white/70 select-none">
+              <Eye className="h-3.5 w-3.5" /> View only
+            </span>
+          )}
+          {canEdit !== false && (
+            <>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 bg-white/5 text-white/90 border border-white/10 hover:bg-white/20 hover:text-white hover:border-white/30 transition-colors"
+                onClick={() => insertPdfInputRef.current?.click()}
+                disabled={busy || startMode === 'choose'}
+              >
+                <FileStack className="h-3.5 w-3.5 mr-1.5" />
+                Insert PDF
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 bg-white/5 text-white/90 border border-white/10 hover:bg-white/20 hover:text-white hover:border-white/30 transition-colors"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={busy || startMode === 'choose'}
+              >
+                <ImagePlus className="h-3.5 w-3.5 mr-1.5" />
+                Insert image
+              </Button>
+            </>
+          )}
+          {fileMode && canEdit !== false && (
             <span
               className={cn(
                 'h-8 px-2.5 inline-flex items-center gap-1.5 rounded-md border text-xs font-medium select-none',
@@ -1343,15 +1381,17 @@ const Whiteboard = () => {
                   : <><Save className="h-3.5 w-3.5" /> Saved</>}
             </span>
           )}
-          <Button
-            size="sm"
-            className="h-8 bg-fuchsia-600 text-white border border-fuchsia-500 hover:bg-fuchsia-500 hover:border-fuchsia-400 transition-colors"
-            onClick={() => setSaveOpen(true)}
-            disabled={busy || startMode === 'choose'}
-          >
-            {fileMode ? <Download className="h-3.5 w-3.5 mr-1.5" /> : <CloudUpload className="h-3.5 w-3.5 mr-1.5" />}
-            {fileMode ? 'Download PDF' : 'End & Save'}
-          </Button>
+          {canEdit !== false && (
+            <Button
+              size="sm"
+              className="h-8 bg-fuchsia-600 text-white border border-fuchsia-500 hover:bg-fuchsia-500 hover:border-fuchsia-400 transition-colors"
+              onClick={() => setSaveOpen(true)}
+              disabled={busy || startMode === 'choose'}
+            >
+              {fileMode ? <Download className="h-3.5 w-3.5 mr-1.5" /> : <CloudUpload className="h-3.5 w-3.5 mr-1.5" />}
+              {fileMode ? 'Download PDF' : 'End & Save'}
+            </Button>
+          )}
           <button
             type="button"
             onClick={() => setStylePanelHidden((v) => !v)}
