@@ -11,8 +11,12 @@ import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { openInternalRoute } from '@/hooks/useInstallApp';
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
   useMyWhiteboards, useAllWhiteboards, useWhiteboardMutations,
-  useWhiteboardViewers, useWhiteboardViewerMutations, type WhiteboardFile,
+  useWhiteboardViewers, useWhiteboardViewerMutations,
+  type WhiteboardFile, type WhiteboardShareRole,
 } from '@/hooks/useWhiteboardFiles';
 
 const lastEdited = (iso: string) => {
@@ -78,19 +82,20 @@ function BoardCard({
  */
 function ShareDialog({ file, onClose }: { file: WhiteboardFile | null; onClose: () => void }) {
   const [email, setEmail] = useState('');
+  const [role, setRole] = useState<WhiteboardShareRole>('viewer');
   const { data: viewers = [], isLoading } = useWhiteboardViewers(file?.id ?? null);
-  const { addViewer, removeViewer } = useWhiteboardViewerMutations();
+  const { addViewer, removeViewer, setRole: changeRole } = useWhiteboardViewerMutations();
 
   const link = file ? `${window.location.origin}/whiteboard/file/${file.id}` : '';
 
   const submit = async () => {
     if (!file || !email.trim()) return;
     try {
-      await addViewer.mutateAsync({ whiteboardId: file.id, email });
+      await addViewer.mutateAsync({ whiteboardId: file.id, email, role });
       setEmail('');
-      toast.success('Viewer added');
+      toast.success(role === 'editor' ? 'Editor added' : 'Viewer added');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not add viewer');
+      toast.error(e instanceof Error ? e.message : 'Could not add person');
     }
   };
 
@@ -100,7 +105,7 @@ function ShareDialog({ file, onClose }: { file: WhiteboardFile | null; onClose: 
         <DialogHeader>
           <DialogTitle>Share “{file?.title}”</DialogTitle>
           <DialogDescription>
-            People you add can view this whiteboard only — they cannot edit it or share it with anyone else.
+            Choose what each person can do. Neither viewers nor editors can share this board with anyone else.
           </DialogDescription>
         </DialogHeader>
 
@@ -113,6 +118,13 @@ function ShareDialog({ file, onClose }: { file: WhiteboardFile | null; onClose: 
             type="email"
             autoFocus
           />
+          <Select value={role} onValueChange={(v) => setRole(v as WhiteboardShareRole)}>
+            <SelectTrigger className="w-[104px] shrink-0"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="viewer">Can view</SelectItem>
+              <SelectItem value="editor">Can edit</SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             onClick={submit}
             disabled={addViewer.isPending || !email.trim()}
@@ -132,8 +144,21 @@ function ShareDialog({ file, onClose }: { file: WhiteboardFile | null; onClose: 
               {viewers.map((v) => (
                 <li key={v.id} className="flex items-center justify-between gap-2 py-2">
                   <span className="text-sm text-slate-700 truncate">{v.email}</span>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[11px] text-slate-400">Viewer</span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <Select
+                      value={v.role}
+                      onValueChange={async (next) => {
+                        if (!file || next === v.role) return;
+                        try { await changeRole.mutateAsync({ id: v.id, role: next as WhiteboardShareRole, whiteboardId: file.id }); }
+                        catch { toast.error('Could not change access'); }
+                      }}
+                    >
+                      <SelectTrigger className="h-7 w-[104px] text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="viewer">Can view</SelectItem>
+                        <SelectItem value="editor">Can edit</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <button
                       title="Remove access"
                       onClick={async () => {

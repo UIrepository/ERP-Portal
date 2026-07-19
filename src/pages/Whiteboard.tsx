@@ -277,9 +277,16 @@ const Whiteboard = () => {
         return;
       }
       // Owners edit their own board; admins keep the access they already had.
-      // Anyone else who can read it got here through whiteboard_viewers.
+      // Anyone else got here through a share, which is either view or edit —
+      // ask the DB (the shares table itself is admin-only, so this RPC is the
+      // only way a shared user can learn their own level).
       const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
-      const editable = data.owner_id === user.id || isAdmin;
+      let editable = data.owner_id === user.id || isAdmin;
+      if (!editable) {
+        const { data: shareRole } = await supabase.rpc('my_whiteboard_role', { file_id: fileId });
+        if (cancelled) return;
+        editable = shareRole === 'editor';
+      }
       canEditRef.current = editable;
       setCanEdit(editable);
       setTitle(data.title);

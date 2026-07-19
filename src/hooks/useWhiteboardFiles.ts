@@ -67,10 +67,13 @@ export function useAllWhiteboards(enabled: boolean) {
   });
 }
 
+export type WhiteboardShareRole = 'viewer' | 'editor';
+
 export interface WhiteboardViewer {
   id: string;
   whiteboard_id: string;
   email: string;
+  role: WhiteboardShareRole;
   created_at: string;
 }
 
@@ -85,7 +88,7 @@ export function useWhiteboardViewers(whiteboardId: string | null) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('whiteboard_viewers')
-        .select('id, whiteboard_id, email, created_at')
+        .select('id, whiteboard_id, email, role, created_at')
         .eq('whiteboard_id', whiteboardId)
         .order('created_at', { ascending: true });
       if (error) throw error;
@@ -102,14 +105,27 @@ export function useWhiteboardViewerMutations() {
     qc.invalidateQueries({ queryKey: ['whiteboard-viewers', whiteboardId] });
 
   const addViewer = useMutation({
-    mutationFn: async ({ whiteboardId, email }: { whiteboardId: string; email: string }) => {
+    mutationFn: async (
+      { whiteboardId, email, role }: { whiteboardId: string; email: string; role: WhiteboardShareRole },
+    ) => {
       const clean = email.trim().toLowerCase();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) throw new Error('Enter a valid email address');
+      // Re-adding an existing person updates their access level instead of failing.
       const { error } = await supabase
         .from('whiteboard_viewers')
-        .insert({ whiteboard_id: whiteboardId, email: clean, added_by: uid });
-      // 23505 = already a viewer; treat as success so adding twice isn't an error.
-      if (error && error.code !== '23505') throw error;
+        .upsert(
+          { whiteboard_id: whiteboardId, email: clean, role, added_by: uid },
+          { onConflict: 'whiteboard_id,email' },
+        );
+      if (error) throw error;
+    },
+    onSuccess: (_d, v) => invalidate(v.whiteboardId),
+  });
+
+  const setRole = useMutation({
+    mutationFn: async ({ id, role }: { id: string; role: WhiteboardShareRole; whiteboardId: string }) => {
+      const { error } = await supabase.from('whiteboard_viewers').update({ role }).eq('id', id);
+      if (error) throw error;
     },
     onSuccess: (_d, v) => invalidate(v.whiteboardId),
   });
@@ -122,7 +138,7 @@ export function useWhiteboardViewerMutations() {
     onSuccess: (_d, v) => invalidate(v.whiteboardId),
   });
 
-  return { addViewer, removeViewer };
+  return { addViewer, removeViewer, setRole };
 }
 
 export function useWhiteboardMutations() {
