@@ -75,6 +75,27 @@ export const AdminCreateAnnouncement = () => {
     return true;
   };
 
+  // Announcements go out on both channels: push (above) and email to the Google
+  // Groups for the same batch/subject, so students who miss the push still get it.
+  const sendAnnouncementEmail = async (announcement: AnnouncementPayload) => {
+    const { error } = await supabase.functions.invoke('send-announcement-email', {
+      body: {
+        title: announcement.title,
+        message: announcement.message,
+        all_students: !announcement.target_batch && !announcement.target_subject,
+        batch: announcement.target_batch ?? undefined,
+        subject: announcement.target_subject ?? undefined,
+      },
+    });
+
+    if (error) {
+      console.warn('Announcement email failed:', error);
+      return false;
+    }
+
+    return true;
+  };
+
   // Fetch all enrollments to understand batch-subject relationships
   const { data: enrollments = [] } = useQuery({
     queryKey: ['all-enrollments-for-announcements'],
@@ -109,10 +130,15 @@ export const AdminCreateAnnouncement = () => {
       const { error } = await supabase.from('notifications').insert(announcementData);
       if (error) throw error;
 
-      await Promise.all(announcementData.map((announcement) => sendAnnouncementPush(announcement)));
+      await Promise.all(
+        announcementData.flatMap((announcement) => [
+          sendAnnouncementPush(announcement),
+          sendAnnouncementEmail(announcement),
+        ]),
+      );
     },
     onSuccess: () => {
-      toast({ title: "Success", description: "Announcement has been sent and push delivery has started." });
+      toast({ title: "Success", description: "Announcement sent — push and email delivery has started." });
       setTitle('');
       setMessage('');
       setTargets([]);

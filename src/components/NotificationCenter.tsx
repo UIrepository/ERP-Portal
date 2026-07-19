@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { NotificationToggle } from './NotificationToggle';
+import { MarkdownText } from '@/components/ui/markdown-text';
 
 interface NotificationItem {
   id: string;
@@ -244,9 +245,10 @@ export const NotificationCenter = () => {
                           {format(new Date(notification.created_at), 'MMM d, h:mm a')}
                         </span>
                       </div>
-                      <p className={cn("text-xs line-clamp-2", notification.type === 'feedback' ? "text-[#7a6a57]" : "text-slate-500")}>
-                        {notification.message}
-                      </p>
+                      <MarkdownText
+                        text={notification.message}
+                        className={cn("text-xs line-clamp-2", notification.type === 'feedback' ? "text-[#7a6a57]" : "text-slate-500")}
+                      />
                     </div>
 
                     {/* Quick Dismiss Action on Hover (Desktop) or Tap (Mobile) */}
