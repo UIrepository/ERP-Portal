@@ -117,7 +117,9 @@ export function useWhiteboardViewerMutations() {
           { whiteboard_id: whiteboardId, email: clean, role, added_by: uid },
           { onConflict: 'whiteboard_id,email' },
         );
-      if (error) throw error;
+      // Surface the real reason (permissions, constraints) instead of a generic
+      // "could not add" that hides what actually went wrong.
+      if (error) throw new Error(error.message || 'Could not add person');
     },
     onSuccess: (_d, v) => invalidate(v.whiteboardId),
   });
