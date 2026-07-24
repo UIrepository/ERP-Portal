@@ -472,17 +472,19 @@ const StudentMainContent = () => {
         </div>
       </header>
 
-      {/* TODAY'S CLASS — live now / upcoming / today's recordings for this
-          batch. Sits above Continue watching; hidden when the day has none. */}
-      <TodaysClassStrip
-        batch={navigation.batch}
-        enrolledSubjects={subjectsForBatch}
-        onJoinLive={() => setActiveTab('live')}
-      />
-
-      {/* CONTINUE WATCHING — its own section between the header and the content
-          card. On-device (localStorage), batch-specific, hidden when empty. */}
-      <ContinueWatchingStrip userId={user?.id} batch={navigation.batch} />
+      {/* TODAY'S CLASS + CONTINUE WATCHING — only on the All Classes tab, not
+          on Live / Announcements / Community / Support. Each hides itself when
+          it has nothing to show. */}
+      {activeTab === 'classes' && (
+        <>
+          <TodaysClassStrip
+            batch={navigation.batch}
+            enrolledSubjects={subjectsForBatch}
+            onJoinLive={() => setActiveTab('live')}
+          />
+          <ContinueWatchingStrip userId={user?.id} batch={navigation.batch} />
+        </>
+      )}
 
       {/* CONTENT SECTION */}
       <div className="w-full bg-white rounded-t-none rounded-b-lg shadow-sm border border-slate-100 p-3 sm:p-6 md:p-8 h-auto min-h-[400px]">
