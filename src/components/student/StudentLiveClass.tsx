@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { EmptyState } from '@/components/StateScreens';
 import { Skeleton } from '@/components/ui/skeleton';
 import { generateJitsiRoomName } from '@/lib/jitsiUtils';
 import { useAuth } from '@/hooks/useAuth';
@@ -332,12 +333,8 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
           ))}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-12 border border-dashed border-slate-200 rounded-[4px] bg-slate-50/50">
-           <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mb-3">
-              <span className="text-lg opacity-40">☕</span>
-           </div>
-           <h3 className="text-sm font-semibold text-slate-900">No classes scheduled</h3>
-           <p className="text-xs text-slate-500 mt-1">There are no live or upcoming sessions for today.</p>
+        <div className="border border-dashed border-slate-200 rounded-[4px] bg-slate-50/50">
+          <EmptyState title="No classes scheduled" subtitle="There are no live or upcoming sessions for today." />
         </div>
       )}
     </div>

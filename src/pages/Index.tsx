@@ -9,12 +9,13 @@ import { TeacherDashboard } from '@/components/teacher/TeacherDashboard';
 import { ManagerDashboard } from '@/components/manager/ManagerDashboard';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { MaintenancePage } from '@/components/MaintenancePage';
+import { SessionExpiredScreen } from '@/components/StateScreens';
 import { ChatDrawerProvider } from '@/hooks/useChatDrawer';
 import { StudentChatbot } from '@/components/student/StudentChatbot';
 import { useParams, useNavigate } from 'react-router-dom';
 
 const Index = () => {
-  const { user, loading, profile, resolvedRole } = useAuth();
+  const { user, loading, profile, resolvedRole, sessionExpired, clearSessionExpired } = useAuth();
   const { shouldShowMaintenance, maintenanceMessage, isLoading: maintenanceLoading } = useMaintenanceMode(user?.email ?? undefined);
   
   // Read current tab from URL
@@ -52,6 +53,11 @@ const Index = () => {
 
   if (loading || maintenanceLoading) {
     return <LoadingSpinner />;
+  }
+
+  // Session expired mid-use: show a clear screen rather than a silent bounce.
+  if (sessionExpired && !user) {
+    return <SessionExpiredScreen onSignIn={clearSessionExpired} />;
   }
 
   if (!user) {

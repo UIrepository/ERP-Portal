@@ -13,6 +13,8 @@ type AuthContextType = {
   signUp: () => void;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  sessionExpired: boolean;
+  clearSessionExpired: () => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,6 +25,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<any | null>(null);
   const [resolvedRole, setResolvedRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // True when the user was signed in and then lost their session without
+  // explicitly signing out (token refresh failed / revoked) — drives the
+  // "Your session ended" screen instead of a silent bounce to sign-in.
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const hadUserRef = useRef(false);
+  const explicitSignOutRef = useRef(false);
 
   const mounted = useRef(true);
 
@@ -176,8 +184,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       setSession(newSession);
       setUser(newSession?.user ?? null);
+      if (newSession?.user) hadUserRef.current = true;
 
       if (event === 'SIGNED_OUT') {
+        // Lost the session without the user asking to sign out → it expired.
+        if (hadUserRef.current && !explicitSignOutRef.current) setSessionExpired(true);
+        hadUserRef.current = false;
         setProfile(null);
         setResolvedRole(null);
         try {
@@ -221,7 +233,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signOut = async () => {
+    explicitSignOutRef.current = true; // this sign-out is intentional
     await supabase.auth.signOut();
+  };
+
+  const clearSessionExpired = () => {
+    setSessionExpired(false);
+    explicitSignOutRef.current = false;
   };
 
   // Re-fetch the signed-in user's profile (e.g. after they change their name)
@@ -240,6 +258,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     signUp: () => {},
     signOut,
     refreshProfile,
+    sessionExpired,
+    clearSessionExpired,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

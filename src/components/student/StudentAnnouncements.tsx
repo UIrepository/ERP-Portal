@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { StudentBackButton } from './StudentBackButton';
 import { MarkdownText } from '@/components/ui/markdown-text';
 import { AnnouncementModal } from '@/components/shared/AnnouncementModal';
+import { EmptyState } from '@/components/StateScreens';
 
 interface Announcement {
   id: string;
@@ -179,12 +180,8 @@ export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [], on
                     ))}
                 </div>
             ) : (
-                <div className="flex flex-col items-center justify-center py-16 bg-white border border-[#eaebed] rounded-[4px]">
-                    <div className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center mb-3">
-                        <span className="text-lg opacity-50">📭</span>
-                    </div>
-                    <h3 className="text-sm font-bold text-black">No updates yet</h3>
-                    <p className="text-xs text-[#888888] mt-1">Check back later for important announcements.</p>
+                <div className="bg-white border border-[#eaebed] rounded-[4px]">
+                    <EmptyState title="No updates yet" subtitle="Check back later for important announcements." />
                 </div>
             )}
 

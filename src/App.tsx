@@ -11,6 +11,8 @@ import LecturePlayer from "./pages/LecturePlayer";
 import Whiteboard from "./pages/Whiteboard";
 import { ScreenRecordingProtection } from "@/components/ScreenRecordingProtection";
 import { InstallAppBanner } from "@/components/InstallAppBanner";
+import { ConnectivityStates } from "@/components/ConnectivityStates";
+import { ErrorBoundary } from "@/components/StateScreens";
 
 // Import Community Components
 import { StudentCommunity } from "@/components/student/StudentCommunity";
@@ -31,12 +33,14 @@ const queryClient = new QueryClient({
 });
 
 const App = () => (
+  <ErrorBoundary>
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <TooltipProvider>
         <ScreenRecordingProtection>
           <Toaster />
           <Sonner />
+          <ConnectivityStates />
           {/* The whiteboard opens in its own full-screen tab — never show the
               install banner there. */}
           {!window.location.pathname.startsWith('/whiteboard') && <InstallAppBanner />}
@@ -72,6 +76,7 @@ const App = () => (
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
