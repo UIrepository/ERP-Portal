@@ -80,8 +80,10 @@ export const AnnouncementModal = ({
             <img
               src={imageUrl}
               alt=""
-              /* Frame follows the image: natural aspect, never cropped. */
-              className="mt-4 w-full max-h-[46vh] rounded-lg border border-slate-100 object-contain bg-slate-50"
+              /* Frame hugs the image: sized to the picture (capped to the
+                 container width and 46vh), centered, so the border never leaves
+                 empty space around a smaller image. */
+              className="mt-4 mx-auto block max-w-full max-h-[46vh] w-auto h-auto rounded-lg border border-slate-100"
             />
           )}
         </div>
