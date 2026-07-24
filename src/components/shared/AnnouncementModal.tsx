@@ -6,6 +6,7 @@ import { MarkdownText } from '@/components/ui/markdown-text';
 interface AnnouncementModalProps {
   title: string;
   message: string;
+  imageUrl?: string | null;
   created_at: string;
   created_by_name?: string | null;
   context?: string | null; // optional footer label (e.g. subject/batch)
@@ -17,6 +18,7 @@ interface AnnouncementModalProps {
 export const AnnouncementModal = ({
   title,
   message,
+  imageUrl,
   created_at,
   created_by_name,
   context,
@@ -73,6 +75,14 @@ export const AnnouncementModal = ({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 sm:px-7 py-5">
+          {imageUrl && (
+            <img
+              src={imageUrl}
+              alt=""
+              /* Frame follows the image: natural aspect, never cropped. */
+              className="mb-4 w-full max-h-[46vh] rounded-lg border border-slate-100 object-contain bg-slate-50"
+            />
+          )}
           <MarkdownText text={message} className="text-[15px] text-slate-700 leading-relaxed" />
         </div>
 

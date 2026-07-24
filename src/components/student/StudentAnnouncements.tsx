@@ -11,6 +11,7 @@ interface Announcement {
   id: string;
   title: string;
   message: string;
+  image_url: string | null;
   created_at: string;
   created_by_name: string;
   target_batch: string | null;
@@ -80,6 +81,14 @@ const AnnouncementCard = ({ announcement, onClick }: { announcement: Announcemen
 
             {/* Message Content - Scrollable */}
             <div className="flex-1 overflow-y-auto pr-2 min-h-0 custom-scrollbar">
+                {announcement.image_url && (
+                    <img
+                        src={announcement.image_url}
+                        alt=""
+                        loading="lazy"
+                        className="mb-2 w-full max-h-28 rounded-md border border-slate-100 object-cover"
+                    />
+                )}
                 <MarkdownText text={announcement.message} className="text-[13px] text-[#444444] font-normal leading-relaxed font-sans" />
             </div>
 
@@ -104,7 +113,7 @@ export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [], on
             
             let query = supabase
                 .from('notifications')
-                .select('id, title, message, created_at, created_by_name, target_batch, target_subject');
+                .select('id, title, message, image_url, created_at, created_by_name, target_batch, target_subject');
 
             if (batch && subject) {
                 query = query.or(`and(target_batch.eq.${batch},target_subject.eq.${subject}),and(target_batch.eq.${batch},target_subject.is.null),and(target_batch.is.null,target_subject.eq.${subject}),and(target_batch.is.null,target_subject.is.null)`);
@@ -183,6 +192,7 @@ export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [], on
                 <AnnouncementModal
                     title={selected.title}
                     message={selected.message}
+                    imageUrl={selected.image_url}
                     created_at={selected.created_at}
                     created_by_name={selected.created_by_name}
                     context={selected.target_subject ? `For ${selected.target_subject}` : null}

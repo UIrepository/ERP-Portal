@@ -13,7 +13,7 @@ const corsHeaders = {
 };
 
 // Generic push sender.
-// Body: { title, body, url?, tag?, user_ids?: string[], batch?, subject?, all_students?: boolean }
+// Body: { title, body, url?, tag?, image?, user_ids?: string[], batch?, subject?, all_students?: boolean }
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { title, body, url, tag, user_ids, batch, subject, all_students } = await req.json();
+    const { title, body, url, tag, image, user_ids, batch, subject, all_students } = await req.json();
 
     if (!title || !body) {
       return new Response(JSON.stringify({ error: 'Missing title or body' }), {
@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const payload: PushPayload = { title, body, url, tag };
+    const payload: PushPayload = { title, body, url, tag, image };
 
     let result;
     if (Array.isArray(user_ids) && user_ids.length > 0) {

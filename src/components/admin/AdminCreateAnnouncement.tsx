@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RichTextArea } from '@/components/ui/rich-text-area';
 import { toast } from '@/hooks/use-toast';
-import { Megaphone, Send, Users, Book, Loader2, Plus, X } from 'lucide-react';
+import { Megaphone, Send, Users, Book, Loader2, Plus, X, ImagePlus } from 'lucide-react';
 import { Combobox } from '@/components/ui/combobox';
+import { uploadImageToCloudinary } from '@/lib/cloudinary';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 
@@ -21,6 +22,7 @@ interface TargetCombination {
 interface AnnouncementPayload {
   title: string;
   message: string;
+  image_url: string | null;
   target_batch: string | null;
   target_subject: string | null;
   created_by: string | null;
@@ -31,7 +33,7 @@ interface AnnouncementPayload {
 // Draft persists across tab switches (leaving the tab unmounts this component,
 // which would otherwise wipe the typed announcement).
 const DRAFT_KEY = 'ui-draft-student-announcement';
-const loadDraft = (): { title?: string; message?: string; targets?: TargetCombination[] } => {
+const loadDraft = (): { title?: string; message?: string; targets?: TargetCombination[]; imageUrl?: string | null } => {
   try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}'); } catch { return {}; }
 };
 
@@ -41,6 +43,10 @@ export const AdminCreateAnnouncement = () => {
   const [draft] = useState(loadDraft);
   const [title, setTitle] = useState(draft.title || '');
   const [message, setMessage] = useState(draft.message || '');
+  // Optional single image, hosted on Cloudinary. Pushed with the notification
+  // and shown in-app; deliberately NOT attached to the email (text only there).
+  const [imageUrl, setImageUrl] = useState<string | null>(draft.imageUrl || null);
+  const [imageUploading, setImageUploading] = useState(false);
   // State to hold multiple target combinations
   const [targets, setTargets] = useState<TargetCombination[]>(draft.targets || []);
   // State for the current selection in the dropdowns
@@ -49,18 +55,36 @@ export const AdminCreateAnnouncement = () => {
 
   // Save the draft whenever the composed content changes; clear it once empty.
   useEffect(() => {
-    if (!title && !message && targets.length === 0) {
+    if (!title && !message && targets.length === 0 && !imageUrl) {
       localStorage.removeItem(DRAFT_KEY);
       return;
     }
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, message, targets }));
-  }, [title, message, targets]);
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, message, targets, imageUrl }));
+  }, [title, message, targets, imageUrl]);
+
+  const handleImagePick = async (file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Not an image', description: 'Please choose an image file.', variant: 'destructive' });
+      return;
+    }
+    setImageUploading(true);
+    try {
+      const url = await uploadImageToCloudinary(file, 'announcements');
+      setImageUrl(url);
+    } catch {
+      toast({ title: 'Upload failed', description: 'Could not upload the image. Try again.', variant: 'destructive' });
+    } finally {
+      setImageUploading(false);
+    }
+  };
 
   const sendAnnouncementPush = async (announcement: AnnouncementPayload) => {
     const { error } = await supabase.functions.invoke('send-push', {
       body: {
         title: announcement.title,
         body: announcement.message,
+        image: announcement.image_url ?? undefined,
         all_students: !announcement.target_batch && !announcement.target_subject,
         batch: announcement.target_batch ?? undefined,
         subject: announcement.target_subject ?? undefined,
@@ -141,6 +165,7 @@ export const AdminCreateAnnouncement = () => {
       toast({ title: "Success", description: "Announcement sent — push and email delivery has started." });
       setTitle('');
       setMessage('');
+      setImageUrl(null);
       setTargets([]);
       setCurrentBatch(null);
       setCurrentSubject(null);
@@ -187,6 +212,7 @@ export const AdminCreateAnnouncement = () => {
         announcementsToSend.push({
             title,
             message,
+            image_url: imageUrl,
             target_batch: null,
             target_subject: null,
             created_by: profile?.user_id,
@@ -198,6 +224,7 @@ export const AdminCreateAnnouncement = () => {
         announcementsToSend = targets.map(target => ({
              title,
             message,
+            image_url: imageUrl,
             target_batch: target.batch,
             target_subject: target.subject,
             created_by: profile?.user_id,
@@ -248,6 +275,45 @@ export const AdminCreateAnnouncement = () => {
                     rows={6}
                     placeholder="Enter the full announcement details… Use the toolbar or Ctrl+B / Ctrl+I for bold, italics, and bullets."
                     />
+                </div>
+
+                {/* Optional single image. Sent with the push + shown in-app; the
+                    email stays text only. The preview frame follows the image's
+                    own aspect ratio (no forced crop). */}
+                <div className="space-y-2">
+                    <label className="font-medium text-slate-700">Image <span className="font-normal text-slate-400">(optional — one image)</span></label>
+                    {imageUrl ? (
+                        <div className="relative inline-block max-w-full">
+                            <img
+                                src={imageUrl}
+                                alt="Announcement"
+                                className="max-h-72 w-auto max-w-full rounded-xl border border-slate-200 object-contain"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setImageUrl(null)}
+                                title="Remove image"
+                                className="absolute -top-2 -right-2 h-7 w-7 inline-flex items-center justify-center rounded-full bg-white border border-slate-200 text-slate-600 shadow hover:text-rose-600"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                    ) : (
+                        <label className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/60 px-4 py-8 text-center transition-colors ${imageUploading ? 'opacity-70' : 'cursor-pointer hover:border-primary/40 hover:bg-primary/5'}`}>
+                            {imageUploading ? (
+                                <><Loader2 className="h-6 w-6 text-primary animate-spin" /><span className="text-sm text-slate-500">Uploading…</span></>
+                            ) : (
+                                <><ImagePlus className="h-6 w-6 text-slate-400" /><span className="text-sm text-slate-500">Click to add an image</span><span className="text-xs text-slate-400">Shown in the app and in the push notification, not in the email.</span></>
+                            )}
+                            <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                disabled={imageUploading}
+                                onChange={(e) => { void handleImagePick(e.target.files?.[0]); e.target.value = ''; }}
+                            />
+                        </label>
+                    )}
                 </div>
             </CardContent>
         </Card>

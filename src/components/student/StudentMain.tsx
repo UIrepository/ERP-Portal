@@ -7,6 +7,7 @@ import { StudentSubjectCard } from './StudentSubjectCard';
 import { StudentSubjectBlocks } from './StudentSubjectBlocks';
 import { StudentBlockContent } from './StudentBlockContent';
 import { ContinueWatchingStrip } from './ContinueWatchingStrip';
+import { TodaysClassStrip } from './TodaysClassStrip';
 import { StudentAnnouncements } from './StudentAnnouncements';
 import { StudentConnect } from './StudentConnect';
 import { StudentLiveClass } from './StudentLiveClass';
@@ -470,6 +471,14 @@ const StudentMainContent = () => {
           </button>
         </div>
       </header>
+
+      {/* TODAY'S CLASS — live now / upcoming / today's recordings for this
+          batch. Sits above Continue watching; hidden when the day has none. */}
+      <TodaysClassStrip
+        batch={navigation.batch}
+        enrolledSubjects={subjectsForBatch}
+        onJoinLive={() => setActiveTab('live')}
+      />
 
       {/* CONTINUE WATCHING — its own section between the header and the content
           card. On-device (localStorage), batch-specific, hidden when empty. */}

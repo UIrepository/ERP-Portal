@@ -1,6 +1,6 @@
 // Minimal service worker — enables PWA installability, push notifications,
 // and a tiny offline app-shell cache.
-const CACHE = 'ui-portal-v5';
+const CACHE = 'ui-portal-v6';
 const APP_SHELL = ['/', '/icon-192.png', '/icon-512.png', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
@@ -106,6 +106,9 @@ self.addEventListener('push', (event) => {
       renotify: !!tag,
       data: { url: data.url || '/', lines: lines, count: count },
     };
+    // Announcements can carry one hero image, shown in the expanded
+    // notification on platforms that support it (Android/Chrome).
+    if (data.image) options.image = data.image;
     await self.registration.showNotification(title, options);
   })());
 });

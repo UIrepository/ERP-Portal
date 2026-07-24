@@ -41,10 +41,10 @@ export const ContinueWatchingStrip = ({ userId, batch }: ContinueWatchingStripPr
   };
 
   return (
-    <section className="bg-white rounded-lg border border-slate-100 shadow-sm p-5 md:p-6">
-      <h2 className="text-xl font-semibold text-[#1e293b] mb-4">Continue watching</h2>
+    <section className="bg-white rounded-lg border border-slate-100 shadow-sm p-4">
+      <h2 className="text-base font-semibold text-[#1e293b] mb-3">Continue watching</h2>
 
-      <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'thin' }}>
+      <div className="flex gap-2.5 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'thin' }}>
         {items.map((it) => {
           const parsed = parseVideoUrl(it.videoUrl);
           const thumb =
@@ -56,24 +56,24 @@ export const ContinueWatchingStrip = ({ userId, batch }: ContinueWatchingStripPr
               key={it.videoId}
               type="button"
               onClick={() => openLecture(it.videoId)}
-              className="group relative shrink-0 w-[150px] sm:w-[168px] text-left rounded-lg overflow-hidden border border-slate-200 bg-white hover:shadow-md hover:border-violet-200 transition-all"
+              className="group relative shrink-0 w-[136px] text-left rounded-lg overflow-hidden border border-slate-200 bg-white hover:shadow-md hover:border-violet-200 transition-all"
             >
               <div className="relative aspect-video bg-gradient-to-br from-slate-800 to-slate-900">
                 {thumb && (
                   <img src={thumb} alt="" loading="lazy" className="h-full w-full object-cover" />
                 )}
                 <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="h-11 w-11 rounded-full bg-white/90 flex items-center justify-center">
-                    <Play className="h-5 w-5 text-slate-900 ml-0.5" fill="currentColor" />
+                  <div className="h-9 w-9 rounded-full bg-white/90 flex items-center justify-center">
+                    <Play className="h-4 w-4 text-slate-900 ml-0.5" fill="currentColor" />
                   </div>
                 </div>
                 <div className="absolute bottom-0 inset-x-0 h-1 bg-black/40">
                   <div className="h-full bg-violet-600" style={{ width: `${it.percent}%` }} />
                 </div>
               </div>
-              <div className="p-2.5">
-                <p className="text-[13px] font-semibold text-slate-900 line-clamp-2 leading-snug">{it.title}</p>
-                <p className="mt-1 text-[11px] font-semibold text-violet-700">{it.percent}% complete</p>
+              <div className="p-2">
+                <p className="text-[12px] font-semibold text-slate-900 line-clamp-2 leading-snug">{it.title}</p>
+                <p className="mt-0.5 text-[10.5px] font-semibold text-violet-700">{it.percent}% complete</p>
               </div>
             </button>
           );
