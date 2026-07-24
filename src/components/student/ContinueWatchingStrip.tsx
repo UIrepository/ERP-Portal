@@ -56,22 +56,25 @@ export const ContinueWatchingStrip = ({ userId, batch }: ContinueWatchingStripPr
               key={it.videoId}
               type="button"
               onClick={() => openLecture(it.videoId)}
-              className="group relative shrink-0 w-[136px] text-left rounded-lg overflow-hidden border border-slate-200 bg-white hover:shadow-md hover:border-violet-200 transition-all"
+              className="group relative shrink-0 w-[136px] text-left rounded-md overflow-hidden border border-slate-200 bg-white hover:border-violet-200 transition-all"
             >
-              <div className="relative aspect-video bg-gradient-to-br from-slate-800 to-slate-900">
-                {thumb && (
-                  <img src={thumb} alt="" loading="lazy" className="h-full w-full object-cover" />
-                )}
-                <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="h-9 w-9 rounded-full bg-white/90 flex items-center justify-center">
-                    <Play className="h-4 w-4 text-slate-900 ml-0.5" fill="currentColor" />
+              {/* Slightly inset frame — matches the Today's class strip size. */}
+              <div className="p-1.5">
+                <div className="relative aspect-video overflow-hidden rounded-[3px] bg-gradient-to-br from-slate-800 to-slate-900">
+                  {thumb && (
+                    <img src={thumb} alt="" loading="lazy" className="h-full w-full object-cover" />
+                  )}
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="h-9 w-9 rounded-full bg-white/90 flex items-center justify-center">
+                      <Play className="h-4 w-4 text-slate-900 ml-0.5" fill="currentColor" />
+                    </div>
+                  </div>
+                  <div className="absolute bottom-0 inset-x-0 h-1 bg-black/40">
+                    <div className="h-full bg-violet-600" style={{ width: `${it.percent}%` }} />
                   </div>
                 </div>
-                <div className="absolute bottom-0 inset-x-0 h-1 bg-black/40">
-                  <div className="h-full bg-violet-600" style={{ width: `${it.percent}%` }} />
-                </div>
               </div>
-              <div className="p-2">
+              <div className="px-2 pb-2">
                 <p className="text-[12px] font-semibold text-slate-900 line-clamp-2 leading-snug">{it.title}</p>
                 <p className="mt-0.5 text-[10.5px] font-semibold text-violet-700">{it.percent}% complete</p>
               </div>
