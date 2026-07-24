@@ -225,7 +225,7 @@ export const TodaysClassStrip = ({ batch, enrolledSubjects = [], onJoinLive }: T
         {upcoming.map((s) => (
           <div key={`up-${s.subject}-${s.start_time}`} className="shrink-0 w-[136px] rounded-md overflow-hidden border border-slate-200 bg-white">
             <Frame>
-              <span className="absolute top-1 left-1 inline-flex items-center rounded-[3px] bg-slate-500 px-1 py-[1px] text-[8px] font-normal text-white font-sans">
+              <span className="absolute top-1 left-1 inline-flex items-center rounded-[3px] bg-red-600 px-1 py-[1px] text-[8px] font-normal text-white font-sans">
                 Upcoming
               </span>
             </Frame>
