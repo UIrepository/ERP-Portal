@@ -1,4 +1,4 @@
-import { GearsArt, StateScreen } from '@/components/StateScreens';
+import { RoadworkArt, StateScreen } from '@/components/StateScreens';
 
 interface MaintenancePageProps {
   message?: string;
@@ -12,7 +12,7 @@ interface MaintenancePageProps {
  */
 export const MaintenancePage = ({ message }: MaintenancePageProps) => (
   <StateScreen
-    art={<GearsArt />}
+    art={<RoadworkArt />}
     title="Under maintenance"
     message={message?.trim() || 'We are performing scheduled maintenance. Please check back soon.'}
   />

@@ -2,46 +2,62 @@ import React from 'react';
 
 /* ------------------------------------------------------------------ *
  * Shared, on-brand artwork + scaffolding for full-page app states.
- * Soft two-tone indigo/slate illustrations, Inter, gentle motion.
+ * Soft two-tone indigo/slate illustrations, Inter. No animation.
  * ------------------------------------------------------------------ */
 
-const KEYFRAMES = `
-  @keyframes uiStateFloat { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-7px) } }
-  @keyframes uiStateIn { 0% { opacity:0; transform: translateY(8px) } 100% { opacity:1; transform: none } }
-  @keyframes uiGearA { 0% { transform: rotate(0) } 100% { transform: rotate(360deg) } }
-  @keyframes uiGearB { 0% { transform: rotate(0) } 100% { transform: rotate(-360deg) } }
-  @keyframes uiTick { 0%,100% { transform: rotate(-18deg) } 50% { transform: rotate(18deg) } }
-  .ui-state-in { animation: uiStateIn .4s ease-out both; }
-  .ui-state-float { animation: uiStateFloat 3s ease-in-out infinite; }
-  .ui-gear-a { animation: uiGearA 7s linear infinite; }
-  .ui-gear-b { animation: uiGearB 5s linear infinite; }
-  .ui-tick { transform-box: fill-box; transform-origin: 50% 92%; animation: uiTick 2.4s ease-in-out infinite; }
-`;
+/** Roadwork scene — hi-vis worker, striped barricade, cone, cement & wires. */
+export const RoadworkArt = () => (
+  <svg viewBox="0 0 212 158" width="204" height="152" aria-hidden="true">
+    <defs>
+      <pattern id="uiStripe" width="14" height="14" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+        <rect width="14" height="14" fill="#f59e0b" />
+        <rect width="7" height="14" fill="#fff7ed" />
+      </pattern>
+    </defs>
 
-/** A cog with radial teeth, hub and a rotation class. */
-const Gear = ({ cx, cy, r, teeth = 9, color, spin }: { cx: number; cy: number; r: number; teeth?: number; color: string; spin: string }) => {
-  const t = [];
-  for (let i = 0; i < teeth; i++) {
-    const a = (i / teeth) * 360;
-    const rad = (a * Math.PI) / 180;
-    const x = cx + Math.cos(rad) * (r + 4.5);
-    const y = cy + Math.sin(rad) * (r + 4.5);
-    t.push(<rect key={i} x={x - 3.2} y={y - 3.2} width="6.4" height="6.4" rx="1.8" fill={color} transform={`rotate(${a} ${x} ${y})`} />);
-  }
-  return (
-    <g className={spin} style={{ transformBox: 'fill-box', transformOrigin: `${cx}px ${cy}px` }}>
-      {t}
-      <circle cx={cx} cy={cy} r={r} fill="#eef2ff" stroke={color} strokeWidth="4" />
-      <circle cx={cx} cy={cy} r={r * 0.36} fill="#fff" stroke={color} strokeWidth="3" />
+    <ellipse cx="106" cy="146" rx="90" ry="9" fill="#e2e8f0" opacity="0.6" />
+
+    {/* loose wires / cables with exposed coloured ends */}
+    <path d="M150 138 q18 -11 38 1" fill="none" stroke="#6366f1" strokeWidth="3.5" strokeLinecap="round" />
+    <path d="M150 143 q22 -3 40 7" fill="none" stroke="#94a3b8" strokeWidth="3.5" strokeLinecap="round" />
+    <circle cx="150" cy="138" r="2.6" fill="#ef4444" />
+    <circle cx="150" cy="143" r="2.6" fill="#f59e0b" />
+
+    {/* cement / brick stack */}
+    <g stroke="#94a3b8" strokeWidth="2">
+      <rect x="166" y="129" width="17" height="8" rx="1.5" fill="#e2e8f0" />
+      <rect x="162" y="121" width="13" height="8" rx="1.5" fill="#eef2ff" />
+      <rect x="176" y="121" width="13" height="8" rx="1.5" fill="#eef2ff" />
     </g>
-  );
-};
 
-export const GearsArt = () => (
-  <svg viewBox="0 0 168 148" width="176" height="155" aria-hidden="true">
-    <ellipse cx="84" cy="134" rx="50" ry="7.5" fill="#e2e8f0" opacity="0.7" />
-    <Gear cx={66} cy={66} r={30} teeth={11} color="#4f46e5" spin="ui-gear-a" />
-    <Gear cx={112} cy={94} r={20} teeth={9} color="#818cf8" spin="ui-gear-b" />
+    {/* striped barricade */}
+    <g>
+      <line x1="24" y1="104" x2="40" y2="137" stroke="#94a3b8" strokeWidth="4.5" strokeLinecap="round" />
+      <line x1="82" y1="104" x2="66" y2="137" stroke="#94a3b8" strokeWidth="4.5" strokeLinecap="round" />
+      <rect x="16" y="92" width="76" height="17" rx="3" fill="url(#uiStripe)" stroke="#78716c" strokeWidth="2.5" />
+      <line x1="24" y1="120" x2="82" y2="120" stroke="#cbd5e1" strokeWidth="4.5" />
+    </g>
+
+    {/* traffic cone */}
+    <g>
+      <path d="M120 137 l11 -30 a3.5 3.5 0 0 1 6 0 l11 30 Z" fill="#fb923c" stroke="#ea580c" strokeWidth="2.5" strokeLinejoin="round" />
+      <path d="M126 123 h16 M123 131 h22" stroke="#fff7ed" strokeWidth="4.5" />
+      <rect x="112" y="135" width="44" height="7" rx="3" fill="#fb923c" stroke="#ea580c" strokeWidth="2" />
+    </g>
+
+    {/* worker */}
+    <g>
+      <rect x="88" y="119" width="8" height="20" rx="3.5" fill="#4f46e5" />
+      <rect x="100" y="119" width="8" height="20" rx="3.5" fill="#4f46e5" />
+      <path d="M84 89 h28 a6 6 0 0 1 6 6 v22 a4 4 0 0 1 -4 4 h-32 a4 4 0 0 1 -4 -4 v-22 a6 6 0 0 1 6 -6 Z" fill="#f59e0b" stroke="#d97706" strokeWidth="2.5" />
+      <path d="M98 89 v34 M84 105 h28" stroke="#e2e8f0" strokeWidth="3.5" />
+      <path d="M82 95 l-9 12" stroke="#f59e0b" strokeWidth="8" strokeLinecap="round" />
+      <path d="M114 95 l11 -12" stroke="#f59e0b" strokeWidth="8" strokeLinecap="round" />
+      <circle cx="98" cy="77" r="10.5" fill="#f5d0a9" stroke="#e0b483" strokeWidth="2" />
+      <path d="M85 75 a13 13 0 0 1 26 0 Z" fill="#fbbf24" stroke="#d97706" strokeWidth="2.5" />
+      <rect x="83" y="73" width="30" height="5.5" rx="2.5" fill="#fbbf24" stroke="#d97706" strokeWidth="2" />
+      <rect x="96" y="62" width="4" height="6" rx="2" fill="#f59e0b" />
+    </g>
   </svg>
 );
 
@@ -54,14 +70,11 @@ export const CrashArt = () => (
       </linearGradient>
     </defs>
     <ellipse cx="84" cy="132" rx="48" ry="7.5" fill="#e2e8f0" opacity="0.7" />
-    {/* scattered bits */}
     <circle cx="34" cy="46" r="3" fill="#c7d2fe" />
     <circle cx="136" cy="40" r="4" fill="#c7d2fe" />
     <path d="M126 96 l7 -3 M32 92 l-7 -2" stroke="#c7d2fe" strokeWidth="3" strokeLinecap="round" />
-    {/* rounded warning triangle */}
     <path d="M84 30 L138 118 a8 8 0 0 1 -7 12 H37 a8 8 0 0 1 -7 -12 Z"
       fill="url(#uiTri)" stroke="#6366f1" strokeWidth="4" strokeLinejoin="round" />
-    {/* exclamation */}
     <path d="M84 62 v26" stroke="#ef4444" strokeWidth="6.5" strokeLinecap="round" />
     <circle cx="84" cy="104" r="4.5" fill="#ef4444" />
   </svg>
@@ -70,18 +83,12 @@ export const CrashArt = () => (
 export const SessionArt = () => (
   <svg viewBox="0 0 168 148" width="176" height="155" aria-hidden="true">
     <ellipse cx="84" cy="134" rx="46" ry="7.5" fill="#e2e8f0" opacity="0.7" />
-    {/* open shackle */}
     <path d="M64 66 v-8 a20 20 0 0 1 39 -6" fill="none" stroke="#94a3b8" strokeWidth="6" strokeLinecap="round" />
-    {/* lock body */}
     <rect x="52" y="64" width="64" height="52" rx="11" fill="#eef2ff" stroke="#4f46e5" strokeWidth="4" />
-    {/* keyhole */}
     <circle cx="84" cy="86" r="6" fill="#4f46e5" />
     <path d="M84 86 l0 14" stroke="#4f46e5" strokeWidth="5" strokeLinecap="round" />
-    {/* little clock (timeout) */}
-    <g className="ui-tick" style={{ transformOrigin: '122px 52px' }}>
-      <circle cx="122" cy="52" r="15" fill="#fff" stroke="#f59e0b" strokeWidth="3.5" />
-      <path d="M122 52 v-8 M122 52 l6 4" stroke="#f59e0b" strokeWidth="3" strokeLinecap="round" />
-    </g>
+    <circle cx="122" cy="52" r="15" fill="#fff" stroke="#f59e0b" strokeWidth="3.5" />
+    <path d="M122 52 v-8 M122 52 l6 4" stroke="#f59e0b" strokeWidth="3" strokeLinecap="round" />
   </svg>
 );
 
@@ -100,9 +107,8 @@ export function StateScreen({
 }: { art: React.ReactNode; title: string; message?: React.ReactNode; action?: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-[150] flex flex-col items-center justify-center bg-white px-6 text-center font-sans">
-      <style>{KEYFRAMES}</style>
-      <div className="ui-state-in flex flex-col items-center">
-        <div className="ui-state-float">{art}</div>
+      <div className="flex flex-col items-center">
+        {art}
         <h1 className="mt-7 text-[21px] font-semibold text-slate-900">{title}</h1>
         {message && (
           <p className="mt-2 max-w-sm text-[14px] leading-relaxed text-slate-500 whitespace-pre-line">{message}</p>
@@ -131,7 +137,6 @@ export const EmptyState = ({
   title, subtitle, className = '',
 }: { title: string; subtitle?: string; className?: string }) => (
   <div className={`flex flex-col items-center justify-center py-14 text-center ${className}`}>
-    <style>{KEYFRAMES}</style>
     <EmptyArt />
     <h3 className="mt-4 text-[15px] font-semibold text-slate-800">{title}</h3>
     {subtitle && <p className="mt-1 max-w-xs text-[13px] leading-relaxed text-slate-500">{subtitle}</p>}

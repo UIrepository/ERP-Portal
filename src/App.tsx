@@ -3,7 +3,9 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "@/hooks/useAuth";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
+import { MaintenancePage } from "@/components/MaintenancePage";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ClassSession from "./pages/ClassSession";
@@ -32,6 +34,20 @@ const queryClient = new QueryClient({
   },
 });
 
+/**
+ * App-wide maintenance guard. Index used to check maintenance itself, but that
+ * left every other route (/lecture, /whiteboard, /class-session, community…)
+ * bypassable by URL. This gate wraps ALL routes, so a non-verified user in
+ * maintenance mode is blocked everywhere. Fail-open (renders children) until the
+ * setting is known, matching the previous behaviour.
+ */
+const MaintenanceGate = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useAuth();
+  const { shouldShowMaintenance, maintenanceMessage } = useMaintenanceMode(user?.email ?? undefined);
+  if (shouldShowMaintenance) return <MaintenancePage message={maintenanceMessage} />;
+  return <>{children}</>;
+};
+
 const App = () => (
   <ErrorBoundary>
   <QueryClientProvider client={queryClient}>
@@ -45,6 +61,7 @@ const App = () => (
               install banner there. */}
           {!window.location.pathname.startsWith('/whiteboard') && <InstallAppBanner />}
           <BrowserRouter>
+            <MaintenanceGate>
             <Routes>
               {/* Root Route - Index will redirect to default tab */}
               <Route path="/" element={<Index />} />
@@ -71,6 +88,7 @@ const App = () => (
               {/* Fallback Route */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </MaintenanceGate>
           </BrowserRouter>
         </ScreenRecordingProtection>
       </TooltipProvider>
