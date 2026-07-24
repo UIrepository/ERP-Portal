@@ -144,7 +144,7 @@ export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [], on
 
     return (
         // Container with padding but no background/border
-        <div className="w-full font-sans antialiased p-4">
+        <div className="w-full font-sans antialiased px-0 py-3 sm:p-4">
             
             {/* Custom scrollbar styling embedded */}
             <style>{`

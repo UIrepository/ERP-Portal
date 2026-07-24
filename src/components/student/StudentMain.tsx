@@ -485,7 +485,7 @@ const StudentMainContent = () => {
       <ContinueWatchingStrip userId={user?.id} batch={navigation.batch} />
 
       {/* CONTENT SECTION */}
-      <div className="w-full bg-white rounded-t-none rounded-b-lg shadow-sm border border-slate-100 p-6 md:p-8 h-auto min-h-[400px]">
+      <div className="w-full bg-white rounded-t-none rounded-b-lg shadow-sm border border-slate-100 p-3 sm:p-6 md:p-8 h-auto min-h-[400px]">
         {renderTabContent()}
       </div>
 
