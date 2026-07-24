@@ -75,15 +75,15 @@ export const AnnouncementModal = ({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 sm:px-7 py-5">
+          <MarkdownText text={message} className="text-[15px] text-slate-700 leading-relaxed" />
           {imageUrl && (
             <img
               src={imageUrl}
               alt=""
               /* Frame follows the image: natural aspect, never cropped. */
-              className="mb-4 w-full max-h-[46vh] rounded-lg border border-slate-100 object-contain bg-slate-50"
+              className="mt-4 w-full max-h-[46vh] rounded-lg border border-slate-100 object-contain bg-slate-50"
             />
           )}
-          <MarkdownText text={message} className="text-[15px] text-slate-700 leading-relaxed" />
         </div>
 
         {context && (

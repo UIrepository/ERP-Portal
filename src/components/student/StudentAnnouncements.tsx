@@ -81,15 +81,15 @@ const AnnouncementCard = ({ announcement, onClick }: { announcement: Announcemen
 
             {/* Message Content - Scrollable */}
             <div className="flex-1 overflow-y-auto pr-2 min-h-0 custom-scrollbar">
+                <MarkdownText text={announcement.message} className="text-[13px] text-[#444444] font-normal leading-relaxed font-sans" />
                 {announcement.image_url && (
                     <img
                         src={announcement.image_url}
                         alt=""
                         loading="lazy"
-                        className="mb-2 w-full max-h-28 rounded-md border border-slate-100 object-cover"
+                        className="mt-2 w-full max-h-28 rounded-md border border-slate-100 object-cover"
                     />
                 )}
-                <MarkdownText text={announcement.message} className="text-[13px] text-[#444444] font-normal leading-relaxed font-sans" />
             </div>
 
             {/* Optional Context Badge - Fixed at bottom */}
