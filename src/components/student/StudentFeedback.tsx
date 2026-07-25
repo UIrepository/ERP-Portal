@@ -24,7 +24,8 @@ import {
 } from '@/components/ui/drawer';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useIsMobile } from '@/hooks/use-mobile'; 
+import { useIsMobile } from '@/hooks/use-mobile';
+import { FeedbackSuccess } from './FeedbackSuccess';
 
 // --- Types ---
 interface UserEnrollment {
@@ -133,6 +134,8 @@ export const StudentFeedback = () => {
   const isMobile = useIsMobile(); 
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [justSubmitted, setJustSubmitted] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<FeedbackTask | null>(null);
   const [ratings, setRatings] = useState({
     teacher_quality: 0,
@@ -208,12 +211,17 @@ export const StudentFeedback = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-submitted-feedback'] });
-      toast({ title: 'Success', description: 'Feedback submitted successfully', variant: "default" });
-      setIsDialogOpen(false);
-      resetForm();
+      // Show the success beat inside the popup, then close.
+      setJustSubmitted(true);
+      window.setTimeout(() => {
+        setJustSubmitted(false);
+        setIsDialogOpen(false);
+        resetForm();
+      }, 1900);
     },
-    onError: (error: any) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    onError: () => {
+      // Never surface raw backend errors to the student.
+      setFormError('Sorry, that didn’t save. Please check your connection and try again.');
     },
   });
 
@@ -225,14 +233,22 @@ export const StudentFeedback = () => {
 
   const handleOpenDialog = (task: FeedbackTask) => {
     setSelectedTask(task);
+    setJustSubmitted(false);
+    setFormError(null);
     setIsDialogOpen(true);
   };
 
+  // Clear the inline error once all four are rated.
+  useEffect(() => {
+    if (formError && Object.values(ratings).every(r => r > 0)) setFormError(null);
+  }, [ratings, formError]);
+
   const handleSubmit = () => {
     if (Object.values(ratings).some(r => r === 0)) {
-      toast({ title: 'Ratings Required', description: 'Please rate all categories.', variant: 'destructive' });
+      setFormError('Please rate all four categories before submitting.');
       return;
     }
+    setFormError(null);
     const feedbackToSubmit = {
         batch: selectedTask?.batch,
         subject: selectedTask?.subject,
@@ -334,18 +350,24 @@ export const StudentFeedback = () => {
             </DrawerHeader>
             
             <div className="px-4 overflow-y-auto">
-              <FeedbackFormContent 
-                questions={questions}
-                ratings={ratings}
-                setRatings={setRatings}
-                comments={comments}
-                setComments={setComments}
-              />
+              {justSubmitted ? (
+                <FeedbackSuccess subtitle="Thanks — your feedback was saved." />
+              ) : (
+                <FeedbackFormContent
+                  questions={questions}
+                  ratings={ratings}
+                  setRatings={setRatings}
+                  comments={comments}
+                  setComments={setComments}
+                />
+              )}
             </div>
 
+            {!justSubmitted && (
             <DrawerFooter className="border-t border-[#ededed] pt-4">
-              <Button 
-                onClick={handleSubmit} 
+              {formError && <p className="text-[13px] font-medium text-rose-600 text-center">{formError}</p>}
+              <Button
+                onClick={handleSubmit}
                 className="bg-black hover:bg-black/90 text-white w-full"
                 disabled={submitFeedbackMutation.isPending}
               >
@@ -357,6 +379,7 @@ export const StudentFeedback = () => {
                 </Button>
               </DrawerClose>
             </DrawerFooter>
+            )}
           </DrawerContent>
         </Drawer>
       ) : (
@@ -382,32 +405,44 @@ export const StudentFeedback = () => {
 
               {/* Scrollable body */}
               <div className="flex-1 overflow-y-auto px-8 py-6">
-                <FeedbackFormContent
-                  questions={questions}
-                  ratings={ratings}
-                  setRatings={setRatings}
-                  comments={comments}
-                  setComments={setComments}
-                />
+                {justSubmitted ? (
+                  <div className="h-full flex items-center justify-center">
+                    <FeedbackSuccess subtitle="Thanks — your feedback was saved." />
+                  </div>
+                ) : (
+                  <FeedbackFormContent
+                    questions={questions}
+                    ratings={ratings}
+                    setRatings={setRatings}
+                    comments={comments}
+                    setComments={setComments}
+                  />
+                )}
               </div>
 
               {/* Footer */}
-              <div className="px-8 py-5 border-t border-gray-100 shrink-0 flex justify-end gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => { resetForm(); setIsDialogOpen(false); }}
-                  className="border-gray-200 text-gray-600"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSubmit}
-                  className="bg-black hover:bg-black/90 text-white px-6"
-                  disabled={submitFeedbackMutation.isPending}
-                >
-                  {submitFeedbackMutation.isPending ? 'Submitting…' : 'Submit Feedback'}
-                </Button>
-              </div>
+              {!justSubmitted && (
+                <div className="px-8 py-5 border-t border-gray-100 shrink-0 flex items-center justify-between gap-3">
+                  {/* Inline error stays inside the modal — always above the blur */}
+                  <span className="text-[13px] font-medium text-rose-600 min-h-[18px]">{formError}</span>
+                  <div className="flex gap-3 shrink-0">
+                    <Button
+                      variant="outline"
+                      onClick={() => { resetForm(); setIsDialogOpen(false); }}
+                      className="border-gray-200 text-gray-600"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleSubmit}
+                      className="bg-black hover:bg-black/90 text-white px-6"
+                      disabled={submitFeedbackMutation.isPending}
+                    >
+                      {submitFeedbackMutation.isPending ? 'Submitting…' : 'Submit Feedback'}
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               <DialogPrimitive.Close className="absolute right-5 top-5 rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300">
                 <X className="h-5 w-5" />

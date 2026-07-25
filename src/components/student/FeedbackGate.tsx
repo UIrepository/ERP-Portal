@@ -3,9 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Loader2, Check } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
+import { Loader2 } from 'lucide-react';
 import { FeedbackFormContent, FEEDBACK_QUESTIONS } from './StudentFeedback';
+import { FeedbackSuccess } from './FeedbackSuccess';
 
 interface Pending { batch: string; subject: string }
 interface GateCfg { enabled: boolean; scope: 'everywhere' | 'active_batch' }
@@ -72,6 +72,7 @@ export const FeedbackGate = () => {
   const [comments, setComments] = useState('');
   const [phase, setPhase] = useState<'form' | 'success'>('form');
   const [completed, setCompleted] = useState(0);
+  const [formError, setFormError] = useState<string | null>(null);
   const timerRef = useRef<number | null>(null);
   // Freeze the round size the first time we know it, so the "x of N" count
   // doesn't jump while the pending list refetches between subjects.
@@ -82,14 +83,19 @@ export const FeedbackGate = () => {
   useEffect(() => {
     setRatings(emptyRatings());
     setComments('');
+    setFormError(null);
   }, [currentKey]);
+
+  // Clear the inline error as soon as all four are rated.
+  useEffect(() => {
+    if (formError && Object.values(ratings).every((r) => r > 0)) setFormError(null);
+  }, [ratings, formError]);
 
   useEffect(() => () => { if (timerRef.current) window.clearTimeout(timerRef.current); }, []);
 
   const submit = useMutation({
     mutationFn: async () => {
       if (!current || !profile?.user_id) return;
-      if (Object.values(ratings).some((r) => r === 0)) throw new Error('Please rate all four categories.');
       const { error } = await supabase.from('feedback').insert([{
         batch: current.batch,
         subject: current.subject,
@@ -100,17 +106,33 @@ export const FeedbackGate = () => {
       if (error) throw error;
     },
     onSuccess: () => {
+      const wasLast = visiblePending.length <= 1;
       setCompleted((c) => c + 1);
-      setPhase('success');
-      timerRef.current = window.setTimeout(() => {
-        setPhase('form');
-        queryClient.invalidateQueries({ queryKey: ['my-pending-feedback-gate'] });
-        queryClient.invalidateQueries({ queryKey: ['student-submitted-feedback'] });
-      }, 1500);
+      setFormError(null);
+      queryClient.invalidateQueries({ queryKey: ['my-pending-feedback-gate'] });
+      queryClient.invalidateQueries({ queryKey: ['student-submitted-feedback'] });
+      if (wasLast) {
+        // Celebrate ONCE, after every subject is done — then unlock.
+        setPhase('success');
+        timerRef.current = window.setTimeout(() => setPhase('form'), 2100);
+      } else {
+        // More subjects remain — slide straight to the next one, no success beat.
+        setRatings(emptyRatings());
+        setComments('');
+      }
     },
-    onError: (e: any) =>
-      toast({ title: 'Please complete your ratings', description: e.message, variant: 'destructive' }),
+    // Never surface raw backend errors to the student.
+    onError: () => setFormError('Sorry, that didn’t save. Please check your connection and try again.'),
   });
+
+  const handleSubmit = () => {
+    if (Object.values(ratings).some((r) => r === 0)) {
+      setFormError('Please rate all four categories before continuing.');
+      return;
+    }
+    setFormError(null);
+    submit.mutate();
+  };
 
   // Nothing to enforce → render nothing (portal stays unlocked).
   if (!cfg?.enabled) return null;
@@ -143,14 +165,8 @@ export const FeedbackGate = () => {
         </div>
 
         {phase === 'success' ? (
-          <div className="flex-1 flex flex-col items-center justify-center py-16 px-8 text-center">
-            <div className="h-16 w-16 rounded-full bg-emerald-100 flex items-center justify-center mb-4">
-              <Check className="h-8 w-8 text-emerald-600" strokeWidth={3} />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900">Thanks for your feedback!</h3>
-            <p className="text-gray-500 mt-1 text-sm">
-              {visiblePending.length > 0 ? 'Just one more…' : "You're all set — unlocking now."}
-            </p>
+          <div className="flex-1 flex items-center justify-center">
+            <FeedbackSuccess title="All feedback submitted!" subtitle="Thanks — unlocking the app." />
           </div>
         ) : (
           <>
@@ -163,11 +179,13 @@ export const FeedbackGate = () => {
                 setComments={setComments}
               />
             </div>
-            <div className="px-8 py-5 border-t border-gray-100 shrink-0 flex items-center justify-end">
+            <div className="px-8 py-5 border-t border-gray-100 shrink-0 flex items-center justify-between gap-4">
+              {/* Inline error lives inside the modal, so it's always above the blur */}
+              <span className="text-[13px] font-medium text-rose-600 min-h-[18px]">{formError}</span>
               <Button
-                onClick={() => submit.mutate()}
+                onClick={handleSubmit}
                 disabled={submit.isPending}
-                className="bg-black hover:bg-black/90 text-white px-6"
+                className="bg-black hover:bg-black/90 text-white px-6 shrink-0"
               >
                 {submit.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : (visiblePending.length > 1 ? 'Submit & continue' : 'Submit & finish')}
               </Button>
