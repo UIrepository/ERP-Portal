@@ -593,24 +593,25 @@ export const AdminCommunity = () => {
               const unread = s?.unread || 0;
               return (
               <div key={`${group.batch_name}-${group.subject_name}`} onClick={() => setSelectedGroup(group)}
-                className={`px-2.5 py-2 cursor-pointer flex items-center gap-2.5 border-l-2 ${active ? 'bg-teal-50/70 border-teal-500' : 'border-transparent hover:bg-gray-50'}`}>
-                <div className={`h-10 w-10 rounded-full flex items-center justify-center font-semibold shrink-0 text-[15px] ${unread ? 'bg-teal-600 text-white' : 'bg-teal-100 text-teal-700'}`}>{group.subject_name[0]}</div>
+                className={`px-3 py-2.5 cursor-pointer flex items-center gap-3 border-l-2 ${active ? 'bg-teal-50/70 border-teal-500' : 'border-transparent hover:bg-gray-50'}`}>
+                <div className={`h-11 w-11 rounded-full flex items-center justify-center font-semibold shrink-0 text-[16px] ${unread ? 'bg-teal-600 text-white' : 'bg-teal-100 text-teal-700'}`}>{group.subject_name[0]}</div>
                 <div className="min-w-0 flex-1 text-left">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <p className="truncate min-w-0">
-                      <span className={`text-[14px] ${unread ? 'font-semibold text-gray-900' : 'font-medium text-gray-800'}`}>{group.subject_name}</span>
-                      <span className="text-[11px] text-gray-400 ml-1.5">{group.batch_name}</span>
-                    </p>
-                    {s?.last_at && <span className={`text-[10.5px] shrink-0 ${unread ? 'text-teal-600 font-medium' : 'text-gray-400'}`}>{formatChatTime(s.last_at)}</span>}
+                  {/* Row 1: chat name (own full line) + time */}
+                  <div className="flex items-center gap-2">
+                    <p className={`flex-1 min-w-0 truncate text-[14.5px] leading-tight ${unread ? 'font-semibold text-gray-900' : 'font-medium text-gray-800'}`}>{group.subject_name}</p>
+                    {s?.last_at && <span className={`text-[11px] shrink-0 ${unread ? 'text-teal-600 font-medium' : 'text-gray-400'}`}>{formatChatTime(s.last_at)}</span>}
                   </div>
-                  <div className="flex items-center justify-between gap-2 mt-0.5">
-                    <p className={`truncate text-[12px] ${unread ? 'text-gray-700' : 'text-gray-400'}`}>
+                  {/* Row 2: last-message preview + unread badge */}
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className={`flex-1 min-w-0 truncate text-[12.5px] leading-tight ${unread ? 'text-gray-700' : 'text-gray-500'}`}>
                       {s?.last_content || <span className="italic text-gray-300">No messages yet</span>}
                     </p>
                     {unread > 0 && (
-                      <span className="shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-teal-600 text-white text-[10.5px] font-semibold flex items-center justify-center">{unread > 99 ? '99+' : unread}</span>
+                      <span className="shrink-0 min-w-[19px] h-[19px] px-1.5 rounded-full bg-teal-600 text-white text-[11px] font-semibold flex items-center justify-center">{unread > 99 ? '99+' : unread}</span>
                     )}
                   </div>
+                  {/* Row 3: which batch this community belongs to */}
+                  <p className="truncate text-[11px] text-gray-400 mt-0.5">{group.batch_name}</p>
                 </div>
               </div>
             );})}
