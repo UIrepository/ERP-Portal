@@ -25,7 +25,7 @@ import {
   DrawerFooter,
   DrawerClose
 } from '@/components/ui/drawer';
-import { differenceInHours, format } from 'date-fns';
+import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useIsMobile } from '@/hooks/use-mobile'; 
 
@@ -155,7 +155,9 @@ export const StudentFeedback = () => {
     return userEnrollments.map(enrollment => {
         const key = `${enrollment.batch_name}-${enrollment.subject_name}`;
         const lastSubmission = latestSubmissions.get(key);
-        const canSubmit = !lastSubmission || differenceInHours(new Date(), lastSubmission) >= 72;
+        // Feedback is unlimited — no 72h cooldown. Students can share feedback
+        // for any enrolled subject at any time (the last-given date is still shown).
+        const canSubmit = true;
 
         return {
             batch: enrollment.batch_name,
