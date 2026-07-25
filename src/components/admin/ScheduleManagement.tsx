@@ -6,8 +6,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, getDay, startOfWeek, addDays, isSameDay, subDays } from 'date-fns';
-import { AlertTriangle, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, ChevronRight, BookOpen, Layers } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 
 // Interface for the schedule data
 interface Schedule {
@@ -71,6 +74,7 @@ const ScheduleSkeleton = () => (
 export const ScheduleManagement = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [displayDate, setDisplayDate] = useState(new Date());
+  const [batchFilter, setBatchFilter] = useState<string>('all');
   const queryClient = useQueryClient();
 
   // --- Real-time Clock ---
@@ -135,6 +139,23 @@ export const ScheduleManagement = () => {
   const isError = isErrorSchedules || isErrorExams;
   const error = errorSchedules || errorExams;
 
+  // --- Batch filter ---
+  const uniqueBatches = useMemo(() => {
+    const set = new Set<string>();
+    schedules?.forEach(s => s.batch && set.add(s.batch));
+    exams?.forEach(e => e.batch && set.add(e.batch));
+    return Array.from(set).sort();
+  }, [schedules, exams]);
+
+  const filteredSchedules = useMemo(
+    () => (batchFilter === 'all' ? schedules : schedules?.filter(s => s.batch === batchFilter)) || [],
+    [schedules, batchFilter],
+  );
+  const filteredExams = useMemo(
+    () => (batchFilter === 'all' ? exams : exams?.filter(e => e.batch === batchFilter)) || [],
+    [exams, batchFilter],
+  );
+
   // --- Data Processing ---
   const weekDates = useMemo(() => {
     const start = startOfWeek(displayDate);
@@ -142,11 +163,10 @@ export const ScheduleManagement = () => {
   }, [displayDate]);
 
   const timeSlots = useMemo(() => {
-    if (!schedules) return [];
     const slots = new Set<string>();
-    schedules.forEach(s => slots.add(s.start_time));
+    filteredSchedules.forEach(s => slots.add(s.start_time));
     return Array.from(slots).sort();
-  }, [schedules]);
+  }, [filteredSchedules]);
   
   const subjectColorMap = useMemo(() => {
     const allSubjects = new Set<string>();
@@ -188,7 +208,27 @@ export const ScheduleManagement = () => {
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-4">
         <div>
           <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Full Class Schedule</h2>
-          <p className="text-gray-600 mt-1">A real-time overview of all scheduled classes and exams.</p>
+          <p className="text-gray-600 mt-1">A real-time overview of scheduled classes and exams.</p>
+          {/* Batch filter */}
+          <div className="mt-3 flex items-center gap-2">
+            <Layers className="h-4 w-4 text-indigo-500 shrink-0" />
+            <Select value={batchFilter} onValueChange={setBatchFilter}>
+              <SelectTrigger className="w-full sm:w-[300px] bg-white">
+                <SelectValue placeholder="Choose a batch" />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value="all">All batches</SelectItem>
+                {uniqueBatches.map((b) => (
+                  <SelectItem key={b} value={b}>{b}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {batchFilter !== 'all' && (
+              <button onClick={() => setBatchFilter('all')} className="text-xs font-medium text-slate-500 hover:text-slate-800 whitespace-nowrap">
+                Clear
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-4">
@@ -235,7 +275,7 @@ export const ScheduleManagement = () => {
               </div>
               <div className="relative">
                   {timeSlots.map(time => {
-                      const sampleScheduleForSlot = schedules?.find(s => s.start_time === time);
+                      const sampleScheduleForSlot = filteredSchedules.find(s => s.start_time === time);
                       const endTime = sampleScheduleForSlot ? sampleScheduleForSlot.end_time : '';
                       return (
                           <div key={time} className="grid grid-cols-[80px_repeat(7,1fr)] border-t">
@@ -243,17 +283,17 @@ export const ScheduleManagement = () => {
                                 {formatTime(time)} - {endTime ? formatTime(endTime) : ''}
                               </div>
                               {weekDates.map((date, dayIndex) => {
-                                  const recurringClasses = schedules.filter(s => !s.date && s.day_of_week === getDay(date) && s.start_time === time);
-                                  const dateSpecificClasses = schedules.filter(s => s.date && isSameDay(new Date(s.date), date) && s.start_time === time);
+                                  const recurringClasses = filteredSchedules.filter(s => !s.date && s.day_of_week === getDay(date) && s.start_time === time);
+                                  const dateSpecificClasses = filteredSchedules.filter(s => s.date && isSameDay(new Date(s.date), date) && s.start_time === time);
                                   const classesInfo = [...dateSpecificClasses, ...recurringClasses];
-                                  const dayExams = exams.filter(e => isSameDay(new Date(e.date), date));
+                                  const dayExams = filteredExams.filter(e => isSameDay(new Date(e.date), date));
                                   return (
                                       <div key={dayIndex} className={`p-2 border-r last:border-r-0 ${isSameDay(date, today) ? 'bg-blue-50' : ''}`}>
                                           {classesInfo.map(classInfo => (
                                             <Card key={classInfo.id} className={cn("shadow-md hover:shadow-lg transition-shadow mb-2", getSubjectColorClass(classInfo.subject))}>
                                                 <CardContent className="p-3">
                                                     <p className="font-bold text-gray-800 text-sm break-words">{classInfo.subject}</p>
-                                                    <Badge variant="secondary" className="mt-1">{classInfo.batch}</Badge>
+                                                    {batchFilter === 'all' && <Badge variant="secondary" className="mt-1">{classInfo.batch}</Badge>}
                                                 </CardContent>
                                             </Card>
                                           ))}
