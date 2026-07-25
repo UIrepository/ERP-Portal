@@ -269,6 +269,9 @@ export const ScheduleManagement = () => {
         </div>
       </div>
 
+      {/* Pull the calendar wider than the dashboard's page padding so there's
+          only a small side gutter. */}
+      <div className="-mx-1 sm:-mx-3 md:-mx-5">
       {isLoading ? (
         <ScheduleSkeleton />
       ) : isError ? (
@@ -336,6 +339,7 @@ export const ScheduleManagement = () => {
           </div>
       </div>
       )}
+      </div>
     </div>
   );
 };
