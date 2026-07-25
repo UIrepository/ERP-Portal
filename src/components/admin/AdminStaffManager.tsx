@@ -12,7 +12,6 @@ import {
 } from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Loader2, Plus, Trash2, Shield, GraduationCap, Check, ChevronsUpDown, X, Pencil,
   Search, Users, BookOpen, Layers, Mail,
@@ -73,22 +72,22 @@ const MultiSelect = ({
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
         <Command>
           <CommandInput placeholder={`Search ${searchLabel || 'options'}…`} />
-          <CommandList>
+          {/* CommandList scrolls natively (max-h + overflow-y-auto). Do NOT nest
+              a Radix ScrollArea here — two scroll containers break scrolling. */}
+          <CommandList className="max-h-60 overscroll-contain">
             <CommandEmpty>No matches.</CommandEmpty>
             <CommandGroup>
-              <ScrollArea className="h-56">
-                {options.map((option) => (
-                  <CommandItem key={option} onSelect={() => toggle(option)} className="cursor-pointer">
-                    <div className={cn(
-                      'mr-2 flex h-4 w-4 items-center justify-center rounded border',
-                      selected.includes(option) ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300',
-                    )}>
-                      {selected.includes(option) && <Check className="h-3 w-3" />}
-                    </div>
-                    <span className="text-sm">{option}</span>
-                  </CommandItem>
-                ))}
-              </ScrollArea>
+              {options.map((option) => (
+                <CommandItem key={option} value={option} onSelect={() => toggle(option)} className="cursor-pointer">
+                  <div className={cn(
+                    'mr-2 flex h-4 w-4 items-center justify-center rounded border',
+                    selected.includes(option) ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300',
+                  )}>
+                    {selected.includes(option) && <Check className="h-3 w-3" />}
+                  </div>
+                  <span className="text-sm">{option}</span>
+                </CommandItem>
+              ))}
             </CommandGroup>
           </CommandList>
         </Command>
