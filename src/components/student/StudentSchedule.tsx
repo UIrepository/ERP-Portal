@@ -70,6 +70,75 @@ const ScheduleSkeleton = () => (
     </div>
 );
 
+/** Cozy coffee-break illustration for a week with no classes. Static. */
+export const FreeTimeArt = () => (
+  <svg viewBox="0 0 184 150" width="172" height="140" role="img" aria-label="No classes this week">
+    <defs>
+      {/* horizontal gradient gives the cup a rounded, 3-D cylinder shading */}
+      <linearGradient id="stCup" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stopColor="#dfe4f6" />
+        <stop offset="0.32" stopColor="#ffffff" />
+        <stop offset="0.62" stopColor="#eef1fb" />
+        <stop offset="1" stopColor="#ccd3ee" />
+      </linearGradient>
+      <linearGradient id="stCoffee" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stopColor="#d98f4a" />
+        <stop offset="1" stopColor="#9a3d0b" />
+      </linearGradient>
+      <radialGradient id="stSaucer" cx="50%" cy="42%" r="60%">
+        <stop offset="0" stopColor="#ffffff" />
+        <stop offset="1" stopColor="#dfe4f6" />
+      </radialGradient>
+    </defs>
+
+    {/* ground shadow */}
+    <ellipse cx="90" cy="138" rx="60" ry="7" fill="#c7d2fe" opacity="0.35" />
+
+    {/* steam — organic wisps of varying height, behind the cup */}
+    <g stroke="#c7d2fe" strokeWidth="3.5" strokeLinecap="round" fill="none" opacity="0.85">
+      <path d="M78 44 q-8 -10 0 -20 q7 -9 1 -17" />
+      <path d="M92 46 q-7 -9 0 -18 q6 -8 1 -15" />
+      <path d="M106 44 q-8 -10 0 -19 q7 -9 1 -16" />
+    </g>
+
+    {/* saucer — a shallow dish the cup rests ON */}
+    <ellipse cx="90" cy="128" rx="56" ry="12" fill="url(#stSaucer)" stroke="#4f46e5" strokeWidth="3" />
+    <path d="M40 130 a52 12 0 0 0 100 0" fill="none" stroke="#4f46e5" strokeWidth="3" opacity="0.35" />
+    <ellipse cx="90" cy="125" rx="30" ry="5.5" fill="#d5dbf2" />
+
+    {/* handle (drawn behind the body) */}
+    <path d="M118 74 C 143 74, 143 106, 116 108" fill="none" stroke="#4f46e5" strokeWidth="7" strokeLinecap="round" />
+    <path d="M118 76 C 138 76, 138 104, 116 106" fill="none" stroke="#eef2ff" strokeWidth="2.4" strokeLinecap="round" />
+
+    {/* cup body — sits on the saucer, rounded base */}
+    <path d="M62 68 Q64 104 78 116 Q90 122 102 116 Q116 104 118 68 Z" fill="url(#stCup)" stroke="#4f46e5" strokeWidth="3" strokeLinejoin="round" />
+    {/* soft left highlight */}
+    <path d="M72 76 Q71 98 79 110" stroke="#ffffff" strokeWidth="4" strokeLinecap="round" fill="none" opacity="0.75" />
+
+    {/* rim + coffee surface */}
+    <ellipse cx="90" cy="68" rx="28" ry="7" fill="#f8fafc" stroke="#4f46e5" strokeWidth="3" />
+    <ellipse cx="90" cy="68" rx="21" ry="5" fill="url(#stCoffee)" />
+    <path d="M77 66 q13 -3 26 0" stroke="#f2c68f" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.7" />
+
+    {/* a little cookie resting on the saucer */}
+    <ellipse cx="46" cy="130" rx="10" ry="3" fill="#c7d2fe" opacity="0.5" />
+    <circle cx="46" cy="124" r="9" fill="#f0bd76" stroke="#c77f2c" strokeWidth="2" />
+    <circle cx="43" cy="122" r="1.3" fill="#6b2d0e" />
+    <circle cx="49" cy="125" r="1.3" fill="#6b2d0e" />
+    <circle cx="48" cy="120" r="1.3" fill="#6b2d0e" />
+  </svg>
+);
+
+const NoClassesWeek = () => (
+  <div className="flex flex-col items-center justify-center py-14 text-center">
+    <FreeTimeArt />
+    <h3 className="mt-4 text-[15px] font-medium text-slate-900">No classes this week</h3>
+    <p className="mt-1 max-w-xs text-[13px] font-normal text-slate-500">
+      Nothing on the calendar — enjoy the break, you've earned it!
+    </p>
+  </div>
+);
+
 export const StudentSchedule = () => {
   const { user } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -429,9 +498,7 @@ export const StudentSchedule = () => {
                     <p className="text-sm">You are not currently enrolled in any batches. Please contact administration.</p>
                 </div>
             ) : timeSlots.length === 0 ? (
-                <div className="col-span-8 py-16 flex flex-col items-center justify-center text-slate-400">
-                    <p className="text-sm">No classes scheduled for this filter/week.</p>
-                </div>
+                <div className="col-span-8"><NoClassesWeek /></div>
             ) : null}
           </div>
       </div>
@@ -443,8 +510,8 @@ export const StudentSchedule = () => {
             You are not currently enrolled in any batches. Please contact administration.
           </div>
         ) : weekAgenda.every((d) => d.dayClasses.length === 0) ? (
-          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 py-16 px-6 text-center text-sm text-slate-400">
-            No classes scheduled for this week.
+          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/40">
+            <NoClassesWeek />
           </div>
         ) : (
           <div className="space-y-5">
