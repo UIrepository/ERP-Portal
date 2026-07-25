@@ -236,7 +236,7 @@ export const StudentSchedule = () => {
   const handleNextWeek = () => setDisplayDate(addDays(displayDate, 7));
 
   return (
-    <div className="p-4 sm:p-8 bg-white min-h-screen font-sans text-slate-900 max-w-[1840px] mx-auto">
+    <div className="p-3 sm:p-4 bg-white min-h-screen font-sans text-slate-900 max-w-[1840px] mx-auto">
       
       {/* TOOLBAR */}
       <header className="mb-6">
@@ -345,13 +345,13 @@ export const StudentSchedule = () => {
                 const isToday = format(date, 'yyyy-MM-dd') === istTodayStr();
                 return (
                     <div key={index} className={cn(
-                        "p-3 text-center border-b border-r border-slate-100 last:border-r-0 transition-colors",
+                        "p-2 text-center border-b border-r border-slate-100 last:border-r-0 transition-colors",
                         isToday ? "bg-indigo-50/40" : "bg-white"
                     )}>
-                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{format(date, 'EEE')}</div>
+                        <div className="text-[12px] font-normal text-slate-900 mb-1">{format(date, 'EEE')}</div>
                         <div className={cn(
-                            "text-base font-semibold inline-flex items-center justify-center h-8 w-8 mx-auto rounded-full",
-                            isToday ? "bg-indigo-600 text-white" : "text-slate-700"
+                            "text-sm font-normal inline-flex items-center justify-center h-7 w-7 mx-auto rounded-full",
+                            isToday ? "bg-indigo-600 text-white" : "text-slate-900"
                         )}>{format(date, 'dd')}</div>
                     </div>
                 );
@@ -361,9 +361,9 @@ export const StudentSchedule = () => {
             {timeSlots.map((time, timeIndex) => (
                 <div key={`row-${time}`} className="contents">
                     {/* Time Label */}
-                    <div className="sticky left-0 z-10 bg-white px-2 text-center border-r border-b border-slate-100 flex flex-col items-center justify-start pt-6 tabular-nums">
-                        <span className="text-[13px] font-semibold text-slate-700 leading-none">{formatTime(time).replace(/ [AP]M$/, '')}</span>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">{formatTime(time).slice(-2)}</span>
+                    <div className="sticky left-0 z-10 bg-white px-1.5 text-center border-r border-b border-slate-100 flex flex-col items-center justify-start pt-3 tabular-nums">
+                        <span className="text-[12px] font-normal text-slate-900 leading-none">{formatTime(time).replace(/ [AP]M$/, '')}</span>
+                        <span className="text-[9px] font-normal text-slate-500 mt-0.5">{formatTime(time).slice(-2)}</span>
                     </div>
 
                     {/* Day Cells for this Time Slot */}
@@ -379,26 +379,26 @@ export const StudentSchedule = () => {
 
                         return (
                             <div key={`cell-${dayIndex}-${timeIndex}`} className={cn(
-                              "p-2 border-r border-b border-slate-100 last:border-r-0 min-h-[120px] hover:bg-slate-50/40 transition-colors relative",
+                              "p-1.5 border-r border-b border-slate-100 last:border-r-0 min-h-[88px] hover:bg-slate-50/40 transition-colors relative",
                               format(date, 'yyyy-MM-dd') === istTodayStr() ? "bg-indigo-50/20" : "bg-white"
                             )}>
                                 {cellClasses.map(classInfo => {
                                     const isLive = isClassLive(classInfo, date);
                                     
                                     return (
-                                        <div 
-                                          key={classInfo.id} 
+                                        <div
+                                          key={classInfo.id}
                                           className={cn(
-                                            "relative bg-white border rounded-md p-3 mb-2 shadow-sm transition-all group overflow-hidden",
-                                            isLive ? "border-indigo-200 shadow-md ring-1 ring-indigo-50" : "border-slate-100 hover:border-gray-300"
+                                            "relative bg-white border rounded-[4px] p-2 mb-1.5 transition-all group overflow-hidden",
+                                            isLive ? "border-indigo-200 ring-1 ring-indigo-50" : "border-slate-100 hover:border-gray-300"
                                           )}
                                         >
                                             {/* Accent Left Border */}
-                                            <div className={cn("absolute left-0 top-3 bottom-3 w-[3px] rounded-r-sm", getSubjectBorderColor(classInfo.subject))} />
+                                            <div className={cn("absolute left-0 top-2 bottom-2 w-[3px] rounded-r-sm", getSubjectBorderColor(classInfo.subject))} />
 
-                                            <div className="pl-3">
-                                                <div className="flex items-center justify-between mb-1">
-                                                    <h3 className="text-xs font-semibold text-slate-900 truncate pr-2 flex items-center">
+                                            <div className="pl-2.5">
+                                                <div className="flex items-center justify-between mb-0.5">
+                                                    <h3 className="text-[13px] font-medium text-slate-900 truncate pr-2 flex items-center">
                                                         {isLive && (
                                                             <span className="relative flex h-2 w-2 mr-2">
                                                               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -408,11 +408,11 @@ export const StudentSchedule = () => {
                                                         {classInfo.subject}
                                                     </h3>
                                                 </div>
-                                                
-                                                <div className="text-[10px] font-medium text-slate-600 mb-1 tabular-nums whitespace-nowrap">
+
+                                                <div className="text-[10px] font-normal text-slate-800 mb-0.5 tabular-nums whitespace-nowrap">
                                                     {formatTime(classInfo.start_time)} – {formatTime(classInfo.end_time)}
                                                 </div>
-                                                <div className="text-[10px] text-slate-400 truncate">{classInfo.batch}</div>
+                                                <div className="text-[10px] font-normal text-slate-500 truncate">{classInfo.batch}</div>
                                             </div>
                                         </div>
                                     );
@@ -455,19 +455,19 @@ export const StudentSchedule = () => {
                 return (
                   <section key={date.toISOString()}>
                     {/* Day header */}
-                    <div className="mb-2.5 flex items-center gap-2.5">
+                    <div className="mb-2 flex items-center gap-2.5">
                       <div className={cn(
-                        "flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg leading-none",
-                        isToday ? "bg-brand text-white" : "bg-slate-100 text-slate-700"
+                        "flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-[6px] leading-none",
+                        isToday ? "bg-brand text-white" : "bg-slate-100 text-slate-900"
                       )}>
-                        <span className="text-[9px] font-bold uppercase tracking-wider opacity-80">{format(date, 'EEE')}</span>
-                        <span className="text-base font-bold tabular-nums">{format(date, 'dd')}</span>
+                        <span className="text-[10px] font-normal opacity-90">{format(date, 'EEE')}</span>
+                        <span className="text-sm font-normal tabular-nums">{format(date, 'dd')}</span>
                       </div>
                       <div className="min-w-0">
-                        <div className="text-sm font-semibold text-slate-900">{format(date, 'EEEE')}</div>
-                        <div className="text-xs text-slate-400">{format(date, 'd MMMM')}{isToday && ' · Today'}</div>
+                        <div className="text-sm font-normal text-slate-900">{format(date, 'EEEE')}</div>
+                        <div className="text-xs font-normal text-slate-500">{format(date, 'd MMMM')}{isToday && ' · Today'}</div>
                       </div>
-                      <div className="ml-auto text-[11px] font-medium text-slate-400">
+                      <div className="ml-auto text-[11px] font-normal text-slate-500">
                         {dayClasses.length} {dayClasses.length === 1 ? 'class' : 'classes'}
                       </div>
                     </div>
@@ -478,7 +478,7 @@ export const StudentSchedule = () => {
                         const isLive = isClassLive(classInfo, date);
                         return (
                           <div key={classInfo.id} className={cn(
-                            "relative flex items-center gap-3 overflow-hidden rounded-lg border bg-white p-3 shadow-sm",
+                            "relative flex items-center gap-3 overflow-hidden rounded-[6px] border bg-white p-2.5",
                             isLive ? "border-brand/30 ring-1 ring-brand/10" : "border-slate-100"
                           )}>
                             {/* Accent left border */}
@@ -491,13 +491,13 @@ export const StudentSchedule = () => {
                                     <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
                                   </span>
                                 )}
-                                <h3 className="truncate text-sm font-semibold text-slate-900">{classInfo.subject}</h3>
+                                <h3 className="truncate text-sm font-medium text-slate-900">{classInfo.subject}</h3>
                               </div>
-                              <div className="mt-0.5 truncate text-xs text-slate-400">{classInfo.batch}</div>
+                              <div className="mt-0.5 truncate text-xs font-normal text-slate-500">{classInfo.batch}</div>
                             </div>
                             <div className="shrink-0 text-right tabular-nums">
-                              <div className="text-xs font-semibold text-slate-700">{formatTime(classInfo.start_time)}</div>
-                              <div className="text-[11px] text-slate-400">{formatTime(classInfo.end_time)}</div>
+                              <div className="text-xs font-normal text-slate-900">{formatTime(classInfo.start_time)}</div>
+                              <div className="text-[11px] font-normal text-slate-500">{formatTime(classInfo.end_time)}</div>
                             </div>
                           </div>
                         );
