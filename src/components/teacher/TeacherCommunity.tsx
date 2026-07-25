@@ -130,8 +130,8 @@ const lastName = (name?: string | null) => {
 };
 
 // Students show their real (last) name; teachers are shown generically as "Teacher"
-const senderLabel = (name?: string | null, isTeacher?: boolean) =>
-  isTeacher ? 'Teacher' : lastName(name);
+const senderLabel = (name?: string | null, isTeacher?: boolean, isAdmin?: boolean) =>
+  isAdmin ? 'SSP Support' : isTeacher ? 'Teacher' : lastName(name);
 
 const getAvatarColor = (name: string) => {
   const colors = ['bg-red-100 text-red-700', 'bg-green-100 text-green-700', 'bg-blue-100 text-blue-700', 'bg-purple-100 text-purple-700', 'bg-yellow-100 text-yellow-700', 'bg-pink-100 text-pink-700'];
@@ -147,6 +147,7 @@ const MessageItem = ({
   msg,
   isMe,
   isSenderTeacher,
+  isSenderAdmin,
   isSenderStudent,
   replyData,
   replyText,
@@ -158,6 +159,7 @@ const MessageItem = ({
   msg: CommunityMessage,
   isMe: boolean,
   isSenderTeacher: boolean,
+  isSenderAdmin: boolean,
   isSenderStudent: boolean,
   replyData: any,
   replyText: string | null,
@@ -267,8 +269,8 @@ const MessageItem = ({
       {!isMe && (
         <Avatar className="h-8 w-8 mb-1 shadow-sm border border-white ring-2 ring-gray-50">
             {isSenderStudent && <AvatarImage src={msg.profiles?.avatar_url || undefined} referrerPolicy="no-referrer" />}
-            <AvatarFallback className={`${getAvatarColor(msg.profiles?.name || '?')} text-[10px] font-bold`}>
-                {msg.profiles?.name?.substring(0, 2).toUpperCase()}
+            <AvatarFallback className={`${isSenderAdmin ? 'bg-rose-100 text-rose-700' : getAvatarColor(msg.profiles?.name || '?')} text-[10px] font-bold`}>
+                {isSenderAdmin ? 'SS' : msg.profiles?.name?.substring(0, 2).toUpperCase()}
             </AvatarFallback>
         </Avatar>
       )}
@@ -284,8 +286,8 @@ const MessageItem = ({
               </div>
             )}
 
-            {!isMe && !msg.is_priority && <div className="text-[11px] font-bold text-teal-600 mb-1">{senderLabel(msg.profiles?.name, isSenderTeacher)}</div>}
-            {!isMe && msg.is_priority && <div className="text-[11px] font-bold text-rose-700 mb-1">{senderLabel(msg.profiles?.name, isSenderTeacher)}</div>}
+            {!isMe && !msg.is_priority && <div className="text-[11px] font-bold text-teal-600 mb-1">{senderLabel(msg.profiles?.name, isSenderTeacher, isSenderAdmin)}</div>}
+            {!isMe && msg.is_priority && <div className="text-[11px] font-bold text-rose-700 mb-1">{senderLabel(msg.profiles?.name, isSenderTeacher, isSenderAdmin)}</div>}
 
             {replyData && replyText && (
               <div 
@@ -901,6 +903,7 @@ export const TeacherCommunity = () => {
                        msg={msg}
                        isMe={msg.user_id === profile?.user_id}
                        isSenderTeacher={senderRoles?.get(msg.user_id) === 'teacher'}
+                       isSenderAdmin={senderRoles?.get(msg.user_id) === 'admin'}
                        isSenderStudent={senderRoles?.get(msg.user_id) === 'student'}
                        replyData={msg.reply_to_id ? messageMap.get(msg.reply_to_id) : null}
                        replyText={msg.reply_to_id ? (messageMap.get(msg.reply_to_id)?.content || 'Message') : null}
