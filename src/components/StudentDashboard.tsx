@@ -3,6 +3,7 @@ import { StudentMain } from './student/StudentMain';
 import { StudentFeedback } from './student/StudentFeedback';
 import { StudentExams } from './student/StudentExams';
 import { StudentSchedule } from './student/StudentSchedule';
+import { FeedbackGate } from './student/FeedbackGate';
 
 interface StudentDashboardProps {
   activeTab: string;
@@ -40,6 +41,8 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
   return (
     <div className="min-h-full bg-white">
       {renderTabContent()}
+      {/* Mandatory feedback gate — blocks the portal when an admin enables it */}
+      <FeedbackGate />
     </div>
   );
 };

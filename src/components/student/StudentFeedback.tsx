@@ -6,15 +6,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
-import { Star, ArrowLeft } from 'lucide-react';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogFooter, 
-  DialogClose, 
-  DialogDescription 
+import { Star, ArrowLeft, X } from 'lucide-react';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
+import {
+  Dialog,
+  DialogPortal,
+  DialogOverlay,
 } from '@/components/ui/dialog';
 import {
   Drawer,
@@ -43,52 +40,85 @@ interface FeedbackTask {
 }
 
 // --- Star Rating Component ---
-const StarRating = ({ rating, setRating }: { rating: number, setRating: (rating: number) => void }) => (
-  <div className="flex gap-2">
-    {[1, 2, 3, 4, 5].map((star) => (
-      <Star
-        key={star}
-        className={`cursor-pointer transition-all duration-200 h-8 w-8 ${
-            rating >= star 
-                ? 'text-yellow-400 fill-yellow-400' 
-                : 'text-gray-200 hover:text-gray-300'
-        }`}
-        onClick={() => setRating(star)}
-      />
-    ))}
-  </div>
-);
+const RATING_LABELS = ['Tap to rate', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'];
+
+const StarRating = ({ rating, setRating }: { rating: number, setRating: (rating: number) => void }) => {
+  const [hover, setHover] = useState(0);
+  const active = hover || rating;
+  return (
+    <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex gap-1.5" onMouseLeave={() => setHover(0)}>
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            type="button"
+            key={star}
+            onClick={() => setRating(star)}
+            onMouseEnter={() => setHover(star)}
+            aria-label={`${star} out of 5`}
+            className="p-0.5 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+          >
+            <Star
+              className={`h-9 w-9 transition-all duration-150 ${
+                active >= star
+                  ? 'text-amber-400 fill-amber-400 scale-105'
+                  : 'text-gray-200 hover:text-amber-200'
+              }`}
+            />
+          </button>
+        ))}
+      </div>
+      <span className={`text-sm font-medium min-w-[92px] ${active ? 'text-gray-700' : 'text-gray-300'}`}>
+        {active ? `${active}/5 · ${RATING_LABELS[active]}` : RATING_LABELS[0]}
+      </span>
+    </div>
+  );
+};
+
+// --- Shared question set (used by the feedback page and the mandatory gate) ---
+export const FEEDBACK_QUESTIONS: { key: string; text: string; hint?: string }[] = [
+  { key: 'teacher_quality', text: 'Teaching quality', hint: 'Was the teacher clear, engaging and well-prepared?' },
+  { key: 'concept_clarity', text: 'Concept clarity', hint: 'How well did you understand the concepts taught?' },
+  { key: 'dpp_quality', text: 'Practice problems (DPP)', hint: 'Were the DPPs and practice questions useful?' },
+  { key: 'premium_content_usefulness', text: 'Premium content', hint: 'How helpful was the extra / premium material?' },
+];
 
 // --- Shared Form Content ---
-const FeedbackFormContent = ({ 
-  questions, 
-  ratings, 
-  setRatings, 
-  comments, 
-  setComments 
-}: { 
-  questions: { key: string; text: string }[],
+export const FeedbackFormContent = ({
+  questions,
+  ratings,
+  setRatings,
+  comments,
+  setComments
+}: {
+  questions: { key: string; text: string; hint?: string }[],
   ratings: any,
   setRatings: React.Dispatch<React.SetStateAction<any>>,
   comments: string,
   setComments: (value: string) => void
 }) => (
-  <div className="py-4 space-y-6">
-      {questions.map(({ key, text }) => (
-          <div key={key} className="space-y-3">
-              <label className="text-sm font-medium text-[#000000]">{text}</label>
-              <StarRating
-                  rating={ratings[key as keyof typeof ratings]}
-                  setRating={(rating) => setRatings(prev => ({ ...prev, [key]: rating }))}
-              />
-          </div>
-      ))}
+  <div className="w-full max-w-[880px] mx-auto">
+      {/* Ratings in a 2-column grid so the wide modal is used and there's little
+          to scroll. Collapses to one column on narrow screens (mobile drawer). */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-6">
+        {questions.map(({ key, text, hint }) => (
+            <div key={key} className="space-y-2.5">
+                <label className="block text-[14.5px] font-medium text-gray-800 leading-snug">{hint || text}</label>
+                <StarRating
+                    rating={ratings[key as keyof typeof ratings]}
+                    setRating={(rating) => setRatings(prev => ({ ...prev, [key]: rating }))}
+                />
+            </div>
+        ))}
+      </div>
 
-      <div className="space-y-3">
-          <label className="text-sm font-medium text-[#000000]">Additional Comments</label>
+      <div className="mt-7 pt-6 border-t border-gray-100 space-y-3">
+          <div>
+            <label className="block text-[15px] font-semibold text-gray-900">Anything else you'd like to share?</label>
+            <p className="text-[13px] text-gray-500 mt-0.5">What went well, and what could be better? Specifics help your teachers most.</p>
+          </div>
           <Textarea
-              className="resize-none min-h-[100px] border-[#ededed] focus:border-black focus:ring-0"
-              placeholder="Tell us more about your experience..."
+              className="resize-none min-h-[96px] rounded-xl border-gray-200 focus:border-gray-900 focus:ring-0 text-[14px]"
+              placeholder="Your honest, detailed feedback helps your teachers improve…"
               value={comments}
               onChange={(e) => setComments(e.target.value)}
           />
@@ -213,12 +243,7 @@ export const StudentFeedback = () => {
     submitFeedbackMutation.mutate(feedbackToSubmit);
   };
 
-  const questions = [
-    { key: 'teacher_quality', text: 'Teacher Quality' },
-    { key: 'concept_clarity', text: 'Concept Clarity' },
-    { key: 'dpp_quality', text: 'DPP Quality' },
-    { key: 'premium_content_usefulness', text: 'Premium Content' },
-  ];
+  const questions = FEEDBACK_QUESTIONS;
 
   const isLoading = isLoadingEnrollments || isLoadingFeedback;
 
@@ -336,18 +361,28 @@ export const StudentFeedback = () => {
         </Drawer>
       ) : (
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogContent className="max-w-xl bg-white rounded-xl border-[#ededed]">
-              <DialogHeader className="border-b border-[#ededed] pb-4">
-                  <DialogTitle className="text-xl font-semibold">
-                      Feedback for {selectedTask?.subject}
-                  </DialogTitle>
-                  <DialogDescription className="text-[#666666]">
-                    {selectedTask?.batch}
-                  </DialogDescription>
-              </DialogHeader>
+          <DialogPortal>
+            {/* Full-screen blurred backdrop, equal on all sides */}
+            <DialogOverlay className="bg-black/40 backdrop-blur-md" />
+            {/* Centered card taking ~75% of the viewport */}
+            <DialogPrimitive.Content
+              className="fixed left-1/2 top-1/2 z-50 flex flex-col -translate-x-1/2 -translate-y-1/2
+                         w-[75vw] max-w-[900px] max-h-[88vh] bg-white rounded-2xl shadow-2xl overflow-hidden
+                         data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 duration-200"
+            >
+              {/* Header */}
+              <div className="px-8 pt-7 pb-5 border-b border-gray-100 shrink-0">
+                <DialogPrimitive.Title className="text-[22px] font-semibold tracking-tight text-gray-900">
+                  Feedback for {selectedTask?.subject}
+                </DialogPrimitive.Title>
+                <DialogPrimitive.Description className="text-[14px] text-gray-500 mt-1">
+                  {selectedTask?.batch} · takes under a minute
+                </DialogPrimitive.Description>
+              </div>
 
-              <div className="max-h-[60vh] overflow-y-auto px-1">
-                <FeedbackFormContent 
+              {/* Scrollable body */}
+              <div className="flex-1 overflow-y-auto px-8 py-6">
+                <FeedbackFormContent
                   questions={questions}
                   ratings={ratings}
                   setRatings={setRatings}
@@ -356,21 +391,30 @@ export const StudentFeedback = () => {
                 />
               </div>
 
-              <DialogFooter className="border-t border-[#ededed] pt-4 gap-3">
-                  <DialogClose asChild>
-                      <Button variant="outline" onClick={resetForm} className="border-[#ededed] text-[#666666]">
-                          Cancel
-                      </Button>
-                  </DialogClose>
-                  <Button 
-                      onClick={handleSubmit} 
-                      className="bg-black hover:bg-black/90 text-white"
-                      disabled={submitFeedbackMutation.isPending}
-                  >
-                      {submitFeedbackMutation.isPending ? 'Submitting...' : 'Submit Feedback'}
-                  </Button>
-              </DialogFooter>
-            </DialogContent>
+              {/* Footer */}
+              <div className="px-8 py-5 border-t border-gray-100 shrink-0 flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => { resetForm(); setIsDialogOpen(false); }}
+                  className="border-gray-200 text-gray-600"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSubmit}
+                  className="bg-black hover:bg-black/90 text-white px-6"
+                  disabled={submitFeedbackMutation.isPending}
+                >
+                  {submitFeedbackMutation.isPending ? 'Submitting…' : 'Submit Feedback'}
+                </Button>
+              </div>
+
+              <DialogPrimitive.Close className="absolute right-5 top-5 rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300">
+                <X className="h-5 w-5" />
+                <span className="sr-only">Close</span>
+              </DialogPrimitive.Close>
+            </DialogPrimitive.Content>
+          </DialogPortal>
         </Dialog>
       )}
     </div>

@@ -2,6 +2,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { ScheduleManagement } from './ScheduleManagement';
 import { MonitoringDashboard } from './MonitoringDashboard';
 import { AdminFeedbackViewer } from './AdminFeedbackViewer';
+import { AdminFeedbackGate } from './AdminFeedbackGate';
 import { WhiteboardHub } from '@/components/whiteboard/WhiteboardHub';
 import { EnrollmentAnalytics } from './EnrollmentAnalytics';
 import { TeacherAnalytics } from './TeacherAnalytics';
@@ -48,6 +49,8 @@ export const AdminDashboard = ({ activeTab, onTabChange }: AdminDashboardProps) 
         return <ScheduleManagement />;
       case 'feedback-viewer':
         return <AdminFeedbackViewer />;
+      case 'feedback-gate':
+        return <AdminFeedbackGate />;
       case 'admin-whiteboard':
         return <WhiteboardHub />;
       case 'create-announcement':

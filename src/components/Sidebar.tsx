@@ -162,6 +162,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
     { id: 'schedules', label: 'Schedules', icon: Calendar03Icon },
     { id: 'schedule-requests', label: 'Schedule Requests', icon: TaskDaily01Icon },
     { id: 'feedback-viewer', label: 'Feedback Viewer', icon: Message01Icon },
+    { id: 'feedback-gate', label: 'Feedback Gate', icon: Quiz01Icon },
     { id: 'admin-whiteboard', label: 'Whiteboard', icon: BoardMathIcon },
     { id: 'create-announcement', label: 'Create Announcement', icon: Megaphone01Icon },
     { id: 'announcement-history', label: 'Announcement History', icon: WorkHistoryIcon },

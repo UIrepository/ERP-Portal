@@ -187,6 +187,8 @@ const StudentMainContent = () => {
   // Navigation handlers
   const handleSelectBatch = (batch: string) => {
     localStorage.setItem('student-selected-batch', batch);
+    // Let the mandatory feedback gate re-evaluate for the newly-selected batch.
+    window.dispatchEvent(new Event('student-batch-changed'));
     const newNav: NavigationState = { level: 'batch', batch, subject: null, block: null };
     setNavigation(newNav);
     updateUrl(newNav);
