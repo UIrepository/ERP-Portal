@@ -89,6 +89,10 @@ export const FreeTimeArt = () => (
         <stop offset="0" stopColor="#ffffff" />
         <stop offset="1" stopColor="#dfe4f6" />
       </radialGradient>
+      <radialGradient id="stCookie" cx="40%" cy="34%" r="78%">
+        <stop offset="0" stopColor="#f7d192" />
+        <stop offset="1" stopColor="#d99f52" />
+      </radialGradient>
     </defs>
 
     {/* ground shadow */}
@@ -120,12 +124,19 @@ export const FreeTimeArt = () => (
     <ellipse cx="90" cy="68" rx="21" ry="5" fill="url(#stCoffee)" />
     <path d="M77 66 q13 -3 26 0" stroke="#f2c68f" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.7" />
 
-    {/* a little cookie resting on the saucer */}
-    <ellipse cx="46" cy="130" rx="10" ry="3" fill="#c7d2fe" opacity="0.5" />
-    <circle cx="46" cy="124" r="9" fill="#f0bd76" stroke="#c77f2c" strokeWidth="2" />
-    <circle cx="43" cy="122" r="1.3" fill="#6b2d0e" />
-    <circle cx="49" cy="125" r="1.3" fill="#6b2d0e" />
-    <circle cx="48" cy="120" r="1.3" fill="#6b2d0e" />
+    {/* a biscuit leaning on the cup, resting on the saucer */}
+    <ellipse cx="58" cy="127" rx="14" ry="3.5" fill="#4f46e5" opacity="0.12" />
+    <g transform="rotate(-14 58 116)">
+      <circle cx="58" cy="116" r="11.5" fill="url(#stCookie)" stroke="#b9772a" strokeWidth="2" />
+      <circle cx="58" cy="116" r="8.5" fill="none" stroke="#c98a3f" strokeWidth="1" opacity="0.5" />
+      {/* chocolate chips with tiny highlights */}
+      <g fill="#5b2408">
+        <circle cx="53" cy="112" r="1.7" /><circle cx="52.4" cy="111.4" r="0.5" fill="#93521f" />
+        <circle cx="62" cy="113" r="1.7" /><circle cx="61.4" cy="112.4" r="0.5" fill="#93521f" />
+        <circle cx="55" cy="120" r="1.7" /><circle cx="54.4" cy="119.4" r="0.5" fill="#93521f" />
+        <circle cx="61" cy="120" r="1.5" /><circle cx="60.5" cy="119.5" r="0.45" fill="#93521f" />
+      </g>
+    </g>
   </svg>
 );
 
