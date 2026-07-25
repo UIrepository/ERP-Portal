@@ -118,23 +118,39 @@ export const AdminFeedbackViewer = () => {
   // --- Data Processing ---
   const { allBatches, allSubjects, filteredFeedback } = useMemo(() => {
     const uniqueBatches = new Set<string>();
-    const uniqueSubjects = new Set<string>();
     feedback.forEach(f => {
       if (f.batch) uniqueBatches.add(f.batch);
-      if (f.subject) uniqueSubjects.add(f.subject);
+    });
+
+    // Subjects are scoped to the selected batch: for a chosen batch we only
+    // list subjects that actually have feedback responses for THAT batch —
+    // not every subject ever collected across all batches.
+    const uniqueSubjects = new Set<string>();
+    feedback.forEach(f => {
+      if (f.subject && (selectedBatch === 'all' || f.batch === selectedBatch)) {
+        uniqueSubjects.add(f.subject);
+      }
     });
 
     const filtered = feedback.filter(f =>
       (selectedBatch === 'all' || f.batch === selectedBatch) &&
       (selectedSubject === 'all' || f.subject === selectedSubject)
     );
-    
+
     return {
       allBatches: Array.from(uniqueBatches).sort(),
       allSubjects: Array.from(uniqueSubjects).sort(),
       filteredFeedback: filtered,
     };
   }, [feedback, selectedBatch, selectedSubject]);
+
+  // If the chosen subject has no responses in the newly-selected batch, drop
+  // back to "All Subjects" so the filter never lands on an empty result.
+  useEffect(() => {
+    if (selectedSubject !== 'all' && !allSubjects.includes(selectedSubject)) {
+      setSelectedSubject('all');
+    }
+  }, [selectedSubject, allSubjects]);
 
 
   // --- Rendering ---

@@ -5,6 +5,7 @@ import { uploadImageToCloudinary } from '@/lib/cloudinary';
 import { clearCommunityNotifications } from '@/lib/push';
 import { useAuth } from '@/hooks/useAuth';
 import { useMergedSubjects } from '@/hooks/useMergedSubjects';
+import { formatChatTime } from '@/hooks/useCommunitySummaries';
 import { useSearchParams, useNavigate } from 'react-router-dom'; // 🟢 Added useSearchParams
 
 import { Button } from '@/components/ui/button';
@@ -764,14 +765,18 @@ export const StudentCommunity = ({ batch: batchProp }: { batch?: string } = {}) 
              enrollments.length === 0 ? <div className="p-6 text-center text-gray-500">No communities found.</div> :
              sortedEnrollments.map((group) => {
               const isActive = selectedGroup?.batch_name === group.batch_name && selectedGroup?.subject_name === group.subject_name;
-              const unread = overview[`${group.batch_name}|${group.subject_name}`]?.unread || 0;
+              const ov = overview[`${group.batch_name}|${group.subject_name}`];
+              const unread = ov?.unread || 0;
               const muted = isMuted(group);
               return (
               <div key={`${group.batch_name}-${group.subject_name}`} onClick={() => { setSelectedGroup(group); markGroupSeen(group); }}
                 className={`p-3 rounded-lg cursor-pointer transition-colors flex items-center gap-2 ${isActive ? 'bg-indigo-50 border-indigo-200 border' : 'hover:bg-gray-100 border border-transparent'}`}>
                 <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold shrink-0">{group.subject_name[0]}</div>
                 <div className="overflow-hidden text-left flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 truncate flex items-center gap-1.5">{group.subject_name}{muted && <BellOff className="h-3 w-3 text-gray-400 shrink-0" />}</p>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="font-semibold text-gray-900 truncate flex items-center gap-1.5 min-w-0">{group.subject_name}{muted && <BellOff className="h-3 w-3 text-gray-400 shrink-0" />}</p>
+                    {ov?.lastAt && <span className={`text-[10.5px] shrink-0 ${unread ? 'text-brand font-medium' : 'text-gray-400'}`}>{formatChatTime(ov.lastAt)}</span>}
+                  </div>
                   <p className="text-xs text-gray-500 truncate">{group.batch_name}</p>
                 </div>
                 {unread > 0 && !isActive && (

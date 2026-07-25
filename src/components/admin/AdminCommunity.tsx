@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { uploadImageToCloudinary } from '@/lib/cloudinary';
 import { useAuth } from '@/hooks/useAuth';
 import { useMergedSubjects } from '@/hooks/useMergedSubjects';
+import { useCommunitySummaries, formatChatTime } from '@/hooks/useCommunitySummaries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -22,7 +23,8 @@ import {
   AlertCircle,
   Megaphone,
   Lock,
-  Mail
+  Mail,
+  Search
 } from 'lucide-react';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -352,20 +354,33 @@ export const AdminCommunity = () => {
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(new Date());
   
   // Admin: Fetch ALL Groups (RLS allows Super Admin to see all)
-  const { data: allGroups = [], isLoading: isLoadingGroups } = useQuery<GroupInfo[]>({
+  const { data: rawGroups = [], isLoading: isLoadingGroups } = useQuery<GroupInfo[]>({
     queryKey: ['admin-all-groups'],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_distinct_enrollment_options');
       if (error) throw error;
-      return (data || []).sort((a: any, b: any) => a.batch_name.localeCompare(b.batch_name)) as GroupInfo[];
+      return (data || []) as GroupInfo[];
     }
   });
+
+  // Per-chat overview (latest message + time + unread), sorted recent-first.
+  const { getSummary, markSeen, orderGroups } = useCommunitySummaries();
+  const [chatSearch, setChatSearch] = useState('');
+
+  const allGroups = useMemo(() => {
+    const filtered = chatSearch.trim()
+      ? rawGroups.filter((g) =>
+          `${g.subject_name} ${g.batch_name}`.toLowerCase().includes(chatSearch.trim().toLowerCase()))
+      : rawGroups;
+    return orderGroups(filtered, (g) => ({ batch: g.batch_name, subject: g.subject_name }));
+  }, [rawGroups, chatSearch, orderGroups]);
 
   // No auto-selection: the chat opens only when a community is picked.
 
   useEffect(() => {
     setMessageText(''); setSelectedImage(null); setReplyingTo(null); setIsPriority(false);
-  }, [selectedGroup]);
+    if (selectedGroup) markSeen(selectedGroup.batch_name, selectedGroup.subject_name);
+  }, [selectedGroup, markSeen]);
 
 
   // Merged batch/subject pairs: read across all of them, write to the canonical primary
@@ -552,20 +567,53 @@ export const AdminCommunity = () => {
 
   return (
     <div className="flex h-[calc(100dvh-64px)] w-full bg-[#fdfbf7] relative overflow-hidden">
-      <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-80'}`}>
-        <div className="p-4 border-b bg-gray-50 flex items-center justify-between">
-          <h2 className="font-bold text-lg flex items-center gap-2 text-gray-800"><Megaphone className="h-5 w-5 text-red-600" /> Admin Chat</h2>
+      <div className={`bg-white border-r flex flex-col h-full z-20 transition-all duration-300 ease-in-out ${isMobile ? (selectedGroup ? 'hidden' : 'w-full') : 'w-[340px]'}`}>
+        <div className="px-3 py-2.5 border-b flex items-center justify-between">
+          <h2 className="font-semibold text-[15px] flex items-center gap-2 text-gray-900"><Megaphone className="h-4 w-4 text-red-600" /> Admin Chats</h2>
+          <span className="text-[11px] text-gray-400">{rawGroups.length}</span>
+        </div>
+        <div className="px-2.5 py-2 border-b">
+          <div className="relative">
+            <Search className="h-3.5 w-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <Input
+              value={chatSearch}
+              onChange={(e) => setChatSearch(e.target.value)}
+              placeholder="Search chats"
+              className="h-8 pl-8 text-[13px] bg-gray-50 border-gray-200 rounded-md focus-visible:ring-1"
+            />
+          </div>
         </div>
         <ScrollArea className="flex-1">
-          <div className="p-2 space-y-1">
-            {isLoadingGroups ? <div className="p-6 text-center text-gray-500"><Loader2 className="animate-spin mx-auto" /></div> : 
-             allGroups.map((group) => (
+          <div className="py-1">
+            {isLoadingGroups ? <div className="p-6 text-center text-gray-500"><Loader2 className="animate-spin mx-auto" /></div> :
+             allGroups.length === 0 ? <div className="px-4 py-8 text-center text-[13px] text-gray-400">No chats found</div> :
+             allGroups.map((group) => {
+              const s = getSummary(group.batch_name, group.subject_name);
+              const active = selectedGroup?.batch_name === group.batch_name && selectedGroup?.subject_name === group.subject_name;
+              const unread = s?.unread || 0;
+              return (
               <div key={`${group.batch_name}-${group.subject_name}`} onClick={() => setSelectedGroup(group)}
-                className={`p-3 rounded-lg cursor-pointer transition-colors flex items-center gap-3 ${selectedGroup?.batch_name === group.batch_name && selectedGroup?.subject_name === group.subject_name ? 'bg-teal-50 border-teal-200 border' : 'hover:bg-gray-100 border border-transparent'}`}>
-                <div className="h-10 w-10 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold shrink-0">{group.subject_name[0]}</div>
-                <div className="overflow-hidden text-left"><p className="font-semibold text-gray-900 truncate">{group.subject_name}</p><p className="text-xs text-gray-500 truncate">{group.batch_name}</p></div>
+                className={`px-2.5 py-2 cursor-pointer flex items-center gap-2.5 border-l-2 ${active ? 'bg-teal-50/70 border-teal-500' : 'border-transparent hover:bg-gray-50'}`}>
+                <div className={`h-10 w-10 rounded-full flex items-center justify-center font-semibold shrink-0 text-[15px] ${unread ? 'bg-teal-600 text-white' : 'bg-teal-100 text-teal-700'}`}>{group.subject_name[0]}</div>
+                <div className="min-w-0 flex-1 text-left">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="truncate min-w-0">
+                      <span className={`text-[14px] ${unread ? 'font-semibold text-gray-900' : 'font-medium text-gray-800'}`}>{group.subject_name}</span>
+                      <span className="text-[11px] text-gray-400 ml-1.5">{group.batch_name}</span>
+                    </p>
+                    {s?.last_at && <span className={`text-[10.5px] shrink-0 ${unread ? 'text-teal-600 font-medium' : 'text-gray-400'}`}>{formatChatTime(s.last_at)}</span>}
+                  </div>
+                  <div className="flex items-center justify-between gap-2 mt-0.5">
+                    <p className={`truncate text-[12px] ${unread ? 'text-gray-700' : 'text-gray-400'}`}>
+                      {s?.last_content || <span className="italic text-gray-300">No messages yet</span>}
+                    </p>
+                    {unread > 0 && (
+                      <span className="shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-teal-600 text-white text-[10.5px] font-semibold flex items-center justify-center">{unread > 99 ? '99+' : unread}</span>
+                    )}
+                  </div>
+                </div>
               </div>
-            ))}
+            );})}
           </div>
         </ScrollArea>
       </div>
@@ -579,24 +627,24 @@ export const AdminCommunity = () => {
 
       {selectedGroup && (
         <div className={`flex-1 flex flex-col h-full relative ${isMobile ? 'w-full fixed inset-0 z-50 bg-[#fdfbf7]' : 'w-full'}`}>
-          <div className="px-4 py-3 bg-white border-b flex items-center justify-between shadow-sm z-20 relative">
-            <div className="flex items-center gap-3">
-              {isMobile && <Button variant="ghost" size="icon" onClick={() => { setSelectedGroup(null); }}><ArrowLeft className="h-5 w-5" /></Button>}
+          <div className="px-3 py-2 bg-white border-b flex items-center justify-between z-20 relative">
+            <div className="flex items-center gap-2.5">
+              {isMobile && <Button variant="ghost" size="icon" className="h-8 w-8 -ml-1" onClick={() => { setSelectedGroup(null); }}><ArrowLeft className="h-5 w-5" /></Button>}
               <Avatar className="h-9 w-9 border border-gray-200">
-                <AvatarFallback className="bg-teal-600 text-white font-bold rounded-full">{selectedGroup.subject_name[0]}</AvatarFallback>
+                <AvatarFallback className="bg-teal-600 text-white font-semibold rounded-full">{selectedGroup.subject_name[0]}</AvatarFallback>
               </Avatar>
-              <div>
-                <h3 className="font-bold text-gray-800 leading-none flex items-center gap-2 text-base">
+              <div className="min-w-0">
+                <h3 className="font-semibold text-gray-900 leading-tight truncate text-[15px]">
                   {selectedGroup.subject_name}
                 </h3>
-                <p className="text-xs text-gray-500 font-medium mt-0.5">{selectedGroup.batch_name} (Admin View)</p>
+                <p className="text-[11px] text-gray-500 truncate">{selectedGroup.batch_name} · Admin view</p>
               </div>
             </div>
           </div>
 
           <div className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: `url('/logoofficial.png')`, backgroundSize: '60px', backgroundRepeat: 'repeat', backgroundPosition: 'center' }} />
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 z-10 pb-24 md:pb-4" ref={scrollAreaRef}>
+          <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 z-10 pb-24 md:pb-4" ref={scrollAreaRef}>
             <div className="flex justify-center mb-6 mt-2">
                 <div className="text-gray-400 text-[10px] font-medium flex items-center gap-1.5 select-none bg-gray-200/50 px-3 py-1 rounded-full border border-gray-200 backdrop-blur-sm">
                     <Lock className="h-3 w-3" />
