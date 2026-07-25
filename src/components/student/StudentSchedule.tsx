@@ -16,6 +16,7 @@ import { format, getDay, startOfWeek, addDays, isSameDay, subDays } from 'date-f
 import { istTodayStr, istMinutesNow, timeToMinutes } from '@/lib/timezone';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { fetchCachedSchedules } from '@/lib/cachedReads';
 import { Button } from '@/components/ui/button';
 
 interface Schedule {
@@ -219,21 +220,41 @@ export const StudentSchedule = () => {
     queryFn: async (): Promise<Schedule[]> => {
       if (studentBatches.length === 0) return [];
 
-      let query = supabase.from('schedules').select('*');
+      const batches =
+        selectedBatchFilter !== 'all' && selectedBatchFilter !== ''
+          ? [selectedBatchFilter]
+          : studentBatches;
 
-      if (selectedBatchFilter !== 'all' && selectedBatchFilter !== '') {
-        query = query.eq('batch', selectedBatchFilter);
-      } else {
-        query = query.in('batch', studentBatches);
+      const sortSchedules = (rows: Schedule[]): Schedule[] =>
+        [...rows].sort((a, b) => {
+          // date nulls last, then day_of_week, then start_time — matches the
+          // previous PostgREST ordering.
+          const ad = a.date || '￿';
+          const bd = b.date || '￿';
+          if (ad !== bd) return ad < bd ? -1 : 1;
+          if (a.day_of_week !== b.day_of_week) return a.day_of_week - b.day_of_week;
+          return (a.start_time || '').localeCompare(b.start_time || '');
+        });
+
+      // Prefer the Vercel edge-cached timetable (offloads Supabase egress). Falls
+      // back to a direct Supabase read in dev or if the endpoint is unavailable.
+      try {
+        const cached = await fetchCachedSchedules(batches);
+        return sortSchedules(cached as Schedule[]);
+      } catch {
+        let query = supabase.from('schedules').select('*');
+        if (selectedBatchFilter !== 'all' && selectedBatchFilter !== '') {
+          query = query.eq('batch', selectedBatchFilter);
+        } else {
+          query = query.in('batch', studentBatches);
+        }
+        const { data, error } = await query
+          .order('date', { nullsFirst: false })
+          .order('day_of_week')
+          .order('start_time');
+        if (error) throw error;
+        return data || [];
       }
-
-      const { data, error } = await query
-        .order('date', { nullsFirst: false })
-        .order('day_of_week')
-        .order('start_time');
-
-      if (error) throw error;
-      return data || [];
     },
     // Don't fire the query until the default selection logic has set a valid state
     enabled: studentBatches.length > 0 && selectedBatchFilter !== '', 
