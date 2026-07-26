@@ -114,8 +114,8 @@ export const FeedbackFormContent = ({
 
       <div className="mt-7 pt-6 border-t border-gray-100 space-y-3">
           <div>
-            <label className="block text-[15px] font-semibold text-gray-900">Anything else you'd like to share?</label>
-            <p className="text-[13px] text-gray-500 mt-0.5">What went well, and what could be better? Specifics help your teachers most.</p>
+            <label className="block text-[15px] font-semibold text-gray-900">Share your feedback in a few words <span className="text-rose-500">*</span></label>
+            <p className="text-[13px] text-gray-500 mt-0.5">Required — at least 3 words. What went well, and what could be better?</p>
           </div>
           <Textarea
               className="resize-none min-h-[96px] rounded-xl border-gray-200 focus:border-gray-900 focus:ring-0 text-[14px]"
@@ -238,14 +238,20 @@ export const StudentFeedback = () => {
     setIsDialogOpen(true);
   };
 
-  // Clear the inline error once all four are rated.
+  // Clear the inline error once ratings AND the min-3-word comment are satisfied.
   useEffect(() => {
-    if (formError && Object.values(ratings).every(r => r > 0)) setFormError(null);
-  }, [ratings, formError]);
+    if (!formError) return;
+    const words = comments.trim().split(/\s+/).filter(Boolean).length;
+    if (Object.values(ratings).every(r => r > 0) && words >= 3) setFormError(null);
+  }, [ratings, comments, formError]);
 
   const handleSubmit = () => {
     if (Object.values(ratings).some(r => r === 0)) {
       setFormError('Please rate all four categories before submitting.');
+      return;
+    }
+    if (comments.trim().split(/\s+/).filter(Boolean).length < 3) {
+      setFormError('Please write at least 3 words in your feedback.');
       return;
     }
     setFormError(null);

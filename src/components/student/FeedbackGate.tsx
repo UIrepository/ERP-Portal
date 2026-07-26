@@ -86,10 +86,12 @@ export const FeedbackGate = () => {
     setFormError(null);
   }, [currentKey]);
 
-  // Clear the inline error as soon as all four are rated.
+  // Clear the inline error once ratings AND the min-3-word comment are satisfied.
   useEffect(() => {
-    if (formError && Object.values(ratings).every((r) => r > 0)) setFormError(null);
-  }, [ratings, formError]);
+    if (!formError) return;
+    const words = comments.trim().split(/\s+/).filter(Boolean).length;
+    if (Object.values(ratings).every((r) => r > 0) && words >= 3) setFormError(null);
+  }, [ratings, comments, formError]);
 
   useEffect(() => () => { if (timerRef.current) window.clearTimeout(timerRef.current); }, []);
 
@@ -128,6 +130,10 @@ export const FeedbackGate = () => {
   const handleSubmit = () => {
     if (Object.values(ratings).some((r) => r === 0)) {
       setFormError('Please rate all four categories before continuing.');
+      return;
+    }
+    if (comments.trim().split(/\s+/).filter(Boolean).length < 3) {
+      setFormError('Please write at least 3 words in your feedback.');
       return;
     }
     setFormError(null);
