@@ -178,10 +178,8 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
           queryClient.invalidateQueries({ queryKey: ['ongoingClassRPC'] });
           queryClient.invalidateQueries({ queryKey: ['allStudentSchedulesRPC'] });
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'meeting_links' }, () => {
-          queryClient.invalidateQueries({ queryKey: ['ongoingClassRPC'] });
-          queryClient.invalidateQueries({ queryKey: ['allStudentSchedulesRPC'] });
-      })
+      // meeting_links realtime removed — class links now come from `schedules`
+      // (Jitsi), so this subscription streamed changes for a table we don't read.
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [queryClient, profile?.user_id]);
