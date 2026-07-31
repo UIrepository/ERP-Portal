@@ -92,7 +92,7 @@ export const ManagerJoinClass = () => {
       return data || [];
     },
     enabled: ATTENDANCE_ENABLED && !!selectedClassForAttendance,
-    refetchInterval: 30000
+    refetchInterval: 60000 // was 30s (egress)
   });
 
   // Real-time attendance updates

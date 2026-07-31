@@ -164,7 +164,7 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
     // fresh: always refetch on mount (ignore the wider global cache window) and
     // poll fast so "live now" + the merged room appear promptly.
     staleTime: 0,
-    refetchInterval: 20000
+    refetchInterval: 60000 // was 20s — live-class detection; 60s is plenty (egress)
   });
 
   // Logic to separate "Live Now" from "Upcoming" — all compared in IST

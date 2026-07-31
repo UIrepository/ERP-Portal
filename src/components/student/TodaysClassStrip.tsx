@@ -86,7 +86,7 @@ export const TodaysClassStrip = ({ batch, enrolledSubjects = [], onJoinLive }: T
     // Live status must stay fresh (no realtime backup), so poll and never serve
     // stale on mount. Small, batch+subject-scoped selects keep egress modest.
     staleTime: 0,
-    refetchInterval: 30000,
+    refetchInterval: 90000, // was 30s (egress)
     queryFn: async () => {
       const [schedRes, activeRes, recRes] = await Promise.all([
         supabase.from('schedules').select('subject, start_time, end_time, date, day_of_week')

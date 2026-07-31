@@ -188,7 +188,7 @@ export const TeacherJoinClass = () => {
       return data || [];
     },
     enabled: ATTENDANCE_ENABLED && !!selectedClassForAttendance,
-    refetchInterval: 30000
+    refetchInterval: 60000 // was 30s (egress)
   });
 
   useEffect(() => {

@@ -36,7 +36,7 @@ export const StudentDirectMessage = ({ receiverId, receiverName }: Props) => {
       return (data || []).reverse();
     },
     // Poll for new messages (raised from 3s to cut egress)
-    refetchInterval: 45000
+    refetchInterval: 120000 // was 45s — realtime DM listener already covers new messages (egress)
   });
 
   // Send Mutation
