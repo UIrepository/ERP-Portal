@@ -67,3 +67,22 @@ export interface CachedFlags {
 export function fetchCachedFlags(): Promise<CachedFlags> {
   return getJson<CachedFlags>('/api/shared?resource=flags');
 }
+
+export interface CachedRecording {
+  id: string;
+  date: string;
+  subject: string;
+  topic: string;
+  created_at: string;
+}
+
+/**
+ * Fetch (CDN-cached) recordings LIST metadata for a batch+subject. Contains NO
+ * video links — playback opens /lecture/:id which fetches the URL by id.
+ */
+export async function fetchCachedRecordings(batch: string, subject: string): Promise<CachedRecording[]> {
+  if (!batch || !subject) return [];
+  return getJson<CachedRecording[]>(
+    `/api/recordings?batch=${encodeURIComponent(batch)}&subject=${encodeURIComponent(subject)}`,
+  );
+}

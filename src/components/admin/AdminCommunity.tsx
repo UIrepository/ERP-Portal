@@ -394,7 +394,7 @@ export const AdminCommunity = () => {
       if (!selectedGroup || !orFilter) return [];
       const { data, error } = await supabase
         .from('community_messages')
-        .select(`*, profiles:profile_basics (name, email, avatar_url), message_likes ( user_id, reaction_type )`)
+        .select(`*, profiles:profile_basics (name, avatar_url), message_likes ( user_id, reaction_type )`)
         .or(orFilter)
         // Latest 80 only (newest first) then flip to chronological (egress).
         .order('created_at', { ascending: false })

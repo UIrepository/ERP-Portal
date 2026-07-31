@@ -535,7 +535,7 @@ export const StudentCommunity = ({ batch: batchProp }: { batch?: string } = {}) 
         .from('community_messages')
         .select(`
           *,
-          profiles:profile_basics (name, email, avatar_url),
+          profiles:profile_basics (name, avatar_url),
           message_likes ( user_id, reaction_type )
         `)
         .or(orFilter)
@@ -610,7 +610,7 @@ export const StudentCommunity = ({ batch: batchProp }: { batch?: string } = {}) 
       if (payload.eventType === 'INSERT' && row.id) {
         const { data } = await supabase
           .from('community_messages')
-          .select(`*, profiles:profile_basics (name, email, avatar_url), message_likes ( user_id, reaction_type )`)
+          .select(`*, profiles:profile_basics (name, avatar_url), message_likes ( user_id, reaction_type )`)
           .eq('id', row.id)
           .maybeSingle();
         if (!data) return;

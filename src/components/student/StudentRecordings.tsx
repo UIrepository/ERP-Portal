@@ -14,6 +14,7 @@ import { Lecture, Doubt as PlayerDoubt } from '@/components/video-player/types';
 import { StudentBackButton } from './StudentBackButton';
 import { useNavigate } from 'react-router-dom';
 import { openInternalRoute } from '@/hooks/useInstallApp';
+import { fetchCachedRecordings } from '@/lib/cachedReads';
 
 // Interfaces
 interface RecordingContent {
@@ -80,17 +81,28 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
         queryKey: ['student-recordings', batch, subject],
         queryFn: async (): Promise<RecordingContent[]> => {
             if (!batch || !subject) return [];
-            
-            const { data, error } = await supabase
-                .from('recordings')
-                .select('id, date, subject, topic, embed_link, batch, created_at')
-                .eq('batch', batch)
-                .eq('subject', subject)
-                .order('date', { ascending: false })
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-            return (data || []) as RecordingContent[];
+            // embed_link is NOT fetched for the list (playback opens /lecture/:id,
+            // which fetches the video URL by id). batch comes from props.
+            const fill = (r: any): RecordingContent => ({
+                id: r.id, date: r.date, subject: r.subject, topic: r.topic,
+                created_at: r.created_at, batch, embed_link: '',
+            });
+            // Prefer the Vercel edge-cached list (offloads Supabase egress); fall
+            // back to a direct Supabase read in dev / if the endpoint is down.
+            try {
+                const cached = await fetchCachedRecordings(batch, subject);
+                return cached.map(fill);
+            } catch {
+                const { data, error } = await supabase
+                    .from('recordings')
+                    .select('id, date, subject, topic, created_at')
+                    .eq('batch', batch)
+                    .eq('subject', subject)
+                    .order('date', { ascending: false })
+                    .order('created_at', { ascending: false });
+                if (error) throw error;
+                return (data || []).map(fill);
+            }
         },
         enabled: !!batch && !!subject,
         // A subject's recording list only grows when a class ends — no need to
