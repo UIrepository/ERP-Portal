@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Play } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { parseVideoUrl } from '@/components/video-player/useVideoPlayer';
@@ -73,6 +73,21 @@ const Frame = ({ thumb, children }: { thumb?: string | null; children?: React.Re
 export const TodaysClassStrip = ({ batch, enrolledSubjects = [], onJoinLive }: TodaysClassStripProps) => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const queryClient = useQueryClient();
+
+  // Instant "Currently Live" — react to the teacher's join (active_classes) in
+  // realtime instead of a fast poll.
+  useEffect(() => {
+    if (!batch) return;
+    const channel = supabase
+      .channel(`todays-strip-live-${batch}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'active_classes', filter: `batch=eq.${batch}` },
+        () => queryClient.invalidateQueries({ queryKey: ['todays-class'] }),
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [batch, queryClient]);
 
   const ist = new Date(Date.now() + IST_OFFSET_MIN * 60000); // read via getUTC* = IST wall clock
   const todayStr = ist.toISOString().slice(0, 10);

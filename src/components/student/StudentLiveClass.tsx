@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { EmptyState } from '@/components/StateScreens';
@@ -38,7 +39,23 @@ interface ScheduleWithLink {
 
 export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: StudentLiveClassProps) => {
   const { profile, user } = useAuth();
+  const queryClient = useQueryClient();
   const { mergedPairs, orFilter, primaryPair } = useMergedSubjects(batch, subject);
+
+  // A class going live is an EVENT (the teacher's join writes an active_classes
+  // row), so listen for it in realtime → the "Join" button appears instantly,
+  // no fast polling needed. This is snappier than the old 20s poll.
+  useEffect(() => {
+    if (!batch) return;
+    const channel = supabase
+      .channel(`live-class-${batch}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'active_classes', filter: `batch=eq.${batch}` },
+        () => queryClient.invalidateQueries({ queryKey: ['studentLiveClass'] }),
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [batch, queryClient]);
   // Pin "today" and the live/upcoming window to IST (Asia/Kolkata = fixed
   // UTC+5:30) so it works regardless of the student's device timezone. Reads the
   // device's absolute clock (assumed time-synced) but interprets the wall clock
@@ -164,7 +181,9 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
     // fresh: always refetch on mount (ignore the wider global cache window) and
     // poll fast so "live now" + the merged room appear promptly.
     staleTime: 0,
-    refetchInterval: 60000 // was 20s — live-class detection; 60s is plenty (egress)
+    // Realtime (active_classes subscription above) makes "live" appear instantly;
+    // this poll is just a slow backup in case the socket drops.
+    refetchInterval: 60000
   });
 
   // Logic to separate "Live Now" from "Upcoming" — all compared in IST
