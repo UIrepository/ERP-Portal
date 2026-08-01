@@ -49,7 +49,11 @@ Deno.serve(async (req) => {
       .from('schedules')
       .select('id, batch, subject, start_time, end_time, reminder_time, reminder_sent_date, date, day_of_week')
       .not('reminder_time', 'is', null)
-      .or(`date.eq.${todayStr},and(date.is.null,day_of_week.eq.${currentDow})`);
+      .or(`date.eq.${todayStr},and(date.is.null,day_of_week.eq.${currentDow})`)
+      // Skip rows whose reminder already went out today — after each class's
+      // reminder is sent, the remaining ~285 daily runs fetch almost nothing.
+      // (Same check the loop below does per-row; this just does it in SQL.)
+      .or(`reminder_sent_date.is.null,reminder_sent_date.neq.${todayStr}`);
 
     if (schedErr) {
       console.error('Error fetching schedules:', schedErr);
