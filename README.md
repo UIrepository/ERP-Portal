@@ -1,4 +1,4 @@
-# Welcome to your Lovable project
+I AM NOT LOVABLE FUCKING BITCH
 
 ## Project info
 
