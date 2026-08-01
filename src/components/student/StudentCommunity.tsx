@@ -5,6 +5,10 @@ import { uploadImageToCloudinary } from '@/lib/cloudinary';
 import { clearCommunityNotifications } from '@/lib/push';
 import { useAuth } from '@/hooks/useAuth';
 import { useMergedSubjects } from '@/hooks/useMergedSubjects';
+import { useCommunitySummaries } from '@/hooks/useCommunitySummaries';
+
+// Session-scoped sender-id → role cache (roles don't change mid-session).
+const senderRoleCache = new Map<string, string>();
 import { formatChatTime } from '@/hooks/useCommunitySummaries';
 import { useSearchParams, useNavigate } from 'react-router-dom'; // 🟢 Added useSearchParams
 
@@ -401,7 +405,7 @@ export const StudentCommunity = ({ batch: batchProp }: { batch?: string } = {}) 
 
   const markGroupSeen = (g: { batch_name: string; subject_name: string }) => {
     try { localStorage.setItem(seenKey(g), new Date().toISOString()); } catch { /* ignore */ }
-    queryClient.invalidateQueries({ queryKey: ['community-overview'] });
+    queryClient.invalidateQueries({ queryKey: ['community-summaries'] });
   };
 
   // --- Per-community mute (push notifications) ---
@@ -453,37 +457,16 @@ export const StudentCommunity = ({ batch: batchProp }: { batch?: string } = {}) 
     toggleMuteMutation.mutate(g);
   };
 
-  const { data: overview = {} } = useQuery<Record<string, { lastAt: string | null; unread: number }>>({
-    queryKey: ['community-overview', profile?.user_id, enrollments.map(e => `${e.batch_name}|${e.subject_name}`).join(',')],
-    queryFn: async () => {
-      const result: Record<string, { lastAt: string | null; unread: number }> = {};
-      await Promise.all(enrollments.map(async (e) => {
-        const key = `${e.batch_name}|${e.subject_name}`;
-        const { data: last } = await supabase
-          .from('community_messages')
-          .select('created_at')
-          .eq('batch', e.batch_name).eq('subject', e.subject_name).eq('is_deleted', false)
-          .order('created_at', { ascending: false }).limit(1).maybeSingle();
-        const lastAt = (last as { created_at: string } | null)?.created_at ?? null;
-        let seen: string | null = null;
-        try { seen = localStorage.getItem(seenKey(e)); } catch { /* ignore */ }
-        let unread = 0;
-        if (lastAt && (!seen || new Date(lastAt) > new Date(seen))) {
-          const { count } = await supabase
-            .from('community_messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('batch', e.batch_name).eq('subject', e.subject_name).eq('is_deleted', false)
-            .neq('user_id', profile?.user_id || '')
-            .gt('created_at', seen || '1970-01-01T00:00:00Z');
-          unread = count ?? 0;
-        }
-        result[key] = { lastAt, unread };
-      }));
-      return result;
-    },
-    enabled: enrollments.length > 0 && !!profile?.user_id,
-    refetchInterval: 120000, // realtime keeps this fresh; long poll is just a safety net
-  });
+  // One RLS-scoped RPC replaces the old 2-queries-PER-GROUP poll (a 6-subject
+  // student fired 12 requests every 2 min). Same numbers, one request.
+  const { summaries } = useCommunitySummaries(enrollments.length > 0 && !!profile?.user_id);
+  const overview = useMemo(() => {
+    const result: Record<string, { lastAt: string | null; unread: number }> = {};
+    for (const [key, sum] of Object.entries(summaries)) {
+      result[key] = { lastAt: sum.last_at, unread: sum.unread };
+    }
+    return result;
+  }, [summaries]);
 
   const sortedEnrollments = useMemo(() => {
     return [...visibleEnrollments].sort((a, b) => {
@@ -565,10 +548,21 @@ export const StudentCommunity = ({ batch: batchProp }: { batch?: string } = {}) 
   const { data: senderRoles } = useQuery<Map<string, string>>({
     queryKey: ['community-sender-roles', senderIds],
     queryFn: async () => {
+      // Roles are stable within a session — resolve each sender ONCE per tab
+      // (module cache), so a new message no longer re-RPCs all ~80 senders.
       const roles = new Map<string, string>();
-      await Promise.all(senderIds.map(async (uid) => {
+      const missing: string[] = [];
+      for (const uid of senderIds) {
+        const cached = senderRoleCache.get(uid);
+        if (cached) roles.set(uid, cached);
+        else missing.push(uid);
+      }
+      await Promise.all(missing.map(async (uid) => {
         const { data } = await supabase.rpc('get_user_role_from_tables', { check_user_id: uid });
-        if (data) roles.set(uid, data as string);
+        if (data) {
+          roles.set(uid, data as string);
+          senderRoleCache.set(uid, data as string);
+        }
       }));
       return roles;
     },
@@ -622,12 +616,36 @@ export const StudentCommunity = ({ batch: batchProp }: { batch?: string } = {}) 
       // Edits/deletes are rare — a cheap refetch keeps them correct.
       refresh();
     };
+    // Server-side batch filter (covers every merged batch; batch names are
+    // comma-free so `in.()` is safe). Without it, EVERY community message in
+    // the app was delivered to every open chat — the realtime egress bomb.
+    const mergeBatches = Array.from(new Set(
+      (mergedPairs.length ? mergedPairs : [{ batch: selectedGroup.batch_name, subject: selectedGroup.subject_name }])
+        .map((p) => p.batch),
+    ));
+    const batchFilter = `batch=in.(${mergeBatches.join(',')})`;
+    // Likes: patch-level refresh, debounced — a burst of reactions costs ONE
+    // bounded refetch instead of an 80-message refetch per like per client.
+    let likeTimer: ReturnType<typeof setTimeout> | null = null;
+    const onLike = (payload: { new?: Record<string, unknown>; old?: Record<string, unknown> }) => {
+      const msgId = (payload.new as { message_id?: string } | undefined)?.message_id;
+      if (msgId) {
+        const current = queryClient.getQueryData<CommunityMessage[]>(msgKey);
+        // A like for a message we aren't displaying — nothing to update.
+        if (current && !current.some((m) => m.id === msgId)) return;
+      }
+      if (likeTimer) clearTimeout(likeTimer);
+      likeTimer = setTimeout(refresh, 2500);
+    };
     const channel = supabase
       .channel(`community-${selectedGroup.batch_name}-${selectedGroup.subject_name}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'community_messages' }, onMsg)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_likes' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'community_messages', filter: batchFilter }, onMsg)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_likes' }, onLike)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (likeTimer) clearTimeout(likeTimer);
+      supabase.removeChannel(channel);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedGroup, orFilter, queryClient]);
 
@@ -636,12 +654,18 @@ export const StudentCommunity = ({ batch: batchProp }: { batch?: string } = {}) 
   useEffect(() => {
     if (enrollments.length === 0) return;
     const enrollSet = new Set(enrollments.map((e) => `${e.batch_name}|${e.subject_name}`));
+    const myBatches = Array.from(new Set(enrollments.map((e) => e.batch_name)));
     const channel = supabase
       .channel('community-overview-global')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'community_messages' }, (payload) => {
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'community_messages',
+        // Only MY batches' messages are delivered (batch names are comma-free);
+        // exact batch+subject membership still checked below.
+        filter: `batch=in.(${myBatches.join(',')})`,
+      }, (payload) => {
         const row = payload.new as { batch?: string; subject?: string };
         if (row && enrollSet.has(`${row.batch}|${row.subject}`)) {
-          queryClient.invalidateQueries({ queryKey: ['community-overview'] });
+          queryClient.invalidateQueries({ queryKey: ['community-summaries'] });
         }
       })
       .subscribe();

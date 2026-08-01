@@ -327,21 +327,6 @@ export const TeacherSchedule = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // --- Real-time Subscription ---
-  useEffect(() => {
-    const channel = supabase
-      .channel('teacher-realtime-schedules-and-exams')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, () => {
-          queryClient.invalidateQueries({ queryKey: ['teacher-all-schedules'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'exams' }, () => {
-          queryClient.invalidateQueries({ queryKey: ['teacher-all-exams'] });
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [queryClient]);
-
   // --- Data Fetching ---
 
   // 1. Fetch Teacher Info
@@ -363,6 +348,25 @@ export const TeacherSchedule = () => {
   const availableBatches = useMemo(() => {
     return teacherInfo?.assigned_batches?.sort() || [];
   }, [teacherInfo]);
+
+  // Realtime scoped to THIS teacher's batches (was unfiltered: every schedule
+  // edit anywhere fanned full rows to every open teacher tab). Batch names are
+  // comma-free, so the in.() filter is safe.
+  const batchesKey = availableBatches.join(',');
+  useEffect(() => {
+    if (!batchesKey) return;
+    const channel = supabase
+      .channel('teacher-realtime-schedules-and-exams')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'schedules', filter: `batch=in.(${batchesKey})` }, () => {
+          queryClient.invalidateQueries({ queryKey: ['teacher-all-schedules'] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'exams', filter: `batch=in.(${batchesKey})` }, () => {
+          queryClient.invalidateQueries({ queryKey: ['teacher-all-exams'] });
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient, batchesKey]);
 
   // 2. Fetch Schedules
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({

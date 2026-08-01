@@ -242,7 +242,8 @@ export const StudentSchedule = () => {
         const cached = await fetchCachedSchedules(batches);
         return sortSchedules(cached as Schedule[]);
       } catch {
-        let query = supabase.from('schedules').select('*');
+        // Mirror the CDN payload's display columns (no link/stream fields).
+        let query = supabase.from('schedules').select('id, subject, batch, day_of_week, start_time, end_time, date');
         if (selectedBatchFilter !== 'all' && selectedBatchFilter !== '') {
           query = query.eq('batch', selectedBatchFilter);
         } else {

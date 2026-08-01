@@ -170,19 +170,11 @@ export const StudentCurrentClass = ({ onTabChange }: StudentCurrentClassProps) =
     refetchInterval: 90000 // was 30s — schedules also update via realtime (egress)
   });
 
-  // --- Realtime Sync ---
-  useEffect(() => {
-    if (!profile?.user_id) return;
-    const channel = supabase.channel('class-updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, () => {
-          queryClient.invalidateQueries({ queryKey: ['ongoingClassRPC'] });
-          queryClient.invalidateQueries({ queryKey: ['allStudentSchedulesRPC'] });
-      })
-      // meeting_links realtime removed — class links now come from `schedules`
-      // (Jitsi), so this subscription streamed changes for a table we don't read.
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [queryClient, profile?.user_id]);
+  // Realtime on `schedules` removed: it was UNFILTERED, so every schedule edit
+  // (947 rows on a bulk change, full old+new rows) fanned out to every student
+  // on this view — the app's single largest realtime egress source. Both
+  // queries above poll every 90s, which already bounds freshness; live-class
+  // state has its own filtered active_classes realtime elsewhere.
 
   // --- Logic for Sections ---
   const { pastClasses, futureClasses, nextClass } = useMemo(() => {

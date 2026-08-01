@@ -133,8 +133,9 @@ export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [], on
                 query = query.or(orConditions.join(','));
             }
 
-            const { data, error } = await query.order('created_at', { ascending: false });
-            
+            // Latest 50 — the feed re-downloaded every announcement ever made.
+            const { data, error } = await query.order('created_at', { ascending: false }).limit(50);
+
             if (error) throw error;
             return (data || []) as Announcement[];
         },

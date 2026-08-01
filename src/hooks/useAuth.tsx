@@ -95,7 +95,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const { data: profileData, error: profileError } = await safeDbCall(
         supabase
           .from('profiles')
-          .select('*')
+          // Everything except bank_details (unused in the app and sensitive —
+          // it was being pulled into every session AND cached in localStorage).
+          .select('id, user_id, name, email, role, avatar_url, batch, subjects, exams, is_active, premium_access, created_at, updated_at')
           .eq('user_id', currentUser.id)
           .maybeSingle(),
         8000

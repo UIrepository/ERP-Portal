@@ -5,6 +5,7 @@ import { uploadImageToCloudinary } from '@/lib/cloudinary';
 import { clearCommunityNotifications } from '@/lib/push';
 import { useAuth } from '@/hooks/useAuth';
 import { useMergedSubjects } from '@/hooks/useMergedSubjects';
+import { useCommunitySummaries } from '@/hooks/useCommunitySummaries';
 import { formatChatTime } from '@/hooks/useCommunitySummaries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -469,37 +470,18 @@ export const TeacherCommunity = () => {
   const seenKey = (g: TeacherGroup) => `community-seen-${g.batch_name}|${g.subject_name}`;
   const markGroupSeen = (g: TeacherGroup) => {
     try { localStorage.setItem(seenKey(g), new Date().toISOString()); } catch { /* ignore */ }
-    queryClient.invalidateQueries({ queryKey: ['teacher-community-overview'] });
+    queryClient.invalidateQueries({ queryKey: ['community-summaries'] });
   };
-  const { data: overview = {} } = useQuery<Record<string, { lastAt: string | null; unread: number }>>({
-    queryKey: ['teacher-community-overview', profile?.user_id, teacherGroups.map(g => `${g.batch_name}|${g.subject_name}`).join(',')],
-    queryFn: async () => {
-      const result: Record<string, { lastAt: string | null; unread: number }> = {};
-      await Promise.all(teacherGroups.map(async (g) => {
-        const key = `${g.batch_name}|${g.subject_name}`;
-        const { data: last } = await supabase
-          .from('community_messages').select('created_at')
-          .eq('batch', g.batch_name).eq('subject', g.subject_name).eq('is_deleted', false)
-          .order('created_at', { ascending: false }).limit(1).maybeSingle();
-        const lastAt = (last as { created_at: string } | null)?.created_at ?? null;
-        let seen: string | null = null;
-        try { seen = localStorage.getItem(seenKey(g)); } catch { /* ignore */ }
-        let unread = 0;
-        if (lastAt && (!seen || new Date(lastAt) > new Date(seen))) {
-          const { count } = await supabase
-            .from('community_messages').select('*', { count: 'exact', head: true })
-            .eq('batch', g.batch_name).eq('subject', g.subject_name).eq('is_deleted', false)
-            .neq('user_id', profile?.user_id || '')
-            .gt('created_at', seen || '1970-01-01T00:00:00Z');
-          unread = count ?? 0;
-        }
-        result[key] = { lastAt, unread };
-      }));
-      return result;
-    },
-    enabled: teacherGroups.length > 0 && !!profile?.user_id,
-    refetchInterval: 30000, // realtime channel already keeps this fresh
-  });
+  // One RLS-scoped RPC replaces the old 2-queries-PER-GROUP poll that ran
+  // every 30s (the shortest interval left in the app). Same numbers, 1 request.
+  const { summaries } = useCommunitySummaries(teacherGroups.length > 0 && !!profile?.user_id);
+  const overview = useMemo(() => {
+    const result: Record<string, { lastAt: string | null; unread: number }> = {};
+    for (const [key, sum] of Object.entries(summaries)) {
+      result[key] = { lastAt: sum.last_at, unread: sum.unread };
+    }
+    return result;
+  }, [summaries]);
   const sortedGroups = useMemo(() => {
     return [...teacherGroups].sort((a, b) => {
       const aAt = overview[`${a.batch_name}|${a.subject_name}`]?.lastAt || '';
@@ -519,7 +501,7 @@ export const TeacherCommunity = () => {
   }, [selectedGroup]);
 
   // Merged batch/subject pairs: read across all of them, write to the canonical primary
-  const { orFilter, primaryPair } = useMergedSubjects(selectedGroup?.batch_name, selectedGroup?.subject_name);
+  const { orFilter, primaryPair, mergedPairs } = useMergedSubjects(selectedGroup?.batch_name, selectedGroup?.subject_name);
 
   const { data: messages = [], isLoading: isLoadingMessages } = useQuery({
     queryKey: ['community-messages', selectedGroup?.batch_name, selectedGroup?.subject_name, orFilter],
@@ -588,25 +570,44 @@ export const TeacherCommunity = () => {
     const refresh = () => {
       queryClient.invalidateQueries({ queryKey: ['community-messages', selectedGroup.batch_name, selectedGroup.subject_name] });
     };
+    // Batch-scoped delivery (covers merged batches; names are comma-free) and
+    // debounced like refreshes — a reaction burst costs one refetch, not one
+    // 80-message refetch per like.
+    const mergeBatches = Array.from(new Set(
+      (mergedPairs.length ? mergedPairs : [{ batch: selectedGroup.batch_name, subject: selectedGroup.subject_name }])
+        .map((pair) => pair.batch),
+    ));
+    let likeTimer: ReturnType<typeof setTimeout> | null = null;
+    const onLike = () => {
+      if (likeTimer) clearTimeout(likeTimer);
+      likeTimer = setTimeout(refresh, 2500);
+    };
     const channel = supabase
       .channel(`community-${selectedGroup.batch_name}-${selectedGroup.subject_name}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'community_messages' }, refresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_likes' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'community_messages', filter: `batch=in.(${mergeBatches.join(',')})` }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_likes' }, onLike)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [selectedGroup, queryClient]);
+    return () => {
+      if (likeTimer) clearTimeout(likeTimer);
+      supabase.removeChannel(channel);
+    };
+  }, [selectedGroup, mergedPairs, queryClient]);
 
   // Global listener: keep the community list order + unread badges fresh
   useEffect(() => {
     if (teacherGroups.length === 0) return;
+    const myBatches = Array.from(new Set(teacherGroups.map((g) => g.batch_name)));
     const channel = supabase
       .channel('teacher-community-overview-global')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'community_messages' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['teacher-community-overview'] });
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'community_messages',
+        filter: `batch=in.(${myBatches.join(',')})`,
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: ['community-summaries'] });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [teacherGroups.length, queryClient]);
+  }, [teacherGroups, queryClient]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });

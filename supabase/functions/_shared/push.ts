@@ -111,13 +111,20 @@ export async function resolveBatchSubjectUserIds(
 
 /** Resolve all enrolled students who currently have a push subscription. */
 export async function resolveAllStudentUserIds(supabase: SupabaseClient): Promise<string[]> {
-  const { data: enrollments } = await supabase
-    .from('user_enrollments')
-    .select('user_id');
-
-  return Array.from(
-    new Set((enrollments ?? []).map((row: { user_id?: string }) => row.user_id).filter(Boolean) as string[]),
-  );
+  // Page past PostgREST's 1000-row cap — the unpaged version silently dropped
+  // every enrollment after the first 1000 (an "all students" push missed ~half).
+  const ids = new Set<string>();
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data: rows } = await supabase
+      .from('user_enrollments')
+      .select('user_id')
+      .order('id', { ascending: true })
+      .range(from, from + PAGE - 1);
+    (rows ?? []).forEach((row: { user_id?: string }) => row.user_id && ids.add(row.user_id));
+    if (!rows || rows.length < PAGE) break;
+  }
+  return Array.from(ids);
 }
 
 type StudentTargetFilters = {

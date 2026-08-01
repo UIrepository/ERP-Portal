@@ -50,13 +50,24 @@ Deno.serve(async (req) => {
 
     const results: { recording_id: string; status: string }[] = [];
 
+    // One schedules fetch for every batch+subject in today's recordings
+    // (was one query per recording inside the loop).
+    const recBatches = Array.from(new Set((recordings || []).map((r: { batch: string }) => r.batch)));
+    const recSubjects = Array.from(new Set((recordings || []).map((r: { subject: string }) => r.subject)));
+    const { data: allSchedules } = recBatches.length
+      ? await supabase
+          .from('schedules')
+          .select('batch, subject, end_time, date, day_of_week')
+          .in('batch', recBatches)
+          .in('subject', recSubjects)
+      : { data: [] as any[] };
+
     for (const recording of recordings || []) {
       // Check if the schedule's end_time has passed for this batch + subject today
-      const { data: schedules } = await supabase
-        .from('schedules')
-        .select('end_time, date, day_of_week')
-        .eq('batch', recording.batch)
-        .eq('subject', recording.subject);
+      const schedules = (allSchedules || []).filter(
+        (sched: { batch: string; subject: string }) =>
+          sched.batch === recording.batch && sched.subject === recording.subject,
+      );
 
       // Find matching schedule for today
       let classEnded = false;

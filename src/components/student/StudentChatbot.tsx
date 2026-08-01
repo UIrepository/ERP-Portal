@@ -187,14 +187,16 @@ export const StudentChatbot = () => {
       // This way the student sees replies from any admin/manager, not just the initially assigned one
       if (state.mode === 'support' && state.supportRole) {
         const ctx = state.supportRole === 'admin' ? 'support_admin' : 'support_manager';
+        // Latest 120 only (was the whole thread, unbounded, every poll).
         const { data, error } = await supabase
           .from('direct_messages')
           .select('*')
           .eq('context', ctx)
           .or(`sender_id.eq.${profile.user_id},receiver_id.eq.${profile.user_id}`)
-          .order('created_at', { ascending: true });
+          .order('created_at', { ascending: false })
+          .limit(120);
         if (error) throw error;
-        return data as Message[];
+        return ((data as Message[]) || []).reverse();
       }
 
       // For subject-connect / other modes, keep 1:1 logic
@@ -209,7 +211,7 @@ export const StudentChatbot = () => {
       return ((data as Message[]) || []).reverse();
     },
     enabled: !!profile?.user_id && !!state.selectedRecipient?.id,
-    refetchInterval: 45000, // was 3s — re-fetched whole thread every poll (egress)
+    refetchInterval: 90000, // was 3s, then 45s — thread is bounded now; 90s keeps support snappy
   });
 
   // Send message mutation

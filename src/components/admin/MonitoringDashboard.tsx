@@ -1,5 +1,4 @@
-import { useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query'; // Import useQueryClient
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,56 +24,11 @@ async function fetchAllPaged<T = any>(makeQuery: () => any): Promise<T[]> {
 }
 
 export const MonitoringDashboard = () => {
-  const queryClient = useQueryClient(); // Initialize useQueryClient
-
-  // --- Real-time Subscriptions ---
-  useEffect(() => {
-    // Channel for profiles table changes (affects Active Users)
-    const profilesChannel = supabase
-      .channel('monitoring-profiles-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'profiles' },
-        (payload) => {
-          console.log('Real-time update: profiles table changed in monitoring dashboard', payload.eventType);
-          queryClient.invalidateQueries({ queryKey: ['active-users'] });
-          queryClient.invalidateQueries({ queryKey: ['student-activities-monitoring'] }); // Invalidate student activities too as they join profiles
-        }
-      )
-      .subscribe();
-
-    // Channel for feedback table changes
-    const feedbackChannel = supabase
-      .channel('monitoring-feedback-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'feedback' },
-        (payload) => {
-          console.log('Real-time update: feedback table changed in monitoring dashboard', payload.eventType);
-          queryClient.invalidateQueries({ queryKey: ['all-feedback'] });
-        }
-      )
-      .subscribe();
-
-    // Channel for student_activities table changes
-    const activitiesChannel = supabase
-      .channel('monitoring-activities-changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'student_activities' },
-        (payload) => {
-          console.log('Real-time update: student_activities table changed in monitoring dashboard', payload.eventType);
-          queryClient.invalidateQueries({ queryKey: ['student-activities-monitoring'] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(profilesChannel);
-      supabase.removeChannel(feedbackChannel);
-      supabase.removeChannel(activitiesChannel);
-    };
-  }, [queryClient]); // Dependency array includes queryClient
+  // Realtime subscriptions removed: they were UNFILTERED (profiles, feedback,
+  // student_activities), so every student login/download/video-open anywhere in
+  // the app pushed events to any open admin tab AND re-fired the queries below
+  // (previously 1,600+ requests per refire). The dashboard now refreshes every
+  // 5 minutes instead — it is a monitoring view, not a live feed.
 
   // --- Data Fetching Queries ---
 
@@ -82,33 +36,39 @@ export const MonitoringDashboard = () => {
     queryKey: ['active-users'],
     queryFn: async () => {
       // Page through so all active users are counted, not just the first 1000.
+      // Only the rendered columns — select('*') pulled bank_details jsonb and
+      // three arrays for every profile.
       return await fetchAllPaged(() =>
         supabase
           .from('profiles')
-          .select('*')
+          .select('id, user_id, name, email, role, batch, updated_at, is_active')
           .eq('is_active', true)
           .order('updated_at', { ascending: false }),
       );
     },
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
   });
 
   const { data: feedback = [], isLoading: isLoadingFeedback, isError: isErrorFeedback, error: errorFeedback } = useQuery({
     queryKey: ['all-feedback'],
     queryFn: async () => {
+      // Rendered columns + a generous recent window (the tab shows a feed, and
+      // unbounded select-* re-downloaded the whole table's history each open).
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
       const { data, error } = await supabase
         .from('feedback')
-        .select(`
-          *,
-          profiles (
-            name,
-            email
-          )
-        `)
-        .order('created_at', { ascending: false });
-      
+        .select('id, comments, subject, batch, created_at, profiles ( name )')
+        .gte('created_at', sixMonthsAgo.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1000);
+
       if (error) throw error;
       return data || [];
     },
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
   });
 
   const { data: studentActivitiesData = [], isLoading: isLoadingStudentActivities, isError: isErrorStudentActivities, error: errorStudentActivities } = useQuery({
@@ -129,25 +89,27 @@ export const MonitoringDashboard = () => {
         return [];
       }
 
-      // Fetch latest activities for each student
-      const activitiesPromises = students.map(async (student) => {
-        const { data: activities, error: activitiesError } = await supabase
-          .from('student_activities')
-          .select('*')
-          .eq('user_id', student.user_id) // Use user_id for joining
-          .order('created_at', { ascending: false })
-          .limit(5); // Get latest 5 activities per student
-        
-        if (activitiesError) {
-          console.warn(`Error fetching activities for student ${student.name}:`, activitiesError);
-          // Return student with empty activities if there's an error for this specific student
-          return { ...student, activities: [] };
-        }
-        return { ...student, activities: activities || [] };
-      });
-      
-      return Promise.all(activitiesPromises);
-    }
+      // ONE bounded query for recent activity instead of one request PER
+      // student (1,600+ requests before, re-fired by realtime). Latest 3,000
+      // events cover the recent window this tab is for; students without
+      // recent rows show the existing "No recent activity" empty state.
+      const { data: recent, error: activitiesError } = await supabase
+        .from('student_activities')
+        .select('id, user_id, activity_type, description, created_at')
+        .order('created_at', { ascending: false })
+        .limit(3000);
+      if (activitiesError) throw activitiesError;
+
+      const byUser = new Map<string, any[]>();
+      for (const a of recent || []) {
+        const list = byUser.get(a.user_id);
+        if (!list) byUser.set(a.user_id, [a]);
+        else if (list.length < 5) list.push(a); // latest 5 per student, as before
+      }
+      return students.map((student) => ({ ...student, activities: byUser.get(student.user_id) ?? [] }));
+    },
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
   });
 
   // Consolidated loading and error states for main dashboard content

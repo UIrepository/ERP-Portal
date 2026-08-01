@@ -88,10 +88,11 @@ export const TeacherRecordings = () => {
             }
             const { data, error } = await supabase
                 .from('recordings')
-                .select('*')
+                .select('id, date, subject, topic, embed_link, batch, created_at')
                 .in('batch', teacherInfo.assigned_batches)
                 .in('subject', teacherInfo.assigned_subjects)
-                .order('date', { ascending: false });
+                .order('date', { ascending: false })
+                .limit(300);
             
             if (error) throw error;
             return (data || []) as RecordingContent[];

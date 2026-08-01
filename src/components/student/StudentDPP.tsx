@@ -136,7 +136,9 @@ export const StudentDPP = ({ batch, subject, onBack }: StudentDPPProps) => {
         {
           event: '*',
           schema: 'public',
-          table: 'dpp_content'
+          table: 'dpp_content',
+          // Only THIS batch's DPP changes (was unfiltered — app-wide fan-out).
+          filter: `batch=eq.${batch}`
         },
         () => {
           queryClient.invalidateQueries({ queryKey: ['student-dpp', batch, subject] });

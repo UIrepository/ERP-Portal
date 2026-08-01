@@ -118,13 +118,21 @@ Deno.serve(async (req) => {
     const domain = Deno.env.get('GOOGLE_GROUPS_DOMAIN') || 'unknowniitians.com';
     const accessToken = await getGoogleAccessToken();
 
-    // 1. Fetch ALL enrollments with emails
-    const { data: enrollments, error: enrollErr } = await supabase
-      .from('user_enrollments')
-      .select('email, batch_name, subject_name')
-      .not('email', 'is', null);
-
-    if (enrollErr) throw new Error(`Fetch enrollments failed: ${enrollErr.message}`);
+    // 1. Fetch ALL enrollments with emails — paged past the 1000-row cap
+    // (the unpaged fetch silently truncated and never synced later rows).
+    const enrollments: { email: string; batch_name: string; subject_name: string }[] = [];
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
+      const { data: page, error: enrollErr } = await supabase
+        .from('user_enrollments')
+        .select('email, batch_name, subject_name')
+        .not('email', 'is', null)
+        .order('id', { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (enrollErr) throw new Error(`Fetch enrollments failed: ${enrollErr.message}`);
+      enrollments.push(...((page ?? []) as typeof enrollments));
+      if (!page || page.length < PAGE) break;
+    }
     if (!enrollments || enrollments.length === 0) {
       return new Response(JSON.stringify({ success: true, message: 'No enrollments found', stats: {} }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

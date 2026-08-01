@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
       .update({ user_id })
       .eq('email', email.toLowerCase().trim())
       .is('user_id', null)
-      .select();
+      .select('id');
 
     if (error) {
       console.error('Error linking enrollments:', error);

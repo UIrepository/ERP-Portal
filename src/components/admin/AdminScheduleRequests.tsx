@@ -67,7 +67,7 @@ export const AdminScheduleRequests = () => {
                 day_of_week: istDayOfWeekForDate(request.new_date)
               })
               .eq('id', request.schedule_id)
-              .select();
+              .select('id');
               
             if (scheduleError) {
                 console.error("Schedule Update Failed", scheduleError);

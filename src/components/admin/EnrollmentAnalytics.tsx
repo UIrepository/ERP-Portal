@@ -105,12 +105,12 @@ export const EnrollmentAnalytics = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    // Only enrollments realtime — the old unfiltered `profiles` subscription
+    // re-downloaded all enrollments+profiles on EVERY student login (useAuth
+    // writes avatar_url on sign-in), for every open admin tab.
     const channel = supabase
       .channel('admin-enrollment-analytics-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_enrollments' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['enrollment-analytics-enrollments'] });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
         queryClient.invalidateQueries({ queryKey: ['enrollment-analytics-enrollments'] });
       })
       .subscribe();

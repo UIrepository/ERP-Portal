@@ -52,12 +52,16 @@ export const TeacherFeedbackViewer = () => {
 
       if (batches.length === 0 || subjects.length === 0) return [];
 
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
       const { data, error } = await supabase
         .from('feedback')
         .select('*')
         .in('batch', batches)
         .in('subject', subjects)
-        .order('created_at', { ascending: false });
+        .gte('created_at', sixMonthsAgo.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(500);
 
       if (error) throw error;
       return data;

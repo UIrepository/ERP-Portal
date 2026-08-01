@@ -45,7 +45,8 @@ export function useAllWhiteboards(enabled: boolean) {
       const { data, error } = await supabase
         .from('whiteboard_files')
         .select('*')
-        .order('updated_at', { ascending: false });
+        .order('updated_at', { ascending: false })
+        .limit(200);
       if (error) throw error;
       const files = (data || []) as WhiteboardFile[];
       // Attach owner names (scoped lookup — no 1000-row cap risk).

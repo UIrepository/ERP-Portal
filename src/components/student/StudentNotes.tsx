@@ -128,7 +128,10 @@ export const StudentNotes = ({ batch, subject, onBack }: StudentNotesProps) => {
         {
           event: '*',
           schema: 'public',
-          table: 'notes'
+          table: 'notes',
+          // Only THIS batch's note changes — unfiltered, every upload for any
+          // batch was delivered to every student sitting on a notes page.
+          filter: `batch=eq.${batch}`
         },
         () => {
           queryClient.invalidateQueries({ queryKey: ['student-notes', batch, subject] });

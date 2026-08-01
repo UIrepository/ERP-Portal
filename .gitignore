@@ -24,4 +24,5 @@ supabase/.temp
 *.ntvs*
 *.njsproj
 *.sln
-*.sw?
+*.sw?.vercel
+.vercel

@@ -23,7 +23,7 @@ export const AdminTeacherManager = () => {
     queryFn: async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, user_id, name, email, role, batch, subjects, is_active, created_at')
         .eq('role', 'teacher' as any)
         .order('created_at', { ascending: false });
       return data || [];

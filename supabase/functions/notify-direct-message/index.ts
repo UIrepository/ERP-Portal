@@ -36,33 +36,39 @@ Deno.serve(async (req) => {
       .from('profiles').select('name').eq('user_id', sender_id).maybeSingle();
     const senderName = senderProfile?.name || 'Someone';
 
-    // Staff id sets (service role bypasses RLS).
-    const [{ data: adminsRows }, { data: managersRows }] = await Promise.all([
-      supabase.from('admins').select('user_id').not('user_id', 'is', null),
-      supabase.from('managers').select('user_id').not('user_id', 'is', null),
+    // Sender staff check via two single-row lookups; the full staff list is
+    // fetched ONLY when a student opens a ticket (broadcast branch) — the old
+    // code pulled both entire lists on every single DM.
+    const [{ data: senderAdminRow }, { data: senderManagerRow }] = await Promise.all([
+      supabase.from('admins').select('user_id').eq('user_id', sender_id).maybeSingle(),
+      supabase.from('managers').select('user_id').eq('user_id', sender_id).maybeSingle(),
     ]);
-    const adminIds = (adminsRows ?? []).map((r: { user_id: string }) => r.user_id).filter(Boolean);
-    const managerIds = (managersRows ?? []).map((r: { user_id: string }) => r.user_id).filter(Boolean);
+    const senderIsAdmin = !!senderAdminRow;
+    const senderIsManager = !!senderManagerRow;
+    const staffIds = async (table: 'admins' | 'managers'): Promise<string[]> => {
+      const { data } = await supabase.from(table).select('user_id').not('user_id', 'is', null);
+      return (data ?? []).map((r: { user_id: string }) => r.user_id).filter(Boolean);
+    };
 
     let recipients: string[] = [];
     let payload: { title: string; body: string; url?: string; tag?: string; stack?: boolean };
 
     if (context === 'support_admin') {
-      if (adminIds.includes(sender_id)) {
+      if (senderIsAdmin) {
         // Admin replied -> notify the student.
         recipients = receiver_id ? [receiver_id] : [];
         payload = { title: 'Support replied', body: preview, url: '/', tag: `support-reply-${sender_id}` };
       } else {
         // Student opened/continued a support ticket -> notify all admins.
-        recipients = adminIds;
+        recipients = await staffIds('admins');
         payload = { title: `Support · ${senderName}`, body: preview, url: '/admin-messages', tag: `support-admin-${sender_id}`, stack: true };
       }
     } else if (context === 'support_manager') {
-      if (managerIds.includes(sender_id)) {
+      if (senderIsManager) {
         recipients = receiver_id ? [receiver_id] : [];
         payload = { title: 'Support replied', body: preview, url: '/', tag: `support-reply-${sender_id}` };
       } else {
-        recipients = managerIds;
+        recipients = await staffIds('managers');
         payload = { title: `Support · ${senderName}`, body: preview, url: '/manager-messages', tag: `support-manager-${sender_id}`, stack: true };
       }
     } else {

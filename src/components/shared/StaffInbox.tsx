@@ -101,11 +101,14 @@ export const StaffInbox = () => {
       if (staffRole.isAdmin) orFilter += `,context.eq.support_admin`;
       if (staffRole.isManager) orFilter += `,context.eq.support_manager`;
 
+      // Latest 800 messages are plenty to build the contact list (was the
+      // entire shared inbox history, unbounded, every 90s per staff member).
       const { data: messages, error } = await supabase
         .from('direct_messages')
         .select('*')
         .or(orFilter)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(800);
 
       if (error) {
         console.error("Error fetching messages:", error);
@@ -200,14 +203,16 @@ export const StaffInbox = () => {
       // For support conversations, fetch ALL messages for this student + context
       // so any admin/manager can see the full conversation
       if (ctx === 'support_admin' || ctx === 'support_manager') {
+        // Latest 150 of the thread (was unbounded ascending — whole history).
         const { data, error } = await supabase
           .from('direct_messages')
           .select('*')
           .eq('context', ctx)
           .or(`sender_id.eq.${selectedContactId},receiver_id.eq.${selectedContactId}`)
-          .order('created_at', { ascending: true });
+          .order('created_at', { ascending: false })
+          .limit(150);
         if (error) throw error;
-        return data as Message[];
+        return ((data as Message[]) || []).reverse();
       }
 
       // For non-support, keep existing 1:1 logic

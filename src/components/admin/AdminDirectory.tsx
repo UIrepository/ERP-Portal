@@ -38,24 +38,19 @@ export const AdminDirectory = () => {
   const { data: rawEnrollments, isLoading } = useQuery({
     queryKey: ['admin-directory'],
     queryFn: async () => {
-      // Fetch enrollments joined with profiles
-      // We use !inner to ensure we only get records where the profile exists
-      const { data, error } = await supabase
-        .from('user_enrollments')
-        .select(`
-          batch_name,
-          subject_name,
-          user_id,
-          profiles!inner (
-            name,
-            email,
-            role
-          )
-        `)
-        .eq('profiles.role', 'student'); // Only fetch students
+      // Two slim queries joined client-side: the old !inner embed repeated each
+      // student's name/email/role on every one of their ~6 enrollment rows.
+      const [enrollRes, profRes] = await Promise.all([
+        supabase.from('user_enrollments').select('batch_name, subject_name, user_id'),
+        supabase.from('profiles').select('user_id, name, email').eq('role', 'student' as any),
+      ]);
+      if (enrollRes.error) throw enrollRes.error;
+      if (profRes.error) throw profRes.error;
+      const profMap = new Map((profRes.data || []).map((p: any) => [p.user_id, p]));
+      const data = (enrollRes.data || [])
+        .filter((e: any) => profMap.has(e.user_id)) // students only, like !inner
+        .map((e: any) => ({ ...e, profiles: profMap.get(e.user_id) }));
 
-      if (error) throw error;
-      
       // Flatten the data structure
       return data.map((item: any) => ({
         user_id: item.user_id,

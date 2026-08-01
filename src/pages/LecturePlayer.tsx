@@ -49,7 +49,7 @@ const LecturePlayer = () => {
       if (!currentId) return null;
       const { data, error } = await supabase
         .from('recordings')
-        .select('*')
+        .select('id, topic, subject, batch, embed_link, date, created_at')
         .eq('id', currentId)
         .maybeSingle();
       if (error) throw error;
@@ -63,13 +63,16 @@ const LecturePlayer = () => {
     queryKey: ['lecture-player-siblings', currentRecording?.batch, currentRecording?.subject],
     queryFn: async () => {
       if (!currentRecording) return [];
+      // Named columns + a bound: this ran select('*') with NO limit for every
+      // lecture open — the sibling list only needs the latest ~150 lectures.
       const { data, error } = await supabase
         .from('recordings')
-        .select('*')
+        .select('id, topic, subject, batch, embed_link, date, created_at')
         .eq('batch', currentRecording.batch)
         .eq('subject', currentRecording.subject)
         .order('date', { ascending: false })
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(150);
       if (error) throw error;
       return (data as RecordingRow[]) || [];
     },

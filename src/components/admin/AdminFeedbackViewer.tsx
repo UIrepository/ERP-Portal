@@ -71,10 +71,14 @@ export const AdminFeedbackViewer = () => {
     queryKey: ['admin-feedback-viewer-combined'],
     queryFn: async () => {
       // Step 1: Fetch all feedback entries
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
       const { data: feedbackData, error: feedbackError } = await supabase
         .from('feedback')
         .select(`*`)
-        .order('created_at', { ascending: false });
+        .gte('created_at', sixMonthsAgo.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(800);
 
       if (feedbackError) {
         console.error("Error fetching feedback:", feedbackError);

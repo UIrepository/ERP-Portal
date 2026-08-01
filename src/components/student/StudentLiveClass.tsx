@@ -113,10 +113,10 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
         if (subjectsFilter.length === 0) return [];
         
         const [schedRes, activeRes] = await Promise.all([
-          supabase.from('schedules').select('*').eq('batch', batch)
+          supabase.from('schedules').select('id, batch, subject, start_time, end_time, date, day_of_week, link').eq('batch', batch)
             .in('subject', subjectsFilter)
             .or(`day_of_week.eq.${currentDayOfWeek},date.eq.${todayDateStr}`),
-          supabase.from('active_classes').select('*').eq('batch', batch)
+          supabase.from('active_classes').select('batch, subject, room_url, started_at, is_active').eq('batch', batch)
             .in('subject', subjectsFilter).eq('is_active', true),
         ]);
         if (schedRes.data) allSchedules = schedRes.data;
@@ -126,14 +126,14 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
         if (!mergedPairs.length) return [];
         for (const pair of mergedPairs) {
           const { data, error } = await supabase
-            .from('schedules').select('*')
+            .from('schedules').select('id, batch, subject, start_time, end_time, date, day_of_week, link')
             .eq('batch', pair.batch).eq('subject', pair.subject)
             .or(`day_of_week.eq.${currentDayOfWeek},date.eq.${todayDateStr}`);
           if (!error && data) allSchedules.push(...data);
         }
         for (const pair of mergedPairs) {
           const { data } = await supabase
-            .from('active_classes').select('*')
+            .from('active_classes').select('batch, subject, room_url, started_at, is_active')
             .eq('batch', pair.batch).eq('subject', pair.subject).eq('is_active', true);
           if (data) allActiveClasses.push(...data);
         }
@@ -180,7 +180,9 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
     // Live-class join is time-sensitive and has no realtime backup, so keep it
     // fresh: always refetch on mount (ignore the wider global cache window) and
     // poll fast so "live now" + the merged room appear promptly.
-    staleTime: 0,
+    // 60s cache: realtime flips "live" instantly and the 180s poll refreshes;
+    // staleTime 0 forced a full refetch (with stream keys) on EVERY tab switch.
+    staleTime: 60_000,
     // Realtime (active_classes subscription above) makes "live" appear instantly;
     // this poll is just a slow backup in case the socket drops.
     refetchInterval: 180000
