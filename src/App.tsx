@@ -27,8 +27,11 @@ const queryClient = new QueryClient({
     queries: {
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
-      staleTime: 120_000,
-      gcTime: 10 * 60_000,
+      // Most portal data (enrollments, recordings, notes…) changes rarely and
+      // time-sensitive views poll or subscribe explicitly — hold everything else
+      // longer so tab switches don't re-download the same rows from Supabase.
+      staleTime: 300_000,
+      gcTime: 30 * 60_000,
       retry: 1,
     },
   },

@@ -83,16 +83,19 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
             
             const { data, error } = await supabase
                 .from('recordings')
-                .select('*')
+                .select('id, date, subject, topic, embed_link, batch, created_at')
                 .eq('batch', batch)
                 .eq('subject', subject)
                 .order('date', { ascending: false })
                 .order('created_at', { ascending: false });
-            
+
             if (error) throw error;
             return (data || []) as RecordingContent[];
         },
-        enabled: !!batch && !!subject
+        enabled: !!batch && !!subject,
+        // A subject's recording list only grows when a class ends — no need to
+        // re-pull ~150 rows every couple of minutes as students move around.
+        staleTime: 15 * 60_000,
     });
 
     const filteredRecordings = useMemo(() => (recordings || []).filter(rec =>

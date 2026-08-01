@@ -97,7 +97,9 @@ export const NotificationCenter = () => {
       }));
     },
     enabled: !!profile?.user_id,
-    refetchInterval: 60000,
+    // Realtime (NotificationListener) invalidates this on new DMs, so the poll
+    // is only a fallback — slow it down to spare Supabase reads.
+    refetchInterval: 300000,
   });
 
   // --- 2. Fetch Feedback Notifications (Only for Teachers) ---
@@ -126,7 +128,7 @@ export const NotificationCenter = () => {
 
         const { data: feedback, error: feedbackError } = await supabase
             .from('feedback')
-            .select('*')
+            .select('id, subject, teacher_quality, comments, created_at')
             .in('batch', batches)
             .in('subject', subjects)
             .gte('created_at', threeDaysAgo.toISOString())
@@ -144,7 +146,7 @@ export const NotificationCenter = () => {
         }));
     },
     enabled: !!profile?.user_id && resolvedRole === 'teacher',
-    refetchInterval: 60000,
+    refetchInterval: 300000,
   });
 
   // Combine and Sort

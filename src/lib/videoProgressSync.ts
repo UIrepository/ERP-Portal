@@ -58,6 +58,17 @@ function toEntry(row: { recording_id: string; progress_seconds: number; duration
  */
 export async function pullProgress(userId: string | null | undefined): Promise<boolean> {
   if (!userId) return false;
+  // Cross-device progress moves slowly — one pull per 15 min per user is
+  // plenty. Without this, every dashboard remount (each tab switch) re-ran the
+  // two queries below for every student.
+  try {
+    const k = `ui_ssp_progress_pulled_at:${userId}`;
+    const last = Number(localStorage.getItem(k) || 0);
+    if (Date.now() - last < 15 * 60_000) return false;
+    localStorage.setItem(k, String(Date.now()));
+  } catch {
+    // localStorage unavailable — fall through and pull anyway
+  }
   try {
     const { data: rows } = await supabase
       .from('video_progress')

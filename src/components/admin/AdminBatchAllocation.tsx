@@ -18,6 +18,13 @@ export const AdminBatchAllocation = () => {
 
   const { data: users = [] } = useQuery({
     queryKey: ['admin-users-allocation'],
+    // This list is every profile in the system — the single heaviest read in
+    // the app. Only the columns the allocation UI shows/edits, and hold the
+    // result for the whole admin session: refetching ~1MB of profiles on every
+    // tab switch was the #1 Supabase egress line item. Saving an allocation
+    // still invalidates this query, so edits show immediately.
+    staleTime: 30 * 60_000,
+    gcTime: 45 * 60_000,
     queryFn: async () => {
         // Supabase caps each request at 1000 rows; page through so every user is
         // selectable for allocation (there are 1000+ profiles).
@@ -26,7 +33,7 @@ export const AdminBatchAllocation = () => {
         let all: any[] = [];
         for (let from = 0; ; from += PAGE) {
             const { data, error } = await supabase
-                .from('profiles').select('*')
+                .from('profiles').select('id, user_id, name, email, role, batch, subjects')
                 .order('user_id', { ascending: true })
                 .range(from, from + PAGE - 1);
             if (error) throw error;

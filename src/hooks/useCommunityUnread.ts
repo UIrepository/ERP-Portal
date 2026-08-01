@@ -86,7 +86,7 @@ export function useCommunityUnread(): number {
       return sum;
     },
     enabled: enrollments.length > 0 && !!uid,
-    refetchInterval: 60000,
+    refetchInterval: 300000,
   });
 
   return total;

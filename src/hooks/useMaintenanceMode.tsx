@@ -1,33 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-
-interface MaintenanceSettings {
-  is_maintenance_mode: boolean;
-  maintenance_message: string | null;
-}
+import { useSharedFlags } from '@/hooks/useSharedFlags';
 
 export const useMaintenanceMode = (userEmail: string | undefined) => {
-  // Fetch maintenance settings
-  const { data: settings, isLoading: settingsLoading } = useQuery({
-    queryKey: ['maintenance-settings'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('maintenance_settings')
-        .select('is_maintenance_mode, maintenance_message')
-        .maybeSingle(); // <--- CHANGED from .single() to .maybeSingle()
-
-      if (error) {
-        console.error("Error fetching maintenance settings:", error);
-        // Return default values on error to prevent infinite loading
-        return { is_maintenance_mode: false, maintenance_message: null };
-      }
-      
-      // If table is empty, return default
-      return data ?? { is_maintenance_mode: false, maintenance_message: null };
-    },
-    staleTime: 30000, 
-    retry: 1, // Only retry once to fail fast if there's an issue
-  });
+  // Maintenance flag rides the shared (Vercel-edge-cached) flags feed instead
+  // of every client polling maintenance_settings directly.
+  const { data: flags, isLoading: settingsLoading } = useSharedFlags();
+  const settings = flags?.maintenance;
 
   // Check if user is verified for maintenance access.
   // Compare case-insensitively — auth emails and stored emails can drift in case.

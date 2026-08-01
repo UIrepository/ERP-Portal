@@ -31,6 +31,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [sessionExpired, setSessionExpired] = useState(false);
   const hadUserRef = useRef(false);
   const explicitSignOutRef = useRef(false);
+  // user_id whose profile AND role are already resolved in this tab — lets the
+  // hourly TOKEN_REFRESHED event skip the redundant profile + role refetch
+  // (those refetches were a top per-user Supabase egress source).
+  const resolvedForRef = useRef<string | null>(null);
 
   const mounted = useRef(true);
 
@@ -126,6 +130,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (mounted.current && role) {
         setResolvedRole(role);
+        resolvedForRef.current = currentUser.id;
         try {
           localStorage.setItem('ui_ssp_role', role);
         } catch {
@@ -190,6 +195,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         // Lost the session without the user asking to sign out → it expired.
         if (hadUserRef.current && !explicitSignOutRef.current) setSessionExpired(true);
         hadUserRef.current = false;
+        resolvedForRef.current = null;
         setProfile(null);
         setResolvedRole(null);
         try {
@@ -214,6 +220,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       if (newSession?.user && event !== 'INITIAL_SESSION') {
+        // Hourly token refreshes don't change who the user is — if this tab
+        // already resolved this user's profile + role, skip the refetch.
+        if (event === 'TOKEN_REFRESHED' && resolvedForRef.current === newSession.user.id) {
+          setLoading(false);
+          return;
+        }
         // Defer DB calls to avoid deadlocks inside the auth callback
         setTimeout(() => {
           if (!mounted.current) return;

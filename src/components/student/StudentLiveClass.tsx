@@ -183,7 +183,7 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
     staleTime: 0,
     // Realtime (active_classes subscription above) makes "live" appear instantly;
     // this poll is just a slow backup in case the socket drops.
-    refetchInterval: 60000
+    refetchInterval: 180000
   });
 
   // Logic to separate "Live Now" from "Upcoming" — all compared in IST

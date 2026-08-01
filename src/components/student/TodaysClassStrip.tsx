@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Play } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchCachedToday } from '@/lib/cachedReads';
 import { parseVideoUrl } from '@/components/video-player/useVideoPlayer';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { openInternalRoute } from '@/hooks/useInstallApp';
@@ -24,7 +25,10 @@ interface ScheduleRow {
   day_of_week: number | null;
 }
 interface ActiveRow { subject: string; started_at: string | null }
-interface RecordingRow { id: string; subject: string; topic: string; embed_link: string; date: string }
+// embed_link is absent when the row came from the CDN-cached /api/shared feed
+// (it deliberately omits watch links); the card then shows the logo frame and
+// the player fetches the link by id under RLS.
+interface RecordingRow { id: string; subject: string; topic: string; embed_link?: string; date: string }
 
 const IST_OFFSET_MIN = 330;
 const hhmmToMin = (t: string) => {
@@ -98,26 +102,40 @@ export const TodaysClassStrip = ({ batch, enrolledSubjects = [], onJoinLive }: T
   const { data } = useQuery({
     queryKey: ['todays-class', batch, subjectsKey, todayStr],
     enabled: !!batch && enrolledSubjects.length > 0,
-    // Live status must stay fresh (no realtime backup), so poll and never serve
-    // stale on mount. Small, batch+subject-scoped selects keep egress modest.
-    staleTime: 0,
-    refetchInterval: 90000, // was 30s (egress)
+    // The CDN holds one shared copy per batch (s-maxage=60), so this poll mostly
+    // costs Vercel — not Supabase — bytes. Realtime (above) still flips "live"
+    // instantly; the poll is the slow backbone.
+    staleTime: 45000,
+    refetchInterval: 150000,
     queryFn: async () => {
-      const [schedRes, activeRes, recRes] = await Promise.all([
-        supabase.from('schedules').select('subject, start_time, end_time, date, day_of_week')
-          .eq('batch', batch).in('subject', enrolledSubjects)
-          .or(`day_of_week.eq.${dow},date.eq.${todayStr}`),
-        supabase.from('active_classes').select('subject, started_at')
-          .eq('batch', batch).in('subject', enrolledSubjects).eq('is_active', true),
-        supabase.from('recordings').select('id, subject, topic, embed_link, date')
-          .eq('batch', batch).in('subject', enrolledSubjects).eq('date', todayStr)
-          .order('created_at', { ascending: false }),
-      ]);
-      return {
-        schedules: (schedRes.data || []) as ScheduleRow[],
-        active: (activeRes.data || []) as ActiveRow[],
-        recordings: (recRes.data || []) as RecordingRow[],
-      };
+      const wanted = new Set(enrolledSubjects);
+      try {
+        // One edge-cached request for the whole batch, filtered to the
+        // student's subjects client-side (keeps the CDN cache key per-batch).
+        const t = await fetchCachedToday(batch!);
+        return {
+          schedules: (t.schedules as ScheduleRow[]).filter((s) => wanted.has(s.subject)),
+          active: (t.active as ActiveRow[]).filter((a) => wanted.has(a.subject)),
+          recordings: (t.recordings as RecordingRow[]).filter((r) => wanted.has(r.subject)),
+        };
+      } catch {
+        // Endpoint unavailable (vite dev / outage) — original direct reads.
+        const [schedRes, activeRes, recRes] = await Promise.all([
+          supabase.from('schedules').select('subject, start_time, end_time, date, day_of_week')
+            .eq('batch', batch).in('subject', enrolledSubjects)
+            .or(`day_of_week.eq.${dow},date.eq.${todayStr}`),
+          supabase.from('active_classes').select('subject, started_at')
+            .eq('batch', batch).in('subject', enrolledSubjects).eq('is_active', true),
+          supabase.from('recordings').select('id, subject, topic, embed_link, date')
+            .eq('batch', batch).in('subject', enrolledSubjects).eq('date', todayStr)
+            .order('created_at', { ascending: false }),
+        ]);
+        return {
+          schedules: (schedRes.data || []) as ScheduleRow[],
+          active: (activeRes.data || []) as ActiveRow[],
+          recordings: (recRes.data || []) as RecordingRow[],
+        };
+      }
     },
   });
 
@@ -211,8 +229,8 @@ export const TodaysClassStrip = ({ batch, enrolledSubjects = [], onJoinLive }: T
 
         {/* Recordings uploaded today — click the frame; keep the subject name. */}
         {recordings.map((rec) => {
-          const parsed = parseVideoUrl(rec.embed_link);
-          const thumb = parsed.type === 'youtube' && parsed.videoId
+          const parsed = rec.embed_link ? parseVideoUrl(rec.embed_link) : null;
+          const thumb = parsed && parsed.type === 'youtube' && parsed.videoId
             ? `https://img.youtube.com/vi/${parsed.videoId}/mqdefault.jpg`
             : null;
           return (

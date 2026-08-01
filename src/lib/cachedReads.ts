@@ -38,3 +38,32 @@ export async function fetchCachedSchedules(batches: string[]): Promise<CachedSch
   );
   return lists.flat();
 }
+
+/** /api/shared?resource=today — a batch's day at a glance (no join/watch links). */
+export interface CachedToday {
+  today: string;
+  dow: number;
+  schedules: {
+    subject: string;
+    start_time: string;
+    end_time: string;
+    date: string | null;
+    day_of_week: number | null;
+  }[];
+  active: { subject: string; started_at: string | null }[];
+  recordings: { id: string; subject: string; topic: string; date: string }[];
+}
+
+export function fetchCachedToday(batch: string): Promise<CachedToday> {
+  return getJson<CachedToday>(`/api/shared?resource=today&batch=${encodeURIComponent(batch)}`);
+}
+
+/** /api/shared?resource=flags — global app flags (world-readable under RLS anyway). */
+export interface CachedFlags {
+  maintenance: { is_maintenance_mode: boolean; maintenance_message: string | null };
+  feedback_gate: { enabled: boolean; scope: string };
+}
+
+export function fetchCachedFlags(): Promise<CachedFlags> {
+  return getJson<CachedFlags>('/api/shared?resource=flags');
+}

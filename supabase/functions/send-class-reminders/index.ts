@@ -41,11 +41,15 @@ Deno.serve(async (req) => {
 
     // Find schedules where reminder_time is within 1 minute of now
     // and reminder hasn't been sent today
-    // Match either by specific date or recurring day_of_week
+    // Match either by specific date or recurring day_of_week.
+    // Filter to TODAY server-side — this runs every minute, and pulling every
+    // reminder-bearing schedule row (~all of them) each run was a steady
+    // egress leak. The per-row date/dow checks below stay as a second guard.
     const { data: schedules, error: schedErr } = await supabase
       .from('schedules')
       .select('id, batch, subject, start_time, end_time, reminder_time, reminder_sent_date, date, day_of_week')
-      .not('reminder_time', 'is', null);
+      .not('reminder_time', 'is', null)
+      .or(`date.eq.${todayStr},and(date.is.null,day_of_week.eq.${currentDow})`);
 
     if (schedErr) {
       console.error('Error fetching schedules:', schedErr);

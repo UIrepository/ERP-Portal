@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useSharedFlags } from '@/hooks/useSharedFlags';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { FeedbackFormContent, FEEDBACK_QUESTIONS } from './StudentFeedback';
@@ -28,14 +29,10 @@ export const FeedbackGate = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: cfg } = useQuery<GateCfg>({
-    queryKey: ['feedback-gate-cfg'],
-    queryFn: async () => {
-      const { data } = await supabase.from('feedback_gate').select('enabled, scope').eq('id', 1).maybeSingle();
-      return (data || { enabled: false, scope: 'everywhere' }) as GateCfg;
-    },
-    refetchInterval: 120000,
-  });
+  // Gate config rides the shared (Vercel-edge-cached) flags feed — one Supabase
+  // read per minute globally instead of one per student every two minutes.
+  const { data: flags } = useSharedFlags();
+  const cfg = flags?.feedback_gate as GateCfg | undefined;
 
   const { data: pending = [], isLoading } = useQuery<Pending[]>({
     queryKey: ['my-pending-feedback-gate', profile?.user_id],
