@@ -681,14 +681,29 @@ export const StudentCommunity = ({ batch: batchProp }: { batch?: string } = {}) 
         reply_to_id: replyId,
         is_priority: false
       };
-      const { error } = await supabase.from('community_messages').insert(insertData as any);
+      const { data, error } = await supabase.from('community_messages').insert(insertData as any).select('*').single();
       if (error) throw error;
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (inserted: any) => {
       setMessageText('');
       setSelectedImage(null);
-      setReplyingTo(null); 
+      setReplyingTo(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      // Show MY message instantly from the confirmed insert — don't wait for
+      // realtime (which delivers the sender's own row unreliably). The realtime
+      // handler dedupes by id, so this never double-shows.
+      if (inserted && selectedGroup) {
+        const mine: CommunityMessage = {
+          ...(inserted as CommunityMessage),
+          profiles: { name: profile?.name ?? null, avatar_url: (profile as any)?.avatar_url ?? null },
+          message_likes: [],
+        };
+        const key = ['community-messages', selectedGroup.batch_name, selectedGroup.subject_name, orFilter];
+        queryClient.setQueryData<CommunityMessage[]>(key, (old = []) =>
+          old.some((m) => m.id === mine.id) ? old : [...old, mine],
+        );
+      }
     },
     onError: (e: any) => { setIsUploading(false); toast({ title: "Error", description: e.message, variant: "destructive" }); }
   });
