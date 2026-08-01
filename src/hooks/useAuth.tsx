@@ -135,6 +135,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         resolvedForRef.current = currentUser.id;
         try {
           localStorage.setItem('ui_ssp_role', role);
+          localStorage.setItem('ui_ssp_auth_verified', JSON.stringify({ uid: currentUser.id, at: Date.now() }));
         } catch {
           // ignore
         }
@@ -174,7 +175,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setUser(initialSession?.user ?? null);
 
           if (initialSession?.user) {
-            await fetchProfileAndRole(initialSession.user);
+            // Quota guard: within 6h of a verified fetch for THIS user, trust
+            // the cached profile+role instead of re-fetching on every page
+            // load (RLS still enforces the true role server-side; SIGNED_IN,
+            // sign-out and refreshProfile() always do the real fetch).
+            let usedCache = false;
+            try {
+              const stamp = JSON.parse(localStorage.getItem('ui_ssp_auth_verified') || 'null');
+              const cachedProfile = JSON.parse(localStorage.getItem('ui_ssp_profile') || 'null');
+              const cachedRole = localStorage.getItem('ui_ssp_role');
+              if (
+                stamp && cachedProfile && cachedRole &&
+                stamp.uid === initialSession.user.id &&
+                cachedProfile.user_id === initialSession.user.id &&
+                Date.now() - stamp.at < 6 * 60 * 60 * 1000
+              ) {
+                setProfile(cachedProfile);
+                setResolvedRole(cachedRole);
+                resolvedForRef.current = initialSession.user.id;
+                usedCache = true;
+              }
+            } catch {
+              // ignore — fall through to the network fetch
+            }
+            if (!usedCache) {
+              await fetchProfileAndRole(initialSession.user);
+            }
           }
           setLoading(false);
         }
@@ -203,6 +229,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         try {
           localStorage.removeItem('ui_ssp_profile');
           localStorage.removeItem('ui_ssp_role');
+          localStorage.removeItem('ui_ssp_auth_verified');
         } catch {
           // ignore
         }
@@ -215,6 +242,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (event === 'SIGNED_IN') {
         try {
           localStorage.removeItem('ui_ssp_role');
+          localStorage.removeItem('ui_ssp_auth_verified');
         } catch {
           // ignore
         }
