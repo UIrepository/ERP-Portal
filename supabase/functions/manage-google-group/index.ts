@@ -10,7 +10,16 @@ function sanitizeForEmail(str: string): string {
   return str.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 30);
 }
 
-async function getGoogleAccessToken(): Promise<string> {
+const DIRECTORY_SCOPE =
+  'https://www.googleapis.com/auth/admin.directory.group https://www.googleapis.com/auth/admin.directory.group.member';
+// Posting perms (whoCanPostMessage) use the Groups Settings API. This scope must
+// ALSO be authorized for the service account in the Workspace admin console
+// (Security → API Controls → Domain-wide Delegation) or the token exchange 403s.
+// Kept SEPARATE from the directory token so that, if it isn't authorized yet,
+// only the posting-lock is skipped — member adds keep working.
+const SETTINGS_SCOPE = 'https://www.googleapis.com/auth/apps.groups.settings';
+
+async function getGoogleAccessToken(scope: string = DIRECTORY_SCOPE): Promise<string> {
   const keyRaw = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_KEY');
   if (!keyRaw) throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY not configured.');
 
@@ -21,7 +30,7 @@ async function getGoogleAccessToken(): Promise<string> {
   const privateKey = await importPKCS8(keyJson.private_key, 'RS256');
 
   const jwt = await new SignJWT({
-    scope: 'https://www.googleapis.com/auth/admin.directory.group https://www.googleapis.com/auth/admin.directory.group.member',
+    scope,
     sub: adminEmail,
   })
     .setProtectedHeader({ alg: 'RS256', typ: 'JWT' })
@@ -46,6 +55,71 @@ async function getGoogleAccessToken(): Promise<string> {
 }
 
 const ADMIN_MEMBER_EMAIL = 'desk@unknowniitians.com';
+// The Resend "from" every announcement/email function posts as. It must be a
+// group MANAGER so it can still post once posting is locked to managers only.
+const POSTING_SENDER_EMAIL = 'notifications@hq.unknowniitians.com';
+
+// Add (or upgrade) an address to MANAGER so it can post under ALL_MANAGERS_CAN_POST.
+async function ensureManager(accessToken: string, groupEmail: string, memberEmail: string): Promise<void> {
+  const res = await fetch(
+    `https://admin.googleapis.com/admin/directory/v1/groups/${encodeURIComponent(groupEmail)}/members`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: memberEmail, role: 'MANAGER' }),
+    },
+  );
+  if (res.status === 409) {
+    // Already a member — make sure the role is MANAGER.
+    const patch = await fetch(
+      `https://admin.googleapis.com/admin/directory/v1/groups/${encodeURIComponent(groupEmail)}/members/${encodeURIComponent(memberEmail)}`,
+      {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'MANAGER' }),
+      },
+    );
+    if (!patch.ok) console.error(`Upgrade ${memberEmail} to manager of ${groupEmail} failed: ${await patch.text()}`);
+    return;
+  }
+  if (!res.ok) console.error(`Add manager ${memberEmail} to ${groupEmail} failed: ${await res.text()}`);
+}
+
+// Cache the settings-scope token for the life of a warm instance.
+let _settingsToken: { tok: string; exp: number } | null = null;
+async function getSettingsToken(): Promise<string> {
+  if (_settingsToken && _settingsToken.exp > Date.now()) return _settingsToken.tok;
+  const tok = await getGoogleAccessToken(SETTINGS_SCOPE);
+  _settingsToken = { tok, exp: Date.now() + 55 * 60 * 1000 };
+  return tok;
+}
+
+// Lock a group so only owners/managers can post (students, who are members,
+// cannot) — while announcements still work because the sender is a manager.
+async function setGroupPosting(groupEmail: string): Promise<void> {
+  const settingsToken = await getSettingsToken();
+  const res = await fetch(
+    `https://www.googleapis.com/groups/v1/groups/${encodeURIComponent(groupEmail)}?alt=json`,
+    {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${settingsToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        whoCanPostMessage: 'ALL_MANAGERS_CAN_POST',
+        messageModerationLevel: 'MODERATE_NONE',
+        whoCanModerateContent: 'OWNERS_AND_MANAGERS',
+      }),
+    },
+  );
+  if (!res.ok) throw new Error(`set posting perms for ${groupEmail} failed: ${res.status} ${await res.text()}`);
+}
+
+// Make a group announcement-only: sender + desk are managers (via the directory
+// token), then lock posting (via the separate settings token).
+async function secureGroup(directoryToken: string, groupEmail: string): Promise<void> {
+  await ensureManager(directoryToken, groupEmail, POSTING_SENDER_EMAIL);
+  await ensureManager(directoryToken, groupEmail, ADMIN_MEMBER_EMAIL);
+  await setGroupPosting(groupEmail);
+}
 
 async function createGoogleGroup(accessToken: string, email: string, name: string): Promise<{ status: string }> {
   const res = await fetch('https://admin.googleapis.com/admin/directory/v1/groups', {
@@ -66,12 +140,14 @@ async function createGoogleGroup(accessToken: string, email: string, name: strin
     console.log(`Created group: ${email}`);
   }
 
-  // Always ensure desk@ is a member of every group
+  // Announcement-only: only managers/owners can post (students, added as
+  // members, cannot) — desk@ and the announcement sender are made managers so
+  // they can still post. Best-effort so group creation never fails on this.
   try {
-    await addMember(accessToken, email, ADMIN_MEMBER_EMAIL);
-    console.log(`Ensured ${ADMIN_MEMBER_EMAIL} is member of ${email}`);
+    await secureGroup(accessToken, email);
+    console.log(`Secured posting (managers-only) for ${email}`);
   } catch (err) {
-    console.error(`Failed to add ${ADMIN_MEMBER_EMAIL} to ${email}:`, err);
+    console.error(`Failed to secure posting for ${email}:`, err);
   }
 
   return { status: res.status === 409 ? 'already_exists' : 'created' };
@@ -265,7 +341,42 @@ Deno.serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ error: 'Invalid action. Supported: add_member, bulk_add_allstudents' }), {
+    // One-time backfill: lock posting (managers-only) on EVERY existing group.
+    if (action === 'secure_groups') {
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+      );
+      const accessToken = await getGoogleAccessToken();
+      const domain = Deno.env.get('GOOGLE_GROUPS_DOMAIN') || 'unknowniitians.com';
+      const { data: groups } = await supabase
+        .from('google_groups')
+        .select('group_email')
+        .eq('is_active', true);
+      const emails = Array.from(
+        new Set([
+          ...((groups || []).map((g: any) => g.group_email).filter(Boolean) as string[]),
+          `allstudents@${domain}`,
+        ]),
+      );
+      const results: { group: string; status: string }[] = [];
+      for (const email of emails) {
+        try {
+          await secureGroup(accessToken, email);
+          results.push({ group: email, status: 'secured' });
+        } catch (err) {
+          results.push({ group: email, status: `error: ${(err as Error).message}` });
+        }
+        await new Promise((r) => setTimeout(r, 200)); // gentle on rate limits
+      }
+      const secured = results.filter((r) => r.status === 'secured').length;
+      console.log(`secure_groups: ${secured}/${emails.length} secured`);
+      return new Response(JSON.stringify({ success: true, total: emails.length, secured, results }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify({ error: 'Invalid action. Supported: add_member, bulk_add_allstudents, secure_groups' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
