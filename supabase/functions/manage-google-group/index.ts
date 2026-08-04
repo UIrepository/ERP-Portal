@@ -341,6 +341,28 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Read back a group's posting setting (verification).
+    if (action === 'check_group') {
+      const groupEmail = String(body.group_email || '').trim();
+      if (!groupEmail) {
+        return new Response(JSON.stringify({ error: 'group_email required' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const settingsToken = await getSettingsToken();
+      const res = await fetch(
+        `https://www.googleapis.com/groups/v1/groups/${encodeURIComponent(groupEmail)}?alt=json`,
+        { headers: { Authorization: `Bearer ${settingsToken}` } },
+      );
+      const data = await res.json();
+      return new Response(JSON.stringify({
+        group: groupEmail,
+        whoCanPostMessage: data.whoCanPostMessage,
+        whoCanModerateContent: data.whoCanModerateContent,
+        messageModerationLevel: data.messageModerationLevel,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     // One-time backfill: lock posting (managers-only) on EVERY existing group.
     if (action === 'secure_groups') {
       const supabase = createClient(
@@ -359,21 +381,27 @@ Deno.serve(async (req) => {
           `allstudents@${domain}`,
         ]),
       );
+      // Process a CHUNK per call (the runtime CPU/mem budget can't do 45+ groups
+      // in one invocation). Caller loops using next_offset until it's null.
+      const offset = Number(body.offset) || 0;
+      const limit = Number(body.limit) || 8;
+      const slice = emails.slice(offset, offset + limit);
       const results: { group: string; status: string }[] = [];
-      for (const email of emails) {
+      for (const email of slice) {
         try {
           await secureGroup(accessToken, email);
           results.push({ group: email, status: 'secured' });
         } catch (err) {
           results.push({ group: email, status: `error: ${(err as Error).message}` });
         }
-        await new Promise((r) => setTimeout(r, 200)); // gentle on rate limits
       }
       const secured = results.filter((r) => r.status === 'secured').length;
-      console.log(`secure_groups: ${secured}/${emails.length} secured`);
-      return new Response(JSON.stringify({ success: true, total: emails.length, secured, results }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      const next_offset = offset + limit < emails.length ? offset + limit : null;
+      console.log(`secure_groups: offset ${offset}, ${secured}/${slice.length} secured, next ${next_offset}`);
+      return new Response(
+        JSON.stringify({ success: true, total: emails.length, offset, processed: slice.length, secured, next_offset, results }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
 
     return new Response(JSON.stringify({ error: 'Invalid action. Supported: add_member, bulk_add_allstudents, secure_groups' }), {
