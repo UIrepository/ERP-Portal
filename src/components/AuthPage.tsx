@@ -60,29 +60,6 @@ export const AuthPage = () => {
     setIsGoogleLoading(false);
   };
 
-  // Fallback sign-in via a full-page redirect (Supabase OAuth). Unlike the GSI
-  // button above, this does NOT need third-party cookies / the gsi widget — so
-  // it works on browsers that block them (Safari, Chrome with 3p-cookies off,
-  // privacy extensions), which otherwise blank-screen at accounts.google.com/gsi.
-  const handleRedirectLogin = async () => {
-    setIsGoogleLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: window.location.origin },
-      });
-      if (error) throw error;
-      // success → the browser navigates to Google; nothing else to do here.
-    } catch (error) {
-      toast({
-        title: "Couldn't start Google sign-in",
-        description: error instanceof Error ? error.message : 'Please try again.',
-        variant: 'destructive',
-      });
-      setIsGoogleLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen w-full bg-white font-sans md:grid md:grid-cols-[1.05fr_1fr]">
       {/* Cinematic crossfade keyframes for the left frame */}
@@ -162,19 +139,6 @@ export const AuthPage = () => {
               )}
             </Button>
           </div>
-
-          {/* Fallback for browsers where the Google widget blank-screens */}
-          <p className="mt-4 text-center text-[12px] leading-relaxed text-slate-500">
-            Button not working or stuck on a blank Google screen?{' '}
-            <button
-              type="button"
-              onClick={handleRedirectLogin}
-              disabled={isGoogleLoading}
-              className="font-medium text-brand underline underline-offset-2 hover:text-brand/80 disabled:opacity-50"
-            >
-              Sign in another way
-            </button>
-          </p>
 
           {/* Terms */}
           <p className="mt-6 text-center text-[11.5px] leading-relaxed text-slate-400">
