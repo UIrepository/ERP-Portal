@@ -247,6 +247,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           // ignore
         }
         setResolvedRole(null);
+        // Stamp user_id onto any enrollments matching this email. Runs here so it
+        // covers BOTH sign-in flows (the GSI id-token button AND the redirect
+        // fallback). Idempotent + fire-and-forget.
+        if (newSession?.user) {
+          supabase.functions
+            .invoke('link-user-enrollments', {
+              body: { email: newSession.user.email, user_id: newSession.user.id },
+            })
+            .catch((e) => console.error('link-user-enrollments failed:', e));
+        }
       }
 
       if (newSession?.user && event !== 'INITIAL_SESSION') {
