@@ -84,8 +84,8 @@ export const AuthPage = () => {
             Update
           </div>
           <div className="mt-2 px-0 text-[12px] leading-relaxed">
-            <span className="block">Some users may experience intermittent issues accessing the dashboard. Our engineering team is investigating the incident and working to restore full service.</span>
-            <span className="block">An update has been released, and monitoring is ongoing. We apologize for the inconvenience. Reported at: 4:35 AM IST, 6 August 2026.</span>
+            <span className="block">The dashboard access issue has been resolved as of 2:46 PM IST, 6 August 2026.</span>
+            <span className="block">Thank you for your patience.</span>
           </div>
         </div>
       </div>
