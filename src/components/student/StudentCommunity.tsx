@@ -95,6 +95,9 @@ interface UserEnrollment {
   subject_name: string;
 }
 
+// How many messages to load per page (initial open + each scroll-up load-older).
+const COMMUNITY_PAGE_SIZE = 30;
+
 // Last name — concise, readable label so people are easy to tell apart
 const lastName = (name?: string | null) => {
   const parts = (name || 'Student').trim().split(/\s+/).filter(Boolean);
@@ -363,6 +366,13 @@ export const StudentCommunity = ({ batch: batchProp }: { batch?: string } = {}) 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
+  // --- WhatsApp-style message pagination (load older on scroll-up) ---
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const loadingOlderRef = useRef(false); // true while prepending → don't auto-scroll to bottom
+  const prevLenRef = useRef(0);
+  const prevGroupRef = useRef<string | null>(null);
+
   const [selectedGroup, setSelectedGroup] = useState<UserEnrollment | null>(null);
   const [messageText, setMessageText] = useState('');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -522,16 +532,64 @@ export const StudentCommunity = ({ batch: batchProp }: { batch?: string } = {}) 
           message_likes ( user_id, reaction_type )
         `)
         .or(orFilter)
-        // Only the latest 80 messages (newest first) then flip to chronological —
-        // avoids re-downloading the entire thread on every fetch (egress).
+        // WhatsApp-style: load only the most recent page on open (older messages
+        // load on scroll-up). Big egress cut vs pulling 80 every time.
         .order('created_at', { ascending: false })
-        .limit(80);
+        .limit(COMMUNITY_PAGE_SIZE);
 
       if (error) throw error;
       return ((data || []) as CommunityMessage[]).reverse();
     },
     enabled: !!selectedGroup && !!orFilter
   });
+
+  // Reset pagination when the open chat changes.
+  useEffect(() => {
+    setHasMore(true);
+    loadingOlderRef.current = false;
+    prevLenRef.current = 0;
+  }, [selectedGroup?.batch_name, selectedGroup?.subject_name, orFilter]);
+
+  // Load one older page on scroll-up, keeping the viewport anchored (no jump).
+  const loadOlder = async () => {
+    if (loadingOlderRef.current || !hasMore || !selectedGroup || !orFilter) return;
+    const oldest = messages[0]?.created_at;
+    if (!oldest) return;
+    const container = scrollAreaRef.current;
+    const prevHeight = container?.scrollHeight ?? 0;
+    const prevTop = container?.scrollTop ?? 0;
+    loadingOlderRef.current = true;
+    setLoadingOlder(true);
+    try {
+      const { data } = await supabase
+        .from('community_messages')
+        .select(`*, profiles:profile_basics (name, avatar_url), message_likes ( user_id, reaction_type )`)
+        .or(orFilter)
+        .lt('created_at', oldest)
+        .order('created_at', { ascending: false })
+        .limit(COMMUNITY_PAGE_SIZE);
+      const older = ((data || []) as CommunityMessage[]).reverse();
+      if (older.length < COMMUNITY_PAGE_SIZE) setHasMore(false);
+      if (older.length > 0) {
+        const key = ['community-messages', selectedGroup.batch_name, selectedGroup.subject_name, orFilter];
+        queryClient.setQueryData<CommunityMessage[]>(key, (old = []) => {
+          const seen = new Set(old.map((m) => m.id));
+          const fresh = older.filter((m) => !seen.has(m.id));
+          return [...fresh, ...old];
+        });
+        // Anchor the viewport to the same message after prepending older ones.
+        requestAnimationFrame(() => {
+          const c = scrollAreaRef.current;
+          if (c) c.scrollTop = c.scrollHeight - prevHeight + prevTop;
+        });
+      }
+    } catch (e) {
+      console.error('loadOlder failed:', e);
+    } finally {
+      setLoadingOlder(false);
+      setTimeout(() => { loadingOlderRef.current = false; }, 120);
+    }
+  };
 
   const messageMap = useMemo(() => {
     const map = new Map<string, CommunityMessage>();
@@ -674,8 +732,23 @@ export const StudentCommunity = ({ batch: batchProp }: { batch?: string } = {}) 
   }, [enrollments, queryClient]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
-  }, [messages?.length, selectedGroup]);
+    const groupKey = selectedGroup ? `${selectedGroup.batch_name}|${selectedGroup.subject_name}` : null;
+    const groupChanged = groupKey !== prevGroupRef.current;
+    const grew = messages.length > prevLenRef.current;
+    prevGroupRef.current = groupKey;
+    prevLenRef.current = messages.length;
+
+    if (loadingOlderRef.current) return; // prepending older → keep position
+    if (!groupChanged && !grew) return;  // edit/delete/reaction → don't move
+
+    // Jump to bottom when opening a chat; for a new message only if already near
+    // the bottom (don't yank the user down while they're reading history).
+    const c = scrollAreaRef.current;
+    const nearBottom = !c || c.scrollHeight - c.scrollTop - c.clientHeight < 200;
+    if (groupChanged || nearBottom) {
+      requestAnimationFrame(() => messagesEndRef.current?.scrollIntoView({ behavior: 'auto' }));
+    }
+  }, [messages.length, selectedGroup]);
 
   // Mark the open community as read (clears its unread badge)
   useEffect(() => {
@@ -891,8 +964,21 @@ export const StudentCommunity = ({ batch: batchProp }: { batch?: string } = {}) 
           />
 
           {/* Messages List */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 z-10 pb-24 md:pb-4" ref={scrollAreaRef}>
-            
+          <div
+            className="flex-1 overflow-y-auto p-4 space-y-4 z-10 pb-24 md:pb-4"
+            ref={scrollAreaRef}
+            onScroll={(e) => {
+              if (e.currentTarget.scrollTop < 60 && hasMore && !loadingOlderRef.current) loadOlder();
+            }}
+          >
+
+            {/* Loading older messages (appears when you scroll up) */}
+            {loadingOlder && (
+              <div className="flex justify-center py-2">
+                <Loader2 className="animate-spin h-5 w-5 text-indigo-400" />
+              </div>
+            )}
+
             {/* Professional Encryption/System Note */}
             <div className="flex justify-center mb-6 mt-2">
                 <div className="text-gray-400 text-[10px] font-medium flex items-center gap-1.5 select-none bg-gray-200/50 px-3 py-1 rounded-full border border-gray-200 backdrop-blur-sm">
