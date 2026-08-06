@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Pin } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 
@@ -69,24 +69,28 @@ export const AuthPage = () => {
         .ui-slide--top { animation: uiCrossfade 14s ease-in-out infinite; }
         @keyframes uiRise { 0% { opacity:0; transform:translateY(10px) } 100% { opacity:1; transform:translateY(0) } }
         @keyframes uiFlicker { 0%,100% { transform:rotate(-7deg) scale(1) } 50% { transform:rotate(7deg) scale(1.2) } }
+        @keyframes uiMarquee { from { transform:translateX(0) } to { transform:translateX(-50%) } }
         .ui-tagline { animation: uiRise .7s cubic-bezier(.2,.7,.2,1) both; }
         .ui-emoji { display:inline-block; animation: uiFlicker 1.5s ease-in-out infinite; transform-origin: 60% 85%; }
+        .ui-notice-track { display:flex; width:max-content; animation: uiMarquee 28s linear infinite; }
         @media (prefers-reduced-motion: reduce) {
           .ui-slide--top { animation: none; opacity:0; }
-          .ui-tagline, .ui-emoji { animation: none; }
+          .ui-tagline, .ui-emoji, .ui-notice-track { animation: none; }
         }
       `}</style>
 
       {/* Page-level technical update */}
       <div className="pointer-events-none absolute inset-x-0 top-6 z-10 flex justify-center px-6 text-center" role="status" aria-label="Service update">
-        <div className="max-w-2xl text-slate-800">
-          <div className="flex items-center justify-center gap-1.5 text-[12px] font-bold uppercase tracking-[0.22em] text-red-600">
-            <Pin className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
-            <span>Update</span>
+        <div className="w-full max-w-none text-slate-800">
+          <div className="text-[12px] font-bold uppercase tracking-[0.22em] text-red-600">
+            Update
           </div>
-          <p className="mt-2 text-[12px] leading-relaxed">
-            Some users may experience intermittent issues accessing the dashboard. Our engineering team is investigating the incident and working to restore full service. An update has been released, and monitoring is ongoing. We apologize for the inconvenience. Reported at: 4:35 AM IST, 6 August 2026.
-          </p>
+          <div className="mt-2 w-full overflow-hidden whitespace-nowrap text-[12px] leading-relaxed">
+            <div className="ui-notice-track">
+              <span className="px-8">Some users may experience intermittent issues accessing the dashboard. Our engineering team is investigating the incident and working to restore full service. An update has been released, and monitoring is ongoing. We apologize for the inconvenience. Reported at: 4:35 AM IST, 6 August 2026.</span>
+              <span className="px-8" aria-hidden="true">Some users may experience intermittent issues accessing the dashboard. Our engineering team is investigating the incident and working to restore full service. An update has been released, and monitoring is ongoing. We apologize for the inconvenience. Reported at: 4:35 AM IST, 6 August 2026.</span>
+            </div>
+          </div>
         </div>
       </div>
 
