@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Pin } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 
@@ -61,7 +61,7 @@ export const AuthPage = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-white font-sans md:grid md:grid-cols-[1.05fr_1fr]">
+    <div className="relative min-h-screen w-full bg-white font-sans md:grid md:grid-cols-[1.05fr_1fr]">
       {/* Cinematic crossfade keyframes for the left frame */}
       <style>{`
         @keyframes uiCrossfade { 0%,40% { opacity:0 } 50%,90% { opacity:1 } 100% { opacity:0 } }
@@ -77,6 +77,19 @@ export const AuthPage = () => {
         }
       `}</style>
 
+      {/* Page-level technical update */}
+      <div className="pointer-events-none absolute inset-x-0 top-6 z-10 flex justify-center px-6 text-center" role="status" aria-label="Service update">
+        <div className="max-w-2xl text-slate-800">
+          <div className="flex items-center justify-center gap-1.5 text-[12px] font-bold uppercase tracking-[0.22em] text-red-600">
+            <Pin className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+            <span>Update</span>
+          </div>
+          <p className="mt-2 text-[12px] leading-relaxed">
+            Some users may experience intermittent issues accessing the dashboard. Our engineering team is investigating the incident and working to restore full service. An update has been released, and monitoring is ongoing. We apologize for the inconvenience. Reported at: 4:35 AM IST, 6 August 2026.
+          </p>
+        </div>
+      </div>
+
       {/* Left: framed cinematic photo pair — full 3:2 image, centered (desktop only) */}
       <aside className="relative hidden md:flex items-center justify-center overflow-hidden bg-white p-6 lg:p-10">
         <div className="relative w-full max-w-[640px] aspect-[3/2] overflow-hidden rounded-[24px] bg-slate-900 shadow-[0_30px_80px_-32px_rgba(15,23,42,0.5)] ring-1 ring-black/5">
@@ -86,14 +99,7 @@ export const AuthPage = () => {
       </aside>
 
       {/* Right: sign-in */}
-      <main className="flex min-h-screen flex-col items-center justify-center px-6 py-12">
-        <div className="mb-8 w-full max-w-sm text-center text-slate-800" role="status" aria-label="Service update">
-          <p className="text-[12px] font-bold uppercase tracking-[0.22em] text-red-600">Update</p>
-          <p className="mt-2 text-[12px] leading-relaxed">
-            Some users may experience intermittent issues accessing the dashboard. Our engineering team is investigating the incident and working to restore full service. An update has been released, and monitoring is ongoing. We apologize for the inconvenience. Reported at: 4:35 AM, 6 August 2026.
-          </p>
-        </div>
-
+      <main className="flex min-h-screen flex-col items-center justify-center px-6 py-12 pt-40 md:pt-44">
         <div className="w-full max-w-sm">
           {/* UI logo + brand name (Inter Regular) */}
           <div className="flex items-center justify-center gap-2.5">
