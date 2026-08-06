@@ -90,7 +90,7 @@ export const AuthPage = () => {
         <div className="mb-8 w-full max-w-sm text-center text-slate-800" role="status" aria-label="Service update">
           <p className="text-[12px] font-bold uppercase tracking-[0.22em] text-red-600">Update</p>
           <p className="mt-2 text-[12px] leading-relaxed">
-            Dashboard access issues were first reported at 4:35 AM on 6 August 2026. An update has been released, and we are continuing to work on a complete resolution. We are sorry for the inconvenience.
+            Some users may experience intermittent issues accessing the dashboard. Our engineering team is investigating the incident and working to restore full service. An update has been released, and monitoring is ongoing. We apologize for the inconvenience. Reported at: 4:35 AM, 6 August 2026.
           </p>
         </div>
 
