@@ -69,18 +69,11 @@ export const AuthPage = () => {
         .ui-slide--top { animation: uiCrossfade 14s ease-in-out infinite; }
         @keyframes uiRise { 0% { opacity:0; transform:translateY(10px) } 100% { opacity:1; transform:translateY(0) } }
         @keyframes uiFlicker { 0%,100% { transform:rotate(-7deg) scale(1) } 50% { transform:rotate(7deg) scale(1.2) } }
-        @keyframes uiMarquee { from { transform:translateX(0) } to { transform:translateX(-50%) } }
         .ui-tagline { animation: uiRise .7s cubic-bezier(.2,.7,.2,1) both; }
         .ui-emoji { display:inline-block; animation: uiFlicker 1.5s ease-in-out infinite; transform-origin: 60% 85%; }
-        .ui-marquee-track { display:flex; width:max-content; animation: uiMarquee 24s linear infinite; }
-        @media (min-width: 768px) {
-          .ui-marquee-track { width:100%; animation:none; }
-          .ui-marquee-track > span:first-child { width:100%; text-align:center; }
-          .ui-marquee-track > span:last-child { display:none; }
-        }
         @media (prefers-reduced-motion: reduce) {
           .ui-slide--top { animation: none; opacity:0; }
-          .ui-tagline, .ui-emoji, .ui-marquee-track { animation: none; }
+          .ui-tagline, .ui-emoji { animation: none; }
         }
       `}</style>
 
@@ -94,6 +87,13 @@ export const AuthPage = () => {
 
       {/* Right: sign-in */}
       <main className="flex min-h-screen flex-col items-center justify-center px-6 py-12">
+        <div className="mb-8 w-full max-w-sm text-center text-slate-800" role="status" aria-label="Service update">
+          <p className="text-[12px] font-bold uppercase tracking-[0.22em] text-red-600">Update</p>
+          <p className="mt-2 text-[12px] leading-relaxed">
+            Dashboard access issues were first reported at 4:35 AM on 6 August 2026. An update has been released, and we are continuing to work on a complete resolution. We are sorry for the inconvenience.
+          </p>
+        </div>
+
         <div className="w-full max-w-sm">
           {/* UI logo + brand name (Inter Regular) */}
           <div className="flex items-center justify-center gap-2.5">
@@ -101,20 +101,8 @@ export const AuthPage = () => {
             <span className="text-[17px] font-normal tracking-tight text-slate-800">Unknown IITians</span>
           </div>
 
-          {/* Hardcoded service update ticker */}
-          <div
-            className="mt-8 overflow-hidden rounded-full border border-amber-200/80 bg-amber-50 py-2.5 text-[11px] text-amber-900"
-            role="status"
-            aria-label="Service update"
-          >
-            <div className="ui-marquee-track">
-              <span className="px-6">Update: We are sorry for the inconvenience users may face while accessing the dashboard. We are continuously working on it. Time: 4:35 AM, 06.08.26.</span>
-              <span className="px-6" aria-hidden="true">Update: We are sorry for the inconvenience users may face while accessing the dashboard. We are continuously working on it. Time: 4:35 AM, 06.08.26.</span>
-            </div>
-          </div>
-
           {/* Heading + welcome */}
-          <p className="ui-tagline mt-10 text-center text-[22px] font-semibold leading-relaxed tracking-tight text-slate-800">
+          <p className="ui-tagline mt-14 text-center text-[22px] font-semibold leading-relaxed tracking-tight text-slate-800">
             Your study choice is too good <span className="ui-emoji align-middle">&#128293;</span>
           </p>
           <p className="mt-4 text-center text-[12.5px] leading-relaxed text-emerald-600">
