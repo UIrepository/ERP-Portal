@@ -73,6 +73,11 @@ export const AuthPage = () => {
         .ui-tagline { animation: uiRise .7s cubic-bezier(.2,.7,.2,1) both; }
         .ui-emoji { display:inline-block; animation: uiFlicker 1.5s ease-in-out infinite; transform-origin: 60% 85%; }
         .ui-marquee-track { display:flex; width:max-content; animation: uiMarquee 24s linear infinite; }
+        @media (min-width: 768px) {
+          .ui-marquee-track { width:100%; animation:none; }
+          .ui-marquee-track > span:first-child { width:100%; text-align:center; }
+          .ui-marquee-track > span:last-child { display:none; }
+        }
         @media (prefers-reduced-motion: reduce) {
           .ui-slide--top { animation: none; opacity:0; }
           .ui-tagline, .ui-emoji, .ui-marquee-track { animation: none; }
