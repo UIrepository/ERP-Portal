@@ -77,19 +77,6 @@ export const AuthPage = () => {
         }
       `}</style>
 
-      {/* Page-level technical update */}
-      <div className="pointer-events-none absolute inset-x-0 top-6 z-10 flex justify-center text-center" role="status" aria-label="Service update">
-        <div className="w-full text-slate-800">
-          <div className="text-[12px] font-bold uppercase tracking-[0.22em] text-red-600">
-            Update
-          </div>
-          <div className="mt-2 px-0 text-[12px] leading-relaxed">
-            <span className="block">The dashboard access issue has been resolved as of 2:46 PM IST, 6 August 2026.</span>
-            <span className="block">Thank you for your patience.</span>
-          </div>
-        </div>
-      </div>
-
       {/* Left: framed cinematic photo pair — full 3:2 image, centered (desktop only) */}
       <aside className="relative hidden md:flex items-center justify-center overflow-hidden bg-white p-6 lg:p-10">
         <div className="relative w-full max-w-[640px] aspect-[3/2] overflow-hidden rounded-[24px] bg-slate-900 shadow-[0_30px_80px_-32px_rgba(15,23,42,0.5)] ring-1 ring-black/5">
@@ -99,7 +86,7 @@ export const AuthPage = () => {
       </aside>
 
       {/* Right: sign-in */}
-      <main className="flex min-h-screen flex-col items-center justify-center px-6 py-12 pt-40 md:pt-44">
+      <main className="flex min-h-screen flex-col items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm">
           {/* UI logo + brand name (Inter Regular) */}
           <div className="flex items-center justify-center gap-2.5">
