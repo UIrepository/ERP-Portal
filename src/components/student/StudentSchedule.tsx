@@ -183,6 +183,10 @@ export const StudentSchedule = () => {
       return data || [];
     },
     enabled: !!user?.id,
+    // A student's enrollments barely change within a session — don't re-read
+    // them every time the schedule tab remounts.
+    staleTime: 30 * 60_000,
+    gcTime: 60 * 60_000,
   });
 
   // Extract unique batches (preserves the "newest first" order from the DB query)
@@ -258,7 +262,11 @@ export const StudentSchedule = () => {
       }
     },
     // Don't fire the query until the default selection logic has set a valid state
-    enabled: studentBatches.length > 0 && selectedBatchFilter !== '', 
+    enabled: studentBatches.length > 0 && selectedBatchFilter !== '',
+    // The timetable changes only when staff edit it — serve from cache for
+    // 15 min so moving between tabs doesn't re-hit the CDN/DB each time.
+    staleTime: 15 * 60_000,
+    gcTime: 30 * 60_000,
   });
 
   const isLoading = isEnrollmentsLoading || isSchedulesLoading;

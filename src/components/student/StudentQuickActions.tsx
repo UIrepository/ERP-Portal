@@ -36,7 +36,7 @@ export const StudentQuickActions = ({ batch, subjects }: StudentQuickActionsProp
       
       const { data, error } = await supabase
         .from('schedules')
-        .select('*')
+        .select('id, subject, day_of_week, date, start_time, end_time')
         .eq('batch', batch)
         .in('subject', subjects)
         .or(`day_of_week.eq.${currentDayOfWeek},date.eq.${todayDateStr}`);
@@ -52,6 +52,11 @@ export const StudentQuickActions = ({ batch, subjects }: StudentQuickActionsProp
       });
     },
     enabled: !!batch && subjects.length > 0,
+    // Today's timetable doesn't change minute-to-minute; ongoing/next-class is
+    // computed client-side from the cached rows, so a 10-min cache is safe and
+    // stops the dashboard re-reading schedules on every visit.
+    staleTime: 10 * 60_000,
+    gcTime: 20 * 60_000,
   });
 
   // Find ongoing class
@@ -84,6 +89,8 @@ export const StudentQuickActions = ({ batch, subjects }: StudentQuickActionsProp
       return count || 0;
     },
     enabled: !!batch,
+    staleTime: 10 * 60_000,
+    gcTime: 20 * 60_000,
   });
 
   const formatTime = (time: string) => {

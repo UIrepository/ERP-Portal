@@ -21,7 +21,10 @@ export const StudentExtraClasses = () => {
         .eq('user_id', profile!.user_id);
       return data || [];
     },
-    enabled: !!profile?.user_id
+    enabled: !!profile?.user_id,
+    // Enrollments barely change within a session.
+    staleTime: 30 * 60_000,
+    gcTime: 60 * 60_000,
   });
 
   const batches = useMemo(() => Array.from(new Set(enrollments?.map(e => e.batch_name) || [])), [enrollments]);

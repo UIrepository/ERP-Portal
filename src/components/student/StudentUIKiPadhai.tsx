@@ -63,7 +63,11 @@ export const StudentUIKiPadhai = ({ batch, subject, onBack }: StudentUIKiPadhaiP
         if (error) throw error;
         return (data || []) as UIKiPadhaiContent[];
     },
-    enabled: !!batch && !!subject
+    enabled: !!batch && !!subject,
+    // Batch-shared content list, low churn — cache 15 min so re-opening the
+    // tab serves from memory instead of re-reading the whole list.
+    staleTime: 15 * 60_000,
+    gcTime: 30 * 60_000,
   });
 
   const handleAccessContent = (content: UIKiPadhaiContent) => {
