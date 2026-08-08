@@ -38,6 +38,10 @@ interface StudentRecordingsProps {
 // mobile via Tailwind, fixed 280px from sm+ — see the card classNames below).
 const CARD_HEIGHT = 280;
 const BANNER_HEIGHT = 160;
+// Only render this many cards up front; the rest reveal via "Load More". The
+// whole list is already in memory (one cached fetch), this just keeps a batch
+// with hundreds of lectures from painting every card at once.
+const RECORDINGS_PAGE = 24;
 
 // Skeletons
 const RecordingSkeleton = () => (
@@ -69,6 +73,7 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
     const queryClient = useQueryClient();
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
+    const [visibleCount, setVisibleCount] = useState(RECORDINGS_PAGE);
     const [selectedRecording, setSelectedRecording] = useState<RecordingContent | null>(null);
     
     
@@ -113,6 +118,13 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
     const filteredRecordings = useMemo(() => (recordings || []).filter(rec =>
         rec.topic.toLowerCase().includes(searchTerm.toLowerCase())
     ), [recordings, searchTerm]);
+
+    // Show only the first `visibleCount`; "Load More" reveals the rest.
+    const visibleRecordings = useMemo(
+        () => filteredRecordings.slice(0, visibleCount),
+        [filteredRecordings, visibleCount]
+    );
+    const hasMore = filteredRecordings.length > visibleCount;
 
     // Transform database recording to player Lecture format
     const recordingToLecture = useCallback((rec: RecordingContent, index: number): Lecture => ({
@@ -225,7 +237,7 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
                         <Input
                             placeholder="Search topics..."
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e) => { setSearchTerm(e.target.value); setVisibleCount(RECORDINGS_PAGE); }}
                             className="pl-9 h-9 text-sm bg-white border-slate-200 focus:border-teal-500 focus:ring-teal-500"
                         />
                     </div>
@@ -236,9 +248,10 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
                     {isLoading ? (
                         <RecordingSkeleton />
                     ) : filteredRecordings.length > 0 ? (
+                        <>
                         <div className="flex flex-wrap gap-5">
-                            {filteredRecordings.map((recording, index) => {
-                                const lectureNo = filteredRecordings.length - index; 
+                            {visibleRecordings.map((recording, index) => {
+                                const lectureNo = filteredRecordings.length - index;
                                 
                                 return (
                                     <div 
@@ -316,6 +329,17 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
                                 );
                             })}
                         </div>
+                        {hasMore && (
+                            <div className="mt-8 flex justify-center">
+                                <button
+                                    onClick={() => setVisibleCount((c) => c + RECORDINGS_PAGE)}
+                                    className="rounded-full border border-teal-200 bg-teal-50 px-6 py-2.5 text-sm font-medium text-teal-700 transition-colors hover:bg-teal-100"
+                                >
+                                    Load more lectures ({filteredRecordings.length - visibleCount} more)
+                                </button>
+                            </div>
+                        )}
+                        </>
                     ) : (
                         <div className="text-center py-16 bg-white rounded-lg border border-dashed border-slate-300">
                             <div className="inline-block bg-slate-50 rounded-full p-3 mb-3">

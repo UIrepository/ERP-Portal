@@ -105,17 +105,24 @@ export const StudentNotes = ({ batch, subject, onBack }: StudentNotesProps) => {
     queryFn: async (): Promise<NotesContent[]> => {
         if (!batch || !subject) return [];
         
+        // Only the columns the cards render — `select('*')` also pulled
+        // updated_at/tags/uploader that are never shown, on every visit.
         const { data, error } = await supabase
             .from('notes')
-            .select('*')
+            .select('id, title, filename, subject, batch, file_url, created_at')
             .eq('batch', batch)
             .eq('subject', subject)
             .order('created_at', { ascending: false });
-        
+
         if (error) throw error;
         return (data || []) as NotesContent[];
     },
-    enabled: !!batch && !!subject
+    enabled: !!batch && !!subject,
+    // References change rarely (a teacher uploads occasionally). Serve from
+    // cache for 15 min so re-opening the tab doesn't re-hit the DB; the
+    // realtime channel below still invalidates instantly on an actual upload.
+    staleTime: 15 * 60_000,
+    gcTime: 30 * 60_000,
   });
 
   useEffect(() => {

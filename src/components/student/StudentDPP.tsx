@@ -112,18 +112,24 @@ export const StudentDPP = ({ batch, subject, onBack }: StudentDPPProps) => {
     queryFn: async (): Promise<DPPContent[]> => {
         if (!batch || !subject) return [];
         
+        // Only the columns the cards render (drops description and other unused
+        // fields that `select('*')` shipped on every visit).
         const { data, error } = await supabase
             .from('dpp_content')
-            .select('*')
+            .select('id, title, difficulty, link, subject, batch, is_active, created_at')
             .eq('batch', batch)
             .eq('subject', subject)
             .eq('is_active', true)
             .order('created_at', { ascending: false });
-        
+
         if (error) throw error;
         return (data || []) as DPPContent[];
     },
-    enabled: !!batch && !!subject
+    enabled: !!batch && !!subject,
+    // DPPs change rarely; serve from cache for 15 min so tab-switches don't
+    // refetch. The realtime channel below still invalidates on a real change.
+    staleTime: 15 * 60_000,
+    gcTime: 30 * 60_000,
   });
 
   useEffect(() => {
