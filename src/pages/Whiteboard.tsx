@@ -946,9 +946,15 @@ const Whiteboard = () => {
     try {
       const snap = getSnapshot(editor.store);
       const snapBlob = new Blob([JSON.stringify(snap)], { type: 'application/json' });
+      // Deterministic public_id per board + overwrite: every autosave overwrites
+      // the SAME Cloudinary object instead of minting a new random one. This is
+      // what stops orphaned snapshots from piling up (previously each save left a
+      // ~10 MB dead copy behind). invalidate purges the CDN copy of the old bytes.
       const { url: contentUrl, publicId: contentPid } = await uploadBlobToCloudinary(snapBlob, {
-        folder: 'whiteboards',
         resourceType: 'raw',
+        publicId: `whiteboards/wb-${fileId}.json`,
+        overwrite: true,
+        invalidate: true,
         fileName: `wb-${fileId}.json`,
       });
 
@@ -958,8 +964,10 @@ const Whiteboard = () => {
       if (thumbBlob) {
         try {
           const up = await uploadBlobToCloudinary(thumbBlob, {
-            folder: 'whiteboard_thumbs',
             resourceType: 'image',
+            publicId: `whiteboard_thumbs/thumb-${fileId}`,
+            overwrite: true,
+            invalidate: true,
             fileName: `thumb-${fileId}.png`,
           });
           patch.thumbnail_url = up.url;
