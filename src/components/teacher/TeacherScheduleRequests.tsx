@@ -150,6 +150,17 @@ export const TeacherScheduleRequests = () => {
       
       if (!selectedClass) throw new Error('Invalid class selected');
 
+      // Required fields — empty strings would be sent to NOT NULL date/time
+      // columns and rejected by Postgres ("invalid input syntax for type
+      // date/time"), which previously surfaced only as a generic failure.
+      if (!formData.new_date) throw new Error('Please choose the new date');
+      if (!formData.new_start_time || !formData.new_end_time) {
+        throw new Error('Please set both the new start and end time');
+      }
+      if (formData.new_end_time <= formData.new_start_time) {
+        throw new Error('End time must be after start time');
+      }
+
       // CRITICAL FIX: Include schedule_id in the insert so managers can update it later
       const { error } = await supabase
         .from('schedule_requests')
@@ -176,7 +187,9 @@ export const TeacherScheduleRequests = () => {
       setFilterDate(''); // Reset filter
     },
     onError: (error) => {
-      toast.error('Failed to submit request');
+      // Show the actual reason (our validation messages, or the DB error)
+      // instead of a generic string that hides what went wrong.
+      toast.error(error instanceof Error ? error.message : 'Failed to submit request');
       console.error(error);
     }
   });
@@ -351,7 +364,16 @@ export const TeacherScheduleRequests = () => {
                     />
                   </div>
                   
-                  <Button onClick={() => createRequest.mutate()} disabled={createRequest.isPending} className="w-full">
+                  <Button
+                    onClick={() => createRequest.mutate()}
+                    disabled={
+                      createRequest.isPending ||
+                      !formData.new_date ||
+                      !formData.new_start_time ||
+                      !formData.new_end_time
+                    }
+                    className="w-full"
+                  >
                     {createRequest.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                     Submit Request
                   </Button>
