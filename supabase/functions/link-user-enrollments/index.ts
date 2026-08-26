@@ -1,14 +1,31 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://ssp.unknowniitians.com',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// The portal is served from several production domains (all Vercel aliases of
+// the same app) plus local dev — echo the caller's origin back when it's one of
+// them. Hardcoding only .com blocked enrollment-linking on the .in / .live
+// domains (and on localhost), so those users silently never got linked.
+const ALLOWED_ORIGINS = [
+  'https://ssp.unknowniitians.com',
+  'https://ssp.unknowniitians.in',
+  'https://ssp.unknowniitians.live',
+  'http://localhost:8080',
+  'http://localhost:5173',
+];
+function corsHeaders(origin: string | null) {
+  const allow = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin': allow,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Vary': 'Origin',
+  };
+}
 
 Deno.serve(async (req) => {
+  const cors = corsHeaders(req.headers.get('Origin'));
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: cors });
   }
 
   try {
@@ -17,7 +34,7 @@ Deno.serve(async (req) => {
     if (!authHeader) {
       return new Response(
         JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 401, headers: { ...cors, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -33,7 +50,7 @@ Deno.serve(async (req) => {
     if (authError || !user) {
       return new Response(
         JSON.stringify({ error: 'Invalid or expired token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 401, headers: { ...cors, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -45,7 +62,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: 'Missing email or user_id' }),
         { 
           status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          headers: { ...cors, 'Content-Type': 'application/json' } 
         }
       );
     }
@@ -58,7 +75,7 @@ Deno.serve(async (req) => {
       });
       return new Response(
         JSON.stringify({ error: 'You can only link your own enrollments' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 403, headers: { ...cors, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -77,7 +94,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: error.message }),
         { 
           status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          headers: { ...cors, 'Content-Type': 'application/json' } 
         }
       );
     }
@@ -90,7 +107,7 @@ Deno.serve(async (req) => {
         linked: data?.length || 0,
         enrollments: data 
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...cors, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
     console.error('Link enrollments error:', error);
@@ -98,7 +115,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { 
         status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { ...cors, 'Content-Type': 'application/json' } 
       }
     );
   }
