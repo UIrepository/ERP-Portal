@@ -295,6 +295,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
                   {withTooltip(tab.label,
                     <Button
                         variant="ghost"
+                        data-tour={`nav-${tab.id}`}
                         className={navItemClass(active)}
                         onClick={() => onTabChange(tab.id)}
                     >

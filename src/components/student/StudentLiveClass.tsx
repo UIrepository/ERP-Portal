@@ -24,6 +24,14 @@ interface StudentLiveClassProps {
   onBack?: () => void;
 }
 
+// Grace fallback: if the teacher's "class is live" signal (active_classes row)
+// never reaches the student — realtime dropped, or the row was written under a
+// merged pair we didn't match — let them join anyway once the class is this many
+// minutes past its scheduled start. The join link is the deterministic room the
+// teacher is in, so this lands them in the right place. Before this, we still
+// show "Waiting for teacher" so nobody enters an empty room early.
+const JOIN_FALLBACK_MIN = 5;
+
 interface ScheduleWithLink {
   id: string;
   batch: string;
@@ -183,9 +191,12 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
     // 60s cache: realtime flips "live" instantly and the 180s poll refreshes;
     // staleTime 0 forced a full refetch (with stream keys) on EVERY tab switch.
     staleTime: 60_000,
-    // Realtime (active_classes subscription above) makes "live" appear instantly;
-    // this poll is just a slow backup in case the socket drops.
-    refetchInterval: 180000
+    // Realtime (active_classes subscription above) makes "live" appear instantly.
+    // This poll is the backup when the socket drops — tightened to 45s so a
+    // missed "live" signal is picked up within ~45s instead of up to 3 min. It
+    // only runs while a student is sitting on the Live tab, so egress is bounded.
+    refetchInterval: 45000,
+    refetchOnWindowFocus: true,
   });
 
   // Logic to separate "Live Now" from "Upcoming" — all compared in IST
@@ -277,7 +288,15 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
       {allClasses.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Render Live Classes */}
-          {liveClasses.map((item) => (
+          {liveClasses.map((item) => {
+            const [sh, sm] = item.start_time.split(':').map(Number);
+            const [eh, em] = item.end_time.split(':').map(Number);
+            const startMinutes = sh * 60 + sm;
+            const endMinutes = eh * 60 + em;
+            // Teacher's signal received, OR we're ≥5 min into the class (grace).
+            const graceOpen = istMinutesNow >= startMinutes + JOIN_FALLBACK_MIN && istMinutesNow <= endMinutes + 15;
+            const joinable = item.is_jitsi_live || graceOpen;
+            return (
              <div key={item.id} className="bg-white border border-slate-200 rounded-[4px] p-6 flex flex-col justify-between min-h-[180px] transition-colors hover:border-slate-300 shadow-sm">
                 <div className="mb-5">
                    <div className="flex items-center gap-1.5 mb-3">
@@ -294,26 +313,35 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
                    </p>
                 </div>
 
-                <div className="flex items-center justify-between mt-auto">
-                   <span className="text-[13px] font-normal text-slate-900">
-                      {formatTimeRange(item.start_time, item.end_time)}
-                   </span>
-                   {/* Check if teacher is truly live before allowing join */}
-                   {item.is_jitsi_live ? (
-                     <button 
-                       onClick={() => handleJoinClass(item)}
-                       className="bg-slate-900 text-white px-4 py-2 text-[12px] font-normal rounded-[4px] hover:bg-slate-800 transition-opacity"
-                     >
-                       Join Class
-                     </button>
-                   ) : (
-                     <button disabled className="bg-slate-100 text-slate-400 px-4 py-2 text-[12px] font-normal rounded-[4px] cursor-not-allowed border border-slate-200">
-                       Waiting for Teacher...
-                     </button>
+                <div className="flex flex-col gap-2 mt-auto">
+                   <div className="flex items-center justify-between">
+                      <span className="text-[13px] font-normal text-slate-900">
+                         {formatTimeRange(item.start_time, item.end_time)}
+                      </span>
+                      {joinable ? (
+                        <button
+                          onClick={() => handleJoinClass(item)}
+                          className="bg-slate-900 text-white px-4 py-2 text-[12px] font-normal rounded-[4px] hover:bg-slate-800 transition-opacity"
+                        >
+                          Join Class
+                        </button>
+                      ) : (
+                        <button disabled className="bg-slate-100 text-slate-400 px-4 py-2 text-[12px] font-normal rounded-[4px] cursor-not-allowed border border-slate-200">
+                          Waiting for Teacher...
+                        </button>
+                      )}
+                   </div>
+                   {/* Grace join: teacher's live signal not confirmed, but the class
+                       is past its start — reassure the student it's OK to enter. */}
+                   {joinable && !item.is_jitsi_live && (
+                     <p className="text-[11px] text-slate-400 leading-snug">
+                       If the class has started, you can join now. If no one’s there yet, please wait for the teacher.
+                     </p>
                    )}
                 </div>
              </div>
-          ))}
+            );
+          })}
 
           {/* Render Upcoming Classes */}
           {upcomingClasses.map((item) => (

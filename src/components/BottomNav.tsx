@@ -36,6 +36,7 @@ export const BottomNav = ({ tabs, activeTab, onTabChange }: BottomNavProps) => {
             <button
               key={tab.id}
               type="button"
+              data-tour={`nav-${tab.id}`}
               onClick={() => (tab.onSelect ? tab.onSelect() : onTabChange(tab.id))}
               aria-label={tab.label}
               aria-current={active ? 'page' : undefined}

@@ -205,7 +205,7 @@ export const StudentNotes = ({ batch, subject, onBack }: StudentNotesProps) => {
       {/* Main Section Holding Container */}
       <div className="bg-white p-4 sm:p-6 md:p-8 rounded-lg">
           {/* Header Section */}
-          <div className="mb-6 sm:mb-8 border-b border-slate-100 pb-5 sm:pb-6">
+          <div data-tour="notes-list" className="mb-6 sm:mb-8 border-b border-slate-100 pb-5 sm:pb-6">
             <div className="flex items-center gap-3">
               {onBack && <StudentBackButton onClick={onBack} />}
               <h1 className="text-2xl font-bold text-gray-900 tracking-tight">

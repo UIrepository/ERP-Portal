@@ -134,10 +134,11 @@ export const StudentSubjectBlocks = ({
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div data-tour="blocks-grid" className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {blocks.map((block) => (
               <button
                 key={block.id}
+                data-tour={`block-${block.id}`}
                 onClick={() => {
                   if (block.id === 'connect') {
                     openSubjectConnect(batch, subject);

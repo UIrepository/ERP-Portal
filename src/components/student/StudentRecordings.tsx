@@ -223,7 +223,7 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
             <div className="bg-white p-4 sm:p-6">
 
                 {/* Header Section */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 sm:mb-8">
+                <div data-tour="recordings-list" className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 sm:mb-8">
                     <div className="flex items-center gap-3">
                         {onBack && <StudentBackButton onClick={onBack} />}
                         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">

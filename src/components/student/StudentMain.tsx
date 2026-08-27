@@ -23,6 +23,12 @@ import {
 } from "@/components/ui/sheet";
 import { FullScreenVideoPlayer } from '@/components/video-player/FullScreenVideoPlayer';
 import { Lecture } from '@/components/video-player/types';
+import { GuidedTour, TourStep } from './GuidedTour';
+
+// Bump this key to re-show the walkthrough to everyone after a nav change.
+// The steps are built inside the component (below) because they drive the app's
+// own navigation (open a subject → its blocks → lectures/notes).
+const STUDENT_TOUR_KEY = 'ui_ssp_tour_v2';
 
 interface UserEnrollment {
   batch_name: string;
@@ -231,36 +237,31 @@ const StudentMainContent = () => {
     updateUrl(newNav);
   };
 
-  // Render block content view
-  if (navigation.level === 'block' && navigation.batch && navigation.subject && navigation.block) {
-    return (
+  // Drill-in screens (subject → blocks → block content). Rendered as a variable
+  // (not an early return) so the GuidedTour below stays mounted across levels.
+  const drillScreen =
+    navigation.level === 'block' && navigation.batch && navigation.subject && navigation.block ? (
       <StudentBlockContent
         blockId={navigation.block}
         batch={navigation.batch}
         subject={navigation.subject}
         onBack={handleBackToBlocks}
       />
-    );
-  }
-
-  // Render subject blocks view
-  if (navigation.level === 'subject' && navigation.batch && navigation.subject) {
-    return (
+    ) : navigation.level === 'subject' && navigation.batch && navigation.subject ? (
       <StudentSubjectBlocks
         batch={navigation.batch}
         subject={navigation.subject}
         onBack={handleBackToSubjects}
         onBlockSelect={handleSelectBlock}
       />
-    );
-  }
+    ) : null;
 
   // --- Main Batch Level View ---
   const renderTabContent = () => {
     switch (activeTab) {
       case 'classes':
         return (
-          <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div data-tour="subjects" className="w-full animate-in fade-in slide-in-from-bottom-4 duration-300">
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-[#1e293b] mb-0.5">Subjects</h2>
               <p className="text-[13px] text-[#64748b]">Select your subjects & start learning</p>
@@ -328,7 +329,68 @@ const StudentMainContent = () => {
     }
   };
 
+  // ----- Guided onboarding tour -----
+  // Steps live here (not module scope) because they DRIVE the app's own
+  // navigation: dashboard → open a subject → its blocks → into the lectures &
+  // notes lists. Each beforeStep sets ABSOLUTE state so Back/Next both land right.
+  const firstSubject = subjectsForBatch[0];
+  const applyNav = useCallback((nav: NavigationState) => {
+    setNavigation(nav);
+    updateUrl(nav);
+  }, [updateUrl]);
+
+  const tourSteps: TourStep[] = useMemo(() => {
+    const b = navigation.batch;
+    const goDash = () => {
+      setActiveTab('classes');
+      applyNav({ level: 'batch', batch: b, subject: null, block: null });
+    };
+    const steps: TourStep[] = [
+      { icon: '👋', title: 'Welcome to your dashboard', body: 'A quick guided tour so you always know where your classes, notes and everything else live. Takes about a minute — you can skip anytime.', beforeStep: goDash },
+      { selector: '[data-tour="header"]', icon: '🎓', title: 'Your batch', body: 'This shows the batch you’re currently viewing. Enrolled in more than one? Use “Switch Batch” up here to jump between them.', beforeStep: goDash },
+      // Side menu (left rail on desktop, bottom bar on mobile) — the top-level
+      // pages. We spotlight each in place without navigating, so the tour stays
+      // on the dashboard while it points them out.
+      { selector: '[data-tour="nav-dashboard"]', title: 'Home', body: 'This is Home — the dashboard you’re on now, with your subjects, live classes and today’s activity.', beforeStep: goDash },
+      { selector: '[data-tour="nav-schedule"]', title: 'Schedule', body: 'Your full class timetable — see which classes are coming up and when. Open it from here anytime.', beforeStep: goDash },
+      { selector: '[data-tour="nav-feedback"]', title: 'Feedback', body: 'Share feedback about your classes and teachers here — it genuinely helps us improve.', beforeStep: goDash },
+      { selector: '[data-tour="nav-exams"]', title: 'Exams', body: 'Your exam schedule and details live here — check it so you never miss a test.', beforeStep: goDash },
+      { selector: '[data-tour="tab-classes"]', icon: '📚', title: 'All Classes', body: 'Your home base — pick a subject to open its recorded lectures, notes and daily practice problems.', beforeStep: goDash },
+      { selector: '[data-tour="tab-live"]', icon: '🔴', title: 'Join Live Class', body: 'When a class is happening live, a Join button appears here to take you straight into it.', beforeStep: goDash },
+      { selector: '[data-tour="tab-announcements"]', icon: '📢', title: 'Announcements', body: 'Notices, schedule changes and important messages from your teachers land here — check it often.', beforeStep: goDash },
+      { selector: '[data-tour="tab-community"]', icon: '💬', title: 'Community', body: 'A group chat for your batch — ask doubts, talk to teachers and share resources.', beforeStep: goDash },
+      { selector: '[data-tour="tab-connect"]', icon: '🛟', title: 'Support Connect', body: 'Facing a technical issue or have a question? Reach the support team directly from here.', beforeStep: goDash },
+      { selector: '[data-tour="tutorial"]', icon: '🎬', title: 'How to use me?', body: 'Prefer watching? This plays a full video walkthrough of the portal anytime.', beforeStep: goDash },
+      { selector: '[data-tour="subjects"]', icon: '✨', title: 'Your subjects', body: 'Each card is a subject. Let’s open one and see what’s inside →', beforeStep: goDash },
+    ];
+
+    if (firstSubject) {
+      const openSubject = () => applyNav({ level: 'subject', batch: b, subject: firstSubject, block: null });
+      const openBlock = (id: string) => applyNav({ level: 'block', batch: b, subject: firstSubject, block: id });
+      steps.push(
+        { selector: '[data-tour="blocks-grid"]', icon: '🗂️', title: `Inside “${firstSubject}”`, body: 'Every subject opens into these sections — lectures, notes, DPPs and more. Here’s what each one holds:', beforeStep: openSubject },
+        { selector: '[data-tour="block-recordings"]', icon: '▶️', title: 'Lectures', body: 'All recorded classes for this subject live here. Let’s open it →', beforeStep: openSubject },
+        { selector: '[data-tour="recordings-list"]', icon: '🎥', title: 'Recorded lectures', body: 'Each past class appears as a card — tap any card to watch it. (We won’t open the video now.)', beforeStep: () => openBlock('recordings') },
+        { selector: '[data-tour="block-notes"]', icon: '📝', title: 'Notes & PDFs', body: 'Back in the subject, “Notes & PDFs” has all your study material and assignments. Opening it →', beforeStep: openSubject },
+        { selector: '[data-tour="notes-list"]', icon: '📄', title: 'Your notes & files', body: 'Notes and PDFs show as cards — tap the download button on any to open the file. (Links stay closed during the tour.)', beforeStep: () => openBlock('notes') },
+        { selector: '[data-tour="block-dpps"]', icon: '🎯', title: 'DPPs', body: 'Daily Practice Problems to test yourself after each class.', beforeStep: openSubject },
+        { selector: '[data-tour="block-ui-ki-padhai"]', icon: '⭐', title: 'UI Ki Padhai', body: 'Exclusive premium series and extra content curated just for you.', beforeStep: openSubject },
+      );
+    }
+
+    steps.push({
+      icon: '🚀', title: 'You’re all set!',
+      body: 'That’s the whole portal. You can replay this tour anytime from “How to use me?”. Happy learning!',
+      beforeStep: goDash,
+    });
+    return steps;
+  }, [navigation.batch, firstSubject, applyNav]);
+
+  const tourRun = isInitialized && !isLoadingEnrollments && subjectsForBatch.length > 0;
+
   return (
+    <>
+      {drillScreen ?? (
     // Outer Container
     <div className="w-full max-w-[1840px] mx-auto px-4 md:px-6 py-6 flex flex-col gap-6 min-h-screen font-sans">
       
@@ -348,7 +410,7 @@ const StudentMainContent = () => {
           <div className="pointer-events-none absolute -bottom-24 left-1/4 h-52 w-52 rounded-full bg-indigo-400/25 blur-3xl z-0" />
           <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(120%_120%_at_0%_0%,rgba(255,255,255,0.12),transparent_55%)]" />
           
-          <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div data-tour="header" className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             {/* Title - Arrow REMOVED */}
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold tracking-tight text-white">
@@ -358,7 +420,8 @@ const StudentMainContent = () => {
 
             <div className="flex items-center gap-3">
               {/* Tutorial Button */}
-              <Button 
+              <Button
+                data-tour="tutorial"
                 variant="outline"
                 className="bg-white/15 backdrop-blur-xl backdrop-saturate-150 border-white/30 text-white hover:bg-white/25 hover:text-white shadow-lg shadow-black/10 gap-2 font-sans font-normal"
                 onClick={() => setShowTutorial(true)}
@@ -443,6 +506,7 @@ const StudentMainContent = () => {
             ].map((tab) => (
               <button
                 key={tab.id}
+                data-tour={`tab-${tab.id}`}
                 onClick={() => handleTabClick(tab.id)}
                 className={cn(
                   "py-4 text-[14px] font-medium transition-colors relative whitespace-nowrap",
@@ -502,7 +566,14 @@ const StudentMainContent = () => {
           userName={profile?.name}
         />
       )}
+
     </div>
+      )}
+
+      {/* First-login onboarding walkthrough — mounted outside the level branching
+          so it stays alive while it drives the app through subjects & blocks. */}
+      <GuidedTour steps={tourSteps} storageKey={STUDENT_TOUR_KEY} run={tourRun} />
+    </>
   );
 };
 
