@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -9,6 +9,8 @@ import { BubbleChatIcon, Cancel01Icon } from '@hugeicons/core-free-icons';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { SUPPORT_TREE } from '@/lib/supportTree';
+import { ChevronRight, Plus } from 'lucide-react';
 import { 
   Drawer, 
   DrawerContent, 
@@ -33,20 +35,31 @@ export const StudentChatbot = () => {
     state, 
     closeDrawer, 
     selectSupportRole, 
-    setRecipient, 
+    setRecipient,
     resetToRoleSelection,
-    toggleChatbot 
+    openSubjectConnect,
+    toggleChatbot
   } = useChatDrawer();
   const [message, setMessage] = useState('');
+  // Guided self-help runs INSIDE the chat as a conversation: the bot asks, the
+  // student taps quick-reply options, each pick echoes as their own message, the
+  // bot "types" (three dots) then replies. Human handoff only appears at the end.
+  const [chatMsgs, setChatMsgs] = useState<{ id: number; from: 'bot' | 'user'; text: string; href?: { label: string; url: string } }[]>([]);
+  const [chatOpts, setChatOpts] = useState<{ label: string; onSelect: () => void; filled?: boolean }[]>([]);
+  const [botTyping, setBotTyping] = useState(false);
+  const chatIdRef = useRef(0);
+  // The batch the student's issue is about (asked up front when they have >1).
+  const [supBatch, setSupBatch] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const guidedEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const [isLoadingRecipient, setIsLoadingRecipient] = useState(false);
   const [managerUnavailable, setManagerUnavailable] = useState(false);
   const isMobile = useIsMobile();
 
   // Custom styles from design
-  const bubbleMeClass = "rounded-[12px_12px_2px_12px]";
-  const bubbleThemClass = "rounded-[12px_12px_12px_2px]";
+  const bubbleMeClass = "rounded-[8px_8px_2px_8px]";
+  const bubbleThemClass = "rounded-[8px_8px_8px_2px]";
   const premiumShadowClass = "shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_-1px_rgba(0,0,0,0.1)]";
   const chatWindowShadowClass = "shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1),0_0_0_1px_rgba(0,0,0,0.05)]";
 
@@ -84,6 +97,26 @@ export const StudentChatbot = () => {
     },
     enabled: !!profile?.user_id && state.isOpen && studentBatches !== undefined,
   });
+
+  // Enrolled (batch, subject) pairs — the "Subject doubt" branch uses these to
+  // connect the student to that subject's teacher (reuses the subject-connect flow).
+  const { data: enrolledPairs = [] } = useQuery({
+    queryKey: ['support-enrolled-pairs', profile?.user_id],
+    queryFn: async () => {
+      if (!profile?.user_id) return [];
+      const { data } = await supabase
+        .from('user_enrollments')
+        .select('batch_name, subject_name')
+        .eq('user_id', profile.user_id);
+      return (data as { batch_name: string; subject_name: string }[]) || [];
+    },
+    enabled: !!profile?.user_id && state.isOpen,
+  });
+  const enrolledSubjects = useMemo(() => {
+    const map = new Map<string, string>(); // subject -> a batch that has it
+    for (const e of enrolledPairs) if (e.subject_name && !map.has(e.subject_name)) map.set(e.subject_name, e.batch_name);
+    return Array.from(map, ([subject, batch]) => ({ subject, batch }));
+  }, [enrolledPairs]);
 
   // Fetch admin for support using RPC
   const fetchAdmin = async () => {
@@ -128,7 +161,7 @@ export const StudentChatbot = () => {
       if (role === 'admin') {
         staffMember = await fetchAdmin();
       } else {
-        staffMember = await fetchManager(studentBatches || []);
+        staffMember = await fetchManager(supBatch ? [supBatch] : (studentBatches || []));
       }
 
       if (staffMember && staffMember.user_id) {
@@ -137,10 +170,18 @@ export const StudentChatbot = () => {
           name: staffMember.name,
           displayName: role === 'admin' ? 'Support Admin' : 'Academic Manager',
         });
-      } else {
-        if (role === 'manager') {
+      } else if (role === 'manager') {
+        // No manager for this student's batch (or the user isn't enrolled in any
+        // batch) — fall back to Admin so support is never a dead end.
+        const admin = await fetchAdmin();
+        if (admin && admin.user_id) {
+          selectSupportRole('admin');
+          setRecipient({ id: admin.user_id, name: admin.name, displayName: 'Support Admin' });
+        } else {
           setManagerUnavailable(true);
+          resetToRoleSelection();
         }
+      } else {
         resetToRoleSelection();
       }
     } catch {
@@ -148,6 +189,93 @@ export const StudentChatbot = () => {
     } finally {
       setIsLoadingRecipient(false);
     }
+  };
+
+  // ----- Guided self-help conversation engine -----
+  const nid = () => (chatIdRef.current += 1);
+  const addUser = (text: string) => setChatMsgs((m) => [...m, { id: nid(), from: 'user', text }]);
+  // Bot "types" for a beat (three dots), then drops its message(s) + next options.
+  const botSay = (
+    items: { text: string; href?: { label: string; url: string } }[],
+    opts: { label: string; onSelect: () => void; filled?: boolean }[] = [],
+  ) => {
+    setChatOpts([]);
+    setBotTyping(true);
+    window.setTimeout(() => {
+      setBotTyping(false);
+      setChatMsgs((m) => [...m, ...items.map((it) => ({ id: nid(), from: 'bot' as const, text: it.text, href: it.href }))]);
+      setChatOpts(opts);
+    }, 700);
+  };
+  const categoryOptions = () => SUPPORT_TREE.map((c) => ({ label: c.label, onSelect: () => chooseCategory(c.id) }));
+  const greetTopics = (lead = 'Hi 👋 ') => botSay([{ text: `${lead}What do you need help with? Pick a topic below.` }], categoryOptions());
+  const startSupportChat = () => {
+    chatIdRef.current = 0;
+    setChatMsgs([]);
+    const batches = studentBatches || [];
+    // Ask which batch first only when the student is in more than one. One batch
+    // is auto-selected silently; no enrolment → skip the question entirely.
+    if (batches.length > 1 && !supBatch) {
+      botSay([{ text: 'Hi 👋 Which batch do you need help with?' }], batches.map((b) => ({ label: b, onSelect: () => chooseBatch(b) })));
+    } else {
+      if (batches.length === 1 && !supBatch) setSupBatch(batches[0]);
+      greetTopics();
+    }
+  };
+  const chooseBatch = (b: string) => {
+    addUser(b);
+    setSupBatch(b);
+    greetTopics('Thanks! ');
+  };
+  const chooseCategory = (catId: string) => {
+    const c = SUPPORT_TREE.find((x) => x.id === catId);
+    if (!c) return;
+    addUser(c.label);
+    botSay([{ text: 'Got it 👍 Which of these is closest?' }], c.leaves.map((l) => ({ label: l.q, onSelect: () => chooseLeaf(catId, l.id) })));
+  };
+  const chooseLeaf = (catId: string, leafId: string) => {
+    const l = SUPPORT_TREE.find((x) => x.id === catId)?.leaves.find((x) => x.id === leafId);
+    if (!l) return;
+    addUser(l.q);
+    // Subject doubt → ask which subject (scoped to the chosen batch), then connect.
+    if (l.route === 'teacher') {
+      const subs = enrolledSubjects.filter((s) => !supBatch || s.batch === supBatch);
+      if (subs.length === 0) {
+        botSay([{ text: "You don't have any enrolled subjects yet, so let me connect you to our support team." }],
+          [{ label: 'Connect me to support', onSelect: () => handoff('admin') }]);
+        return;
+      }
+      botSay([{ text: 'Sure! Which subject is your doubt about?' }],
+        subs.map((s) => ({ label: s.subject, onSelect: () => pickSubject(s.batch, s.subject) })));
+      return;
+    }
+    // Normal answer, then ask if it solved it. Human handoff only appears on "No".
+    botSay(
+      [{ text: 'Thanks for telling me — here’s what should help 👇' }, { text: l.a, href: l.href }, { text: 'Did this solve it?' }],
+      [
+        { label: '✅ Yes, thanks!', onSelect: () => { addUser('Yes, that solved it'); botSay([{ text: 'Awesome — glad that helped! 🎉' }], [{ label: 'I have another issue', onSelect: () => greetTopics('Sure — '), filled: true }]); } },
+        { label: '🙋 No, I still need help', onSelect: () => { addUser('No, I still need help'); handoff(l.route === 'manager' ? 'manager' : 'admin'); } },
+      ],
+    );
+  };
+  const pickSubject = (batch: string, subject: string) => {
+    addUser(subject);
+    botSay([{ text: `Connecting you to your ${subject} teacher…` }], []);
+    openSubjectConnect(batch, subject); // reuses the existing teacher / subject_doubt flow
+  };
+  // Human handoff — only reached at the END, once self-help didn't resolve it.
+  const handoff = (route: 'admin' | 'manager') => {
+    addUser('Yes please, connect me');
+    botSay([{ text: 'No problem — connecting you to the right person now…' }], []);
+    handleRoleSelect(route);
+  };
+  // Start a fresh conversation for a NEW issue — works from anywhere, including
+  // while connected to a person. Disconnects and re-shows the topic options.
+  const startNewIssue = () => {
+    resetToRoleSelection(); // drop any human recipient
+    setChatMsgs([]);        // clear the thread → the effect re-greets with topics
+    setChatOpts([]);
+    setBotTyping(false);
   };
 
   // Auto-fetch teacher when subject-connect mode opens
@@ -287,18 +415,37 @@ export const StudentChatbot = () => {
     }
   }, [messages]);
 
-  // Reset manager unavailable state when drawer closes
+  // Minimizing keeps the conversation — DON'T clear it, so reopening resumes
+  // exactly where the student left off. Only drop the transient "manager
+  // unavailable" flag.
   useEffect(() => {
-    if (!state.isOpen) {
-      setManagerUnavailable(false);
-    }
+    if (!state.isOpen) setManagerUnavailable(false);
   }, [state.isOpen]);
 
-  // Handle Back Button Logic
+  // Greet only when the thread is empty (first ever open, or after "Start a new
+  // issue"). Waits for the batch list so the batch question can appear. Because
+  // the transcript persists, reopening a minimized chat does NOT restart it.
+  useEffect(() => {
+    if (state.isOpen && state.mode === 'support' && !state.selectedRecipient && studentBatches !== undefined && chatMsgs.length === 0 && !botTyping) {
+      startSupportChat();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.isOpen, state.mode, state.selectedRecipient, studentBatches, chatMsgs.length, botTyping]);
+
+  // Auto-scroll the guided chat as it grows / while the bot is typing / when a
+  // connected human replies (all in the same thread).
+  useEffect(() => {
+    guidedEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMsgs, botTyping, chatOpts, messages]);
+
+  // Handle Back Button Logic (from the human chat view)
   const handleBack = () => {
     if (state.mode === 'subject-connect') {
       closeDrawer();
     } else {
+      // Restart the guided conversation instead of a dead-end.
+      setChatMsgs([]);
+      setChatOpts([]);
       resetToRoleSelection();
     }
   };
@@ -514,15 +661,160 @@ export const StudentChatbot = () => {
     </div>
   );
 
+  // Support mode: ONE continuous chat. Guided self-help bubbles first; once it
+  // escalates, the live human conversation continues in the SAME thread with a
+  // text input (no separate screen).
+  const renderGuidedSupport = () => {
+    const connected = !!state.selectedRecipient;
+    return (
+    <div className="flex flex-col h-full bg-white">
+      {/* Header (same chat interface throughout) */}
+      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-white z-10 shadow-sm">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <img src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" alt="Logo" className="h-7 w-auto object-contain shrink-0" />
+          <div className="min-w-0">
+            <h3 className="font-bold text-slate-900 text-sm leading-tight truncate">{connected ? state.selectedRecipient!.displayName : 'Support Assistant'}</h3>
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+              <span className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter">Online</span>
+            </div>
+          </div>
+        </div>
+        <button onClick={closeDrawer} className="text-slate-400 hover:text-slate-600 transition-colors shrink-0">
+          <Minus className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Conversation — guided bubbles, then (once connected) the live human thread */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/30" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <style>{`div::-webkit-scrollbar { display: none; }`}</style>
+        {chatMsgs.map((m) => (
+          <div key={m.id} className={`flex ${m.from === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}>
+            <div className={cn(
+              'px-3.5 py-2.5 text-sm shadow-sm max-w-[85%]',
+              m.from === 'user' ? `bg-slate-900 text-white ${bubbleMeClass}` : `bg-white border border-slate-200 text-slate-700 ${bubbleThemClass}`,
+            )}>
+              <span className="whitespace-pre-wrap leading-relaxed">{m.text}</span>
+              {m.href && (
+                <a href={m.href.url} target="_blank" rel="noopener noreferrer" className="mt-1.5 flex items-center gap-1 text-[13px] font-semibold text-indigo-600 hover:underline">
+                  {m.href.label} <ChevronRight className="w-3.5 h-3.5" />
+                </a>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {botTyping && (
+          <div className="flex justify-start animate-in fade-in duration-200">
+            <div className={`px-4 py-3 bg-white border border-slate-200 ${bubbleThemClass} shadow-sm`}>
+              <span className="flex gap-1 items-center">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '-0.25s' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '-0.12s' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" />
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Inline options — plain rows in a card; "filled" ones as solid buttons */}
+        {!connected && chatOpts.length > 0 && !botTyping && (
+          <div className="flex flex-col items-start gap-2 animate-in fade-in slide-in-from-bottom-1 duration-200">
+            {chatOpts.some((o) => !o.filled) && (
+              <div className="max-w-[88%] rounded-md bg-white border border-slate-200 shadow-sm overflow-hidden">
+                {chatOpts.filter((o) => !o.filled).map((o, idx) => (
+                  <button
+                    key={idx}
+                    onClick={o.onSelect}
+                    className="w-full text-left px-4 py-2.5 text-[13px] font-medium text-indigo-700 hover:bg-indigo-50/70 transition-colors border-t border-slate-100 first:border-t-0"
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {chatOpts.filter((o) => o.filled).map((o, idx) => (
+              <button
+                key={`f${idx}`}
+                onClick={o.onSelect}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-violet-600 text-white text-[13px] font-semibold shadow-sm hover:bg-violet-700 active:scale-[0.98] transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" /> {o.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Live human thread — continues in the same chat once connected */}
+        {connected && (
+          <>
+            <div className="flex justify-center my-1">
+              <span className="text-[10px] text-slate-500 bg-slate-100 rounded-full px-2.5 py-0.5">Connected to {state.selectedRecipient!.displayName}</span>
+            </div>
+            {loadingMessages ? (
+              <div className="flex justify-center py-3"><Loader2 className="h-5 w-5 animate-spin text-slate-300" /></div>
+            ) : (
+              messages?.map((msg) => {
+                const isMe = msg.sender_id === profile?.user_id;
+                return (
+                  <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}>
+                    <div className={cn('px-3.5 py-2.5 text-sm shadow-sm max-w-[85%]', isMe ? `bg-slate-900 text-white ${bubbleMeClass}` : `bg-white border border-slate-200 text-slate-700 ${bubbleThemClass}`)}>
+                      <span className="whitespace-pre-wrap leading-relaxed">{msg.content}</span>
+                      <div className={cn('text-[9px] mt-1 text-right opacity-60', isMe ? 'text-slate-300' : 'text-slate-400')}>
+                        {msg.created_at ? format(new Date(msg.created_at), 'h:mm a') : ''}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </>
+        )}
+        <div ref={guidedEndRef} />
+      </div>
+
+      {/* Text input appears ONLY once connected to a person. During self-help
+          it's options-only, so typing can't bypass the guided flow. */}
+      {connected && (
+        <div className="p-3 bg-white border-t border-slate-100">
+          <div className="flex justify-center pb-2">
+            <button onClick={startNewIssue} className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 hover:text-indigo-800 transition-colors">
+              <Plus className="w-3 h-3" /> Start a new issue
+            </button>
+          </div>
+          <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-lg border border-slate-200 focus-within:border-slate-400 transition-all">
+            <input
+              type="text"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage.mutate()}
+              placeholder="Type your message…"
+              className="flex-1 bg-transparent border-none px-2 py-1.5 text-sm outline-none text-slate-800 placeholder:text-slate-400"
+            />
+            <button
+              onClick={() => sendMessage.mutate()}
+              disabled={!message.trim() || sendMessage.isPending}
+              className="p-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {sendMessage.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+    );
+  };
+
   // Render logic based on content
   const renderContent = () => {
-    if (isLoadingRecipient && state.mode === 'subject-connect') {
-      return renderLoadingView();
+    // Subject-connect (opened from a subject page) keeps its own flow.
+    if (state.mode === 'subject-connect') {
+      if (isLoadingRecipient) return renderLoadingView();
+      if (state.selectedRecipient) return renderChatView();
+      return renderWelcomeView();
     }
-    if (state.selectedRecipient) {
-      return renderChatView();
-    }
-    return renderWelcomeView();
+    // Support mode → ONE continuous chat: guided self-help, and if it escalates,
+    // the human conversation continues in the SAME thread (not a separate view).
+    return renderGuidedSupport();
   };
 
   return (

@@ -294,6 +294,7 @@ Deno.serve(async (req) => {
         batch: pair.batch,
         file_url: fileUrl,
         tags: ['Whiteboard'],
+        schedule_id: scheduleId, // links this saved whiteboard PDF to its class
       }));
 
       const { error: noteErr } = await admin.from('notes').insert(noteRows);
@@ -306,9 +307,12 @@ Deno.serve(async (req) => {
       noteInsertCount = noteRows.length;
     }
 
-    // The notes are saved — drop this class's editable recovery snapshot
-    // (the permanent record is now the PDF in Drive). Best-effort.
-    try { await deleteCloudinaryRaw(`class_wb/${scheduleId}.txt`); } catch (e) { console.error('class snapshot cleanup failed:', e); }
+    // Only drop the editable recovery snapshot once it's genuinely SAVED to
+    // Notes (the PDF is then the permanent record). If it wasn't saved, KEEP the
+    // snapshot so the teacher can still reopen this class's whiteboard later.
+    if (noteInserted) {
+      try { await deleteCloudinaryRaw(`class_wb/${scheduleId}.txt`); } catch (e) { console.error('class snapshot cleanup failed:', e); }
+    }
 
     return json({ success: true, fileUrl, fileId: uploaded.id, noteInserted, noteInsertCount });
   } catch (e) {

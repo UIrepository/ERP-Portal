@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Clock, Key, Copy, Merge, X, Loader2, Square, PenLine } from 'lucide-react';
+import { Clock, Key, Copy, Merge, X, Loader2, Square, PenLine, FileText } from 'lucide-react';
 import { format, parse } from 'date-fns';
 import { istDayOfWeek, istTodayStr, istMinutesNow, timeToMinutes } from '@/lib/timezone';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -205,6 +205,36 @@ export const TeacherJoinClass = () => {
     return () => { supabase.removeChannel(channel); };
   }, [selectedClassForAttendance, queryClient]);
 
+  // Collapse merged batch/subject schedules into one representative row.
+  const dedupByMerge = useMemo(() => (filtered: Schedule[]): Schedule[] => {
+    const deduped: Schedule[] = [];
+    const consumed = new Set<string>();
+    for (const cls of filtered) {
+      if (consumed.has(cls.id)) continue;
+      const key = `${cls.batch}|${cls.subject}`;
+      const root = mergeGroups.find(key);
+      const group = mergeGroups.groups.get(root);
+      if (group && group.size > 1) {
+        const groupMembers = filtered.filter(s => !consumed.has(s.id) && group.has(`${s.batch}|${s.subject}`));
+        if (groupMembers.length > 0) {
+          groupMembers.forEach(m => consumed.add(m.id));
+          const withStream = groupMembers.find(m => m.stream_key);
+          const withBroadcast = groupMembers.find(m => m.broadcast_id);
+          deduped.push({
+            ...groupMembers[0],
+            stream_key: withStream?.stream_key || null,
+            broadcast_id: withBroadcast?.broadcast_id || null,
+            mergedBatches: groupMembers.map(m => ({ batch: m.batch, subject: m.subject, id: m.id })),
+          });
+          continue;
+        }
+      }
+      consumed.add(cls.id);
+      deduped.push(cls);
+    }
+    return deduped;
+  }, [mergeGroups]);
+
   // Filter schedules
   const todaysClasses = useMemo(() => {
     if (!schedules || !teacher) return [];
@@ -230,51 +260,58 @@ export const TeacherJoinClass = () => {
       }
     }).sort((a, b) => a.start_time.localeCompare(b.start_time));
 
-    // N-way merge group dedup: group all schedules by their merge group root
-    const deduped: Schedule[] = [];
-    const consumed = new Set<string>();
+    return dedupByMerge(filtered);
+  }, [schedules, teacher, dedupByMerge]);
 
-    for (const cls of filtered) {
-      if (consumed.has(cls.id)) continue;
+  // Previous classes the teacher held on earlier dates — lets them reopen the
+  // whiteboard of a past class. Dated schedules only (recurring day-of-week
+  // classes share one per-schedule whiteboard). Most recent first, capped.
+  const previousClasses = useMemo(() => {
+    if (!schedules || !teacher) return [];
+    const todayDateStr = istTodayStr();
+    const assignedBatches = teacher.assigned_batches || [];
+    const assignedSubjects = teacher.assigned_subjects || [];
+    const filtered = schedules
+      .filter(s =>
+        assignedBatches.includes(s.batch) &&
+        assignedSubjects.some(a => subjectsMatch(a, s.subject)) &&
+        !!s.date && s.date < todayDateStr,
+      )
+      .sort((a, b) => b.date!.localeCompare(a.date!) || a.start_time.localeCompare(b.start_time));
+    return dedupByMerge(filtered).slice(0, 40);
+  }, [schedules, teacher, dedupByMerge]);
 
-      const key = `${cls.batch}|${cls.subject}`;
-      const root = mergeGroups.find(key);
-      const group = mergeGroups.groups.get(root);
+  // For those past classes, find any that were SAVED (a Whiteboard PDF note
+  // linked by schedule_id) → schedule_id → Drive PDF url. Saved ones open the
+  // PDF; unsaved ones open the editable whiteboard (its snapshot is kept).
+  const prevClassIds = useMemo(() => {
+    const ids = new Set<string>();
+    previousClasses.forEach((c) => {
+      ids.add(c.id);
+      c.mergedBatches?.forEach((m) => ids.add(m.id));
+    });
+    return Array.from(ids);
+  }, [previousClasses]);
 
-      if (group && group.size > 1) {
-        // Find ALL partner schedules in this merge group
-        const groupMembers = filtered.filter(s =>
-          !consumed.has(s.id) && group.has(`${s.batch}|${s.subject}`)
-        );
-
-        if (groupMembers.length > 0) {
-          // Mark all as consumed
-          groupMembers.forEach(m => consumed.add(m.id));
-
-          // Pick stream_key/broadcast_id from any member that has one
-          const withStream = groupMembers.find(m => m.stream_key);
-          const withBroadcast = groupMembers.find(m => m.broadcast_id);
-
-          deduped.push({
-            ...groupMembers[0],
-            stream_key: withStream?.stream_key || null,
-            broadcast_id: withBroadcast?.broadcast_id || null,
-            mergedBatches: groupMembers.map(m => ({
-              batch: m.batch,
-              subject: m.subject,
-              id: m.id,
-            })),
-          });
-          continue;
-        }
-      }
-
-      consumed.add(cls.id);
-      deduped.push(cls);
-    }
-
-    return deduped;
-  }, [schedules, teacher, mergeGroups]);
+  const { data: savedWbMap = {} } = useQuery<Record<string, string>>({
+    queryKey: ['teacher-prev-whiteboard-pdfs', prevClassIds],
+    enabled: prevClassIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('notes')
+        .select('schedule_id, file_url')
+        .in('schedule_id', prevClassIds)
+        .contains('tags', ['Whiteboard']);
+      const map: Record<string, string> = {};
+      (data || []).forEach((n: { schedule_id: string | null; file_url: string }) => {
+        if (n.schedule_id && n.file_url && !map[n.schedule_id]) map[n.schedule_id] = n.file_url;
+      });
+      return map;
+    },
+  });
+  const savedPdfFor = (cls: Schedule): string | undefined =>
+    savedWbMap[cls.id] || cls.mergedBatches?.map((m) => savedWbMap[m.id]).find(Boolean);
 
   const { liveClasses, upcomingClasses, completedClasses } = useMemo(() => {
     const nowMin = istMinutesNow();
@@ -660,6 +697,52 @@ export const TeacherJoinClass = () => {
            <h3 className="text-slate-900 font-semibold">No Classes Today</h3>
            <p className="text-slate-600 text-sm mt-2">You don't have any scheduled classes for today.</p>
         </div>
+      )}
+
+      {/* --- PREVIOUS CLASSES (past dates) — reopen the whiteboard of any class --- */}
+      {previousClasses.length > 0 && (
+        <>
+          <div className={styles.sectionHeading}>Previous Classes</div>
+          <p className="text-[13px] text-slate-500 -mt-2 mb-4">Reopen the whiteboard from an earlier class.</p>
+          {previousClasses.map((cls) => (
+            <div key={`prev-${cls.id}`} className={styles.classCard}>
+              <div className="class-info flex-1">
+                <span className={styles.batchLabel}>
+                  {cls.mergedBatches ? cls.mergedBatches.map(m => m.batch).join(' • ') : cls.batch}
+                </span>
+                <h3 className={styles.subjectTitle}>{cls.subject}</h3>
+                <div className={styles.metaContainer}>
+                  <span>{cls.date ? format(parse(cls.date, 'yyyy-MM-dd', new Date()), 'EEE, MMM d, yyyy') : ''}</span>
+                  <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {formatTime(cls.start_time)} — {formatTime(cls.end_time)}</span>
+                </div>
+              </div>
+              <div className={styles.actionsWrapper}>
+                {ATTENDANCE_ENABLED && <button onClick={() => setSelectedClassForAttendance(cls)} className={styles.btn}>View Attendance</button>}
+                {savedPdfFor(cls) ? (
+                  <a
+                    href={savedPdfFor(cls)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded text-sm font-semibold cursor-pointer transition-all border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                    title="Open the saved whiteboard PDF"
+                  >
+                    <FileText className="w-4 h-4" />
+                    View PDF
+                  </a>
+                ) : (
+                  <button
+                    onClick={() => openInternalRoute(`/whiteboard/${cls.id}`, navigate)}
+                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded text-sm font-semibold cursor-pointer transition-all border border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-100"
+                    title="Open the whiteboard (with your annotations)"
+                  >
+                    <PenLine className="w-4 h-4" />
+                    Whiteboard
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </>
       )}
 
       {/* --- ATTENDANCE TABLE --- */}
