@@ -269,16 +269,20 @@ export const TeacherJoinClass = () => {
   const previousClasses = useMemo(() => {
     if (!schedules || !teacher) return [];
     const todayDateStr = istTodayStr();
+    // Only the previous 7 days (past week), not the whole history.
+    const wk = new Date(`${todayDateStr}T00:00:00Z`);
+    wk.setUTCDate(wk.getUTCDate() - 7);
+    const weekAgoStr = wk.toISOString().slice(0, 10);
     const assignedBatches = teacher.assigned_batches || [];
     const assignedSubjects = teacher.assigned_subjects || [];
     const filtered = schedules
       .filter(s =>
         assignedBatches.includes(s.batch) &&
         assignedSubjects.some(a => subjectsMatch(a, s.subject)) &&
-        !!s.date && s.date < todayDateStr,
+        !!s.date && s.date >= weekAgoStr && s.date < todayDateStr,
       )
       .sort((a, b) => b.date!.localeCompare(a.date!) || a.start_time.localeCompare(b.start_time));
-    return dedupByMerge(filtered).slice(0, 40);
+    return dedupByMerge(filtered);
   }, [schedules, teacher, dedupByMerge]);
 
   // For those past classes, find any that were SAVED (a Whiteboard PDF note
@@ -702,8 +706,8 @@ export const TeacherJoinClass = () => {
       {/* --- PREVIOUS CLASSES (past dates) — reopen the whiteboard of any class --- */}
       {previousClasses.length > 0 && (
         <>
-          <div className={styles.sectionHeading}>Previous Classes</div>
-          <p className="text-[13px] text-slate-500 -mt-2 mb-4">Reopen the whiteboard from an earlier class.</p>
+          <div className={styles.sectionHeading}>Previous Classes · Past Week</div>
+          <p className="text-[13px] text-slate-500 -mt-2 mb-4">Reopen the whiteboard from a class in the last 7 days.</p>
           {previousClasses.map((cls) => (
             <div key={`prev-${cls.id}`} className={styles.classCard}>
               <div className="class-info flex-1">
