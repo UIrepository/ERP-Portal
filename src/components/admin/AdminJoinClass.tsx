@@ -58,8 +58,21 @@ export const AdminJoinClass = () => {
   const [batchFilter, setBatchFilter] = useState<string>('all');
   const [subjectFilter, setSubjectFilter] = useState<string>('all');
   // Date-wise whiteboard browser: which past date's classes we're viewing.
-  // Defaults to yesterday (the most likely "recover the board I just taught").
-  const [wbDate, setWbDate] = useState<string>(() => shiftDateStr(istTodayStr(), -1));
+  // Persisted so that opening a board (new tab) and coming back — which can
+  // remount this view — restores the chosen date instead of snapping back to the
+  // default. Defaults to yesterday (the likely "recover the board I just taught").
+  const WB_DATE_KEY = 'admin-wb-browse-date';
+  const [wbDate, setWbDate] = useState<string>(() => {
+    const fallback = shiftDateStr(istTodayStr(), -1);
+    try {
+      const saved = localStorage.getItem(WB_DATE_KEY);
+      if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved) && saved <= istTodayStr()) return saved;
+    } catch { /* storage blocked — use fallback */ }
+    return fallback;
+  });
+  useEffect(() => {
+    try { localStorage.setItem(WB_DATE_KEY, wbDate); } catch { /* ignore */ }
+  }, [wbDate]);
 
   // Fetch all schedules
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
