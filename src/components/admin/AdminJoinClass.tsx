@@ -7,13 +7,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Video, Clock, Calendar, Users, UserCheck, Eye, Filter } from 'lucide-react';
+import { Video, Clock, Calendar, Users, UserCheck, Eye, Filter, FileText, PenLine, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ATTENDANCE_ENABLED } from '@/lib/features';
 import { format, parse } from 'date-fns';
 import { istDayOfWeek, istTodayStr, istMinutesNow, timeToMinutes } from '@/lib/timezone';
 import { JitsiMeeting } from '@/components/JitsiMeeting';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { generateJitsiRoomName } from '@/lib/jitsiUtils';
+import { useNavigate } from 'react-router-dom';
+import { openInternalRoute } from '@/hooks/useInstallApp';
 
 interface Schedule {
   id: string;
@@ -34,8 +36,17 @@ interface Attendance {
   duration_minutes: number | null;
 }
 
+// Shift an ISO yyyy-MM-dd date string by `days` (can be negative), staying in
+// pure date math so it never drifts across timezones.
+const shiftDateStr = (iso: string, days: number): string => {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+};
+
 export const AdminJoinClass = () => {
   const { profile, user } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeMeeting, setActiveMeeting] = useState<{
     roomName: string;
@@ -46,6 +57,9 @@ export const AdminJoinClass = () => {
   const [selectedClassForAttendance, setSelectedClassForAttendance] = useState<Schedule | null>(null);
   const [batchFilter, setBatchFilter] = useState<string>('all');
   const [subjectFilter, setSubjectFilter] = useState<string>('all');
+  // Date-wise whiteboard browser: which past date's classes we're viewing.
+  // Defaults to yesterday (the most likely "recover the board I just taught").
+  const [wbDate, setWbDate] = useState<string>(() => shiftDateStr(istTodayStr(), -1));
 
   // Fetch all schedules
   const { data: schedules, isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
@@ -148,6 +162,44 @@ export const AdminJoinClass = () => {
 
     return { liveClasses: live, upcomingClasses: upcoming, completedClasses: completed };
   }, [todaysClasses]);
+
+  const todayStr = istTodayStr();
+
+  // Whiteboard browser: all DATED classes held on the chosen date (recurring
+  // day-of-week rows share one board and aren't date-specific, so we skip them),
+  // honoring the same batch/subject filters. Most useful ordered by time.
+  const classesOnDate = useMemo(() => {
+    if (!schedules) return [] as Schedule[];
+    return schedules
+      .filter(s => s.date === wbDate)
+      .filter(s => batchFilter === 'all' || s.batch === batchFilter)
+      .filter(s => subjectFilter === 'all' || s.subject === subjectFilter)
+      .sort((a, b) => a.start_time.localeCompare(b.start_time));
+  }, [schedules, wbDate, batchFilter, subjectFilter]);
+
+  // For those classes, find any already SAVED as a Whiteboard PDF note (linked by
+  // schedule_id) → schedule_id → Drive PDF url. Saved ones offer "View PDF";
+  // unsaved ones open the editable board (its live annotation snapshot is kept),
+  // which an admin can then save to recover it into Notes.
+  const wbClassIds = useMemo(() => classesOnDate.map(c => c.id), [classesOnDate]);
+
+  const { data: savedWbMap = {} } = useQuery<Record<string, string>>({
+    queryKey: ['admin-prev-whiteboard-pdfs', wbClassIds],
+    enabled: wbClassIds.length > 0,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('notes')
+        .select('schedule_id, file_url')
+        .in('schedule_id', wbClassIds)
+        .contains('tags', ['Whiteboard']);
+      const map: Record<string, string> = {};
+      (data || []).forEach((n: { schedule_id: string | null; file_url: string }) => {
+        if (n.schedule_id && n.file_url && !map[n.schedule_id]) map[n.schedule_id] = n.file_url;
+      });
+      return map;
+    },
+  });
 
   const formatTime = (time: string) => {
     const parsed = parse(time, 'HH:mm:ss', new Date());
@@ -368,6 +420,100 @@ export const AdminJoinClass = () => {
           </div>
         </div>
       )}
+
+      {/* Previous Class Whiteboards — browse any past date and reopen/recover its board */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <PenLine className="h-5 w-5" />
+            Previous Class Whiteboards
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Pick a date to see the classes held that day. Open a board to view its saved PDF, or reopen an
+            unsaved one (its annotations are preserved) and save it into Notes.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Date navigator */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setWbDate(d => shiftDateStr(d, -1))}
+              title="Previous day"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <input
+              type="date"
+              value={wbDate}
+              max={todayStr}
+              onChange={(e) => e.target.value && setWbDate(e.target.value)}
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setWbDate(d => (d < todayStr ? shiftDateStr(d, 1) : d))}
+              disabled={wbDate >= todayStr}
+              title="Next day"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <span className="text-sm text-muted-foreground ml-1">
+              {format(parse(wbDate, 'yyyy-MM-dd', new Date()), 'EEEE, MMMM d, yyyy')}
+            </span>
+          </div>
+
+          {classesOnDate.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">
+              No dated classes on this day{batchFilter !== 'all' || subjectFilter !== 'all' ? ' for the selected filters' : ''}.
+            </p>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2">
+              {classesOnDate.map((cls) => {
+                const pdf = savedWbMap[cls.id];
+                return (
+                  <div
+                    key={`wb-${cls.id}`}
+                    className="flex items-center justify-between gap-3 rounded-lg border p-4"
+                  >
+                    <div className="min-w-0">
+                      <h3 className="font-semibold truncate">{cls.subject}</h3>
+                      <p className="text-sm text-muted-foreground truncate">{cls.batch}</p>
+                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5" />
+                        {formatTime(cls.start_time)} - {formatTime(cls.end_time)}
+                      </p>
+                    </div>
+                    {pdf ? (
+                      <a
+                        href={pdf}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300"
+                        title="Open the saved whiteboard PDF"
+                      >
+                        <FileText className="h-4 w-4" />
+                        View PDF
+                      </a>
+                    ) : (
+                      <button
+                        onClick={() => openInternalRoute(`/whiteboard/${cls.id}`, navigate)}
+                        className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border border-fuchsia-200 bg-fuchsia-50 px-3 py-2 text-sm font-semibold text-fuchsia-700 transition-colors hover:bg-fuchsia-100 dark:border-fuchsia-900 dark:bg-fuchsia-950 dark:text-fuchsia-300"
+                        title="Open the whiteboard (annotations preserved) — save to recover it into Notes"
+                      >
+                        <PenLine className="h-4 w-4" />
+                        Open Whiteboard
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* No Classes Today */}
       {todaysClasses.length === 0 && (
