@@ -109,30 +109,41 @@ export const TodaysClassStrip = ({ batch, enrolledSubjects = [], onJoinLive }: T
     refetchInterval: 150000,
     queryFn: async () => {
       const wanted = new Set(enrolledSubjects);
+      // "Currently Live" comes from active_classes. Read it directly (not from the
+      // per-batch CDN feed) and WITHOUT a batch filter: a merged class's teacher
+      // writes the live signal under the primary pair's batch, so the cached
+      // per-batch feed misses it. RLS returns only this student's own + merged
+      // sibling rows, so filtering by subject alone is both correct and safe.
+      // active_classes is tiny, so this extra read is negligible egress.
+      const fetchActiveMergeAware = async (): Promise<ActiveRow[]> => {
+        const { data } = await supabase.from('active_classes')
+          .select('subject, started_at')
+          .in('subject', enrolledSubjects).eq('is_active', true);
+        return (data || []) as ActiveRow[];
+      };
       try {
         // One edge-cached request for the whole batch, filtered to the
         // student's subjects client-side (keeps the CDN cache key per-batch).
-        const t = await fetchCachedToday(batch!);
+        const [t, active] = await Promise.all([fetchCachedToday(batch!), fetchActiveMergeAware()]);
         return {
           schedules: (t.schedules as ScheduleRow[]).filter((s) => wanted.has(s.subject)),
-          active: (t.active as ActiveRow[]).filter((a) => wanted.has(a.subject)),
+          active,
           recordings: (t.recordings as RecordingRow[]).filter((r) => wanted.has(r.subject)),
         };
       } catch {
         // Endpoint unavailable (vite dev / outage) — original direct reads.
-        const [schedRes, activeRes, recRes] = await Promise.all([
+        const [schedRes, active, recRes] = await Promise.all([
           supabase.from('schedules').select('subject, start_time, end_time, date, day_of_week')
             .eq('batch', batch).in('subject', enrolledSubjects)
             .or(`day_of_week.eq.${dow},date.eq.${todayStr}`),
-          supabase.from('active_classes').select('subject, started_at')
-            .eq('batch', batch).in('subject', enrolledSubjects).eq('is_active', true),
+          fetchActiveMergeAware(),
           supabase.from('recordings').select('id, subject, topic, embed_link, date')
             .eq('batch', batch).in('subject', enrolledSubjects).eq('date', todayStr)
             .order('created_at', { ascending: false }),
         ]);
         return {
           schedules: (schedRes.data || []) as ScheduleRow[],
-          active: (activeRes.data || []) as ActiveRow[],
+          active,
           recordings: (recRes.data || []) as RecordingRow[],
         };
       }

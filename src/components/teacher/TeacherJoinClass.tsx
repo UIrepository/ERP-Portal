@@ -361,8 +361,8 @@ export const TeacherJoinClass = () => {
         const roomName = generateJitsiRoomName(primary.batch, primary.subject);
         const roomUrl = `https://meet.jit.si/${encodeURIComponent(roomName)}`;
 
-        for (const pair of allPairs) {
-          if (ATTENDANCE_ENABLED) {
+        if (ATTENDANCE_ENABLED) {
+          for (const pair of allPairs) {
             await supabase.from('class_attendance').upsert({
               user_id: profile.user_id,
               user_name: profile.name || user?.email || 'Teacher',
@@ -374,16 +374,33 @@ export const TeacherJoinClass = () => {
               joined_at: new Date().toISOString()
             }, { onConflict: 'user_id,schedule_id,class_date' });
           }
-
-          await supabase.from('active_classes').upsert({
-            batch: pair.batch,
-            subject: pair.subject,
-            room_url: roomUrl,
-            teacher_id: profile.user_id,
-            is_active: true,
-            started_at: new Date().toISOString()
-          }, { onConflict: 'batch, subject' });
         }
+
+        // Live-signal fan-out. Cover the FULL merge group — not just the batches
+        // that happened to have a schedule row loaded today (allPairs) — so a
+        // merged batch still lights up "live" for its students even if its
+        // schedule row was missing. Fault-tolerant (allSettled): one failed
+        // upsert must not abort the rest, which previously stranded a whole
+        // batch's students on "Waiting for Teacher".
+        const acPairsMap = new Map<string, { batch: string; subject: string }>();
+        const add = (b: string, s: string) => acPairsMap.set(`${b}|${s}`, { batch: b, subject: s });
+        allPairs.forEach(p => add(p.batch, p.subject));
+        add(cls.batch, cls.subject);
+        const root = mergeGroups.find(`${cls.batch}|${cls.subject}`);
+        const group = mergeGroups.groups.get(root);
+        if (group) group.forEach(k => { const [b, s] = k.split('|'); add(b, s); });
+        await Promise.allSettled(
+          [...acPairsMap.values()].map(pair =>
+            supabase.from('active_classes').upsert({
+              batch: pair.batch,
+              subject: pair.subject,
+              room_url: roomUrl,
+              teacher_id: profile.user_id,
+              is_active: true,
+              started_at: new Date().toISOString()
+            }, { onConflict: 'batch, subject' })
+          )
+        );
       }
     } catch (e) {
       console.error("Error marking attendance:", e);

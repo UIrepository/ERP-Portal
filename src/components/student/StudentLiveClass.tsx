@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useMergedSubjects } from '@/hooks/useMergedSubjects';
 import { toast } from 'sonner';
 import { StudentBackButton } from './StudentBackButton';
+import { logClassJoin } from '@/lib/logClassJoin';
 
 interface MergeRow {
   primary_batch: string;
@@ -124,7 +125,14 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
           supabase.from('schedules').select('id, batch, subject, start_time, end_time, date, day_of_week, link').eq('batch', batch)
             .in('subject', subjectsFilter)
             .or(`day_of_week.eq.${currentDayOfWeek},date.eq.${todayDateStr}`),
-          supabase.from('active_classes').select('batch, subject, room_url, started_at, is_active').eq('batch', batch)
+          // Merge-aware: do NOT pin to this batch. A merged class's teacher writes
+          // its live signal under the primary pair's batch, which is a DIFFERENT
+          // batch than the student's. RLS ("Enrolled or merged students can view
+          // active classes") already returns only this student's own + merged
+          // sibling rows, so filtering by subject alone is safe and picks up the
+          // sibling row — without it, a merged student was stuck on "Waiting for
+          // Teacher" whenever the teacher's fan-out didn't also write their batch.
+          supabase.from('active_classes').select('batch, subject, room_url, started_at, is_active')
             .in('subject', subjectsFilter).eq('is_active', true),
         ]);
         if (schedRes.data) allSchedules = schedRes.data;
@@ -223,6 +231,22 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
 
   const handleJoinClass = (item: ScheduleWithLink) => {
     if (!item.meeting_link_url) return;
+
+    // Record the join click (admin-only visibility) — fire-and-forget so it never
+    // delays opening the room or trips the popup blocker.
+    if (user?.id) {
+      logClassJoin({
+        userId: user.id,
+        batch: item.batch,
+        subject: item.subject,
+        scheduleId: item.id,
+        classDate: todayDateStr,
+        roomUrl: item.meeting_link_url,
+        userName: profile?.name || user?.email || null,
+        userEmail: user?.email || null,
+        role: 'student',
+      });
+    }
 
     if (item.meeting_link_url.includes('meet.jit.si')) {
       // 1. Construct URL object

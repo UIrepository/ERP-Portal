@@ -155,6 +155,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
   const adminTabs = [
     { id: 'enrollment-analytics', label: 'Student Analytics', icon: Analytics01Icon },
     { id: 'admin-join-class', label: 'Join Class', icon: Video01Icon },
+    { id: 'admin-join-activity', label: 'Join Activity', icon: Analytics01Icon },
     { id: 'admin-messages', label: 'Messages / Inbox', icon: InboxIcon },
     { id: 'directory', label: 'Student Directory', icon: UserListIcon },
     { id: 'staff-manager', label: 'Staff Management', icon: UserSettings01Icon },
