@@ -155,6 +155,19 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
         }
       }
 
+      // Ignore STALE is_active=true rows from earlier days. active_classes is
+      // never reliably flipped to is_active=false when a class ends, so a row
+      // can linger holding an OLD dated room_url (e.g. ...20260904). Serving
+      // that sends students into last session's empty/"random" room until the
+      // teacher re-joins and overwrites it (the "rejoin redirected me" bug).
+      // A real live signal must have started TODAY (IST).
+      allActiveClasses = allActiveClasses.filter(ac => {
+        if (!ac.started_at) return false;
+        const startedDay = new Date(new Date(ac.started_at).getTime() + IST_OFFSET_MIN * 60000)
+          .toISOString().slice(0, 10);
+        return startedDay === todayDateStr;
+      });
+
       const validSchedules = allSchedules.filter(schedule => {
         if (schedule.date) return schedule.date === todayDateStr;
         return schedule.day_of_week === currentDayOfWeek;
