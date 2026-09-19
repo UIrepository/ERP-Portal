@@ -83,9 +83,10 @@ function youtubeId(url: string): string | null {
 
 /** Which column on which table holds the address, per catalog source_table. */
 const URL_COLUMN: Record<string, string> = {
-  recordings:  'embed_link',
-  notes:       'file_url',
-  dpp_content: 'link',
+  recordings:           'embed_link',
+  notes:                'file_url',
+  dpp_content:          'link',
+  ui_ki_padhai_content: 'link',
 };
 
 /** Verifies a main-website access token and returns its email, or null. */
