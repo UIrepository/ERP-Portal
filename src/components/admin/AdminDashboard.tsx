@@ -18,6 +18,7 @@ import { AdminMaintenanceManager } from './AdminMaintenanceManager';
 import { AdminJoinClass } from './AdminJoinClass';
 import { AdminJoinActivity } from './AdminJoinActivity';
 import { AdminSubjectMerges } from './AdminSubjectMerges';
+import { AdminFreePreview } from './AdminFreePreview';
 
 interface AdminDashboardProps {
   activeTab: string;
@@ -76,6 +77,8 @@ export const AdminDashboard = ({ activeTab, onTabChange }: AdminDashboardProps) 
         return <AdminMaintenanceManager />;
       case 'subject-merges':
         return <AdminSubjectMerges />;
+      case 'free-preview':
+        return <AdminFreePreview />;
       default:
         return <EnrollmentAnalytics />;
     }
