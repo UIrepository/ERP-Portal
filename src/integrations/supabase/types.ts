@@ -256,6 +256,48 @@ export type Database = {
           },
         ]
       }
+      class_join_events: {
+        Row: {
+          batch: string
+          class_date: string
+          clicked_at: string
+          id: string
+          role: string | null
+          room_url: string | null
+          schedule_id: string | null
+          subject: string
+          user_email: string | null
+          user_id: string
+          user_name: string | null
+        }
+        Insert: {
+          batch: string
+          class_date: string
+          clicked_at?: string
+          id?: string
+          role?: string | null
+          room_url?: string | null
+          schedule_id?: string | null
+          subject: string
+          user_email?: string | null
+          user_id: string
+          user_name?: string | null
+        }
+        Update: {
+          batch?: string
+          class_date?: string
+          clicked_at?: string
+          id?: string
+          role?: string | null
+          room_url?: string | null
+          schedule_id?: string | null
+          subject?: string
+          user_email?: string | null
+          user_id?: string
+          user_name?: string | null
+        }
+        Relationships: []
+      }
       community_messages: {
         Row: {
           batch: string
@@ -316,6 +358,99 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
         ]
+      }
+      community_mutes: {
+        Row: {
+          batch: string
+          created_at: string
+          id: string
+          subject: string
+          user_id: string
+        }
+        Insert: {
+          batch: string
+          created_at?: string
+          id?: string
+          subject: string
+          user_id: string
+        }
+        Update: {
+          batch?: string
+          created_at?: string
+          id?: string
+          subject?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      content_catalog: {
+        Row: {
+          batch: string
+          content_date: string | null
+          content_type: string
+          created_at: string
+          id: string
+          is_free_preview: boolean
+          sort_key: string
+          source_id: string
+          source_table: string
+          subject: string
+          title: string
+          topic: string | null
+          updated_at: string
+        }
+        Insert: {
+          batch: string
+          content_date?: string | null
+          content_type: string
+          created_at?: string
+          id?: string
+          is_free_preview?: boolean
+          sort_key?: string
+          source_id: string
+          source_table: string
+          subject: string
+          title: string
+          topic?: string | null
+          updated_at?: string
+        }
+        Update: {
+          batch?: string
+          content_date?: string | null
+          content_type?: string
+          created_at?: string
+          id?: string
+          is_free_preview?: boolean
+          sort_key?: string
+          source_id?: string
+          source_table?: string
+          subject?: string
+          title?: string
+          topic?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      content_preview_settings: {
+        Row: {
+          batch: string
+          is_preview_enabled: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          batch: string
+          is_preview_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          batch?: string
+          is_preview_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
       }
       debug_logs: {
         Row: {
@@ -474,6 +609,7 @@ export type Database = {
           difficulty: string | null
           id: string
           is_active: boolean
+          is_free_preview: boolean
           link: string
           subject: string
           title: string
@@ -486,6 +622,7 @@ export type Database = {
           difficulty?: string | null
           id?: string
           is_active?: boolean
+          is_free_preview?: boolean
           link: string
           subject: string
           title: string
@@ -498,6 +635,7 @@ export type Database = {
           difficulty?: string | null
           id?: string
           is_active?: boolean
+          is_free_preview?: boolean
           link?: string
           subject?: string
           title?: string
@@ -577,6 +715,36 @@ export type Database = {
           subject?: string
           submitted_by?: string | null
           teacher_quality?: number
+        }
+        Relationships: []
+      }
+      feedback_gate: {
+        Row: {
+          activated_at: string | null
+          enabled: boolean
+          id: number
+          scope: string
+          targets: Json
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          activated_at?: string | null
+          enabled?: boolean
+          id?: number
+          scope?: string
+          targets?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          activated_at?: string | null
+          enabled?: boolean
+          id?: number
+          scope?: string
+          targets?: Json
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }
@@ -780,6 +948,8 @@ export type Database = {
           file_url: string
           filename: string
           id: string
+          is_free_preview: boolean
+          schedule_id: string | null
           subject: string
           tags: string[] | null
           title: string
@@ -791,6 +961,8 @@ export type Database = {
           file_url: string
           filename: string
           id?: string
+          is_free_preview?: boolean
+          schedule_id?: string | null
           subject: string
           tags?: string[] | null
           title: string
@@ -802,6 +974,8 @@ export type Database = {
           file_url?: string
           filename?: string
           id?: string
+          is_free_preview?: boolean
+          schedule_id?: string | null
           subject?: string
           tags?: string[] | null
           title?: string
@@ -815,6 +989,7 @@ export type Database = {
           created_by: string | null
           created_by_name: string | null
           id: string
+          image_url: string | null
           is_active: boolean
           message: string
           target_batch: string | null
@@ -829,6 +1004,7 @@ export type Database = {
           created_by?: string | null
           created_by_name?: string | null
           id?: string
+          image_url?: string | null
           is_active?: boolean
           message: string
           target_batch?: string | null
@@ -843,6 +1019,7 @@ export type Database = {
           created_by?: string | null
           created_by_name?: string | null
           id?: string
+          image_url?: string | null
           is_active?: boolean
           message?: string
           target_batch?: string | null
@@ -900,6 +1077,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_url: string | null
           bank_details: Json | null
           batch: string[] | null
           created_at: string
@@ -915,6 +1093,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          avatar_url?: string | null
           bank_details?: Json | null
           batch?: string[] | null
           created_at?: string
@@ -930,6 +1109,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          avatar_url?: string | null
           bank_details?: Json | null
           batch?: string[] | null
           created_at?: string
@@ -946,6 +1126,39 @@ export type Database = {
         }
         Relationships: []
       }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          p256dh: string
+          updated_at: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          p256dh: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       recordings: {
         Row: {
           batch: string
@@ -953,6 +1166,7 @@ export type Database = {
           date: string
           embed_link: string
           id: string
+          is_free_preview: boolean
           recording_email_sent: boolean | null
           subject: string
           topic: string
@@ -964,6 +1178,7 @@ export type Database = {
           date: string
           embed_link: string
           id?: string
+          is_free_preview?: boolean
           recording_email_sent?: boolean | null
           subject: string
           topic: string
@@ -975,6 +1190,7 @@ export type Database = {
           date?: string
           embed_link?: string
           id?: string
+          is_free_preview?: boolean
           recording_email_sent?: boolean | null
           subject?: string
           topic?: string
@@ -1354,20 +1570,94 @@ export type Database = {
         }
         Relationships: []
       }
+      whiteboard_files: {
+        Row: {
+          content_public_id: string | null
+          content_url: string | null
+          created_at: string
+          id: string
+          owner_id: string
+          thumbnail_public_id: string | null
+          thumbnail_url: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content_public_id?: string | null
+          content_url?: string | null
+          created_at?: string
+          id?: string
+          owner_id: string
+          thumbnail_public_id?: string | null
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          content_public_id?: string | null
+          content_url?: string | null
+          created_at?: string
+          id?: string
+          owner_id?: string
+          thumbnail_public_id?: string | null
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      whiteboard_viewers: {
+        Row: {
+          added_by: string | null
+          created_at: string
+          email: string
+          id: string
+          role: string
+          whiteboard_id: string
+        }
+        Insert: {
+          added_by?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          role?: string
+          whiteboard_id: string
+        }
+        Update: {
+          added_by?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          role?: string
+          whiteboard_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whiteboard_viewers_whiteboard_id_fkey"
+            columns: ["whiteboard_id"]
+            isOneToOne: false
+            referencedRelation: "whiteboard_files"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       profile_basics: {
         Row: {
+          avatar_url: string | null
           email: string | null
           name: string | null
           user_id: string | null
         }
         Insert: {
+          avatar_url?: string | null
           email?: string | null
           name?: string | null
           user_id?: string | null
         }
         Update: {
+          avatar_url?: string | null
           email?: string | null
           name?: string | null
           user_id?: string | null
@@ -1377,6 +1667,7 @@ export type Database = {
     }
     Functions: {
       app_is_admin: { Args: never; Returns: boolean }
+      assert_catalog_has_no_urls: { Args: never; Returns: string[] }
       backfill_role_table_user_ids: {
         Args: never
         Returns: {
@@ -1386,6 +1677,8 @@ export type Database = {
           user_id: string
         }[]
       }
+      can_edit_whiteboard: { Args: { file_id: string }; Returns: boolean }
+      can_open_whiteboard: { Args: { p_schedule_id: string }; Returns: boolean }
       check_is_admin_or_manager: { Args: never; Returns: boolean }
       check_user_role_sync: { Args: never; Returns: Json }
       claim_group_addition_batch: {
@@ -1427,6 +1720,13 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_all_batch_subjects: {
+        Args: never
+        Returns: {
+          batch_name: string
+          subject_name: string
+        }[]
+      }
       get_all_options: {
         Args: never
         Returns: {
@@ -1439,6 +1739,17 @@ export type Database = {
         Returns: {
           has_admin: boolean
           has_manager: boolean
+        }[]
+      }
+      get_community_group_summaries: {
+        Args: { seen?: Json }
+        Returns: {
+          batch: string
+          last_at: string
+          last_content: string
+          subject: string
+          total: number
+          unread: number
         }[]
       }
       get_current_ongoing_class: {
@@ -1480,6 +1791,13 @@ export type Database = {
         Returns: {
           batch: string
           merged_at: string
+          subject: string
+        }[]
+      }
+      get_my_pending_feedback_gate: {
+        Args: never
+        Returns: {
+          batch: string
           subject: string
         }[]
       }
@@ -1549,9 +1867,15 @@ export type Database = {
         Args: { check_user_id?: string }
         Returns: string
       }
+      has_content_entitlement: {
+        Args: { p_batch: string; p_email: string; p_subject: string }
+        Returns: boolean
+      }
       is_admin: { Args: { check_user_id?: string }; Returns: boolean }
       is_manager: { Args: { check_user_id?: string }; Returns: boolean }
       is_teacher: { Args: { check_user_id?: string }; Returns: boolean }
+      is_whiteboard_viewer: { Args: { file_id: string }; Returns: boolean }
+      my_whiteboard_role: { Args: { file_id: string }; Returns: string }
       subject_normalize: { Args: { s: string }; Returns: string }
       teacher_can_modify_schedule: {
         Args: { p_batch: string; p_subject: string }
@@ -1586,12 +1910,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1615,11 +1939,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1640,11 +1964,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1665,11 +1989,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1682,11 +2006,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
