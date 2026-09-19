@@ -41,3 +41,12 @@ verify_jwt = true
 
 [functions.upload-whiteboard-pdf]
 verify_jwt = true
+
+# Public, anonymous — serves the URL-free catalog to the main website.
+[functions.public-catalog]
+verify_jwt = false
+
+# Server-to-server only. Authenticated by CATALOG_BRIDGE_SECRET, not by a JWT,
+# because the caller is the website's /api/unlock route rather than a browser.
+[functions.resolve-content]
+verify_jwt = false
