@@ -64,6 +64,23 @@ function secretMatches(a: string, b: string): boolean {
   return diff === 0;
 }
 
+/**
+ * Pulls the bare YouTube id out of any shape we store:
+ *   /embed/<id>, /embed/<id>?si=…, /live/<id>, watch?v=<id>, youtu.be/<id>
+ * Returns null for anything that is not YouTube (Drive previews, etc).
+ *
+ * We hand the player an id instead of a URL so the response never contains a
+ * copy-pasteable youtube.com link. The id is still the secret — this narrows
+ * the exposure, it does not remove it. Real protection needs signed hosting.
+ */
+function youtubeId(url: string): string | null {
+  const m =
+    url.match(/(?:youtube\.com|youtube-nocookie\.com)\/(?:embed|live|v)\/([A-Za-z0-9_-]{6,})/) ??
+    url.match(/[?&]v=([A-Za-z0-9_-]{6,})/) ??
+    url.match(/youtu\.be\/([A-Za-z0-9_-]{6,})/);
+  return m ? m[1] : null;
+}
+
 /** Which column on which table holds the address, per catalog source_table. */
 const URL_COLUMN: Record<string, string> = {
   recordings:  'embed_link',
@@ -200,12 +217,17 @@ Deno.serve(async (req) => {
       `(${item.is_free_preview ? 'free preview' : 'purchased'})`,
     );
 
+    // For a YouTube lecture, send ONLY the id. The website mounts it through
+    // the IFrame API with YouTube's own chrome switched off, exactly like the
+    // portal does, so no youtube.com URL is ever handed to the page.
+    const ytId = item.content_type === 'video' ? youtubeId(url) : null;
+
     return json({
-      allowed: true,
-      type:    item.content_type,
-      title:   item.title,
-      url,
-      free:    item.is_free_preview,
+      allowed:  true,
+      type:     item.content_type,
+      title:    item.title,
+      free:     item.is_free_preview,
+      ...(ytId ? { video_id: ytId } : { url }),
     });
   } catch (err) {
     console.error('resolve-content error', err);
