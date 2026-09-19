@@ -25,6 +25,7 @@ import {
   Wrench01Icon,
   CustomerSupportIcon,
   GitMergeIcon,
+  ViewIcon,
   Message01Icon,
   InboxIcon,
   Quiz01Icon,
@@ -170,6 +171,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
     { id: 'teacher-announcement', label: 'Teacher Broadcast', icon: Megaphone01Icon },
     { id: 'maintenance', label: 'Maintenance Mode', icon: Wrench01Icon },
     { id: 'subject-merges', label: 'Subject Merges', icon: GitMergeIcon },
+    { id: 'free-preview', label: 'Free Preview', icon: ViewIcon },
   ];
 
   const getTabs = () => {
