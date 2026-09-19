@@ -29,19 +29,20 @@ import { Eye, EyeOff, FileText, Search, Sparkles, Video, Notebook } from 'lucide
 
 type CatalogItem = {
   id: string;
-  source_table: 'recordings' | 'notes' | 'dpp_content';
+  source_table: 'recordings' | 'notes' | 'dpp_content' | 'ui_ki_padhai_content';
   source_id: string;
   subject: string;
-  content_type: 'video' | 'note' | 'dpp';
+  content_type: 'video' | 'note' | 'dpp' | 'uikp';
   title: string;
   content_date: string | null;
   is_free_preview: boolean;
 };
 
 const TYPE_META = {
-  video: { label: 'Lecture', icon: Video },
-  note:  { label: 'Note',    icon: Notebook },
-  dpp:   { label: 'DPP',     icon: FileText },
+  video: { label: 'Lecture',      icon: Video },
+  note:  { label: 'Note',         icon: Notebook },
+  dpp:   { label: 'DPP',          icon: FileText },
+  uikp:  { label: 'UI Ki Padhai', icon: Sparkles },
 } as const;
 
 export const AdminFreePreview = () => {
