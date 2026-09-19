@@ -103,6 +103,12 @@ Deno.serve(async (req) => {
       .eq('batch', batch)
       .order('subject', { ascending: true })
       .order('sort_key', { ascending: false })
+      // Deterministic tiebreaker. Whole batches of notes and DPPs are inserted
+      // in one transaction and share an identical created_at, so sort_key alone
+      // left their order undefined — the same request could return a different
+      // first row each time, which made "the top item of this subject" a
+      // meaningless thing to point at.
+      .order('id', { ascending: true })
       .limit(MAX_ITEMS);
 
     if (error) {
