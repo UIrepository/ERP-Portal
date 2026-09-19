@@ -51,7 +51,7 @@ const MAX_ITEMS = 2000;
 type CatalogRow = {
   id: string;
   subject: string;
-  content_type: 'video' | 'note' | 'dpp';
+  content_type: 'video' | 'note' | 'dpp' | 'uikp';
   title: string;
   topic: string | null;
   content_date: string | null;
@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
     // batch shows up without anyone having to remember to opt it in.
     if (settings && settings.is_preview_enabled === false) {
       return json(
-        { batch, preview_enabled: false, subjects: [], totals: { video: 0, note: 0, dpp: 0, free: 0 } },
+        { batch, preview_enabled: false, subjects: [], totals: { video: 0, note: 0, dpp: 0, uikp: 0, free: 0 } },
         200,
         { 'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=3600' },
       );
@@ -134,6 +134,7 @@ Deno.serve(async (req) => {
         video: items.filter((i) => i.content_type === 'video').length,
         note:  items.filter((i) => i.content_type === 'note').length,
         dpp:   items.filter((i) => i.content_type === 'dpp').length,
+        uikp:  items.filter((i) => i.content_type === 'uikp').length,
         free:  items.filter((i) => i.is_free_preview).length,
       },
       items: items.map((i) => ({
@@ -151,9 +152,10 @@ Deno.serve(async (req) => {
         video: acc.video + s.counts.video,
         note:  acc.note  + s.counts.note,
         dpp:   acc.dpp   + s.counts.dpp,
+        uikp:  acc.uikp  + s.counts.uikp,
         free:  acc.free  + s.counts.free,
       }),
-      { video: 0, note: 0, dpp: 0, free: 0 },
+      { video: 0, note: 0, dpp: 0, uikp: 0, free: 0 },
     );
 
     return json(
