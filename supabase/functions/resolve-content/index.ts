@@ -8,18 +8,50 @@
  * This is the ONLY place in the system where a content URL crosses a network
  * boundary toward a viewer, which is what makes the guarantee checkable.
  *
- * DELIBERATELY NOT BROWSER-REACHABLE.
- * There are no CORS headers and the caller must present CATALOG_BRIDGE_SECRET.
- * The only legitimate caller is the main website's /api/unlock route, which has
- * already verified the viewer's Supabase session and passes the email it read
- * out of that verified token. A browser cannot reach this function, so a
- * forged x-viewer-email is not a path an attacker has.
+ * WHO IS ASKING — two accepted proofs, never a claim:
+ *
+ *   1. Authorization: Bearer <access token from unknowniitians.com>
+ *      We hand the token to the WEBSITE project's own /auth/v1/user, which
+ *      verifies its signature and expiry and returns the real account. The
+ *      email comes from that response. A forged or expired token dies there.
+ *      This is the normal path and it is safe to expose to a browser: the
+ *      token proves the identity end to end, so a visitor calling this
+ *      directly can still only ever reach their own entitlements.
+ *
+ *   2. x-bridge-secret + x-viewer-email
+ *      Server-to-server escape hatch for a trusted backend that has already
+ *      done its own verification. Only active when CATALOG_BRIDGE_SECRET is
+ *      configured. Nothing depends on it today.
+ *
+ * An unverified email header on its own is ignored completely.
  *
  * Responses are single-item and never cacheable. There is no endpoint anywhere
  * that returns more than one URL at a time.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+/** The main website's Supabase project — the issuer whose tokens we trust. */
+const WEBSITE_SUPABASE_URL =
+  Deno.env.get('WEBSITE_SUPABASE_URL') ?? 'https://qzrvctpwefhmcduariuw.supabase.co';
+const WEBSITE_ANON_KEY = Deno.env.get('WEBSITE_SUPABASE_ANON_KEY') ?? '';
+
+const ALLOWED_ORIGINS = [
+  'https://www.unknowniitians.com',
+  'https://unknowniitians.com',
+  'http://localhost:8080',
+  'http://localhost:5173',
+];
+
+function corsHeaders(origin: string | null) {
+  const allow = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin': allow,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-bridge-secret, x-viewer-email',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin',
+  };
+}
 
 /** Length-safe, constant-time string compare — no early exit on first mismatch. */
 function secretMatches(a: string, b: string): boolean {
@@ -39,35 +71,60 @@ const URL_COLUMN: Record<string, string> = {
   dpp_content: 'link',
 };
 
+/** Verifies a main-website access token and returns its email, or null. */
+async function emailFromWebsiteToken(token: string): Promise<string | null> {
+  if (!WEBSITE_ANON_KEY) {
+    console.error('WEBSITE_SUPABASE_ANON_KEY is not configured');
+    return null;
+  }
+  try {
+    const res = await fetch(`${WEBSITE_SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: WEBSITE_ANON_KEY, Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    const user = (await res.json()) as { email?: string | null };
+    return user?.email?.trim().toLowerCase() || null;
+  } catch (err) {
+    console.error('token verification failed', err);
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
+  const cors = corsHeaders(req.headers.get('Origin'));
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), {
       status,
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' },
+      headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' },
     });
 
-  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
-
-  const expected = Deno.env.get('CATALOG_BRIDGE_SECRET');
-  if (!expected) {
-    console.error('CATALOG_BRIDGE_SECRET is not configured');
-    return json({ error: 'Not configured' }, 500);
-  }
-
-  const presented = req.headers.get('x-bridge-secret') ?? '';
-  if (!secretMatches(presented, expected)) {
-    // Same shape as any other denial — do not tell a prober which check failed.
-    return json({ allowed: false, reason: 'forbidden' }, 403);
-  }
+  if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
+  if (req.method !== 'POST') return json({ allowed: false, reason: 'method_not_allowed' }, 405);
 
   try {
     const body = await req.json().catch(() => ({}));
     const catalogId: string | undefined = body?.catalog_id;
-    // Comes from the website AFTER it verified the session token. Never trusted
-    // from a browser, because a browser cannot call this function at all.
-    const viewerEmail: string | undefined = req.headers.get('x-viewer-email')?.trim() || undefined;
-
     if (!catalogId) return json({ allowed: false, reason: 'bad_request' }, 400);
+
+    // ---- establish who is asking -------------------------------------------
+    let viewerEmail: string | null = null;
+
+    const authHeader = req.headers.get('Authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.slice(7).trim();
+      // The anon key is itself a Bearer token; it carries no user, so
+      // /auth/v1/user rejects it and we simply get null. No special case needed.
+      if (token) viewerEmail = await emailFromWebsiteToken(token);
+    }
+
+    if (!viewerEmail) {
+      const bridgeSecret = Deno.env.get('CATALOG_BRIDGE_SECRET');
+      const presented = req.headers.get('x-bridge-secret') ?? '';
+      if (bridgeSecret && presented && secretMatches(presented, bridgeSecret)) {
+        viewerEmail = req.headers.get('x-viewer-email')?.trim().toLowerCase() || null;
+      }
+    }
+    // ------------------------------------------------------------------------
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -95,22 +152,21 @@ Deno.serve(async (req) => {
       );
     }
 
-    const entitled = item.is_free_preview
-      ? true
-      : await (async () => {
-          const { data, error } = await supabase.rpc('has_content_entitlement', {
-            p_email:   viewerEmail,
-            p_batch:   item.batch,
-            p_subject: item.subject,
-          });
-          if (error) {
-            // Fail CLOSED. An entitlement check that errors must never be read
-            // as "allowed" — that is exactly how paywalls quietly fall open.
-            console.error('entitlement check failed', error);
-            throw new Error('entitlement_check_failed');
-          }
-          return data === true;
-        })();
+    let entitled = item.is_free_preview === true;
+    if (!entitled) {
+      const { data, error } = await supabase.rpc('has_content_entitlement', {
+        p_email:   viewerEmail,
+        p_batch:   item.batch,
+        p_subject: item.subject,
+      });
+      if (error) {
+        // Fail CLOSED. An entitlement check that errors must never be read as
+        // "allowed" — that is exactly how paywalls quietly fall open.
+        console.error('entitlement check failed', error);
+        return json({ allowed: false, reason: 'unavailable' }, 500);
+      }
+      entitled = data === true;
+    }
 
     if (!entitled) {
       return json(
