@@ -17,12 +17,20 @@ export const useYoutubeStream = () => {
   /**
    * Creates a YouTube Broadcast via Edge Function and saves the link to the database.
    */
+  /**
+   * @param bucketByPair week/chapter bucket id per "batch|subject" key, as
+   *   returned by ensureBucketGroup(). A bucket belongs to one (batch, subject),
+   *   so each merged pair gets its own id — never one id reused across batches.
+   *   Missing or empty simply leaves the recording Unsorted, which is the
+   *   deliberate fallback: the class must always be able to start.
+   */
   const startStream = async (
     batch: string,
     subject: string,
     primaryBatch?: string,
     primarySubject?: string,
-    allMergedPairs?: Array<{ batch: string; subject: string }>
+    allMergedPairs?: Array<{ batch: string; subject: string }>,
+    bucketByPair?: Record<string, string>
   ) => {
     if (isStartingStream || isStreaming) return null;
 
@@ -59,6 +67,7 @@ export const useYoutubeStream = () => {
         topic: `${p.subject} Class - ${format(new Date(), 'MMM dd, yyyy')}`,
         date: format(new Date(), 'yyyy-MM-dd'),
         embed_link: streamData.embedLink,
+        bucket_id: bucketByPair?.[`${p.batch}|${p.subject}`] ?? null,
       }));
 
       const { error: dbError } = await supabase.from('recordings').insert(recordingRows);
