@@ -8,6 +8,7 @@ import { istDayOfWeek, istTodayStr, istMinutesNow, timeToMinutes } from '@/lib/t
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { generateJitsiRoomName, subjectsMatch } from '@/lib/jitsiUtils';
 import { useYoutubeStream } from '@/hooks/useYoutubeStream';
+import { BucketPickerDialog } from '@/components/BucketPickerDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -64,6 +65,8 @@ export const TeacherJoinClass = () => {
   const { startStream, isStartingStream } = useYoutubeStream();
   const [streamKey, setStreamKey] = useState<string>("");
   const [showStreamDialog, setShowStreamDialog] = useState(false);
+  // The class waiting for the teacher to pick a week before it goes live.
+  const [bucketPrompt, setBucketPrompt] = useState<Schedule | null>(null);
   const [currentClass, setCurrentClass] = useState<Schedule | null>(null);
   const [isMergedSession, setIsMergedSession] = useState(false);
   const [mergedRoomUrl, setMergedRoomUrl] = useState<string>("");
@@ -346,7 +349,20 @@ export const TeacherJoinClass = () => {
     return format(parsed, 'h:mm a');
   };
 
-  const handleStartClass = async (cls: Schedule) => {
+  /**
+   * Entry point for Go Live. Asks which week the class belongs to BEFORE any
+   * side effects, so backing out of the prompt leaves nothing half-started.
+   * Resuming an existing broadcast skips it — that class already has its week.
+   */
+  const handleStartClass = (cls: Schedule) => {
+    if (cls.stream_key) {
+      void runStartClass(cls, undefined);
+      return;
+    }
+    setBucketPrompt(cls);
+  };
+
+  const runStartClass = async (cls: Schedule, bucketByPair?: Record<string, string>) => {
     setCurrentClass(cls);
     setIsMergedSession(false);
 
@@ -417,7 +433,7 @@ export const TeacherJoinClass = () => {
     const mergedPairs = cls.mergedBatches
       ? cls.mergedBatches.map(m => ({ batch: m.batch, subject: m.subject }))
       : [{ batch: cls.batch, subject: cls.subject }];
-    const details = await startStream(cls.batch, cls.subject, primary.batch, primary.subject, mergedPairs);
+    const details = await startStream(cls.batch, cls.subject, primary.batch, primary.subject, mergedPairs, bucketByPair);
     if (details?.streamKey) {
       const allIds = cls.mergedBatches
         ? cls.mergedBatches.map(m => m.id)
@@ -436,6 +452,23 @@ export const TeacherJoinClass = () => {
         console.error(`Stream key save partial: expected ${allIds.length} rows, got ${updated?.length ?? 0}`);
         toast.error(`Saved ${updated?.length ?? 0}/${allIds.length} schedules. Students on merged partner batches may not receive the stream — contact admin.`);
       }
+      // Stamp the week onto each schedule row. upload-whiteboard-pdf reads it
+      // back so the saved whiteboard note lands in the same week without
+      // asking the teacher a second time. Done per row because each merged
+      // pair has its OWN bucket id.
+      if (bucketByPair) {
+        const pairsForSchedules = cls.mergedBatches
+          ? cls.mergedBatches.map(m => ({ id: m.id, batch: m.batch, subject: m.subject }))
+          : [{ id: cls.id, batch: cls.batch, subject: cls.subject }];
+        await Promise.allSettled(
+          pairsForSchedules.map(p => {
+            const bucketId = bucketByPair[`${p.batch}|${p.subject}`];
+            if (!bucketId) return Promise.resolve();
+            return supabase.from('schedules').update({ bucket_id: bucketId }).eq('id', p.id);
+          })
+        );
+      }
+
       queryClient.invalidateQueries({ queryKey: ['allSchedulesTeacher'] });
 
       setStreamKey(details.streamKey);
@@ -846,6 +879,26 @@ export const TeacherJoinClass = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/*
+        Asked before every new broadcast. Closing it does NOT start the class —
+        the teacher simply stays put and can press Go Live again. The Unsorted
+        fallback exists for the case where the bucket write itself fails, not
+        as a way to skip the question.
+      */}
+      {bucketPrompt && (
+        <BucketPickerDialog
+          open
+          batch={bucketPrompt.batch}
+          subject={bucketPrompt.subject}
+          onCancel={() => setBucketPrompt(null)}
+          onConfirm={(byPair) => {
+            const cls = bucketPrompt;
+            setBucketPrompt(null);
+            void runStartClass(cls, byPair);
+          }}
+        />
+      )}
     </div>
   );
 };
