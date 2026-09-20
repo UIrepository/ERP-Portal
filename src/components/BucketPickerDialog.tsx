@@ -26,8 +26,12 @@ interface Props {
   open: boolean;
   batch: string;
   subject: string;
-  /** Resolved bucket id for THIS pair, or null if the teacher skipped. */
-  onConfirm: (bucketId: string | null) => void;
+  /**
+   * Bucket ids keyed "batch|subject" for EVERY pair in the merge group. Going
+   * live writes one recording per pair and each needs its own bucket, so the
+   * caller gets the whole map rather than a single id.
+   */
+  onConfirm: (byPair: Record<string, string>) => void;
   onCancel: () => void;
 }
 
@@ -70,8 +74,8 @@ export const BucketPickerDialog = ({ open, batch, subject, onConfirm, onCancel }
       // Go through ensure_bucket_group even for an existing bucket: the merge
       // group may have grown since it was made, and the partner batches need
       // the same name to exist before the recordings are written.
-      const { own } = await ensureBucketGroup(batch, subject, bucket.name);
-      onConfirm(own ?? bucket.id);
+      const { byPair } = await ensureBucketGroup(batch, subject, bucket.name);
+      onConfirm(byPair);
     } catch (e) {
       console.error('bucket resolve failed', e);
       toast({ title: 'Could not set the week', description: (e as Error).message, variant: 'destructive' });
@@ -84,9 +88,9 @@ export const BucketPickerDialog = ({ open, batch, subject, onConfirm, onCancel }
     if (!name) return;
     setBusy(true);
     try {
-      const { own } = await ensureBucketGroup(batch, subject, name);
+      const { byPair } = await ensureBucketGroup(batch, subject, name);
       invalidate();
-      onConfirm(own);
+      onConfirm(byPair);
     } catch (e) {
       console.error('bucket create failed', e);
       toast({ title: 'Could not create the week', description: (e as Error).message, variant: 'destructive' });
