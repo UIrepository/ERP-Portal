@@ -4,13 +4,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Play, Search, PlayCircle, Clock, Filter, X } from 'lucide-react';
+import { Play, Search, PlayCircle, Clock, Filter, X, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { FullScreenVideoPlayer } from '@/components/video-player';
 import { Lecture, Doubt as PlayerDoubt } from '@/components/video-player/types';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ensureBucketGroup, useInvalidateBuckets, UNSORTED_LABEL } from '@/hooks/useContentBuckets';
 
 // Interfaces
 interface RecordingContent {
@@ -21,11 +23,25 @@ interface RecordingContent {
     embed_link: string;
     batch: string;
     created_at: string;
+    /** Week/chapter this lecture sits in. Null = Unsorted. */
+    bucket_id: string | null;
 }
+
+interface TeacherBucket {
+    id: string;
+    batch: string;
+    subject: string;
+    name: string;
+    position: number;
+}
+
+/** Sentinel values for the per-card week selector. */
+const NO_WEEK = '__none__';
+const NEW_WEEK = '__new__';
 
 // Fixed card dimensions for zoom stability (Matching Student Design)
 const CARD_WIDTH = 280;
-const CARD_HEIGHT = 280;
+const CARD_HEIGHT = 326;
 const BANNER_HEIGHT = 160;
 
 // Skeletons
@@ -88,7 +104,7 @@ export const TeacherRecordings = () => {
             }
             const { data, error } = await supabase
                 .from('recordings')
-                .select('id, date, subject, topic, embed_link, batch, created_at')
+                .select('id, date, subject, topic, embed_link, batch, created_at, bucket_id')
                 .in('batch', teacherInfo.assigned_batches)
                 .in('subject', teacherInfo.assigned_subjects)
                 .order('date', { ascending: false })
@@ -110,6 +126,103 @@ export const TeacherRecordings = () => {
             return matchesBatch && matchesSubject && matchesSearch;
         });
     }, [recordings, selectedBatch, selectedSubject, searchTerm]);
+
+    // Every week across the teacher's own batches, fetched once rather than
+    // per card. RLS already limits this to subjects they are assigned to.
+    const { data: buckets = [] } = useQuery<TeacherBucket[]>({
+        queryKey: ['teacherBuckets', teacherInfo?.assigned_batches, teacherInfo?.assigned_subjects],
+        queryFn: async () => {
+            const { data, error } = await supabase
+                .from('content_buckets')
+                .select('id, batch, subject, name, position')
+                .in('batch', teacherInfo!.assigned_batches)
+                .in('subject', teacherInfo!.assigned_subjects)
+                .order('position', { ascending: true })
+                .order('created_at', { ascending: true });
+            if (error) throw error;
+            return (data ?? []) as TeacherBucket[];
+        },
+        enabled: !!teacherInfo?.assigned_batches?.length && !!teacherInfo?.assigned_subjects?.length,
+        staleTime: 5 * 60_000,
+    });
+
+    const bucketsFor = useCallback(
+        (batch: string, subject: string) => buckets.filter(b => b.batch === batch && b.subject === subject),
+        [buckets],
+    );
+
+    const invalidateBuckets = useInvalidateBuckets();
+    const [newWeekFor, setNewWeekFor] = useState<RecordingContent | null>(null);
+    const [newWeekName, setNewWeekName] = useState('');
+    const [savingWeek, setSavingWeek] = useState(false);
+
+    const refreshRecordings = useCallback(() => {
+        queryClient.invalidateQueries({ queryKey: ['teacherRecordings'] });
+        queryClient.invalidateQueries({ queryKey: ['teacherBuckets'] });
+        invalidateBuckets();
+    }, [queryClient, invalidateBuckets]);
+
+    /** Move one lecture into a week (or out of all of them). */
+    const moveToBucket = useCallback(async (rec: RecordingContent, bucketId: string | null) => {
+        const { error } = await supabase
+            .from('recordings')
+            .update({ bucket_id: bucketId })
+            .eq('id', rec.id);
+        if (error) {
+            toast({ title: 'Could not move it', description: error.message, variant: 'destructive' });
+            return;
+        }
+        const name = bucketId ? (buckets.find(b => b.id === bucketId)?.name ?? 'that week') : UNSORTED_LABEL;
+        toast({ title: `Moved to ${name}` });
+        refreshRecordings();
+        queryClient.invalidateQueries({ queryKey: ['student-recordings', rec.batch, rec.subject] });
+    }, [buckets, refreshRecordings, queryClient]);
+
+    const createWeekAndMove = useCallback(async () => {
+        const rec = newWeekFor;
+        const name = newWeekName.trim();
+        if (!rec || !name) return;
+        setSavingWeek(true);
+        try {
+            // Creates the week in every merged batch, same as Go Live does, so
+            // the partner batches stay in step.
+            const { own } = await ensureBucketGroup(rec.batch, rec.subject, name);
+            if (own) await moveToBucket(rec, own);
+            setNewWeekFor(null);
+            setNewWeekName('');
+        } catch (e) {
+            toast({ title: 'Could not create the week', description: (e as Error).message, variant: 'destructive' });
+        } finally {
+            setSavingWeek(false);
+        }
+    }, [newWeekFor, newWeekName, moveToBucket]);
+
+    /**
+     * Week sections, but only once a single batch AND subject are chosen —
+     * a week belongs to one (batch, subject), so grouping across "All Batches"
+     * would put unrelated Week 1s in the same pile. With the filters wide open
+     * the flat grid stays, and every card still has its own week selector.
+     */
+    const sections = useMemo(() => {
+        if (selectedBatch === 'all' || selectedSubject === 'all') return [];
+        const mine = bucketsFor(selectedBatch, selectedSubject);
+        if (mine.length === 0) return [];
+        const byId = new Map(mine.map(b => [b.id, b] as const));
+        const groups = new Map<string, RecordingContent[]>();
+        for (const rec of filteredRecordings) {
+            const key = rec.bucket_id && byId.has(rec.bucket_id) ? rec.bucket_id : '__unsorted__';
+            const list = groups.get(key);
+            if (list) list.push(rec); else groups.set(key, [rec]);
+        }
+        const out = mine
+            .filter(b => groups.has(b.id))
+            .map(b => ({ key: b.id, label: b.name, items: groups.get(b.id)! }));
+        const loose = groups.get('__unsorted__');
+        if (loose?.length) out.push({ key: '__unsorted__', label: UNSORTED_LABEL, items: loose });
+        return out;
+    }, [selectedBatch, selectedSubject, bucketsFor, filteredRecordings]);
+
+    const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
     const availableBatches = teacherInfo?.assigned_batches || [];
     const availableSubjects = teacherInfo?.assigned_subjects || [];
@@ -229,6 +342,120 @@ export const TeacherRecordings = () => {
         );
     }
 
+    /**
+     * One lecture card. Defined here rather than inline so the same markup
+     * serves the flat grid and the week-grouped view — no second copy to drift.
+     */
+    const renderCard = (recording: RecordingContent, lectureNo: number) => (
+
+                                    <div 
+                                        key={recording.id}
+                                        onClick={() => handlePlayInFullscreen(recording)}
+                                        className={cn(
+                                            "bg-white rounded-lg p-3",
+                                            "shadow-[0_1px_3px_rgba(0,0,0,0.05)]",
+                                            "border border-slate-200",
+                                            "cursor-pointer",
+                                            "flex flex-col",
+                                            "hover:shadow-md hover:border-teal-200 transition-all duration-200"
+                                        )}
+                                        style={{
+                                            width: CARD_WIDTH,
+                                            height: CARD_HEIGHT,
+                                            minWidth: CARD_WIDTH,
+                                            maxWidth: CARD_WIDTH,
+                                            minHeight: CARD_HEIGHT,
+                                            maxHeight: CARD_HEIGHT,
+                                            flexShrink: 0,
+                                            flexGrow: 0,
+                                        }}
+                                    >
+                                        {/* Visual Banner */}
+                                        <div 
+                                            className="w-full bg-gradient-to-br from-white to-[#f0fdfa] rounded-lg relative flex items-center px-5 border border-[#ccfbf1] overflow-hidden group"
+                                            style={{ height: BANNER_HEIGHT, minHeight: BANNER_HEIGHT, maxHeight: BANNER_HEIGHT, flexShrink: 0 }}
+                                        >
+                                            {/* Banner Title */}
+                                            <div className="z-10 relative" style={{ flexShrink: 0 }}>
+                                                <span className="text-[#0d9488] font-bold text-xl block tracking-tight whitespace-nowrap">
+                                                    Lecture {lectureNo}
+                                                </span>
+                                                <span className="text-teal-600/70 text-xs font-medium uppercase tracking-wider mt-1 block">
+                                                    {recording.batch}
+                                                </span>
+                                            </div>
+
+                                            {/* Graphic Elements */}
+                                            <div className="absolute right-3 top-1/2 -translate-y-1/2" style={{ flexShrink: 0 }}>
+                                                <div 
+                                                    className="bg-[#111] rounded-full flex items-center justify-center border-4 border-[#f0fdfa] shadow-sm select-none overflow-hidden p-2"
+                                                    style={{ width: 100, height: 100, minWidth: 100, minHeight: 100, flexShrink: 0 }}
+                                                >
+                                                    <img 
+                                                        src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
+                                                        alt="UI Logo" 
+                                                        className="w-full h-full object-contain"
+                                                    />
+                                                </div>
+                                                <div 
+                                                    className="absolute bottom-0 right-0 bg-[#0d9488] rounded-full flex items-center justify-center text-white border-2 border-white shadow-sm z-20 group-hover:scale-110 transition-transform"
+                                                    style={{ width: 36, height: 36, minWidth: 36, minHeight: 36, flexShrink: 0 }}
+                                                >
+                                                    <Play fill="white" className="w-3 h-3 ml-0.5" />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Info Footer */}
+                                        <div className="pt-3 px-1 pb-1 flex-1 flex flex-col justify-between overflow-hidden" style={{ minHeight: 0 }}>
+                                            <div className="flex justify-between items-center mb-2 text-slate-500 font-normal text-xs" style={{ flexShrink: 0 }}>
+                                                <span style={{ whiteSpace: 'nowrap' }}>{format(new Date(recording.date), 'dd MMM, yyyy')}</span>
+                                                <div className="flex items-center gap-1" style={{ flexShrink: 0 }}>
+                                                    <Clock className="opacity-70" style={{ width: 12, height: 12, flexShrink: 0 }} />
+                                                    <span style={{ whiteSpace: 'nowrap' }}>{format(new Date(recording.created_at), 'h:mm a')}</span>
+                                                </div>
+                                            </div>
+                                            <h2 className="text-base font-semibold text-slate-900 tracking-tight leading-snug line-clamp-2" style={{ flexShrink: 0 }} title={recording.topic}>
+                                                {recording.topic}
+                                            </h2>
+
+                                            {/* Week selector. stopPropagation everywhere so using it
+                                                never opens the player behind the dropdown. */}
+                                            <div
+                                                className="mt-2"
+                                                style={{ flexShrink: 0 }}
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <Select
+                                                    value={recording.bucket_id ?? NO_WEEK}
+                                                    onValueChange={(v) => {
+                                                        if (v === NEW_WEEK) {
+                                                            setNewWeekFor(recording);
+                                                            setNewWeekName('');
+                                                            return;
+                                                        }
+                                                        void moveToBucket(recording, v === NO_WEEK ? null : v);
+                                                    }}
+                                                >
+                                                    <SelectTrigger
+                                                        className="h-8 text-xs border-slate-200 bg-slate-50"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent onClick={(e) => e.stopPropagation()}>
+                                                        <SelectItem value={NO_WEEK}>{UNSORTED_LABEL}</SelectItem>
+                                                        {bucketsFor(recording.batch, recording.subject).map((b) => (
+                                                            <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                                                        ))}
+                                                        <SelectItem value={NEW_WEEK}>+ New week…</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+                                    </div>
+    );
+
     return (
         <div className="p-6 bg-slate-50 min-h-screen font-sans">
             <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
@@ -304,86 +531,44 @@ export const TeacherRecordings = () => {
                     {isLoading ? (
                         <RecordingSkeleton />
                     ) : filteredRecordings.length > 0 ? (
-                        <div className="flex flex-wrap gap-5">
-                            {filteredRecordings.map((recording, index) => {
-                                const lectureNo = filteredRecordings.length - index; 
-                                
+                        sections.length > 0 ? (
+                        <div className="space-y-4">
+                            {sections.map((section) => {
+                                const isCollapsed = !!collapsed[section.key];
                                 return (
-                                    <div 
-                                        key={recording.id}
-                                        onClick={() => handlePlayInFullscreen(recording)}
-                                        className={cn(
-                                            "bg-white rounded-lg p-3",
-                                            "shadow-[0_1px_3px_rgba(0,0,0,0.05)]",
-                                            "border border-slate-200",
-                                            "cursor-pointer",
-                                            "flex flex-col",
-                                            "hover:shadow-md hover:border-teal-200 transition-all duration-200"
-                                        )}
-                                        style={{
-                                            width: CARD_WIDTH,
-                                            height: CARD_HEIGHT,
-                                            minWidth: CARD_WIDTH,
-                                            maxWidth: CARD_WIDTH,
-                                            minHeight: CARD_HEIGHT,
-                                            maxHeight: CARD_HEIGHT,
-                                            flexShrink: 0,
-                                            flexGrow: 0,
-                                        }}
-                                    >
-                                        {/* Visual Banner */}
-                                        <div 
-                                            className="w-full bg-gradient-to-br from-white to-[#f0fdfa] rounded-lg relative flex items-center px-5 border border-[#ccfbf1] overflow-hidden group"
-                                            style={{ height: BANNER_HEIGHT, minHeight: BANNER_HEIGHT, maxHeight: BANNER_HEIGHT, flexShrink: 0 }}
+                                    <div key={section.key} className="overflow-hidden rounded-lg border border-slate-200">
+                                        <button
+                                            type="button"
+                                            onClick={() => setCollapsed(c => ({ ...c, [section.key]: !c[section.key] }))}
+                                            className="flex w-full items-center gap-3 bg-slate-50 px-4 py-3 text-left transition-colors hover:bg-slate-100"
                                         >
-                                            {/* Banner Title */}
-                                            <div className="z-10 relative" style={{ flexShrink: 0 }}>
-                                                <span className="text-[#0d9488] font-bold text-xl block tracking-tight whitespace-nowrap">
-                                                    Lecture {lectureNo}
-                                                </span>
-                                                <span className="text-teal-600/70 text-xs font-medium uppercase tracking-wider mt-1 block">
-                                                    {recording.batch}
-                                                </span>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="truncate text-base font-semibold text-slate-900">{section.label}</p>
+                                                <p className="text-xs text-slate-500">
+                                                    {section.items.length} lecture{section.items.length > 1 ? 's' : ''}
+                                                </p>
                                             </div>
-
-                                            {/* Graphic Elements */}
-                                            <div className="absolute right-3 top-1/2 -translate-y-1/2" style={{ flexShrink: 0 }}>
-                                                <div 
-                                                    className="bg-[#111] rounded-full flex items-center justify-center border-4 border-[#f0fdfa] shadow-sm select-none overflow-hidden p-2"
-                                                    style={{ width: 100, height: 100, minWidth: 100, minHeight: 100, flexShrink: 0 }}
-                                                >
-                                                    <img 
-                                                        src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
-                                                        alt="UI Logo" 
-                                                        className="w-full h-full object-contain"
-                                                    />
-                                                </div>
-                                                <div 
-                                                    className="absolute bottom-0 right-0 bg-[#0d9488] rounded-full flex items-center justify-center text-white border-2 border-white shadow-sm z-20 group-hover:scale-110 transition-transform"
-                                                    style={{ width: 36, height: 36, minWidth: 36, minHeight: 36, flexShrink: 0 }}
-                                                >
-                                                    <Play fill="white" className="w-3 h-3 ml-0.5" />
-                                                </div>
+                                            <ChevronDown
+                                                className={cn(
+                                                    'h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200',
+                                                    !isCollapsed && 'rotate-180'
+                                                )}
+                                            />
+                                        </button>
+                                        {!isCollapsed && (
+                                            <div className="flex flex-wrap gap-5 bg-white p-4">
+                                                {section.items.map((recording, i) => renderCard(recording, section.items.length - i))}
                                             </div>
-                                        </div>
-
-                                        {/* Info Footer */}
-                                        <div className="pt-3 px-1 pb-1 flex-1 flex flex-col justify-between overflow-hidden" style={{ minHeight: 0 }}>
-                                            <div className="flex justify-between items-center mb-2 text-slate-500 font-normal text-xs" style={{ flexShrink: 0 }}>
-                                                <span style={{ whiteSpace: 'nowrap' }}>{format(new Date(recording.date), 'dd MMM, yyyy')}</span>
-                                                <div className="flex items-center gap-1" style={{ flexShrink: 0 }}>
-                                                    <Clock className="opacity-70" style={{ width: 12, height: 12, flexShrink: 0 }} />
-                                                    <span style={{ whiteSpace: 'nowrap' }}>{format(new Date(recording.created_at), 'h:mm a')}</span>
-                                                </div>
-                                            </div>
-                                            <h2 className="text-base font-semibold text-slate-900 tracking-tight leading-snug line-clamp-2" style={{ flexShrink: 0 }} title={recording.topic}>
-                                                {recording.topic}
-                                            </h2>
-                                        </div>
+                                        )}
                                     </div>
                                 );
                             })}
                         </div>
+                        ) : (
+                        <div className="flex flex-wrap gap-5">
+                            {filteredRecordings.map((recording, index) => renderCard(recording, filteredRecordings.length - index))}
+                        </div>
+                        )
                     ) : (
                         <div className="text-center py-16 bg-white rounded-lg border border-dashed border-slate-300">
                             <div className="inline-block bg-slate-50 rounded-full p-3 mb-3">
@@ -399,6 +584,33 @@ export const TeacherRecordings = () => {
                     )}
                 </div>
             </div>
+
+            {/* Name a new week for one lecture, then move it there. */}
+            <Dialog open={!!newWeekFor} onOpenChange={(o) => { if (!o && !savingWeek) setNewWeekFor(null); }}>
+                <DialogContent className="max-w-sm gap-0 p-6 sm:rounded-[24px]">
+                    <DialogHeader className="space-y-0">
+                        <DialogTitle className="pr-10 text-left text-base font-semibold">
+                            New week for {newWeekFor?.subject}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <Input
+                        autoFocus
+                        className="mt-4"
+                        placeholder="Week 1, Chapter 2, Revision…"
+                        value={newWeekName}
+                        onChange={(e) => setNewWeekName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' && newWeekName.trim()) void createWeekAndMove(); }}
+                    />
+                    <div className="mt-4 flex gap-2">
+                        <Button className="flex-1" disabled={!newWeekName.trim() || savingWeek} onClick={() => void createWeekAndMove()}>
+                            Create &amp; move
+                        </Button>
+                        <Button variant="outline" disabled={savingWeek} onClick={() => setNewWeekFor(null)}>
+                            Cancel
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };
