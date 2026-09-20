@@ -47,15 +47,20 @@ export const BucketPickerDialog = ({ open, batch, subject, onConfirm, onCancel }
   const [newName, setNewName] = useState('');
   const [busy, setBusy] = useState(false);
 
-  // Fresh state every time it opens, and preselect the most recent bucket —
-  // classes usually continue the week they were last in.
   useEffect(() => {
     if (!open) return;
-    setSelected(null);
     setCreating(false);
     setNewName('');
     setBusy(false);
   }, [open]);
+
+  // Preselect the newest week. Most classes continue the week they were last
+  // in, so the common case becomes a single click — and the teacher can still
+  // pick another one or create a new week from the same screen.
+  useEffect(() => {
+    if (!open || buckets.length === 0) return;
+    setSelected((cur) => cur ?? buckets[buckets.length - 1].id);
+  }, [open, buckets]);
 
   const suggestion = useMemo(() => {
     // Offer the obvious next name when the existing ones are "Week <n>".
@@ -178,7 +183,7 @@ export const BucketPickerDialog = ({ open, batch, subject, onConfirm, onCancel }
 
             <Button className="w-full" disabled={!selected || busy} onClick={confirmExisting}>
               {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Go live in this week
+              Go live in “{buckets.find((b) => b.id === selected)?.name ?? '…'}”
             </Button>
           </div>
         )}
