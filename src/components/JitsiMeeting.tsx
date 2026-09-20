@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { generateJitsiRoomName } from '@/lib/jitsiUtils';
 import { useYoutubeStream } from '@/hooks/useYoutubeStream';
+import { BucketPickerDialog } from '@/components/BucketPickerDialog';
 import { ATTENDANCE_ENABLED } from '@/lib/features';
 
 interface JitsiMeetingProps {
@@ -124,6 +125,10 @@ export const JitsiMeeting = ({
   const [showFallbackPrompt, setShowFallbackPrompt] = useState(false);
   const [lastStreamKey, setLastStreamKey] = useState<string | null>(null);
   const [lastBroadcastId, setLastBroadcastId] = useState<string | null>(null);
+  // Go Live asks which week the class belongs to first, exactly as the
+  // teacher's own Join Class screen does — this is the second path that
+  // creates recordings, and without it they would arrive Unsorted.
+  const [askBucket, setAskBucket] = useState(false);
 
   // Hook for YouTube logic
   const { startStream, stopStream, isStreaming, isStartingStream, streamDropped, setStreamDropped } = useYoutubeStream();
@@ -233,11 +238,23 @@ export const JitsiMeeting = ({
   }, []);
 
   // --- STREAMING LOGIC WRAPPER ---
-  const handleGoLive = async () => {
+  const handleGoLive = () => {
+    if (!isHost) { toast.error("Only teachers can start the live stream."); return; }
+    setAskBucket(true);
+  };
+
+  const runGoLive = async (bucketByPair?: Record<string, string>) => {
     const currentProps = propsRef.current;
     if (!isHost) { toast.error("Only teachers can start the live stream."); return; }
 
-    const streamDetails = await startStream(currentProps.batch, currentProps.subject);
+    const streamDetails = await startStream(
+      currentProps.batch,
+      currentProps.subject,
+      undefined,
+      undefined,
+      undefined,
+      bucketByPair,
+    );
 
     if (streamDetails && apiRef.current) {
          setLastStreamKey(streamDetails.streamKey);
@@ -720,6 +737,19 @@ export const JitsiMeeting = ({
 
         <div ref={jitsiContainerRef} className="absolute inset-0 w-full h-full bg-black" style={{ display: hasJoined ? 'block' : 'none' }} />
       </div>
+
+      {askBucket && (
+        <BucketPickerDialog
+          open
+          batch={batch}
+          subject={subject}
+          onCancel={() => setAskBucket(false)}
+          onConfirm={(byPair) => {
+            setAskBucket(false);
+            void runGoLive(byPair);
+          }}
+        />
+      )}
     </div>
   );
 };
