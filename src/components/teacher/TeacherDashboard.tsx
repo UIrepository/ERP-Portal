@@ -13,6 +13,7 @@ import { TeacherAnnouncements } from './TeacherAnnouncements';
 import { Button } from '@/components/ui/button';
 import { FullScreenVideoPlayer } from '@/components/video-player/FullScreenVideoPlayer';
 import { Lecture } from '@/components/video-player/types';
+import { ContentOrganiser } from '@/components/shared/ContentOrganiser';
 
 interface TeacherDashboardProps {
   activeTab: string;
@@ -57,6 +58,8 @@ export const TeacherDashboard = ({ activeTab, onTabChange }: TeacherDashboardPro
         return <TeacherAnnouncements />;
       case 'teacher-resources':
         return <TeacherResources />;
+      case 'teacher-organise':
+        return <ContentOrganiser />;
       case 'teacher-schedule-requests':
         return <TeacherScheduleRequests />;
       case 'teacher-messages':
