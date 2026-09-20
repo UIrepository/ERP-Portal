@@ -383,6 +383,39 @@ export type Database = {
         }
         Relationships: []
       }
+      content_buckets: {
+        Row: {
+          batch: string
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          position: number
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          batch: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          position?: number
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          batch?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          position?: number
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       content_catalog: {
         Row: {
           batch: string
@@ -944,6 +977,7 @@ export type Database = {
       notes: {
         Row: {
           batch: string
+          bucket_id: string | null
           created_at: string
           file_url: string
           filename: string
@@ -957,6 +991,7 @@ export type Database = {
         }
         Insert: {
           batch: string
+          bucket_id?: string | null
           created_at?: string
           file_url: string
           filename: string
@@ -970,6 +1005,7 @@ export type Database = {
         }
         Update: {
           batch?: string
+          bucket_id?: string | null
           created_at?: string
           file_url?: string
           filename?: string
@@ -981,7 +1017,15 @@ export type Database = {
           title?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "notes_bucket_id_fkey"
+            columns: ["bucket_id"]
+            isOneToOne: false
+            referencedRelation: "content_buckets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notifications: {
         Row: {
@@ -1162,6 +1206,7 @@ export type Database = {
       recordings: {
         Row: {
           batch: string
+          bucket_id: string | null
           created_at: string
           date: string
           embed_link: string
@@ -1174,6 +1219,7 @@ export type Database = {
         }
         Insert: {
           batch: string
+          bucket_id?: string | null
           created_at?: string
           date: string
           embed_link: string
@@ -1186,6 +1232,7 @@ export type Database = {
         }
         Update: {
           batch?: string
+          bucket_id?: string | null
           created_at?: string
           date?: string
           embed_link?: string
@@ -1196,7 +1243,15 @@ export type Database = {
           topic?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "recordings_bucket_id_fkey"
+            columns: ["bucket_id"]
+            isOneToOne: false
+            referencedRelation: "content_buckets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       schedule_requests: {
         Row: {
@@ -1265,6 +1320,7 @@ export type Database = {
         Row: {
           batch: string
           broadcast_id: string | null
+          bucket_id: string | null
           created_at: string
           date: string | null
           day_of_week: number
@@ -1281,6 +1337,7 @@ export type Database = {
         Insert: {
           batch: string
           broadcast_id?: string | null
+          bucket_id?: string | null
           created_at?: string
           date?: string | null
           day_of_week: number
@@ -1297,6 +1354,7 @@ export type Database = {
         Update: {
           batch?: string
           broadcast_id?: string | null
+          bucket_id?: string | null
           created_at?: string
           date?: string | null
           day_of_week?: number
@@ -1310,7 +1368,15 @@ export type Database = {
           subject?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "schedules_bucket_id_fkey"
+            columns: ["bucket_id"]
+            isOneToOne: false
+            referencedRelation: "content_buckets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       student_activities: {
         Row: {
@@ -1416,6 +1482,7 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean | null
+          is_free_preview: boolean
           link: string
           subject: string | null
           title: string
@@ -1428,6 +1495,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
+          is_free_preview?: boolean
           link: string
           subject?: string | null
           title: string
@@ -1440,6 +1508,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
+          is_free_preview?: boolean
           link?: string
           subject?: string | null
           title?: string
@@ -1713,6 +1782,18 @@ export type Database = {
             Args: { p_emails: string[]; p_group_email: string; p_role: string }
             Returns: number
           }
+      ensure_bucket: {
+        Args: { p_batch: string; p_name: string; p_subject: string }
+        Returns: string
+      }
+      ensure_bucket_group: {
+        Args: { p_batch: string; p_name: string; p_subject: string }
+        Returns: {
+          bucket_batch: string
+          bucket_id: string
+          bucket_subject: string
+        }[]
+      }
       get_admin_for_support: {
         Args: never
         Returns: {
@@ -1843,6 +1924,7 @@ export type Database = {
         Returns: {
           batch: string
           broadcast_id: string | null
+          bucket_id: string | null
           created_at: string
           date: string | null
           day_of_week: number
