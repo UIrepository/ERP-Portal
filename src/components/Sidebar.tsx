@@ -26,6 +26,7 @@ import {
   CustomerSupportIcon,
   GitMergeIcon,
   ViewIcon,
+  FolderLibraryIcon as OrganiseIcon,
   Message01Icon,
   InboxIcon,
   Quiz01Icon,
@@ -137,6 +138,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
     { id: 'teacher-whiteboard', label: 'Whiteboard', icon: BoardMathIcon },
     { id: 'teacher-announcements', label: 'Announcements', icon: Megaphone01Icon },
     { id: 'teacher-resources', label: 'Resources', icon: FolderLibraryIcon },
+    { id: 'teacher-organise', label: 'Organise Content', icon: OrganiseIcon },
     { id: 'teacher-schedule-requests', label: 'Schedule Requests', icon: TaskDaily01Icon },
     { id: 'teacher-feedback', label: 'Feedback', icon: FavouriteIcon },
     { id: 'teacher-messages', label: 'Messages', icon: Message01Icon },
@@ -172,6 +174,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
     { id: 'maintenance', label: 'Maintenance Mode', icon: Wrench01Icon },
     { id: 'subject-merges', label: 'Subject Merges', icon: GitMergeIcon },
     { id: 'free-preview', label: 'Free Preview', icon: ViewIcon },
+    { id: 'organise-content', label: 'Organise Content', icon: OrganiseIcon },
   ];
 
   const getTabs = () => {
