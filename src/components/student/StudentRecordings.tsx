@@ -15,6 +15,8 @@ import { StudentBackButton } from './StudentBackButton';
 import { useNavigate } from 'react-router-dom';
 import { openInternalRoute } from '@/hooks/useInstallApp';
 import { fetchCachedRecordings } from '@/lib/cachedReads';
+import { useContentBuckets, UNSORTED, UNSORTED_LABEL } from '@/hooks/useContentBuckets';
+import { ChevronDown } from 'lucide-react';
 
 // Interfaces
 interface RecordingContent {
@@ -25,6 +27,8 @@ interface RecordingContent {
     embed_link: string;
     batch: string;
     created_at: string;
+    /** Week/chapter this lecture was filed under. Null = Unsorted. */
+    bucket_id: string | null;
 }
 
 interface StudentRecordingsProps {
@@ -44,6 +48,95 @@ const BANNER_HEIGHT = 160;
 const RECORDINGS_PAGE = 24;
 
 // Skeletons
+/**
+ * One lecture card. Pulled out of the grid unchanged so the same markup can be
+ * used both flat (a subject with no weeks yet) and inside a week section.
+ */
+const RecordingCard = ({
+    recording,
+    lectureNo,
+    onOpen,
+}: {
+    recording: RecordingContent;
+    lectureNo: number;
+    onOpen: () => void;
+}) => (
+
+                                    <div 
+                                        key={recording.id}
+                                        onClick={onOpen}
+                                        className={cn(
+                                            "bg-white rounded-md p-3",
+                                            "shadow-[0_1px_3px_rgba(0,0,0,0.05)]",
+                                            "border border-slate-200",
+                                            "cursor-pointer",
+                                            "flex flex-col",
+                                            // Full width on mobile (so it can't overflow the screen),
+                                            // fixed 280px from sm+ to keep the zoom-stable desktop grid.
+                                            "w-full sm:w-[280px] sm:min-w-[280px] sm:max-w-[280px]",
+                                            "hover:border-indigo-200 transition-colors duration-200"
+                                        )}
+                                        style={{
+                                            height: CARD_HEIGHT,
+                                            minHeight: CARD_HEIGHT,
+                                            maxHeight: CARD_HEIGHT,
+                                            flexShrink: 0,
+                                            flexGrow: 0,
+                                        }}
+                                    >
+                                        {/* Visual Banner - Fixed Height */}
+                                        <div 
+                                            className="w-full bg-gradient-to-br from-white to-[#f0fdfa] rounded-lg relative flex items-center px-5 border border-[#ccfbf1] overflow-hidden"
+                                            style={{ height: BANNER_HEIGHT, minHeight: BANNER_HEIGHT, maxHeight: BANNER_HEIGHT, flexShrink: 0 }}
+                                        >
+                                            {/* Banner Title - Lecture No */}
+                                            <div className="z-10 relative" style={{ flexShrink: 0 }}>
+                                                <span className="text-[#0d9488] font-bold text-xl block tracking-tight whitespace-nowrap">
+                                                    Lecture {lectureNo}
+                                                </span>
+                                            </div>
+
+                                            {/* Graphic Elements (Right) - Fixed Position */}
+                                            <div className="absolute right-3 top-1/2 -translate-y-1/2" style={{ flexShrink: 0 }}>
+                                                {/* Logo Circle - Fixed Size */}
+                                                <div 
+                                                    className="bg-[#111] rounded-full flex items-center justify-center border-4 border-[#f0fdfa] shadow-sm select-none overflow-hidden p-2"
+                                                    style={{ width: 100, height: 100, minWidth: 100, minHeight: 100, flexShrink: 0 }}
+                                                >
+                                                    <img 
+                                                        src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
+                                                        alt="UI Logo" 
+                                                        className="w-full h-full object-contain"
+                                                    />
+                                                </div>
+                                                {/* Play Button Overlay - Fixed Size */}
+                                                <div 
+                                                    className="absolute bottom-0 right-0 bg-[#0d9488] rounded-full flex items-center justify-center text-white border-2 border-white shadow-sm z-20"
+                                                    style={{ width: 36, height: 36, minWidth: 36, minHeight: 36, flexShrink: 0 }}
+                                                >
+                                                    <Play fill="white" className="w-3 h-3 ml-0.5" />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Info Footer - Fixed layout */}
+                                        <div className="pt-3 px-1 pb-1 flex-1 flex flex-col justify-between overflow-hidden" style={{ minHeight: 0 }}>
+                                            <div className="flex justify-between items-center mb-2 text-slate-500 font-normal text-xs" style={{ flexShrink: 0 }}>
+                                                <span style={{ whiteSpace: 'nowrap' }}>{format(new Date(recording.date), 'dd MMM, yyyy')}</span>
+                                                <div className="flex items-center gap-1" style={{ flexShrink: 0 }}>
+                                                    <Clock className="opacity-70" style={{ width: 12, height: 12, flexShrink: 0 }} />
+                                                    <span style={{ whiteSpace: 'nowrap' }}>{format(new Date(recording.created_at), 'h:mm a')}</span>
+                                                </div>
+                                            </div>
+                                            {/* Topic Title */}
+                                            <h2 className="text-base font-semibold text-slate-900 tracking-tight leading-snug line-clamp-2 break-words" style={{ flexShrink: 0 }}>
+                                                {recording.topic}
+                                            </h2>
+                                        </div>
+                                    </div>
+                                
+);
+
 const RecordingSkeleton = () => (
     <div className="flex flex-wrap gap-5">
         {[...Array(8)].map((_, i) => (
@@ -91,6 +184,7 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
             const fill = (r: any): RecordingContent => ({
                 id: r.id, date: r.date, subject: r.subject, topic: r.topic,
                 created_at: r.created_at, batch, embed_link: '',
+                bucket_id: r.bucket_id ?? null,
             });
             // Prefer the Vercel edge-cached list (offloads Supabase egress); fall
             // back to a direct Supabase read in dev / if the endpoint is down.
@@ -100,7 +194,7 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
             } catch {
                 const { data, error } = await supabase
                     .from('recordings')
-                    .select('id, date, subject, topic, created_at')
+                    .select('id, date, subject, topic, created_at, bucket_id')
                     .eq('batch', batch)
                     .eq('subject', subject)
                     .order('date', { ascending: false })
@@ -125,6 +219,39 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
         [filteredRecordings, visibleCount]
     );
     const hasMore = filteredRecordings.length > visibleCount;
+
+    const { data: buckets = [] } = useContentBuckets(batch, subject);
+
+    /**
+     * Lectures grouped into the weeks the teacher created, in the teacher's own
+     * order, with anything not yet filed in a trailing "Unsorted" group.
+     *
+     * A subject with no weeks yet keeps the original flat grid — grouping only
+     * appears once there is something to group by, so nothing changes for the
+     * back catalogue until someone organises it.
+     */
+    const sections = useMemo(() => {
+        if (buckets.length === 0) return [];
+        const byId = new Map(buckets.map((b) => [b.id, b] as const));
+        const groups = new Map<string, RecordingContent[]>();
+        for (const rec of filteredRecordings) {
+            const key = rec.bucket_id && byId.has(rec.bucket_id) ? rec.bucket_id : UNSORTED;
+            const list = groups.get(key);
+            if (list) list.push(rec); else groups.set(key, [rec]);
+        }
+        const out = buckets
+            .filter((b) => groups.has(b.id))
+            .map((b) => ({ key: b.id, label: b.name, items: groups.get(b.id)! }));
+        const loose = groups.get(UNSORTED);
+        if (loose?.length) out.push({ key: UNSORTED, label: UNSORTED_LABEL, items: loose });
+        return out;
+    }, [buckets, filteredRecordings]);
+
+    // Sections start open so a student sees their lectures without hunting.
+    const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+    const toggleSection = useCallback((key: string) => {
+        setCollapsed((c) => ({ ...c, [key]: !c[key] }));
+    }, []);
 
     // Transform database recording to player Lecture format
     const recordingToLecture = useCallback((rec: RecordingContent, index: number): Lecture => ({
@@ -248,86 +375,60 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
                     {isLoading ? (
                         <RecordingSkeleton />
                     ) : filteredRecordings.length > 0 ? (
-                        <>
-                        <div className="flex flex-wrap gap-5">
-                            {visibleRecordings.map((recording, index) => {
-                                const lectureNo = filteredRecordings.length - index;
-                                
+                        sections.length > 0 ? (
+                        /* Grouped by the weeks the teacher created */
+                        <div className="space-y-4">
+                            {sections.map((section) => {
+                                const isCollapsed = !!collapsed[section.key];
                                 return (
-                                    <div 
-                                        key={recording.id}
-                                        onClick={() => handlePlayInFullscreen(recording, index)}
-                                        className={cn(
-                                            "bg-white rounded-md p-3",
-                                            "shadow-[0_1px_3px_rgba(0,0,0,0.05)]",
-                                            "border border-slate-200",
-                                            "cursor-pointer",
-                                            "flex flex-col",
-                                            // Full width on mobile (so it can't overflow the screen),
-                                            // fixed 280px from sm+ to keep the zoom-stable desktop grid.
-                                            "w-full sm:w-[280px] sm:min-w-[280px] sm:max-w-[280px]",
-                                            "hover:border-indigo-200 transition-colors duration-200"
-                                        )}
-                                        style={{
-                                            height: CARD_HEIGHT,
-                                            minHeight: CARD_HEIGHT,
-                                            maxHeight: CARD_HEIGHT,
-                                            flexShrink: 0,
-                                            flexGrow: 0,
-                                        }}
-                                    >
-                                        {/* Visual Banner - Fixed Height */}
-                                        <div 
-                                            className="w-full bg-gradient-to-br from-white to-[#f0fdfa] rounded-lg relative flex items-center px-5 border border-[#ccfbf1] overflow-hidden"
-                                            style={{ height: BANNER_HEIGHT, minHeight: BANNER_HEIGHT, maxHeight: BANNER_HEIGHT, flexShrink: 0 }}
+                                    <div key={section.key} className="rounded-lg border border-slate-200 overflow-hidden">
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleSection(section.key)}
+                                            className="flex w-full items-center gap-3 bg-slate-50 px-4 py-3 text-left transition-colors hover:bg-slate-100"
                                         >
-                                            {/* Banner Title - Lecture No */}
-                                            <div className="z-10 relative" style={{ flexShrink: 0 }}>
-                                                <span className="text-[#0d9488] font-bold text-xl block tracking-tight whitespace-nowrap">
-                                                    Lecture {lectureNo}
-                                                </span>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="truncate text-base font-semibold text-slate-900">{section.label}</p>
+                                                <p className="text-xs text-slate-500">
+                                                    {section.items.length} lecture{section.items.length > 1 ? 's' : ''}
+                                                </p>
                                             </div>
-
-                                            {/* Graphic Elements (Right) - Fixed Position */}
-                                            <div className="absolute right-3 top-1/2 -translate-y-1/2" style={{ flexShrink: 0 }}>
-                                                {/* Logo Circle - Fixed Size */}
-                                                <div 
-                                                    className="bg-[#111] rounded-full flex items-center justify-center border-4 border-[#f0fdfa] shadow-sm select-none overflow-hidden p-2"
-                                                    style={{ width: 100, height: 100, minWidth: 100, minHeight: 100, flexShrink: 0 }}
-                                                >
-                                                    <img 
-                                                        src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
-                                                        alt="UI Logo" 
-                                                        className="w-full h-full object-contain"
+                                            <ChevronDown
+                                                className={cn(
+                                                    'h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200',
+                                                    !isCollapsed && 'rotate-180'
+                                                )}
+                                            />
+                                        </button>
+                                        {!isCollapsed && (
+                                            <div className="flex flex-wrap gap-5 bg-white p-4">
+                                                {section.items.map((recording, i) => (
+                                                    <RecordingCard
+                                                        key={recording.id}
+                                                        recording={recording}
+                                                        /* Numbered within the week, so Week 2 starts at Lecture 1 again. */
+                                                        lectureNo={section.items.length - i}
+                                                        onOpen={() => handlePlayInFullscreen(recording, i)}
                                                     />
-                                                </div>
-                                                {/* Play Button Overlay - Fixed Size */}
-                                                <div 
-                                                    className="absolute bottom-0 right-0 bg-[#0d9488] rounded-full flex items-center justify-center text-white border-2 border-white shadow-sm z-20"
-                                                    style={{ width: 36, height: 36, minWidth: 36, minHeight: 36, flexShrink: 0 }}
-                                                >
-                                                    <Play fill="white" className="w-3 h-3 ml-0.5" />
-                                                </div>
+                                                ))}
                                             </div>
-                                        </div>
-
-                                        {/* Info Footer - Fixed layout */}
-                                        <div className="pt-3 px-1 pb-1 flex-1 flex flex-col justify-between overflow-hidden" style={{ minHeight: 0 }}>
-                                            <div className="flex justify-between items-center mb-2 text-slate-500 font-normal text-xs" style={{ flexShrink: 0 }}>
-                                                <span style={{ whiteSpace: 'nowrap' }}>{format(new Date(recording.date), 'dd MMM, yyyy')}</span>
-                                                <div className="flex items-center gap-1" style={{ flexShrink: 0 }}>
-                                                    <Clock className="opacity-70" style={{ width: 12, height: 12, flexShrink: 0 }} />
-                                                    <span style={{ whiteSpace: 'nowrap' }}>{format(new Date(recording.created_at), 'h:mm a')}</span>
-                                                </div>
-                                            </div>
-                                            {/* Topic Title */}
-                                            <h2 className="text-base font-semibold text-slate-900 tracking-tight leading-snug line-clamp-2 break-words" style={{ flexShrink: 0 }}>
-                                                {recording.topic}
-                                            </h2>
-                                        </div>
+                                        )}
                                     </div>
                                 );
                             })}
+                        </div>
+                        ) : (
+                        /* No weeks created for this subject yet — original flat grid */
+                        <>
+                        <div className="flex flex-wrap gap-5">
+                            {visibleRecordings.map((recording, index) => (
+                                <RecordingCard
+                                    key={recording.id}
+                                    recording={recording}
+                                    lectureNo={filteredRecordings.length - index}
+                                    onOpen={() => handlePlayInFullscreen(recording, index)}
+                                />
+                            ))}
                         </div>
                         {hasMore && (
                             <div className="mt-8 flex justify-center">
@@ -340,6 +441,7 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
                             </div>
                         )}
                         </>
+                        )
                     ) : (
                         <div className="text-center py-16 bg-white rounded-lg border border-dashed border-slate-300">
                             <div className="inline-block bg-slate-50 rounded-full p-3 mb-3">
