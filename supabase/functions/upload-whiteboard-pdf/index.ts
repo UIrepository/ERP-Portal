@@ -188,7 +188,10 @@ Deno.serve(async (req) => {
     // Resolve the class and confirm the caller is its teacher.
     const { data: schedule, error: schedErr } = await admin
       .from('schedules')
-      .select('batch, subject')
+      // bucket_id is the week the teacher chose at Go Live — the saved
+      // whiteboard note inherits it so it files itself alongside that day's
+      // lecture without asking the teacher a second time.
+      .select('batch, subject, bucket_id')
       .eq('id', scheduleId)
       .maybeSingle();
     if (schedErr || !schedule) return json({ error: 'Schedule not found' }, 404);
@@ -287,6 +290,38 @@ Deno.serve(async (req) => {
     let noteInsertCount = 0;
     if (postToNotes) {
       const notePairs = await getActiveMergePairs(admin, schedule.batch, schedule.subject);
+
+      // Resolve the same-named week in EVERY merged batch. A bucket belongs to
+      // one (batch, subject), so the schedule's own bucket id is only correct
+      // for its own pair; the partner batches need their own row with the same
+      // name. ensure_bucket_group is idempotent, so this is a lookup in the
+      // normal case where Go Live already created them.
+      const bucketByPair: Record<string, string> = {};
+      if (schedule.bucket_id) {
+        const { data: bucket } = await admin
+          .from('content_buckets')
+          .select('name')
+          .eq('id', schedule.bucket_id)
+          .maybeSingle();
+        if (bucket?.name) {
+          const { data: group, error: groupErr } = await admin.rpc('ensure_bucket_group', {
+            p_batch: schedule.batch,
+            p_subject: schedule.subject,
+            p_name: bucket.name,
+          });
+          if (groupErr) {
+            // Not fatal — the note still saves, just Unsorted.
+            console.error('ensure_bucket_group failed:', groupErr);
+          } else if (Array.isArray(group)) {
+            for (const row of group as Record<string, string>[]) {
+              if (row.bucket_batch && row.bucket_subject && row.bucket_id) {
+                bucketByPair[`${row.bucket_batch}|${row.bucket_subject}`] = row.bucket_id;
+              }
+            }
+          }
+        }
+      }
+
       const noteRows = notePairs.map((pair) => ({
         filename: fileName,
         title: title || safeTitle,
@@ -295,6 +330,7 @@ Deno.serve(async (req) => {
         file_url: fileUrl,
         tags: ['Whiteboard'],
         schedule_id: scheduleId, // links this saved whiteboard PDF to its class
+        bucket_id: bucketByPair[`${pair.batch}|${pair.subject}`] ?? null,
       }));
 
       const { error: noteErr } = await admin.from('notes').insert(noteRows);
