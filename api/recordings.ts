@@ -14,7 +14,10 @@
  * key is server-side only; every query is pinned to one batch+subject.
  */
 
-const SAFE_COLUMNS = 'id,date,subject,topic,created_at';
+// bucket_id is just a grouping key — it names no URL and reveals nothing
+// beyond "these lectures belong to the same week", which the titles already
+// imply. Safe to cache publicly alongside the rest.
+const SAFE_COLUMNS = 'id,date,subject,topic,created_at,bucket_id';
 
 export default async function handler(req: any, res: any) {
   const batch = (req.query?.batch ?? '').toString().trim();
