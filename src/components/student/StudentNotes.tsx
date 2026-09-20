@@ -4,8 +4,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
 import { StudentBackButton } from './StudentBackButton';
-import { FileText, Download, FileSpreadsheet, FileCode, File } from 'lucide-react';
+import { FileText, Download, FileSpreadsheet, FileCode, File, ChevronDown } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useMemo, useState, useCallback } from 'react';
+import { cn } from '@/lib/utils';
+import { useContentBuckets, UNSORTED, UNSORTED_LABEL } from '@/hooks/useContentBuckets';
 
 interface NotesContent {
   id: string;
@@ -16,6 +19,8 @@ interface NotesContent {
   file_url: string;
   tags?: string[];
   created_at: string;
+  /** Week/chapter this note was filed under. Null = Unsorted. */
+  bucket_id: string | null;
 }
 
 interface StudentNotesProps {
@@ -76,6 +81,68 @@ const getFileMetadata = (url: string, filename: string) => {
   };
 };
 
+/**
+ * One note card. Extracted unchanged so the identical markup serves both the
+ * flat grid (a subject with no weeks yet) and the grouped week sections.
+ */
+const NoteCard = ({
+  note,
+  onDownload,
+}: {
+  note: NotesContent;
+  onDownload: (e: React.MouseEvent, note: NotesContent) => void;
+}) => {
+  const meta = getFileMetadata(note.file_url, note.filename);
+
+  return (
+
+                    <div
+                      key={note.id}
+                      className="
+                        group relative bg-white min-w-0 w-full
+                        border border-slate-200
+                        rounded-lg
+                        p-4 sm:p-6 flex flex-col justify-between gap-4 sm:gap-6
+                        transition-all duration-300
+                      "
+                    >
+                      {/* Title Section (Semi Bold) */}
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-slate-900 text-base sm:text-lg leading-snug line-clamp-2 break-words">
+                          {note.title}
+                        </h3>
+                      </div>
+
+                      {/* Footer Section: Icon/Name Left, Download Right */}
+                      <div className="flex items-center justify-between gap-4 pt-2 mt-auto">
+                        {/* Left: File Info */}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`shrink-0 w-11 h-11 rounded-lg flex items-center justify-center ${meta.bg} ${meta.color}`}>
+                            {meta.icon}
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-medium text-slate-700 truncate block">
+                               {note.filename}
+                            </span>
+                            <span className="text-[11px] text-slate-400 font-medium uppercase tracking-wider">
+                               {meta.ext}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Right: Circular Download Button (Bottom Corner) */}
+                        <button 
+                          onClick={(e) => onDownload(e, note)}
+                          className="shrink-0 w-11 h-11 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-slate-700 hover:scale-105 transition-all duration-300"
+                          aria-label="Download"
+                        >
+                          <Download className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+  );
+};
+
 const NotesSkeleton = () => (
   <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
     {[...Array(6)].map((_, i) => (
@@ -109,7 +176,7 @@ export const StudentNotes = ({ batch, subject, onBack }: StudentNotesProps) => {
         // updated_at/tags/uploader that are never shown, on every visit.
         const { data, error } = await supabase
             .from('notes')
-            .select('id, title, filename, subject, batch, file_url, created_at')
+            .select('id, title, filename, subject, batch, file_url, created_at, bucket_id')
             .eq('batch', batch)
             .eq('subject', subject)
             .order('created_at', { ascending: false });
@@ -163,6 +230,37 @@ export const StudentNotes = ({ batch, subject, onBack }: StudentNotesProps) => {
       subject: subject || null,
     });
   };
+
+  const { data: buckets = [] } = useContentBuckets(batch, subject);
+
+  /**
+   * Notes grouped into the same weeks as the lectures — a whiteboard note
+   * inherits its week from the class it was saved in, so the two sections
+   * line up. Anything not filed sits in a trailing "Unsorted" group.
+   *
+   * A subject with no weeks keeps the original flat grid untouched.
+   */
+  const sections = useMemo(() => {
+    if (buckets.length === 0) return [];
+    const byId = new Map(buckets.map((b) => [b.id, b] as const));
+    const groups = new Map<string, NotesContent[]>();
+    for (const note of notes ?? []) {
+      const key = note.bucket_id && byId.has(note.bucket_id) ? note.bucket_id : UNSORTED;
+      const list = groups.get(key);
+      if (list) list.push(note); else groups.set(key, [note]);
+    }
+    const out = buckets
+      .filter((b) => groups.has(b.id))
+      .map((b) => ({ key: b.id, label: b.name, items: groups.get(b.id)! }));
+    const loose = groups.get(UNSORTED);
+    if (loose?.length) out.push({ key: UNSORTED, label: UNSORTED_LABEL, items: loose });
+    return out;
+  }, [buckets, notes]);
+
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const toggleSection = useCallback((key: string) => {
+    setCollapsed((c) => ({ ...c, [key]: !c[key] }));
+  }, []);
 
   const handleDownload = async (e: React.MouseEvent, note: NotesContent) => {
     e.stopPropagation();
@@ -220,58 +318,46 @@ export const StudentNotes = ({ batch, subject, onBack }: StudentNotesProps) => {
             {isLoading ? (
               <NotesSkeleton />
             ) : notes && notes.length > 0 ? (
-              <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3">
-                {notes.map((note) => {
-                  const meta = getFileMetadata(note.file_url, note.filename);
-
+              sections.length > 0 ? (
+              <div className="space-y-4">
+                {sections.map((section) => {
+                  const isCollapsed = !!collapsed[section.key];
                   return (
-                    <div
-                      key={note.id}
-                      className="
-                        group relative bg-white min-w-0 w-full
-                        border border-slate-200
-                        rounded-lg
-                        p-4 sm:p-6 flex flex-col justify-between gap-4 sm:gap-6
-                        transition-all duration-300
-                      "
-                    >
-                      {/* Title Section (Semi Bold) */}
-                      <div className="min-w-0">
-                        <h3 className="font-semibold text-slate-900 text-base sm:text-lg leading-snug line-clamp-2 break-words">
-                          {note.title}
-                        </h3>
-                      </div>
-
-                      {/* Footer Section: Icon/Name Left, Download Right */}
-                      <div className="flex items-center justify-between gap-4 pt-2 mt-auto">
-                        {/* Left: File Info */}
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className={`shrink-0 w-11 h-11 rounded-lg flex items-center justify-center ${meta.bg} ${meta.color}`}>
-                            {meta.icon}
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-sm font-medium text-slate-700 truncate block">
-                               {note.filename}
-                            </span>
-                            <span className="text-[11px] text-slate-400 font-medium uppercase tracking-wider">
-                               {meta.ext}
-                            </span>
-                          </div>
+                    <div key={section.key} className="overflow-hidden rounded-lg border border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => toggleSection(section.key)}
+                        className="flex w-full items-center gap-3 bg-slate-50 px-4 py-3 text-left transition-colors hover:bg-slate-100"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-base font-semibold text-slate-900">{section.label}</p>
+                          <p className="text-xs text-slate-500">
+                            {section.items.length} item{section.items.length > 1 ? 's' : ''}
+                          </p>
                         </div>
-
-                        {/* Right: Circular Download Button (Bottom Corner) */}
-                        <button 
-                          onClick={(e) => handleDownload(e, note)}
-                          className="shrink-0 w-11 h-11 rounded-full bg-slate-900 text-white flex items-center justify-center hover:bg-slate-700 hover:scale-105 transition-all duration-300"
-                          aria-label="Download"
-                        >
-                          <Download className="w-5 h-5" />
-                        </button>
-                      </div>
+                        <ChevronDown
+                          className={cn(
+                            'h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200',
+                            !isCollapsed && 'rotate-180'
+                          )}
+                        />
+                      </button>
+                      {!isCollapsed && (
+                        <div className="grid grid-cols-1 gap-4 bg-white p-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3">
+                          {section.items.map((note) => (
+                            <NoteCard key={note.id} note={note} onDownload={handleDownload} />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
+              ) : (
+              <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3">
+                {notes.map((note) => <NoteCard key={note.id} note={note} onDownload={handleDownload} />)}
+              </div>
+              )
             ) : (
               <div className="text-center py-20">
                 <div className="inline-block bg-slate-50 rounded-full p-4 mb-3">
