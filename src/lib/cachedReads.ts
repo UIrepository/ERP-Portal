@@ -74,6 +74,8 @@ export interface CachedRecording {
   subject: string;
   topic: string;
   created_at: string;
+  /** Week/chapter bucket. Null for anything not filed yet. */
+  bucket_id: string | null;
 }
 
 /**
