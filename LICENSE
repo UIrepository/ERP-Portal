@@ -1,0 +1,79 @@
+PROPRIETARY SOFTWARE LICENCE
+Copyright (c) 2025-2026 Unknown IITians. All rights reserved.
+
+This repository and its entire contents — including source code, configuration,
+database schema and migrations, edge functions, design, user interface, text,
+and assets (together, the "Software") — are the confidential and proprietary
+property of Unknown IITians ("the Owner").
+
+-------------------------------------------------------------------------------
+1. NO LICENCE IS GRANTED
+-------------------------------------------------------------------------------
+No right, licence, or permission of any kind is granted to any person by the
+publication of this repository. All rights are reserved by the Owner.
+
+You may NOT, without the Owner's prior written permission:
+
+  (a) copy, reproduce, download, or retain the Software or any part of it;
+  (b) use, run, host, or deploy the Software, in whole or in part;
+  (c) modify, adapt, translate, or create derivative works from it;
+  (d) distribute, publish, sublicense, sell, rent, or otherwise transfer it;
+  (e) remove, obscure, or alter any copyright or proprietary notice;
+  (f) reverse engineer or re-implement it in another language or framework.
+
+-------------------------------------------------------------------------------
+2. AUTOMATED AND MACHINE-LEARNING USE IS PROHIBITED
+-------------------------------------------------------------------------------
+Without limiting Section 1, the following are expressly prohibited:
+
+  (a) using the Software, in whole or in part, as training, fine-tuning,
+      pre-training, evaluation, retrieval, grounding, or context data for any
+      machine-learning model, large language model, or other automated system;
+  (b) supplying the Software as input, context, or reference to any AI coding
+      assistant, code-generation tool, or autonomous agent;
+  (c) using any such system to produce software that is derived from, based on,
+      or substantially similar to the Software;
+  (d) automated scraping, crawling, mirroring, or bulk retrieval of this
+      repository or its history.
+
+Output produced in violation of this Section is a derivative work of the
+Software and remains the property of the Owner.
+
+-------------------------------------------------------------------------------
+3. PUBLIC VISIBILITY IS NOT A LICENCE
+-------------------------------------------------------------------------------
+This repository may be publicly visible for operational, integration, and
+transparency reasons. Public visibility does not place the Software in the
+public domain, does not make it open source, and does not grant any licence,
+express or implied. Nothing here is offered under any open-source licence.
+
+-------------------------------------------------------------------------------
+4. AUTHORISED PERSONNEL
+-------------------------------------------------------------------------------
+Employees, contractors, and collaborators expressly authorised in writing by the
+Owner may use and modify the Software solely to build, operate, and maintain the
+Owner's own products and services, and solely for as long as that authorisation
+subsists. All work so produced vests in the Owner. No other use is permitted,
+and authorisation is not transferable.
+
+-------------------------------------------------------------------------------
+5. NO WARRANTY
+-------------------------------------------------------------------------------
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE OWNER BE
+LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM THE SOFTWARE OR
+ITS USE.
+
+-------------------------------------------------------------------------------
+6. ENFORCEMENT
+-------------------------------------------------------------------------------
+Unauthorised use infringes the Owner's copyright and other rights. The Owner
+will pursue all available remedies, including injunctive relief, damages, and
+takedown procedures under the Digital Millennium Copyright Act and equivalent
+laws. This licence is governed by the laws of India.
+
+-------------------------------------------------------------------------------
+7. CONTACT
+-------------------------------------------------------------------------------
+For permissions and licensing enquiries: unknowniitians@gmail.com
