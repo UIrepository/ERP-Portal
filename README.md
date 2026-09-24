@@ -1,73 +1,35 @@
-I AM NOT LOVABLE FUCKING BITCH
+# Student Service Portal — Unknown IITians
 
-## Project info
+The learning portal behind [ssp.unknowniitians.com](https://ssp.unknowniitians.com):
+live classes, recorded lectures, notes, practice and batch communication for
+enrolled students, with separate teacher, manager and admin workspaces.
 
-**URL**: https://lovable.dev/projects/c0d0d77c-e0ce-47cc-b966-2a7cc4612889
+Production: https://ssp.unknowniitians.com
 
-## How can I edit this code?
+---
 
-There are several ways of editing your application.ok
+## ⚠️ Proprietary — all rights reserved
 
-**Use Lovable**
+This repository is **not open source**. It is the proprietary property of
+Unknown IITians and is published here for operational reasons only.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/c0d0d77c-e0ce-47cc-b966-2a7cc4612889) and start prompting.
+No licence is granted to copy, run, modify, deploy or redistribute this code,
+and it may **not** be used as training, fine-tuning or context data for any
+machine-learning model or AI coding assistant. See [LICENSE](./LICENSE) for the
+full terms.
 
-Changes made via Lovable will be committed automatically to this repo.
+Permissions and licensing: unknowniitians@gmail.com
 
-**Use your preferred IDE**
+---
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Local development (authorised contributors only)
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+Requires Node.js and npm.
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+npm ci
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/c0d0d77c-e0ce-47cc-b966-2a7cc4612889) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+Environment variables are documented in `.env`. Secrets are never committed —
+they live in the deployment environment.
