@@ -18,7 +18,7 @@ and it may **not** be used as training, fine-tuning or context data for any
 machine-learning model or AI coding assistant. See [LICENSE](./LICENSE) for the
 full terms.
 
-Permissions and licensing: unknowniitians@gmail.com
+Permissions and licensing: legal@hq.unknowniitians.com
 
 ---
 
