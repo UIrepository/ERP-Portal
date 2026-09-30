@@ -65,7 +65,7 @@ export const StudentBlockContent = ({
     <div className="w-full max-w-[1840px] mx-auto px-2 py-3 sm:px-4 sm:py-6 md:px-6 font-sans">
 
       {/* Single framed content card (border matches sidebar) */}
-      <div className="w-full bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden min-h-[400px]">
+      <div className="w-full bg-white rounded-lg border border-slate-200 shadow-sm overflow-clip min-h-[400px]">
         {renderContent()}
       </div>
     </div>
