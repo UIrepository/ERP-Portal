@@ -33,8 +33,11 @@ export const BottomNav = ({ tabs, activeTab, onTabChange }: BottomNavProps) => {
       aria-label="Primary"
     >
       <div className="flex items-stretch justify-around h-[68px]">
-        {tabs.map((tab) => {
-          const active = activeTab === tab.id;
+        {tabs.map((tab, i) => {
+          // Home (first tab) is the default: it stays selected on any page that
+          // isn't one of the other bottom tabs.
+          const matched = tabs.some((t) => t.id === activeTab);
+          const active = matched ? activeTab === tab.id : i === 0;
           return (
             <button
               key={tab.id}
