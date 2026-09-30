@@ -81,12 +81,12 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
   // Community is an action tab that opens the community page (separate route),
   // badged with the total unread across all enrolled batch+subject groups.
   const studentBottomTabs: BottomNavTab[] = [
-    { id: 'dashboard', label: 'Home', icon: HomeNavIcon, art: '/nav/my-learning.png' },
-    { id: 'schedule', label: 'Schedule', icon: ScheduleNavIcon, art: '/nav/schedule.png' },
-    { id: 'discussion', label: 'General', icon: DiscussionNavIcon, art: '/nav/general-discussion.png' },
-    { id: 'feedback', label: 'Feedback', icon: FeedbackNavIcon, art: '/nav/feedback.png' },
-    { id: 'exams', label: 'Exams', icon: ExamsNavIcon, art: '/nav/exams.png' },
-    { id: 'community', label: 'Community', icon: CommunityNavIcon, art: '/nav/community.png', onSelect: () => navigate('/portal/student/community'), badge: communityUnread },
+    { id: 'dashboard', label: 'Home', icon: HomeNavIcon, art: '/nav/bn-home-outline.png', artActive: '/nav/bn-home-filled.png' },
+    { id: 'schedule', label: 'Schedule', icon: ScheduleNavIcon, art: '/nav/bn-schedule-outline.png', artActive: '/nav/bn-schedule-filled.png' },
+    { id: 'discussion', label: 'General', icon: DiscussionNavIcon, art: '/nav/bn-general-outline.png', artActive: '/nav/bn-general-filled.png' },
+    { id: 'feedback', label: 'Feedback', icon: FeedbackNavIcon, art: '/nav/bn-feedback-outline.png', artActive: '/nav/bn-feedback-filled.png' },
+    { id: 'exams', label: 'Exams', icon: ExamsNavIcon, art: '/nav/bn-exams-outline.png', artActive: '/nav/bn-exams-filled.png' },
+    { id: 'community', label: 'Community', icon: CommunityNavIcon, art: '/nav/bn-community-outline.png', artActive: '/nav/bn-community-filled.png', onSelect: () => navigate('/portal/student/community'), badge: communityUnread },
   ];
 
   // Only try to use chat drawer for students (it's wrapped in provider only for students)

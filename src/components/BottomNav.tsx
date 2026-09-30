@@ -5,8 +5,9 @@ export interface BottomNavTab {
   /** Used for the accessible label only — the bar is icon-only on screen. */
   label: string;
   icon: React.ComponentType<{ className?: string; filled?: boolean }>;
-  /** Illustrated icon (public/nav/*.png); replaces `icon` when set. */
+  /** Image icon (public/nav/*.png) — outline when inactive, filled when active; replaces `icon`. */
   art?: string;
+  artActive?: string;
   /** Action tabs (e.g. open WhatsApp) run this instead of switching tab. */
   onSelect?: () => void;
   /** Unread count shown as a small red bubble on the icon (0/undefined hides it). */
@@ -44,17 +45,17 @@ export const BottomNav = ({ tabs, activeTab, onTabChange }: BottomNavProps) => {
               aria-current={active ? 'page' : undefined}
               className={cn(
                 'flex-1 flex items-center justify-center transition-transform duration-200 ease-out active:scale-90',
-                active ? 'text-brand' : 'text-slate-400',
+                active ? 'text-slate-900' : 'text-slate-500',
               )}
             >
               <span className="relative inline-flex">
                 {tab.art ? (
                   <img
-                    src={tab.art}
+                    src={active && tab.artActive ? tab.artActive : tab.art}
                     alt=""
                     aria-hidden
                     draggable={false}
-                    className={cn('object-contain transition-all', active ? 'h-8 w-8' : 'h-7 w-7 opacity-50 grayscale')}
+                    className="h-7 w-7 object-contain"
                   />
                 ) : (
                   <tab.icon className={active ? 'h-7 w-7' : 'h-[26px] w-[26px]'} filled={active} />
