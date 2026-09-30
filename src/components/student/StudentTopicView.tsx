@@ -79,7 +79,7 @@ export const StudentTopicView = ({ batch, subject, topicId, onBack }: StudentTop
 
       {/* Tab bar */}
       {available.length > 0 && (
-        <div className="no-scrollbar sticky top-0 z-10 mt-2 overflow-x-auto bg-white px-3 py-2 sm:static sm:mt-5 sm:px-8 sm:py-0">
+        <div className="no-scrollbar sticky top-0 z-40 mt-2 border-b border-transparent shadow-[0_6px_8px_-6px_rgba(15,23,42,0.12)] sm:shadow-none overflow-x-auto bg-white px-3 py-2 sm:static sm:mt-5 sm:px-8 sm:py-0">
           <div
             role="tablist"
             aria-label={`${topicName} content`}

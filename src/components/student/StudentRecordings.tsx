@@ -4,7 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
 import { Input } from '@/components/ui/input';
-import { Play, Search, PlayCircle, Clock } from 'lucide-react';
+import { Play, Search, PlayCircle, Clock, RotateCcw } from 'lucide-react';
+import { getAllProgress, COMPLETE_PCT } from '@/lib/videoProgress';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/hooks/use-toast';
@@ -58,10 +59,13 @@ const RecordingCard = ({
     recording,
     lectureNo,
     onOpen,
+    resumePct,
 }: {
     recording: RecordingContent;
     lectureNo: number;
     onOpen: () => void;
+    /** Watched part-way (not finished): show a Resume button under the card. */
+    resumePct?: number;
 }) => (
 
                                     <div 
@@ -79,9 +83,9 @@ const RecordingCard = ({
                                             "hover:border-indigo-200 transition-colors duration-200"
                                         )}
                                         style={{
-                                            height: CARD_HEIGHT,
+                                            height: resumePct ? 'auto' : CARD_HEIGHT,
                                             minHeight: CARD_HEIGHT,
-                                            maxHeight: CARD_HEIGHT,
+                                            maxHeight: resumePct ? undefined : CARD_HEIGHT,
                                             flexShrink: 0,
                                             flexGrow: 0,
                                         }}
@@ -127,6 +131,16 @@ const RecordingCard = ({
                                             <h2 className="text-base font-semibold text-slate-900 tracking-tight leading-snug line-clamp-2 break-words" style={{ flexShrink: 0 }}>
                                                 {recording.topic}
                                             </h2>
+                                            {resumePct ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.stopPropagation(); onOpen(); }}
+                                                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-slate-100 py-2 text-[13px] font-normal text-slate-900 transition-colors hover:bg-slate-200"
+                                                >
+                                                    <RotateCcw className="h-3.5 w-3.5" />
+                                                    Resume · {Math.round(resumePct)}% watched
+                                                </button>
+                                            ) : null}
                                         </div>
                                     </div>
                                 
@@ -158,6 +172,12 @@ const RecordingSkeleton = () => (
 // Main Component
 export const StudentRecordings = ({ batch, subject, onBack, topicId }: StudentRecordingsProps) => {
     const { user, profile } = useAuth();
+    // On-device watch progress → which lectures were left part-way.
+    const progress = useMemo(() => getAllProgress(user?.id), [user?.id]);
+    const resumeFor = (id: string) => {
+        const pct = progress[id]?.percent ?? 0;
+        return pct > 2 && pct < COMPLETE_PCT ? pct : undefined;
+    };
     const queryClient = useQueryClient();
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
@@ -408,6 +428,7 @@ export const StudentRecordings = ({ batch, subject, onBack, topicId }: StudentRe
                                                         /* Numbered within the week, so Week 2 starts at Lecture 1 again. */
                                                         lectureNo={section.items.length - i}
                                                         onOpen={() => handlePlayInFullscreen(recording, i)}
+                                                        resumePct={resumeFor(recording.id)}
                                                     />
                                                 ))}
                                             </div>
@@ -426,6 +447,7 @@ export const StudentRecordings = ({ batch, subject, onBack, topicId }: StudentRe
                                     recording={recording}
                                     lectureNo={filteredRecordings.length - index}
                                     onOpen={() => handlePlayInFullscreen(recording, index)}
+                                    resumePct={resumeFor(recording.id)}
                                 />
                             ))}
                         </div>
