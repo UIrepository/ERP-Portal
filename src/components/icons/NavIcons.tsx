@@ -105,6 +105,20 @@ export const CommunityNavIcon = ({ className, filled }: NavIconProps) =>
     </svg>
   );
 
+/** Discussion — two overlapping speech bubbles (a conversation, not a DM). */
+export const DiscussionNavIcon = ({ className, filled }: NavIconProps) =>
+  filled ? (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M3 4h12v9H8l-4 3.5V13H3Z" />
+      <path d="M17 8h4v9h-1v3l-3.5-3H10v-2h7Z" opacity={0.55} />
+    </svg>
+  ) : (
+    <svg className={className} viewBox="0 0 24 24" {...outline}>
+      <path d="M3.5 4.5 H15 V12.5 H8 L4.5 15.5 V12.5 H3.5 Z" />
+      <path d="M17.5 8.5 H20.5 V16.5 H19.5 V19 L16.5 16.5 H10.5 V15" />
+    </svg>
+  );
+
 /** WhatsApp brand glyph for the header — always the recognisable green logo. */
 export const WhatsAppGlyph = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

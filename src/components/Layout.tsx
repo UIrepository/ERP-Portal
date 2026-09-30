@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { LogOut, Menu } from 'lucide-react';
+import { Headset, LogOut, Menu } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,7 +34,7 @@ import { NotificationCenter } from './NotificationCenter';
 import { NotificationListener } from './NotificationListener';
 import { PushManager } from './PushManager';
 import { NameConfirmGate } from './NameConfirmGate';
-import { HomeNavIcon, ScheduleNavIcon, FeedbackNavIcon, ExamsNavIcon, CommunityNavIcon, WhatsAppGlyph } from './icons/NavIcons';
+import { HomeNavIcon, ScheduleNavIcon, FeedbackNavIcon, ExamsNavIcon, CommunityNavIcon, DiscussionNavIcon, WhatsAppGlyph } from './icons/NavIcons';
 
 const ADMIN_WHATSAPP_NUMBER = '916297143798';
 
@@ -81,11 +81,12 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
   // Community is an action tab that opens the community page (separate route),
   // badged with the total unread across all enrolled batch+subject groups.
   const studentBottomTabs: BottomNavTab[] = [
-    { id: 'dashboard', label: 'Home', icon: HomeNavIcon },
-    { id: 'schedule', label: 'Schedule', icon: ScheduleNavIcon },
-    { id: 'feedback', label: 'Feedback', icon: FeedbackNavIcon },
-    { id: 'exams', label: 'Exams', icon: ExamsNavIcon },
-    { id: 'community', label: 'Community', icon: CommunityNavIcon, onSelect: () => navigate('/portal/student/community'), badge: communityUnread },
+    { id: 'dashboard', label: 'Home', icon: HomeNavIcon, art: '/nav/my-learning.png' },
+    { id: 'schedule', label: 'Schedule', icon: ScheduleNavIcon, art: '/nav/schedule.png' },
+    { id: 'discussion', label: 'General', icon: DiscussionNavIcon, art: '/nav/general-discussion.png' },
+    { id: 'feedback', label: 'Feedback', icon: FeedbackNavIcon, art: '/nav/feedback.png' },
+    { id: 'exams', label: 'Exams', icon: ExamsNavIcon, art: '/nav/exams.png' },
+    { id: 'community', label: 'Community', icon: CommunityNavIcon, art: '/nav/community.png', onSelect: () => navigate('/portal/student/community'), badge: communityUnread },
   ];
 
   // Only try to use chat drawer for students (it's wrapped in provider only for students)
@@ -156,6 +157,19 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
           
           <div className="flex items-center space-x-2 md:space-x-4">
 
+            {/* Support assistant — mobile only (desktop has "Ask Assistant") */}
+            {isStudent && (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => navigate('/assistant')}
+                className="md:hidden h-9 w-9 text-slate-700 hover:bg-slate-100"
+                aria-label="Support assistant"
+              >
+                <Headset className="h-6 w-6" />
+              </Button>
+            )}
+
             {/* Contact Admin on WhatsApp — mobile only (desktop has it in the
                sidebar). The bottom nav now hosts Community instead. */}
             {isStudent && (
@@ -168,6 +182,17 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
               >
                 <WhatsAppGlyph className="h-6 w-6" />
               </Button>
+            )}
+
+            {/* Ask Assistant — desktop only; opens the assistant as its own page. */}
+            {isStudent && (
+              <button
+                type="button"
+                onClick={() => navigate('/assistant')}
+                className="hidden md:inline-flex h-9 items-center rounded-md bg-slate-900 px-3.5 text-[13px] font-normal text-white hover:bg-slate-800"
+              >
+                Ask Assistant
+              </button>
             )}
 
             {/* 2. Notification Bell Icon
@@ -212,18 +237,17 @@ export const Layout = ({ children, activeTab, onTabChange }: LayoutProps) => {
 
       {/* Content Area: floating Sidebar over Main */}
       <div className="relative flex flex-1 min-h-0 overflow-hidden">
-        {/* Desktop floating dock - tall light capsule that floats over the page */}
-        <aside className="hidden md:flex absolute left-4 top-4 bottom-4 z-20 w-16 rounded-lg bg-white border border-slate-200 overflow-hidden">
+        {/* Desktop sidebar - flush to the left edge, icon + label for every item */}
+        <aside className="hidden md:flex absolute left-0 top-0 bottom-0 z-20 w-60 bg-white border-r border-slate-200 overflow-hidden">
           <Sidebar
             activeTab={activeTab}
             onTabChange={onTabChange}
             onSupportClick={resolvedRole === 'student' ? openSupportDrawer : undefined}
-            collapsed
           />
         </aside>
 
-        {/* Scrollable Main Content - left padding on desktop to clear the floating rail */}
-        <main className="flex-1 overflow-y-auto min-w-0 md:pl-24">
+        {/* Scrollable Main Content - left padding on desktop to clear the sidebar */}
+        <main className="flex-1 overflow-y-auto min-w-0 md:pl-60">
           <div className="min-h-full flex flex-col">
             {/* Bottom padding on mobile keeps content clear of the bottom nav */}
             <div className={isStudent ? 'flex-1 pb-24 md:pb-0' : 'flex-1'}>

@@ -5,68 +5,12 @@ import { useIsFetching } from '@tanstack/react-query';
 // is slow and show the snail. Long enough that normal loads never trigger it.
 const SLOW_MS = 7000;
 
-/** Hand-drawn snail — indigo spiral shell, gently crawling with a slime trail. */
-const Snail = ({ size = 120 }: { size?: number }) => (
-  <svg viewBox="0 0 96 64" width={size} height={(size * 64) / 96} aria-hidden="true">
-    <path d="M4 55 H84" stroke="#c7d2fe" strokeWidth="3.5" strokeLinecap="round" strokeDasharray="2 8" fill="none" />
-    <ellipse cx="42" cy="58" rx="34" ry="3.5" fill="#e2e8f0" opacity="0.7" />
-    {/* foot */}
-    <path d="M10 54 q2 -10 16 -10 h34 q8 0 8 8 q0 4 -5 4 H16 q-6 0 -6 -2 Z" fill="#e0e7ff" stroke="#6366f1" strokeWidth="2.5" strokeLinejoin="round" />
-    {/* head + neck */}
-    <path d="M60 46 q10 -2 13 -12" fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" />
-    <circle cx="74" cy="33" r="4.5" fill="#e0e7ff" stroke="#6366f1" strokeWidth="2.5" />
-    {/* antennae */}
-    <path d="M76 30 l4 -8" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" />
-    <path d="M72 29 l1 -9" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" />
-    <circle cx="80" cy="21" r="1.9" fill="#4f46e5" />
-    <circle cx="73" cy="19" r="1.9" fill="#4f46e5" />
-    {/* shell — spiral, with a soft two-tone */}
-    <circle cx="38" cy="34" r="17" fill="#eef2ff" stroke="#4f46e5" strokeWidth="2.5" />
-    <circle cx="38" cy="34" r="17" fill="url(#uiShell)" opacity="0.5" />
-    <path d="M38 34 m0 -10 a10 10 0 1 1 -7 3 a6.5 6.5 0 1 0 5 -2 a3 3 0 1 1 -2 1" fill="none" stroke="#4f46e5" strokeWidth="2.5" strokeLinecap="round" />
-    <defs>
-      <linearGradient id="uiShell" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stopColor="#ffffff" />
-        <stop offset="1" stopColor="#c7d2fe" />
-      </linearGradient>
-    </defs>
-  </svg>
-);
 
-/** Enhanced "no connection" artwork — a soft two-tone cloud, unplugged from a
- *  dangling cord, sitting on a gentle shadow, with a red disconnect slash. */
-const CloudOff = () => (
-  <svg viewBox="0 0 180 156" width="188" height="163" aria-hidden="true">
-    <defs>
-      <linearGradient id="uiCloud" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stopColor="#f8fafc" />
-        <stop offset="1" stopColor="#e2e8f0" />
-      </linearGradient>
-    </defs>
-    {/* ground shadow */}
-    <ellipse cx="90" cy="140" rx="52" ry="8" fill="#e2e8f0" opacity="0.7" />
-
-    {/* dangling cord + unplugged plug (the "disconnected" cue) */}
-    <path d="M96 108 q6 12 -2 20" fill="none" stroke="#cbd5e1" strokeWidth="3.5" strokeLinecap="round" />
-    <rect x="86" y="126" width="12" height="9" rx="2.5" fill="#f1f5f9" stroke="#94a3b8" strokeWidth="2.5" />
-    <path d="M89 126 v-3 M95 126 v-3" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round" />
-    {/* a couple of little "no signal" sparks */}
-    <path d="M110 120 l6 -4 M112 128 l7 -1" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" />
-
-    {/* cloud */}
-    <path d="M54 104 a26 26 0 0 1 -2 -52 a34 34 0 0 1 66 -9 a23 23 0 0 1 5 61 Z"
-      fill="url(#uiCloud)" stroke="#94a3b8" strokeWidth="3.5" strokeLinejoin="round" />
-
-    {/* red disconnect slash, lifted off the cloud with a white underlay */}
-    <line x1="44" y1="34" x2="132" y2="110" stroke="#ffffff" strokeWidth="9" strokeLinecap="round" />
-    <line x1="44" y1="34" x2="132" y2="110" stroke="#ef4444" strokeWidth="5.5" strokeLinecap="round" />
-  </svg>
-);
 
 function OfflineScreen() {
   return (
     <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-white px-6 text-center font-sans">
-      <CloudOff />
+      <img src="/art/state-offline.png" alt="" aria-hidden width={240} height={240} draggable={false} className="object-contain" />
       <h1 className="mt-7 text-[21px] font-semibold text-slate-900">You're offline</h1>
       <p className="mt-2 max-w-xs text-[14px] leading-relaxed text-slate-500">
         We can't reach the internet right now. Check your Wi-Fi or mobile data, then try again.
@@ -85,7 +29,7 @@ function OfflineScreen() {
 function SlowConnection() {
   return (
     <div className="fixed inset-0 z-[190] flex flex-col items-center justify-center bg-white px-6 text-center font-sans">
-      <Snail />
+      <img src="/art/state-slow.png" alt="" aria-hidden width={240} height={240} draggable={false} className="object-contain" />
       <h1 className="mt-7 text-[21px] font-semibold text-slate-900">Taking longer than usual…</h1>
       <p className="mt-2 max-w-xs text-[14px] leading-relaxed text-slate-500">
         You seem to be on a slow connection. Hang tight — we're still loading.

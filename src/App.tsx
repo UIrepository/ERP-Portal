@@ -60,10 +60,10 @@ const App = () => (
           <Toaster />
           <Sonner />
           <ConnectivityStates />
-          {/* The whiteboard opens in its own full-screen tab — never show the
-              install banner there. */}
-          {!window.location.pathname.startsWith('/whiteboard') && <InstallAppBanner />}
           <BrowserRouter>
+            {/* Inside the router so it can hide itself per page (whiteboard,
+                support assistant) as the route changes. */}
+            <InstallAppBanner />
             <MaintenanceGate>
             <Routes>
               {/* Root Route - Index will redirect to default tab */}

@@ -73,72 +73,7 @@ const ScheduleSkeleton = () => (
 
 /** Cozy coffee-break illustration for a week with no classes. Static. */
 export const FreeTimeArt = () => (
-  <svg viewBox="0 0 184 150" width="172" height="140" role="img" aria-label="No classes this week">
-    <defs>
-      {/* horizontal gradient gives the cup a rounded, 3-D cylinder shading */}
-      <linearGradient id="stCup" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0" stopColor="#dfe4f6" />
-        <stop offset="0.32" stopColor="#ffffff" />
-        <stop offset="0.62" stopColor="#eef1fb" />
-        <stop offset="1" stopColor="#ccd3ee" />
-      </linearGradient>
-      <linearGradient id="stCoffee" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stopColor="#d98f4a" />
-        <stop offset="1" stopColor="#9a3d0b" />
-      </linearGradient>
-      <radialGradient id="stSaucer" cx="50%" cy="42%" r="60%">
-        <stop offset="0" stopColor="#ffffff" />
-        <stop offset="1" stopColor="#dfe4f6" />
-      </radialGradient>
-      <radialGradient id="stCookie" cx="40%" cy="34%" r="78%">
-        <stop offset="0" stopColor="#f7d192" />
-        <stop offset="1" stopColor="#d99f52" />
-      </radialGradient>
-    </defs>
-
-    {/* ground shadow */}
-    <ellipse cx="90" cy="138" rx="60" ry="7" fill="#c7d2fe" opacity="0.35" />
-
-    {/* steam — organic wisps of varying height, behind the cup */}
-    <g stroke="#c7d2fe" strokeWidth="3.5" strokeLinecap="round" fill="none" opacity="0.85">
-      <path d="M78 44 q-8 -10 0 -20 q7 -9 1 -17" />
-      <path d="M92 46 q-7 -9 0 -18 q6 -8 1 -15" />
-      <path d="M106 44 q-8 -10 0 -19 q7 -9 1 -16" />
-    </g>
-
-    {/* saucer — a shallow dish the cup rests ON */}
-    <ellipse cx="90" cy="128" rx="56" ry="12" fill="url(#stSaucer)" stroke="#4f46e5" strokeWidth="3" />
-    <path d="M40 130 a52 12 0 0 0 100 0" fill="none" stroke="#4f46e5" strokeWidth="3" opacity="0.35" />
-    <ellipse cx="90" cy="125" rx="30" ry="5.5" fill="#d5dbf2" />
-
-    {/* handle (drawn behind the body) */}
-    <path d="M118 74 C 143 74, 143 106, 116 108" fill="none" stroke="#4f46e5" strokeWidth="7" strokeLinecap="round" />
-    <path d="M118 76 C 138 76, 138 104, 116 106" fill="none" stroke="#eef2ff" strokeWidth="2.4" strokeLinecap="round" />
-
-    {/* cup body — sits on the saucer, rounded base */}
-    <path d="M62 68 Q64 104 78 116 Q90 122 102 116 Q116 104 118 68 Z" fill="url(#stCup)" stroke="#4f46e5" strokeWidth="3" strokeLinejoin="round" />
-    {/* soft left highlight */}
-    <path d="M72 76 Q71 98 79 110" stroke="#ffffff" strokeWidth="4" strokeLinecap="round" fill="none" opacity="0.75" />
-
-    {/* rim + coffee surface */}
-    <ellipse cx="90" cy="68" rx="28" ry="7" fill="#f8fafc" stroke="#4f46e5" strokeWidth="3" />
-    <ellipse cx="90" cy="68" rx="21" ry="5" fill="url(#stCoffee)" />
-    <path d="M77 66 q13 -3 26 0" stroke="#f2c68f" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.7" />
-
-    {/* a biscuit leaning on the cup, resting on the saucer */}
-    <ellipse cx="58" cy="127" rx="14" ry="3.5" fill="#4f46e5" opacity="0.12" />
-    <g transform="rotate(-14 58 116)">
-      <circle cx="58" cy="116" r="11.5" fill="url(#stCookie)" stroke="#b9772a" strokeWidth="2" />
-      <circle cx="58" cy="116" r="8.5" fill="none" stroke="#c98a3f" strokeWidth="1" opacity="0.5" />
-      {/* chocolate chips with tiny highlights */}
-      <g fill="#5b2408">
-        <circle cx="53" cy="112" r="1.7" /><circle cx="52.4" cy="111.4" r="0.5" fill="#93521f" />
-        <circle cx="62" cy="113" r="1.7" /><circle cx="61.4" cy="112.4" r="0.5" fill="#93521f" />
-        <circle cx="55" cy="120" r="1.7" /><circle cx="54.4" cy="119.4" r="0.5" fill="#93521f" />
-        <circle cx="61" cy="120" r="1.5" /><circle cx="60.5" cy="119.5" r="0.45" fill="#93521f" />
-      </g>
-    </g>
-  </svg>
+  <img src="/art/state-no-class.png" alt="No classes this week" width={200} height={200} draggable={false} className="object-contain" />
 );
 
 const NoClassesWeek = () => (

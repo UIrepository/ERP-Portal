@@ -5,6 +5,8 @@ export interface BottomNavTab {
   /** Used for the accessible label only — the bar is icon-only on screen. */
   label: string;
   icon: React.ComponentType<{ className?: string; filled?: boolean }>;
+  /** Illustrated icon (public/nav/*.png); replaces `icon` when set. */
+  art?: string;
   /** Action tabs (e.g. open WhatsApp) run this instead of switching tab. */
   onSelect?: () => void;
   /** Unread count shown as a small red bubble on the icon (0/undefined hides it). */
@@ -46,10 +48,17 @@ export const BottomNav = ({ tabs, activeTab, onTabChange }: BottomNavProps) => {
               )}
             >
               <span className="relative inline-flex">
-                <tab.icon
-                  className={active ? 'h-7 w-7' : 'h-[26px] w-[26px]'}
-                  filled={active}
-                />
+                {tab.art ? (
+                  <img
+                    src={tab.art}
+                    alt=""
+                    aria-hidden
+                    draggable={false}
+                    className={cn('object-contain transition-all', active ? 'h-8 w-8' : 'h-7 w-7 opacity-50 grayscale')}
+                  />
+                ) : (
+                  <tab.icon className={active ? 'h-7 w-7' : 'h-[26px] w-[26px]'} filled={active} />
+                )}
                 {tab.badge && tab.badge > 0 ? (
                   <span className="absolute -top-1.5 -right-2.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white">
                     {tab.badge > 9 ? '9+' : tab.badge}

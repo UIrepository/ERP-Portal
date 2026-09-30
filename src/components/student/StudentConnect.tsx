@@ -132,7 +132,7 @@ export const StudentConnect = ({ onOpenSupportDrawer }: StudentConnectProps) => 
           <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 opacity-50 pointer-events-none" />
 
           <img
-            src="https://illustrations.popsy.co/blue/customer-support.svg"
+            src="/art/support.png"
             alt="Customer Support"
             className="w-32 h-32 md:w-40 md:h-40 object-contain drop-shadow-sm relative z-10"
             loading="lazy"

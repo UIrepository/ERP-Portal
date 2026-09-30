@@ -7,6 +7,8 @@ import { StudentCommunity } from './StudentCommunity';
 import { StudentConnect } from './StudentConnect';
 import { StudentLiveClass } from './StudentLiveClass';
 import { StudentDPP } from './StudentDPP';
+import { StudentTopicView } from './StudentTopicView';
+import { TOPIC_PREFIX } from '@/hooks/useContentBuckets';
 
 interface StudentBlockContentProps {
   blockId: string;
@@ -22,6 +24,17 @@ export const StudentBlockContent = ({
   onBack,
 }: StudentBlockContentProps) => {
   const renderContent = () => {
+    // "topic:<bucket id>" (or "topic:__unsorted__") opens one topic of the subject.
+    if (blockId.startsWith(TOPIC_PREFIX)) {
+      return (
+        <StudentTopicView
+          batch={batch}
+          subject={subject}
+          topicId={blockId.slice(TOPIC_PREFIX.length)}
+          onBack={onBack}
+        />
+      );
+    }
     switch (blockId) {
       case 'live-class':
         return <div className="p-4 md:p-6"><StudentLiveClass batch={batch} subject={subject} onBack={onBack} /></div>;

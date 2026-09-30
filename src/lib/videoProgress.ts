@@ -21,7 +21,7 @@ const keyFor = (userId: string) => `ui_video_progress_${userId}`;
 
 // Below this we treat it as "not really started"; above COMPLETE_PCT as "done".
 const MIN_PCT = 2;
-const COMPLETE_PCT = 95;
+export const COMPLETE_PCT = 95;
 const MAX_ENTRIES = 60;
 
 function readMap(userId: string): ProgressMap {

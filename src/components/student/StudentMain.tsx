@@ -268,13 +268,13 @@ const StudentMainContent = () => {
             </div>
 
             {isLoadingEnrollments ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                 {[...Array(4)].map((_, i) => (
                   <Skeleton key={i} className="h-20 rounded-lg" />
                 ))}
               </div>
             ) : subjectsForBatch.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                 {subjectsForBatch.map((subject, index) => (
                   <StudentSubjectCard
                     key={subject}

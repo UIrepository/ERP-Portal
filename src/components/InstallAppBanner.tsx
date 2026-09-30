@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { DownloadCircle01Icon, Download01Icon, Share01Icon, AddSquareIcon, More01Icon } from '@hugeicons/core-free-icons';
@@ -27,8 +28,9 @@ export const InstallAppBanner = () => {
 
   // Don't interrupt the full-screen whiteboard (it opens in its own tab) with
   // the install banner.
-  const onWhiteboard =
-    typeof window !== 'undefined' && window.location.pathname.startsWith('/whiteboard');
+  // Never on the full-screen whiteboard or the support assistant page.
+  const { pathname } = useLocation();
+  const onWhiteboard = pathname.startsWith('/whiteboard') || pathname === '/assistant';
 
   // Slide up shortly after load, every reload.
   useEffect(() => {
@@ -72,10 +74,8 @@ export const InstallAppBanner = () => {
           >
             <div className="pointer-events-auto w-full max-w-2xl overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
               <div className="flex items-center gap-4 p-4">
-                {/* App icon */}
-                <div className="shrink-0 rounded-md border border-slate-200 overflow-hidden h-12 w-12 bg-white">
-                  <img src="/icon-192.png" alt="App icon" className="h-full w-full object-cover" />
-                </div>
+                {/* Illustration */}
+                <img src="/art/get-app-banner.png" alt="" aria-hidden draggable={false} className="h-16 w-16 shrink-0 object-contain sm:h-20 sm:w-20" />
 
                 <div className="min-w-0 flex-1">
                   <p className="text-[15px] font-semibold text-slate-900 leading-tight">Get the app</p>

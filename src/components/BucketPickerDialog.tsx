@@ -9,7 +9,7 @@ import { ensureBucketGroup, useContentBuckets, useInvalidateBuckets } from '@/ho
 import { FolderPlus, Layers, Loader2 } from 'lucide-react';
 
 /**
- * "Which week is this class in?" — shown before a teacher goes live.
+ * "Which topic is this class in?" — shown before a teacher goes live.
  *
  * Deliberately has no skip: the whole point is that every lecture lands in a
  * week so students get a tidy list instead of 200 undated cards. But it also
@@ -65,10 +65,10 @@ export const BucketPickerDialog = ({ open, batch, subject, onConfirm, onCancel }
   const suggestion = useMemo(() => {
     // Offer the obvious next name when the existing ones are "Week <n>".
     const nums = buckets
-      .map((b) => /^week\s*(\d+)$/i.exec(b.name.trim())?.[1])
+      .map((b) => /^(?:week|topic)\s*(\d+)$/i.exec(b.topic.trim())?.[1])
       .filter(Boolean)
       .map(Number);
-    return nums.length ? `Week ${Math.max(...nums) + 1}` : 'Week 1';
+    return nums.length ? `Topic ${Math.max(...nums) + 1}` : 'Topic 1';
   }, [buckets]);
 
   const confirmExisting = async () => {
@@ -79,11 +79,11 @@ export const BucketPickerDialog = ({ open, batch, subject, onConfirm, onCancel }
       // Go through ensure_bucket_group even for an existing bucket: the merge
       // group may have grown since it was made, and the partner batches need
       // the same name to exist before the recordings are written.
-      const { byPair } = await ensureBucketGroup(batch, subject, bucket.name);
+      const { byPair } = await ensureBucketGroup(batch, subject, bucket.topic);
       onConfirm(byPair);
     } catch (e) {
       console.error('bucket resolve failed', e);
-      toast({ title: 'Could not set the week', description: (e as Error).message, variant: 'destructive' });
+      toast({ title: 'Could not set the topic', description: (e as Error).message, variant: 'destructive' });
       setBusy(false);
     }
   };
@@ -98,7 +98,7 @@ export const BucketPickerDialog = ({ open, batch, subject, onConfirm, onCancel }
       onConfirm(byPair);
     } catch (e) {
       console.error('bucket create failed', e);
-      toast({ title: 'Could not create the week', description: (e as Error).message, variant: 'destructive' });
+      toast({ title: 'Could not create the topic', description: (e as Error).message, variant: 'destructive' });
       setBusy(false);
     }
   };
@@ -111,7 +111,7 @@ export const BucketPickerDialog = ({ open, batch, subject, onConfirm, onCancel }
             <Layers className="h-5 w-5 text-primary" />
           </div>
           <DialogTitle className="pr-10 text-left text-lg font-semibold tracking-tight">
-            Which week is this class in?
+            Which topic is this class in?
           </DialogTitle>
         </DialogHeader>
 
@@ -135,7 +135,7 @@ export const BucketPickerDialog = ({ open, batch, subject, onConfirm, onCancel }
             />
             {buckets.length === 0 && (
               <p className="text-xs text-muted-foreground">
-                No weeks yet for this subject. Name the first one — anything works: Week 1,
+                No topics yet for this subject. Name the first one — anything works: Topic 1,
                 Chapter 1, Induction.
               </p>
             )}
@@ -166,7 +166,7 @@ export const BucketPickerDialog = ({ open, batch, subject, onConfirm, onCancel }
                       : 'border-border hover:border-foreground/30',
                   )}
                 >
-                  {b.name}
+                  {b.topic}
                 </button>
               ))}
             </div>
@@ -178,12 +178,12 @@ export const BucketPickerDialog = ({ open, batch, subject, onConfirm, onCancel }
               onClick={() => { setCreating(true); setNewName(''); }}
             >
               <FolderPlus className="mr-2 h-4 w-4" />
-              Create a new week
+              Create a new topic
             </Button>
 
             <Button className="w-full" disabled={!selected || busy} onClick={confirmExisting}>
               {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Go live in “{buckets.find((b) => b.id === selected)?.name ?? '…'}”
+              Go live in “{buckets.find((b) => b.id === selected)?.topic ?? '…'}”
             </Button>
           </div>
         )}

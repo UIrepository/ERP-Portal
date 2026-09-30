@@ -111,6 +111,19 @@ export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [], on
         queryKey: ['student-announcements', batch, subject, enrolledSubjects],
         queryFn: async (): Promise<Announcement[]> => {
             if (!batch && !subject) return [];
+
+            // When did this student join the batch (and each subject)? Anything
+            // announced before that isn't theirs: late joiners don't get the old
+            // announcements of a batch/subject they weren't in yet.
+            const { data: { user } } = await supabase.auth.getUser();
+            const { data: enrolments } = await supabase
+                .from('user_enrollments')
+                .select('subject_name, created_at')
+                .eq('user_id', user?.id ?? '')
+                .eq('batch_name', batch!);
+            const joinedSubject = new Map((enrolments ?? []).map((e) => [e.subject_name, e.created_at]));
+            const joinedBatch = (enrolments ?? []).reduce<string | null>(
+                (min, e) => (!min || e.created_at < min ? e.created_at : min), null);
             
             let query = supabase
                 .from('notifications')
@@ -134,10 +147,15 @@ export const StudentAnnouncements = ({ batch, subject, enrolledSubjects = [], on
             }
 
             // Latest 50 — the feed re-downloaded every announcement ever made.
+            if (joinedBatch) query = query.gte('created_at', joinedBatch);
             const { data, error } = await query.order('created_at', { ascending: false }).limit(50);
 
             if (error) throw error;
-            return (data || []) as Announcement[];
+            return ((data || []) as Announcement[]).filter((a) => {
+                if (!a.target_subject) return true; // batch-wide: covered by the batch join date
+                const joined = joinedSubject.get(a.target_subject);
+                return !joined || a.created_at >= joined;
+            });
         },
         enabled: !!batch,
     });

@@ -14,10 +14,10 @@ import { cn } from '@/lib/utils';
 import {
   ensureBucketGroup, useContentBuckets, useInvalidateBuckets, UNSORTED_LABEL,
 } from '@/hooks/useContentBuckets';
-import { ArrowDown, ArrowUp, FolderPlus, Loader2, Notebook, Trash2, Video } from 'lucide-react';
+import { ArrowDown, ArrowUp, Crown, FolderPlus, Loader2, Notebook, Target, Trash2, Video } from 'lucide-react';
 
 /**
- * Organise Content — file existing lectures and notes into weeks.
+ * Organise Content — file existing lectures, notes, DPPs and UI Ki Padhai into topics.
  *
  * Needed for two reasons beyond the Go Live prompt:
  *   - everything uploaded before buckets existed starts out Unsorted;
@@ -28,7 +28,13 @@ import { ArrowDown, ArrowUp, FolderPlus, Loader2, Notebook, Trash2, Video } from
  * Both go through the same RLS as everywhere else.
  */
 
-type Kind = 'recordings' | 'notes';
+type Kind = 'recordings' | 'notes' | 'dpp_content' | 'ui_ki_padhai_content';
+
+/**
+ * DPPs and UI Ki Padhai are filed through set_content_topic(): teachers have no
+ * UPDATE rights on those tables, and the function changes the topic only.
+ */
+const VIA_RPC: Kind[] = ['dpp_content', 'ui_ki_padhai_content'];
 
 interface Row {
   id: string;
@@ -57,12 +63,14 @@ export const ContentOrganiser = ({ isAdmin = false }: { isAdmin?: boolean }) => 
       if (isAdmin) {
         // Every pair that actually has content, so the dropdowns never offer
         // an empty combination.
-        const [rec, nts] = await Promise.all([
+        const [rec, nts, dpp, uikp] = await Promise.all([
           supabase.from('recordings').select('batch, subject'),
           supabase.from('notes').select('batch, subject'),
+          supabase.from('dpp_content').select('batch, subject'),
+          supabase.from('ui_ki_padhai_content').select('batch, subject'),
         ]);
         const pairs = new Set<string>();
-        [...(rec.data ?? []), ...(nts.data ?? [])].forEach((r: { batch: string; subject: string }) => {
+        [...(rec.data ?? []), ...(nts.data ?? []), ...(dpp.data ?? []), ...(uikp.data ?? [])].forEach((r: { batch: string; subject: string }) => {
           if (r.batch && r.subject) pairs.add(`${r.batch}|${r.subject}`);
         });
         return [...pairs].map((p) => { const [b, s] = p.split('|'); return { batch: b, subject: s }; });
@@ -103,6 +111,20 @@ export const ContentOrganiser = ({ isAdmin = false }: { isAdmin?: boolean }) => 
         if (error) throw error;
         return (data ?? []).map((r) => ({ id: r.id, label: r.topic, sub: r.date, bucket_id: r.bucket_id }));
       }
+      if (kind === 'dpp_content' || kind === 'ui_ki_padhai_content') {
+        const { data, error } = await supabase
+          .from(kind)
+          .select('id, title, created_at, bucket_id')
+          .eq('batch', batch).eq('subject', subject)
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data ?? []).map((r) => ({
+          id: r.id,
+          label: r.title,
+          sub: r.created_at ? r.created_at.slice(0, 10) : null,
+          bucket_id: r.bucket_id,
+        }));
+      }
       const { data, error } = await supabase
         .from('notes')
         .select('id, title, filename, created_at, bucket_id')
@@ -120,7 +142,7 @@ export const ContentOrganiser = ({ isAdmin = false }: { isAdmin?: boolean }) => 
   });
 
   const bucketName = (id: string | null) =>
-    buckets.find((b) => b.id === id)?.name ?? UNSORTED_LABEL;
+    buckets.find((b) => b.id === id)?.topic ?? UNSORTED_LABEL;
 
   const resetSelection = () => setPicked(new Set());
 
@@ -131,10 +153,10 @@ export const ContentOrganiser = ({ isAdmin = false }: { isAdmin?: boolean }) => 
     if (picked.size === 0) return;
     setBusy(true);
     try {
-      const { error } = await supabase
-        .from(kind)
-        .update({ bucket_id: bucketId })
-        .in('id', [...picked]);
+      const ids = [...picked];
+      const { error } = VIA_RPC.includes(kind)
+        ? await supabase.rpc('set_content_topic', { p_kind: kind, p_ids: ids, p_bucket_id: bucketId })
+        : await supabase.from(kind as 'recordings' | 'notes').update({ bucket_id: bucketId }).in('id', ids);
       if (error) throw error;
       toast({
         title: bucketId ? `Moved to ${bucketName(bucketId)}` : 'Moved to Unsorted',
@@ -144,6 +166,10 @@ export const ContentOrganiser = ({ isAdmin = false }: { isAdmin?: boolean }) => 
       queryClient.invalidateQueries({ queryKey: ['organiser-rows', kind, batch, subject] });
       queryClient.invalidateQueries({ queryKey: ['student-recordings', batch, subject] });
       queryClient.invalidateQueries({ queryKey: ['student-notes', batch, subject] });
+      queryClient.invalidateQueries({ queryKey: ['student-dpp', batch, subject] });
+      queryClient.invalidateQueries({ queryKey: ['student-ui-ki-padhai', batch, subject] });
+      queryClient.invalidateQueries({ queryKey: ['topic-counts', batch, subject] });
+      queryClient.invalidateQueries({ queryKey: ['subject-topic-stats', batch, subject] });
     } catch (e) {
       toast({ title: 'Could not move these', description: (e as Error).message, variant: 'destructive' });
     } finally {
@@ -194,7 +220,7 @@ export const ContentOrganiser = ({ isAdmin = false }: { isAdmin?: boolean }) => 
       if (error) throw error;
       invalidateBuckets();
       queryClient.invalidateQueries({ queryKey: ['organiser-rows', kind, batch, subject] });
-      toast({ title: 'Bucket removed', description: 'Its items moved to Unsorted.' });
+      toast({ title: 'Topic removed', description: 'Its items moved to Unsorted.' });
     } catch (e) {
       toast({ title: 'Could not remove it', description: (e as Error).message, variant: 'destructive' });
     } finally {
@@ -209,8 +235,8 @@ export const ContentOrganiser = ({ isAdmin = false }: { isAdmin?: boolean }) => 
       <div>
         <h1 className="text-2xl font-bold">Organise Content</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Put lectures and notes into weeks. New classes are filed automatically when a teacher
-          picks a week at Go Live — this is for everything that came before, and for notes added
+          Put lectures, notes, DPPs and UI Ki Padhai into topics. New classes are filed automatically when a teacher
+          picks a topic at Go Live — this is for everything that came before, and for notes added
           straight to the database.
         </p>
       </div>
@@ -243,12 +269,12 @@ export const ContentOrganiser = ({ isAdmin = false }: { isAdmin?: boolean }) => 
         <>
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Weeks</CardTitle>
+              <CardTitle className="text-base">Topics</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex gap-2">
                 <Input
-                  placeholder="Name a new week — Week 1, Chapter 2, Revision…"
+                  placeholder="Name a new topic — Topic 1, Chapter 2, Revision…"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') createBucket(); }}
@@ -259,12 +285,12 @@ export const ContentOrganiser = ({ isAdmin = false }: { isAdmin?: boolean }) => 
               </div>
 
               {buckets.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No weeks yet for this subject.</p>
+                <p className="text-sm text-muted-foreground">No topics yet for this subject.</p>
               ) : (
                 <div className="divide-y rounded-lg border">
                   {buckets.map((b, i) => (
                     <div key={b.id} className="flex items-center gap-2 p-2.5">
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium">{b.name}</span>
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium">{b.topic}</span>
                       <Badge variant="secondary">
                         {rows.filter((r) => r.bucket_id === b.id).length}
                       </Badge>
@@ -296,6 +322,8 @@ export const ContentOrganiser = ({ isAdmin = false }: { isAdmin?: boolean }) => 
                 <TabsList>
                   <TabsTrigger value="recordings"><Video className="mr-2 h-4 w-4" />Lectures</TabsTrigger>
                   <TabsTrigger value="notes"><Notebook className="mr-2 h-4 w-4" />Notes</TabsTrigger>
+                  <TabsTrigger value="dpp_content"><Target className="mr-2 h-4 w-4" />DPPs</TabsTrigger>
+                  <TabsTrigger value="ui_ki_padhai_content"><Crown className="mr-2 h-4 w-4" />UI Ki Padhai</TabsTrigger>
                 </TabsList>
               </Tabs>
 
@@ -305,14 +333,14 @@ export const ContentOrganiser = ({ isAdmin = false }: { isAdmin?: boolean }) => 
                   <Select value={target} onValueChange={setTarget}>
                     <SelectTrigger className="w-56"><SelectValue placeholder="Move to…" /></SelectTrigger>
                     <SelectContent>
-                      {buckets.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                      {buckets.map((b) => <SelectItem key={b.id} value={b.id}>{b.topic}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   <Button disabled={!target || busy} onClick={() => assign(target)}>
                     {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Move
                   </Button>
                   <Button variant="outline" disabled={busy} onClick={() => assign(null)}>
-                    Clear week
+                    Clear topic
                   </Button>
                   <Button variant="ghost" onClick={resetSelection}>Cancel</Button>
                 </div>

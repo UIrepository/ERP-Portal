@@ -33,6 +33,7 @@ import {
   Download01Icon,
   FolderLibraryIcon,
   BoardMathIcon,
+  BubbleChatIcon,
 } from '@hugeicons/core-free-icons';
 
 import {
@@ -62,6 +63,20 @@ interface UserEnrollment {
     batch_name: string;
     subject_name: string;
 }
+
+/** Illustrated nav icons (public/nav/*.png), keyed by tab id. */
+const NAV_ART: Record<string, string> = {
+  dashboard: '/nav/my-learning.png',
+  schedule: '/nav/schedule.png',
+  discussion: '/nav/general-discussion.png',
+  'student-discussion': '/nav/general-discussion.png',
+  support: '/nav/support.png',
+  feedback: '/nav/feedback.png',
+  exams: '/nav/exams.png',
+  'contact-admin': '/nav/contact-admin.png',
+  'get-app': '/nav/get-app.png',
+  logout: '/nav/logout.png',
+};
 
 export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = false }: SidebarProps) => {
   const { profile, user, signOut, resolvedRole } = useAuth();
@@ -123,6 +138,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
   const studentTabs = [
     { id: 'dashboard', label: 'My Learning', icon: DashboardSquare01Icon },
     { id: 'schedule', label: 'Schedule', icon: Calendar03Icon },
+    { id: 'discussion', label: 'General Discussion', icon: BubbleChatIcon },
     { id: 'support', label: 'Support', icon: CustomerSupportIcon },
     { id: 'feedback', label: 'Submit Feedback', icon: Message01Icon },
     { id: 'exams', label: 'Exams', icon: Quiz01Icon },
@@ -163,6 +179,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
     { id: 'directory', label: 'Student Directory', icon: UserListIcon },
     { id: 'staff-manager', label: 'Staff Management', icon: UserSettings01Icon },
     { id: 'community-admin', label: 'Community Chat', icon: UserGroupIcon },
+    { id: 'student-discussion', label: 'General Discussion', icon: BubbleChatIcon },
     { id: 'schedules', label: 'Schedules', icon: Calendar03Icon },
     { id: 'schedule-requests', label: 'Schedule Requests', icon: TaskDaily01Icon },
     { id: 'feedback-viewer', label: 'Feedback Viewer', icon: Message01Icon },
@@ -200,9 +217,17 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
         : 'text-slate-600 hover:bg-brand/5 hover:text-brand',
     );
 
-  const icon = (i: typeof DashboardSquare01Icon) => (
-    <HugeiconsIcon icon={i} size={18} strokeWidth={1.8} className="shrink-0" />
-  );
+  // Custom illustrated icon when one exists for the item, else the line icon.
+  // Illustrations are already transparent, so no chip behind them.
+  const icon = (i: typeof DashboardSquare01Icon, id?: string) => {
+    const art = id ? NAV_ART[id] : undefined;
+    if (!art) return <HugeiconsIcon icon={i} size={18} strokeWidth={1.8} className="shrink-0" />;
+    return (
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center">
+        <img src={art} alt="" aria-hidden className="h-6 w-6 object-contain" draggable={false} />
+      </span>
+    );
+  };
 
   // In collapsed mode wrap the trigger in a hover tooltip showing the label.
   const withTooltip = (label: string, node: ReactNode) =>
@@ -242,7 +267,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
                       className={navItemClass(false)}
                       onClick={() => navigate('/teacher-community')}
                     >
-                      {icon(tab.icon)}
+                      {icon(tab.icon, tab.id)}
                       {!collapsed && label}
                     </Button>
                   )}
@@ -259,7 +284,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
                             className={navItemClass(false)}
                             onClick={onSupportClick}
                         >
-                            {icon(tab.icon)}
+                            {icon(tab.icon, tab.id)}
                             {!collapsed && label}
                         </Button>
                       )}
@@ -273,7 +298,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
                         {withTooltip(tab.label,
                             <AlertDialogTrigger asChild>
                                 <Button variant="ghost" className={navItemClass(active)}>
-                                    {icon(tab.icon)}
+                                    {icon(tab.icon, tab.id)}
                                     {!collapsed && label}
                                 </Button>
                             </AlertDialogTrigger>
@@ -305,7 +330,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
                         className={navItemClass(active)}
                         onClick={() => onTabChange(tab.id)}
                     >
-                        {icon(tab.icon)}
+                        {icon(tab.icon, tab.id)}
                         {!collapsed && label}
                     </Button>
                   )}
@@ -328,7 +353,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
               )}
               onClick={() => { void installOrShowHelp(); }}
             >
-              <HugeiconsIcon icon={Download01Icon} size={18} strokeWidth={1.8} className="shrink-0" />
+              {icon(Download01Icon, 'get-app')}
               {!collapsed && 'Get the app'}
             </Button>
           )}
@@ -348,7 +373,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
             )}
             onClick={signOut}
           >
-            <HugeiconsIcon icon={Logout01Icon} size={18} strokeWidth={1.8} className="shrink-0" />
+            {icon(Logout01Icon, 'logout')}
             {!collapsed && 'Logout'}
           </Button>
         )}

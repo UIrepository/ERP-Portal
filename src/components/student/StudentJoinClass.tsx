@@ -308,7 +308,7 @@ export const StudentJoinClass = () => {
       {todaysClasses.length === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
+            <img src="/art/state-no-class.png" alt="" aria-hidden width={200} height={200} draggable={false} className="mb-4 object-contain" />
             <h3 className="text-lg font-semibold">No Classes Today</h3>
             <p className="text-muted-foreground text-center mt-2">
               You don't have any scheduled classes for today.

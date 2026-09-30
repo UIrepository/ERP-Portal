@@ -20,6 +20,7 @@ import { AdminJoinActivity } from './AdminJoinActivity';
 import { AdminSubjectMerges } from './AdminSubjectMerges';
 import { AdminFreePreview } from './AdminFreePreview';
 import { ContentOrganiser } from '@/components/shared/ContentOrganiser';
+import { DiscussionChannel } from '@/components/discussion/DiscussionChannel';
 
 interface AdminDashboardProps {
   activeTab: string;
@@ -82,6 +83,8 @@ export const AdminDashboard = ({ activeTab, onTabChange }: AdminDashboardProps) 
         return <AdminFreePreview />;
       case 'organise-content':
         return <ContentOrganiser isAdmin />;
+      case 'student-discussion':
+        return <DiscussionChannel />;
       default:
         return <EnrollmentAnalytics />;
     }

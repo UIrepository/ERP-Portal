@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Crown, ExternalLink } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StudentBackButton } from './StudentBackButton';
+import { inTopic } from '@/hooks/useContentBuckets';
 
 interface UIKiPadhaiContent {
   id: string;
@@ -18,12 +19,15 @@ interface UIKiPadhaiContent {
   created_at: string;
   batch: string;
   subject: string;
+  bucket_id?: string | null;
 }
 
 interface StudentUIKiPadhaiProps {
   batch?: string;
   subject?: string;
   onBack?: () => void;
+  /** Show only this topic's items (a bucket id, or UNSORTED for "Other"). */
+  topicId?: string;
 }
 
 const PremiumContentSkeleton = () => (
@@ -44,7 +48,7 @@ const PremiumContentSkeleton = () => (
 );
 
 
-export const StudentUIKiPadhai = ({ batch, subject, onBack }: StudentUIKiPadhaiProps) => {
+export const StudentUIKiPadhai = ({ batch, subject, onBack, topicId }: StudentUIKiPadhaiProps) => {
   const { profile } = useAuth();
 
   const { data: premiumContent, isLoading } = useQuery<UIKiPadhaiContent[]>({
@@ -54,7 +58,7 @@ export const StudentUIKiPadhai = ({ batch, subject, onBack }: StudentUIKiPadhaiP
         
         const { data, error } = await supabase
             .from('ui_ki_padhai_content')
-            .select('id, title, description, category, link, is_active, created_at, batch, subject')
+            .select('id, title, description, category, link, is_active, created_at, batch, subject, bucket_id')
             .eq('is_active', true)
             .eq('batch', batch)
             .eq('subject', subject)
@@ -64,6 +68,7 @@ export const StudentUIKiPadhai = ({ batch, subject, onBack }: StudentUIKiPadhaiP
         return (data || []) as UIKiPadhaiContent[];
     },
     enabled: !!batch && !!subject,
+    select: (rows) => (topicId ? rows.filter((c) => inTopic(c.bucket_id, topicId)) : rows),
     // Batch-shared content list, low churn — cache 15 min so re-opening the
     // tab serves from memory instead of re-reading the whole list.
     staleTime: 15 * 60_000,
@@ -71,6 +76,18 @@ export const StudentUIKiPadhai = ({ batch, subject, onBack }: StudentUIKiPadhaiP
   });
 
   const handleAccessContent = (content: UIKiPadhaiContent) => {
+    // Logged so the topic progress meter can count it as done. Fire-and-forget:
+    // the new tab must open on the click itself, not after the insert.
+    if (profile?.user_id) {
+      void supabase.from('student_activities').insert({
+        user_id: profile.user_id,
+        activity_type: 'uikp_open',
+        description: `Opened ${content.title}`,
+        metadata: { uikpId: content.id, subject: content.subject },
+        batch: batch || null,
+        subject: subject || null,
+      });
+    }
     window.open(content.link, '_blank');
   };
 
@@ -78,11 +95,12 @@ export const StudentUIKiPadhai = ({ batch, subject, onBack }: StudentUIKiPadhaiP
 
 
   return (
-    <div className="p-3 sm:p-6 md:p-8 bg-[#fcfcfd] min-h-full font-sans">
+    <div className={topicId ? "font-sans" : "p-3 sm:p-6 md:p-8 bg-[#fcfcfd] min-h-full font-sans"}>
       {/* Main Section Holding Container */}
-      <div className="bg-white p-4 sm:p-6 md:p-8 rounded-lg">
+      <div className={topicId ? "" : "bg-white p-4 sm:p-6 md:p-8 rounded-lg"}>
 
-        {/* Section Header */}
+        {/* Section Header — hidden inside a topic */}
+        {!topicId && (
         <header className="flex flex-col md:flex-row justify-between items-end mb-6 sm:mb-8 border-b border-slate-100 pb-5 sm:pb-6">
             <div className="mb-2 md:mb-0">
                 <div className="flex items-center gap-3">
@@ -96,6 +114,7 @@ export const StudentUIKiPadhai = ({ batch, subject, onBack }: StudentUIKiPadhaiP
                 </p>
             </div>
         </header>
+        )}
 
         {/* Content Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">

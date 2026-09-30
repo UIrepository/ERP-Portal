@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { inTopic } from '@/hooks/useContentBuckets';
 import { useAuth } from '@/hooks/useAuth';
 import { StudentBackButton } from './StudentBackButton';
 
@@ -24,12 +25,15 @@ interface DPPContent {
   created_at: string;
   batch: string;
   subject: string;
+  bucket_id?: string | null;
 }
 
 interface StudentDPPProps {
   batch: string;
   subject: string;
   onBack?: () => void;
+  /** Show only this topic's DPPs (a bucket id, or UNSORTED for "Other"). */
+  topicId?: string;
 }
 
 // Helper function to determine icon and label based on file type/link
@@ -103,7 +107,7 @@ const DPPSkeleton = () => (
   </div>
 );
 
-export const StudentDPP = ({ batch, subject, onBack }: StudentDPPProps) => {
+export const StudentDPP = ({ batch, subject, onBack, topicId }: StudentDPPProps) => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
 
@@ -116,7 +120,7 @@ export const StudentDPP = ({ batch, subject, onBack }: StudentDPPProps) => {
         // fields that `select('*')` shipped on every visit).
         const { data, error } = await supabase
             .from('dpp_content')
-            .select('id, title, difficulty, link, subject, batch, is_active, created_at')
+            .select('id, title, difficulty, link, subject, batch, is_active, created_at, bucket_id')
             .eq('batch', batch)
             .eq('subject', subject)
             .eq('is_active', true)
@@ -126,6 +130,7 @@ export const StudentDPP = ({ batch, subject, onBack }: StudentDPPProps) => {
         return (data || []) as DPPContent[];
     },
     enabled: !!batch && !!subject,
+    select: (rows) => (topicId ? rows.filter((d) => inTopic(d.bucket_id, topicId)) : rows),
     // DPPs change rarely; serve from cache for 15 min so tab-switches don't
     // refetch. The realtime channel below still invalidates on a real change.
     staleTime: 15 * 60_000,
@@ -185,10 +190,11 @@ export const StudentDPP = ({ batch, subject, onBack }: StudentDPPProps) => {
   // Removed iframe viewer - files open directly in new tab on click
 
   return (
-    <div className="p-3 sm:p-6 space-y-6 bg-[#fcfcfd] min-h-full font-sans">
+    <div className={topicId ? "font-sans" : "p-3 sm:p-6 space-y-6 bg-[#fcfcfd] min-h-full font-sans"}>
       {/* Main Section Holding Container */}
-      <div className="bg-white p-4 sm:p-6 md:p-8 rounded-lg">
-          {/* Header Section */}
+      <div className={topicId ? "" : "bg-white p-4 sm:p-6 md:p-8 rounded-lg"}>
+          {/* Header Section — hidden inside a topic */}
+          {!topicId && (
           <div className="mb-6 sm:mb-8 border-b border-slate-100 pb-5 sm:pb-6">
             <div className="flex items-center gap-3">
               {onBack && <StudentBackButton onClick={onBack} />}
@@ -198,6 +204,7 @@ export const StudentDPP = ({ batch, subject, onBack }: StudentDPPProps) => {
             </div>
             <p className="text-gray-500 mt-1 text-sm">Practice sets and assignments</p>
           </div>
+          )}
 
           {/* DPP Grid */}
           <div>
@@ -231,12 +238,10 @@ export const StudentDPP = ({ batch, subject, onBack }: StudentDPPProps) => {
                       <div className="flex items-center justify-between gap-4 pt-2 mt-auto">
                         {/* Left: File Info */}
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className={`shrink-0 w-11 h-11 rounded-lg flex items-center justify-center ${meta.bg} ${meta.color}`}>
-                            {meta.icon}
-                          </div>
+                          <img src="/art/tab-dpp.png" alt="" aria-hidden draggable={false} className="h-11 w-11 shrink-0 object-contain" />
                           <div className="flex flex-col min-w-0">
                             <span className="text-sm font-medium text-slate-700 truncate block">
-                               {dpp.difficulty || meta.ext}
+                               <span className="capitalize">{dpp.difficulty || meta.ext}</span>
                             </span>
                             <span className="text-[11px] text-slate-400 font-medium uppercase tracking-wider">
                                {meta.type}
@@ -259,9 +264,7 @@ export const StudentDPP = ({ batch, subject, onBack }: StudentDPPProps) => {
               </div>
             ) : (
               <div className="text-center py-20">
-                <div className="inline-block bg-slate-50 rounded-full p-4 mb-3">
-                  <Target className="h-8 w-8 text-slate-400" />
-                </div>
+                <img src="/art/empty.png" alt="" aria-hidden width={160} height={160} draggable={false} className="mx-auto mb-3 object-contain" />
                 <h3 className="text-lg font-medium text-slate-900">No DPPs Found</h3>
                 <p className="text-slate-500 text-sm mt-1">No practice problems have been uploaded yet.</p>
               </div>

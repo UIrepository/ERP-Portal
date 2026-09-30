@@ -812,9 +812,7 @@ export const TeacherCommunity = () => {
       {/* EMPTY STATE */}
       {!selectedGroup && (
         <div className={`flex-1 flex flex-col items-center justify-center bg-gray-50 text-gray-400 ${isMobile ? 'hidden' : 'flex'}`}>
-          <div className="h-20 w-20 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm">
-            <Users className="h-10 w-10 text-teal-200" />
-          </div>
+          <img src="/art/community-select.png" alt="" aria-hidden width={220} height={220} draggable={false} className="mb-4 object-contain" />
           <p className="text-lg font-medium text-gray-600">Select a community to start chatting</p>
           <Button 
             variant="ghost" 

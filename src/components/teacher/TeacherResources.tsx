@@ -91,7 +91,7 @@ export const TeacherResources = () => {
       const items: ResourceItem[] = [];
       (dpp.data || []).forEach((d: any) => items.push({
         id: d.id, type: 'DPP', title: d.title, url: d.link, batch: d.batch, subject: d.subject,
-        tag: d.difficulty || undefined, created_at: d.created_at,
+        tag: d.difficulty ? d.difficulty.charAt(0).toUpperCase() + d.difficulty.slice(1) : undefined, created_at: d.created_at,
       }));
       (uiki.data || []).forEach((u: any) => items.push({
         id: u.id, type: 'UI ki Padhai', title: u.title, url: u.link, batch: u.batch, subject: u.subject,

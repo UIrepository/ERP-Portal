@@ -389,7 +389,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
-          name: string
+          topic: string
           position: number
           subject: string
           updated_at: string
@@ -399,7 +399,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
-          name: string
+          topic: string
           position?: number
           subject: string
           updated_at?: string
@@ -409,7 +409,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
-          name?: string
+          topic?: string
           position?: number
           subject?: string
           updated_at?: string
@@ -637,6 +637,7 @@ export type Database = {
       dpp_content: {
         Row: {
           batch: string
+          bucket_id: string | null
           created_at: string | null
           description: string | null
           difficulty: string | null
@@ -650,6 +651,7 @@ export type Database = {
         }
         Insert: {
           batch: string
+          bucket_id?: string | null
           created_at?: string | null
           description?: string | null
           difficulty?: string | null
@@ -663,6 +665,7 @@ export type Database = {
         }
         Update: {
           batch?: string
+          bucket_id?: string | null
           created_at?: string | null
           description?: string | null
           difficulty?: string | null
@@ -1477,6 +1480,7 @@ export type Database = {
       ui_ki_padhai_content: {
         Row: {
           batch: string | null
+          bucket_id: string | null
           category: string | null
           created_at: string | null
           description: string | null
@@ -1490,6 +1494,7 @@ export type Database = {
         }
         Insert: {
           batch?: string | null
+          bucket_id?: string | null
           category?: string | null
           created_at?: string | null
           description?: string | null
@@ -1503,6 +1508,7 @@ export type Database = {
         }
         Update: {
           batch?: string | null
+          bucket_id?: string | null
           category?: string | null
           created_at?: string | null
           description?: string | null
@@ -1715,21 +1721,8 @@ export type Database = {
       profile_basics: {
         Row: {
           avatar_url: string | null
-          email: string | null
           name: string | null
           user_id: string | null
-        }
-        Insert: {
-          avatar_url?: string | null
-          email?: string | null
-          name?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          avatar_url?: string | null
-          email?: string | null
-          name?: string | null
-          user_id?: string | null
         }
         Relationships: []
       }
@@ -1782,6 +1775,10 @@ export type Database = {
             Args: { p_emails: string[]; p_group_email: string; p_role: string }
             Returns: number
           }
+      set_content_topic: {
+        Args: { p_bucket_id: string | null; p_ids: string[]; p_kind: string }
+        Returns: number
+      }
       ensure_bucket: {
         Args: { p_batch: string; p_name: string; p_subject: string }
         Returns: string

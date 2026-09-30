@@ -300,14 +300,14 @@ Deno.serve(async (req) => {
       if (schedule.bucket_id) {
         const { data: bucket } = await admin
           .from('content_buckets')
-          .select('name')
+          .select('topic')
           .eq('id', schedule.bucket_id)
           .maybeSingle();
-        if (bucket?.name) {
+        if (bucket?.topic) {
           const { data: group, error: groupErr } = await admin.rpc('ensure_bucket_group', {
             p_batch: schedule.batch,
             p_subject: schedule.subject,
-            p_name: bucket.name,
+            p_name: bucket.topic,
           });
           if (groupErr) {
             // Not fatal — the note still saves, just Unsorted.

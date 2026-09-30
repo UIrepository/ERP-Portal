@@ -420,7 +420,7 @@ export const StudentLiveClass = ({ batch, subject, enrolledSubjects, onBack }: S
         </div>
       ) : (
         <div className="border border-dashed border-slate-200 rounded-[4px] bg-slate-50/50">
-          <EmptyState title="No classes scheduled" subtitle="There are no live or upcoming sessions for today." />
+          <EmptyState art="/art/state-no-class.png" title="No classes scheduled" subtitle="There are no live or upcoming sessions for today." />
         </div>
       )}
     </div>

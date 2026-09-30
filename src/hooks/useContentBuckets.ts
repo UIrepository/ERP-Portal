@@ -17,9 +17,12 @@ export interface ContentBucket {
   id: string;
   batch: string;
   subject: string;
-  name: string;
+  topic: string;
   position: number;
 }
+
+/** Block ids that open one topic of a subject look like `topic:<bucket id>`. */
+export const TOPIC_PREFIX = 'topic:';
 
 /** Sentinel used as a grouping key for items with no bucket. */
 export const UNSORTED = '__unsorted__';
@@ -31,7 +34,7 @@ export const useContentBuckets = (batch?: string, subject?: string) =>
     queryFn: async () => {
       const { data, error } = await supabase
         .from('content_buckets')
-        .select('id, batch, subject, name, position')
+        .select('id, batch, subject, topic, position')
         .eq('batch', batch!)
         .eq('subject', subject!)
         .order('position', { ascending: true })
@@ -77,3 +80,10 @@ export const useInvalidateBuckets = () => {
   const qc = useQueryClient();
   return () => qc.invalidateQueries({ queryKey: ['content-buckets'] });
 };
+
+/**
+ * Does an item belong to the topic being viewed? `topicId` is a bucket id, or
+ * UNSORTED for the "Other" group of items that have not been filed anywhere.
+ */
+export const inTopic = (bucketId: string | null | undefined, topicId: string): boolean =>
+  topicId === UNSORTED ? !bucketId : bucketId === topicId;

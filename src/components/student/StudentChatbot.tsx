@@ -9,14 +9,15 @@ import { BubbleChatIcon, Cancel01Icon } from '@hugeicons/core-free-icons';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { SUPPORT_TREE } from '@/lib/supportTree';
 import { ChevronRight, Plus } from 'lucide-react';
-import { 
-  Drawer, 
-  DrawerContent, 
-  DrawerHeader, 
-  DrawerTitle, 
-  DrawerDescription 
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription
 } from '@/components/ui/drawer';
 
 interface Message {
@@ -29,17 +30,25 @@ interface Message {
   subject_context?: string | null;
 }
 
+/** Small round avatar beside the assistant's bubbles. */
+const BotAvatar = () => (
+  <img src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" alt="" className="block h-7 w-7 shrink-0 rounded-md object-cover" />
+);
+
 export const StudentChatbot = () => {
   const { profile } = useAuth();
-  const { 
-    state, 
-    closeDrawer, 
-    selectSupportRole, 
+  const {
+    state,
+    closeDrawer,
+    selectSupportRole,
     setRecipient,
     resetToRoleSelection,
     openSubjectConnect,
-    toggleChatbot
+    toggleChatbot,
+    openSupportDrawer,
   } = useChatDrawer();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [message, setMessage] = useState('');
   // Guided self-help runs INSIDE the chat as a conversation: the bot asks, the
   // student taps quick-reply options, each pick echoes as their own message, the
@@ -56,10 +65,22 @@ export const StudentChatbot = () => {
   const [isLoadingRecipient, setIsLoadingRecipient] = useState(false);
   const [managerUnavailable, setManagerUnavailable] = useState(false);
   const isMobile = useIsMobile();
+  // The support assistant is its own page (/assistant), opened from the navbar
+  // on every screen size. Subject-connect keeps its small window / drawer.
+  const onAssistantPage = location.pathname === '/assistant';
+  const prevPathRef = useRef(location.pathname);
+  useEffect(() => {
+    const prev = prevPathRef.current;
+    prevPathRef.current = location.pathname;
+    if (prev === '/assistant' && location.pathname !== '/assistant') { closeDrawer(); return; }
+    if (location.pathname === '/assistant' && !state.isOpen) openSupportDrawer();
+    else if (location.pathname !== '/assistant' && state.isOpen && state.mode === 'support') navigate('/assistant');
+  }, [location.pathname, state.isOpen, state.mode, closeDrawer, openSupportDrawer, navigate]);
+  const closeGuided = onAssistantPage ? () => navigate('/dashboard') : closeDrawer;
 
   // Custom styles from design
-  const bubbleMeClass = "rounded-[8px_8px_2px_8px]";
-  const bubbleThemClass = "rounded-[8px_8px_8px_2px]";
+  const bubbleMeClass = "rounded-[14px_14px_4px_14px]";
+  const bubbleThemClass = "rounded-[14px_14px_14px_4px]";
   const premiumShadowClass = "shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_-1px_rgba(0,0,0,0.1)]";
   const chatWindowShadowClass = "shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1),0_0_0_1px_rgba(0,0,0,0.05)]";
 
@@ -71,8 +92,10 @@ export const StudentChatbot = () => {
       if (!profile?.user_id) return [];
       const { data } = await supabase
         .from('user_enrollments')
-        .select('batch_name')
-        .eq('user_id', profile.user_id);
+        .select('batch_name, created_at')
+        .eq('user_id', profile.user_id)
+        .order('created_at', { ascending: false });
+      // Most recently joined batch first.
       return [...new Set(data?.map(e => e.batch_name) || [])];
     },
     enabled: !!profile?.user_id && state.isOpen,
@@ -139,9 +162,9 @@ export const StudentChatbot = () => {
 
   // Fetch teacher for subject connect using RPC
   const fetchTeacher = async (batch: string, subject: string) => {
-    const { data, error } = await supabase.rpc('get_teacher_for_subject', { 
-      p_batch: batch, 
-      p_subject: subject 
+    const { data, error } = await supabase.rpc('get_teacher_for_subject', {
+      p_batch: batch,
+      p_subject: subject
     });
     if (error || !data || data.length === 0) {
       return null;
@@ -200,12 +223,19 @@ export const StudentChatbot = () => {
     opts: { label: string; onSelect: () => void; filled?: boolean }[] = [],
   ) => {
     setChatOpts([]);
-    setBotTyping(true);
-    window.setTimeout(() => {
-      setBotTyping(false);
-      setChatMsgs((m) => [...m, ...items.map((it) => ({ id: nid(), from: 'bot' as const, text: it.text, href: it.href }))]);
-      setChatOpts(opts);
-    }, 700);
+    // Each message gets its own "typing…" beat (longer text types a bit longer),
+    // and the options only appear after the last one.
+    const step = (i: number) => {
+      if (i >= items.length) { setBotTyping(false); setChatOpts(opts); return; }
+      setBotTyping(true);
+      const it = items[i];
+      window.setTimeout(() => {
+        setBotTyping(false);
+        setChatMsgs((m) => [...m, { id: nid(), from: 'bot' as const, text: it.text, href: it.href }]);
+        window.setTimeout(() => step(i + 1), i + 1 < items.length ? 250 : 0);
+      }, Math.min(1400, 600 + it.text.length * 8));
+    };
+    step(0);
   };
   const categoryOptions = () => SUPPORT_TREE.map((c) => ({ label: c.label, onSelect: () => chooseCategory(c.id) }));
   const greetTopics = (lead = 'Hi 👋 ') => botSay([{ text: `${lead}What do you need help with? Pick a topic below.` }], categoryOptions());
@@ -216,7 +246,15 @@ export const StudentChatbot = () => {
     // Ask which batch first only when the student is in more than one. One batch
     // is auto-selected silently; no enrolment → skip the question entirely.
     if (batches.length > 1 && !supBatch) {
-      botSay([{ text: 'Hi 👋 Which batch do you need help with?' }], batches.map((b) => ({ label: b, onSelect: () => chooseBatch(b) })));
+      // Recent batches first; the rest behind "Show more".
+      const all = batches.map((b) => ({ label: b, onSelect: () => chooseBatch(b) }));
+      const SHOWN = 5;
+      botSay(
+        [{ text: 'Hi 👋 Which batch do you need help with?' }],
+        all.length > SHOWN
+          ? [...all.slice(0, SHOWN), { label: `Show ${all.length - SHOWN} more`, onSelect: () => setChatOpts(all) }]
+          : all,
+      );
     } else {
       if (batches.length === 1 && !supBatch) setSupBatch(batches[0]);
       greetTopics();
@@ -264,10 +302,22 @@ export const StudentChatbot = () => {
     openSubjectConnect(batch, subject); // reuses the existing teacher / subject_doubt flow
   };
   // Human handoff — only reached at the END, once self-help didn't resolve it.
+  // Only hand off to someone who is actually available: fall back to the other
+  // role, and if nobody is, say so instead of offering a dead end.
   const handoff = (route: 'admin' | 'manager') => {
+    const available = (r: 'admin' | 'manager') => (r === 'admin' ? availableStaff?.hasAdmin : availableStaff?.hasManager);
+    const other = route === 'admin' ? 'manager' : 'admin';
+    const target = available(route) ? route : available(other) ? other : null;
     addUser('Yes please, connect me');
+    if (!target) {
+      botSay(
+        [{ text: "Our team isn't available right now. Please try again a little later, or message us on WhatsApp from Contact Admin." }],
+        [{ label: 'I have another issue', onSelect: () => greetTopics('Sure — '), filled: true }],
+      );
+      return;
+    }
     botSay([{ text: 'No problem — connecting you to the right person now…' }], []);
-    handleRoleSelect(route);
+    handleRoleSelect(target);
   };
   // Start a fresh conversation for a NEW issue — works from anywhere, including
   // while connected to a person. Disconnects and re-shows the topic options.
@@ -285,7 +335,7 @@ export const StudentChatbot = () => {
         setIsLoadingRecipient(true);
         try {
           const teacher = await fetchTeacher(
-            state.subjectContext!.batch, 
+            state.subjectContext!.batch,
             state.subjectContext!.subject
           );
           if (teacher && teacher.user_id) {
@@ -310,7 +360,7 @@ export const StudentChatbot = () => {
     queryKey: ['chat-messages', profile?.user_id, state.selectedRecipient?.id, state.supportRole, state.mode],
     queryFn: async () => {
       if (!profile?.user_id || !state.selectedRecipient?.id) return [];
-      
+
       // For support conversations, fetch all messages with matching context involving this student
       // This way the student sees replies from any admin/manager, not just the initially assigned one
       if (state.mode === 'support' && state.supportRole) {
@@ -346,7 +396,7 @@ export const StudentChatbot = () => {
   const sendMessage = useMutation({
     mutationFn: async () => {
       if (!message.trim() || !state.selectedRecipient?.id || !profile?.user_id) return;
-      
+
       // Determine context based on mode
       let context = 'general';
       let subjectContext: string | null = null;
@@ -365,7 +415,7 @@ export const StudentChatbot = () => {
         context,
         subject_context: subjectContext,
       });
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -456,10 +506,10 @@ export const StudentChatbot = () => {
       {/* Header */}
       <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
         <div className="flex items-center gap-2.5">
-          <img 
-            src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
-            alt="Logo" 
-            className="h-7 w-auto object-contain" 
+          <img
+            src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png"
+            alt="Logo"
+            className="h-7 w-auto object-contain"
           />
           <span className="font-bold text-slate-800 text-sm tracking-tight">Support Center</span>
         </div>
@@ -484,51 +534,56 @@ export const StudentChatbot = () => {
         )}
 
         {/* Grid Options */}
-        <div className="grid grid-cols-2 gap-3">
-          {/* Admin Option */}
-          <button 
+        <div className="flex w-full flex-wrap gap-3 md:mx-auto md:max-w-2xl">{/* available roles share the row; no empty slots */}
+          {/* Admin Option — only when an admin is available */}
+          {availableStaff?.hasAdmin && (
+          <button
             onClick={() => handleRoleSelect('admin')}
-            disabled={isLoadingRecipient || !availableStaff?.hasAdmin}
+            disabled={isLoadingRecipient}
             className={cn(
-              "flex flex-col items-center justify-center p-4 rounded-md border border-slate-200 bg-white transition-all text-center group",
+              "flex flex-1 basis-[40%] md:basis-0 flex-col items-center justify-center p-4 rounded-md border border-slate-200 bg-white transition-all text-center group cursor-pointer hover:border-slate-900 hover:shadow-md",
               premiumShadowClass,
-              availableStaff?.hasAdmin 
-                ? "hover:border-slate-400 hover:bg-slate-50 cursor-pointer" 
-                : "opacity-60 cursor-not-allowed grayscale"
             )}
           >
+            <img src="/art/role-admin.png" alt="" aria-hidden draggable={false} className="mb-2 h-16 w-16 object-contain" />
             <span className="text-[13px] font-semibold text-slate-800">Admin</span>
             <span className="text-[10px] text-slate-400 uppercase mt-1 tracking-wider">Tech Support</span>
           </button>
+          )}
 
-          {/* Manager Option */}
-          <button 
+          {/* Manager Option — only when a manager is available */}
+          {availableStaff?.hasManager && (
+          <button
             onClick={() => handleRoleSelect('manager')}
-            disabled={isLoadingRecipient || !availableStaff?.hasManager}
+            disabled={isLoadingRecipient}
             className={cn(
-              "flex flex-col items-center justify-center p-4 rounded-md border border-slate-200 bg-white transition-all text-center group",
+              "flex flex-1 basis-[40%] md:basis-0 flex-col items-center justify-center p-4 rounded-md border border-slate-200 bg-white transition-all text-center group cursor-pointer hover:border-slate-900 hover:shadow-md",
               premiumShadowClass,
-              availableStaff?.hasManager 
-                ? "hover:border-slate-400 hover:bg-slate-50 cursor-pointer" 
-                : "opacity-60 cursor-not-allowed grayscale"
             )}
           >
+            <img src="/art/role-manager.png" alt="" aria-hidden draggable={false} className="mb-2 h-16 w-16 object-contain" />
             <span className="text-[13px] font-semibold text-slate-800">Manager</span>
             <span className="text-[10px] text-slate-400 uppercase mt-1 tracking-wider">Academics</span>
           </button>
+          )}
+
+          {availableStaff && !availableStaff.hasAdmin && !availableStaff.hasManager && !(state.mode === 'subject-connect' && state.subjectContext) && (
+            <p className="basis-full py-3 text-center text-[13px] text-slate-500">Our team isn't available right now. Please try again a little later.</p>
+          )}
 
           {/* Mentor Option - Only visible if active */}
           {state.mode === 'subject-connect' && state.subjectContext && (
-            <button 
+            <button
               onClick={() => {/* Triggered by effect mostly, but good for UX */}}
               disabled={isLoadingRecipient}
               className={cn(
-                "flex flex-col items-center justify-center p-4 rounded-md border border-slate-200 bg-white transition-all text-center group col-span-2",
+                "flex basis-full md:basis-0 md:flex-1 flex-col items-center justify-center p-4 rounded-md border border-slate-200 bg-white transition-all text-center group",
                 premiumShadowClass,
-                "hover:border-slate-400 hover:bg-slate-50 cursor-pointer"
+                "cursor-pointer hover:border-slate-900 hover:shadow-md"
               )}
             >
-              <span className="text-[13px] font-semibold text-slate-800">Mentor</span>
+              <img src="/art/role-mentor.png" alt="" aria-hidden draggable={false} className="mb-2 h-16 w-16 object-contain" />
+            <span className="text-[13px] font-semibold text-slate-800">Mentor</span>
               <span className="text-[10px] text-slate-400 uppercase mt-1 tracking-wider">
                 {state.subjectContext.subject} Doubt Solving
               </span>
@@ -536,7 +591,7 @@ export const StudentChatbot = () => {
           )}
 
           {isLoadingRecipient && (
-             <div className="col-span-2 flex items-center justify-center py-4 text-xs text-slate-400 gap-2">
+             <div className="basis-full flex items-center justify-center py-4 text-xs text-slate-400 gap-2">
                <Loader2 className="h-3 w-3 animate-spin" /> Connecting...
              </div>
           )}
@@ -546,10 +601,10 @@ export const StudentChatbot = () => {
       {/* Footer Logo */}
       <div className="p-4 flex justify-center border-t border-slate-100 bg-white/50">
          <div className="flex items-center gap-2 opacity-50 grayscale hover:grayscale-0 transition-all duration-300">
-            <img 
-              src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
-              alt="UI" 
-              className="h-5 w-auto" 
+            <img
+              src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png"
+              alt="UI"
+              className="h-5 w-auto"
             />
             <span className="text-[10px] font-bold text-slate-600">Unknown IITians</span>
          </div>
@@ -562,7 +617,7 @@ export const StudentChatbot = () => {
     <div className="flex flex-col h-full bg-white">
       {/* Chat Header */}
       <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3 bg-white z-10 shadow-sm">
-        <button 
+        <button
           onClick={handleBack}
           className="p-1.5 hover:bg-slate-100 rounded transition-colors text-slate-500"
         >
@@ -584,7 +639,7 @@ export const StudentChatbot = () => {
         <style>{`
           div::-webkit-scrollbar { display: none; }
         `}</style>
-        
+
         {loadingMessages ? (
           <div className="flex justify-center py-10">
             <Loader2 className="h-6 w-6 animate-spin text-slate-300" />
@@ -601,10 +656,10 @@ export const StudentChatbot = () => {
             const isMe = msg.sender_id === profile?.user_id;
             return (
               <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}>
-                <div 
+                <div
                   className={cn(
                     "p-3 text-sm shadow-sm max-w-[85%]",
-                    isMe 
+                    isMe
                       ? `bg-slate-900 text-white ${bubbleMeClass}`
                       : `bg-white border border-slate-200 text-slate-700 ${bubbleThemClass}`
                   )}
@@ -627,15 +682,15 @@ export const StudentChatbot = () => {
       {/* Input */}
       <div className="p-4 bg-white border-t border-slate-100">
         <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-lg border border-slate-200 focus-within:border-slate-400 transition-all">
-          <input 
-            type="text" 
+          <input
+            type="text"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage.mutate()}
-            placeholder="Type a message..." 
+            placeholder="Type a message..."
             className="flex-1 bg-transparent border-none px-2 py-1.5 text-sm outline-none text-slate-800 placeholder:text-slate-400"
           />
-          <button 
+          <button
             onClick={() => sendMessage.mutate()}
             disabled={!message.trim() || sendMessage.isPending}
             className="p-2 bg-slate-900 text-white rounded-md hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -669,44 +724,52 @@ export const StudentChatbot = () => {
     return (
     <div className="flex flex-col h-full bg-white">
       {/* Header (same chat interface throughout) */}
-      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-white z-10 shadow-sm">
-        <div className="flex items-center gap-2.5 min-w-0">
+      <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-white z-10">
+        <div className="flex items-center gap-3 min-w-0">
           <img src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" alt="Logo" className="h-7 w-auto object-contain shrink-0" />
           <div className="min-w-0">
-            <h3 className="font-bold text-slate-900 text-sm leading-tight truncate">{connected ? state.selectedRecipient!.displayName : 'Support Assistant'}</h3>
-            <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-              <span className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter">Online</span>
-            </div>
+            <h3 className="font-semibold text-slate-900 text-[15px] leading-tight truncate">{connected ? state.selectedRecipient!.displayName : 'Support Assistant'}</h3>
+            <p className="text-[12px] text-slate-500">{connected ? 'Online now' : 'Online · usually replies in minutes'}</p>
           </div>
         </div>
-        <button onClick={closeDrawer} className="text-slate-400 hover:text-slate-600 transition-colors shrink-0">
+        <button onClick={closeGuided} className="text-slate-400 hover:text-slate-600 transition-colors shrink-0" aria-label="Close">
           <Minus className="w-4 h-4" />
         </button>
       </div>
 
       {/* Conversation — guided bubbles, then (once connected) the live human thread */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/30" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+      <div className="flex-1 overflow-y-auto px-4 py-4 bg-slate-50" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         <style>{`div::-webkit-scrollbar { display: none; }`}</style>
-        {chatMsgs.map((m) => (
-          <div key={m.id} className={`flex ${m.from === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}>
-            <div className={cn(
-              'px-3.5 py-2.5 text-sm shadow-sm max-w-[85%]',
-              m.from === 'user' ? `bg-slate-900 text-white ${bubbleMeClass}` : `bg-white border border-slate-200 text-slate-700 ${bubbleThemClass}`,
-            )}>
-              <span className="whitespace-pre-wrap leading-relaxed">{m.text}</span>
-              {m.href && (
-                <a href={m.href.url} target="_blank" rel="noopener noreferrer" className="mt-1.5 flex items-center gap-1 text-[13px] font-semibold text-indigo-600 hover:underline">
-                  {m.href.label} <ChevronRight className="w-3.5 h-3.5" />
-                </a>
-              )}
+        {/* Full width: each bubble is capped, so only the opposite side stays empty. */}
+        <div className="w-full">
+        {chatMsgs.map((m, i) => {
+          const prev = chatMsgs[i - 1];
+          const next = chatMsgs[i + 1];
+          const grouped = prev?.from === m.from;
+          // Bot avatar sits beside the last bubble of a run (unless typing follows).
+          const showAvatar = m.from === 'bot' && next?.from !== 'bot' && !(botTyping && i === chatMsgs.length - 1);
+          return (
+            <div key={m.id} className={cn('flex items-end gap-2 animate-in slide-in-from-bottom-2 duration-300', m.from === 'user' ? 'justify-end' : 'justify-start', i === 0 ? '' : grouped ? 'mt-1' : 'mt-3')}>
+              {m.from === 'bot' && (showAvatar ? <BotAvatar /> : <span className="w-7 shrink-0" />)}
+              <div className={cn(
+                'px-3.5 py-2.5 text-[14px] max-w-[75%]',
+                m.from === 'user' ? `bg-slate-900 text-white ${bubbleMeClass}` : `bg-white border border-slate-200 text-slate-800 ${bubbleThemClass}`,
+              )}>
+                <span className="whitespace-pre-wrap leading-relaxed">{m.text}</span>
+                {m.href && (
+                  <a href={m.href.url} target="_blank" rel="noopener noreferrer" className="mt-2 flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[13px] font-semibold text-slate-900 hover:bg-slate-100">
+                    {m.href.label} <ChevronRight className="ml-auto w-3.5 h-3.5" />
+                  </a>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {botTyping && (
-          <div className="flex justify-start animate-in fade-in duration-200">
-            <div className={`px-4 py-3 bg-white border border-slate-200 ${bubbleThemClass} shadow-sm`}>
+          <div className="mt-3 flex items-end gap-2 animate-in fade-in duration-200">
+            <BotAvatar />
+            <div className={`px-4 py-3 bg-white border border-slate-200 ${bubbleThemClass}`}>
               <span className="flex gap-1 items-center">
                 <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '-0.25s' }} />
                 <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '-0.12s' }} />
@@ -718,25 +781,21 @@ export const StudentChatbot = () => {
 
         {/* Inline options — plain rows in a card; "filled" ones as solid buttons */}
         {!connected && chatOpts.length > 0 && !botTyping && (
-          <div className="flex flex-col items-start gap-2 animate-in fade-in slide-in-from-bottom-1 duration-200">
-            {chatOpts.some((o) => !o.filled) && (
-              <div className="max-w-[88%] rounded-md bg-white border border-slate-200 shadow-sm overflow-hidden">
-                {chatOpts.filter((o) => !o.filled).map((o, idx) => (
-                  <button
-                    key={idx}
-                    onClick={o.onSelect}
-                    className="w-full text-left px-4 py-2.5 text-[13px] font-medium text-indigo-700 hover:bg-indigo-50/70 transition-colors border-t border-slate-100 first:border-t-0"
-                  >
-                    {o.label}
-                  </button>
-                ))}
-              </div>
-            )}
+          <div className="mt-3 flex max-w-[75%] flex-wrap items-start gap-2 pl-9 animate-in fade-in slide-in-from-bottom-1 duration-200">
+            {chatOpts.filter((o) => !o.filled).map((o, idx) => (
+              <button
+                key={idx}
+                onClick={o.onSelect}
+                className="rounded-md bg-slate-100 px-3 py-1.5 text-left text-[13px] font-normal text-slate-900 transition-colors hover:bg-slate-200 active:scale-[0.98]"
+              >
+                {o.label}
+              </button>
+            ))}
             {chatOpts.filter((o) => o.filled).map((o, idx) => (
               <button
                 key={`f${idx}`}
                 onClick={o.onSelect}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-violet-600 text-white text-[13px] font-semibold shadow-sm hover:bg-violet-700 active:scale-[0.98] transition-all"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-slate-900 text-white text-[13px] font-semibold hover:bg-slate-800 active:scale-[0.98] transition-all"
               >
                 <Plus className="w-3.5 h-3.5" /> {o.label}
               </button>
@@ -747,8 +806,10 @@ export const StudentChatbot = () => {
         {/* Live human thread — continues in the same chat once connected */}
         {connected && (
           <>
-            <div className="flex justify-center my-1">
-              <span className="text-[10px] text-slate-500 bg-slate-100 rounded-full px-2.5 py-0.5">Connected to {state.selectedRecipient!.displayName}</span>
+            <div className="my-4 flex items-center gap-3">
+              <span className="h-px flex-1 bg-slate-200" />
+              <span className="text-[11px] font-medium text-slate-500">Connected to {state.selectedRecipient!.displayName}</span>
+              <span className="h-px flex-1 bg-slate-200" />
             </div>
             {loadingMessages ? (
               <div className="flex justify-center py-3"><Loader2 className="h-5 w-5 animate-spin text-slate-300" /></div>
@@ -756,8 +817,8 @@ export const StudentChatbot = () => {
               messages?.map((msg) => {
                 const isMe = msg.sender_id === profile?.user_id;
                 return (
-                  <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}>
-                    <div className={cn('px-3.5 py-2.5 text-sm shadow-sm max-w-[85%]', isMe ? `bg-slate-900 text-white ${bubbleMeClass}` : `bg-white border border-slate-200 text-slate-700 ${bubbleThemClass}`)}>
+                  <div key={msg.id} className={`mt-2 flex ${isMe ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}>
+                    <div className={cn('px-3.5 py-2.5 text-[14px] max-w-[75%]', isMe ? `bg-slate-900 text-white ${bubbleMeClass}` : `bg-white border border-slate-200 text-slate-800 ${bubbleThemClass}`)}>
                       <span className="whitespace-pre-wrap leading-relaxed">{msg.content}</span>
                       <div className={cn('text-[9px] mt-1 text-right opacity-60', isMe ? 'text-slate-300' : 'text-slate-400')}>
                         {msg.created_at ? format(new Date(msg.created_at), 'h:mm a') : ''}
@@ -769,6 +830,7 @@ export const StudentChatbot = () => {
             )}
           </>
         )}
+        </div>
         <div ref={guidedEndRef} />
       </div>
 
@@ -781,7 +843,7 @@ export const StudentChatbot = () => {
               <Plus className="w-3 h-3" /> Start a new issue
             </button>
           </div>
-          <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-lg border border-slate-200 focus-within:border-slate-400 transition-all">
+          <div className="flex w-full items-center gap-2 bg-white p-1.5 rounded-lg border border-slate-300 focus-within:border-slate-900 transition-all">
             <input
               type="text"
               value={message}
@@ -819,31 +881,14 @@ export const StudentChatbot = () => {
 
   return (
     <>
-      {/* Floating Action Button - Always visible to trigger/toggle */}
-      <button
-        onClick={toggleChatbot}
-        className={cn(
-          // Sits above the mobile bottom-nav (incl. the iOS safe-area); drops to
-          // the corner on desktop where there is no bottom bar.
-          "fixed right-6 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] md:bottom-6 w-14 h-14 bg-slate-900 hover:bg-slate-800 text-white rounded-full flex items-center justify-center shadow-xl transition-all hover:scale-105 active:scale-95 z-50",
-          state.isOpen && !isMobile ? "rotate-0" : "" // Rotate animation mostly for desktop X icon
-        )}
-      >
-        {state.isOpen && !isMobile ? (
-          <HugeiconsIcon icon={Cancel01Icon} size={24} strokeWidth={2} />
-        ) : (
-          <HugeiconsIcon icon={BubbleChatIcon} size={24} strokeWidth={2} />
-        )}
-        {!state.isOpen && supportUnread > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold leading-none text-white ring-2 ring-white">
-            {supportUnread > 9 ? '9+' : supportUnread}
-          </span>
-        )}
-      </button>
-
-      {/* Mobile: Drawer Interface */}
-      {isMobile ? (
-        <Drawer open={state.isOpen} onOpenChange={(open) => !open && closeDrawer()}>
+      {onAssistantPage ? (
+        /* Full page, below the navbar (covers the mobile bottom nav) */
+        <div className="fixed inset-0 z-[130] flex flex-col bg-white md:inset-auto md:bottom-0 md:left-60 md:right-0 md:top-16 md:z-[45]">
+          {renderContent()}
+        </div>
+      ) : isMobile ? (
+        /* Mobile: drawer for subject-connect */
+        <Drawer open={state.isOpen && state.mode === 'subject-connect'} onOpenChange={(open) => !open && closeDrawer()}>
           <DrawerContent className="h-[85vh] p-0 outline-none">
              <div className="sr-only">
                <DrawerTitle>Student Support</DrawerTitle>
@@ -855,9 +900,9 @@ export const StudentChatbot = () => {
           </DrawerContent>
         </Drawer>
       ) : (
-        /* Desktop: Floating Window */
-        state.isOpen && (
-          <div 
+        /* Desktop: small window for subject-connect */
+        state.isOpen && state.mode === 'subject-connect' && (
+          <div
             className={cn(
               "fixed bottom-24 right-6 w-[380px] h-[520px] bg-white rounded-xl flex flex-col overflow-hidden z-50 animate-in slide-in-from-bottom-4 duration-300 ease-out",
               chatWindowShadowClass

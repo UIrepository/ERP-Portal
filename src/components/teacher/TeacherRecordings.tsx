@@ -31,7 +31,7 @@ interface TeacherBucket {
     id: string;
     batch: string;
     subject: string;
-    name: string;
+    topic: string;
     position: number;
 }
 
@@ -134,7 +134,7 @@ export const TeacherRecordings = () => {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('content_buckets')
-                .select('id, batch, subject, name, position')
+                .select('id, batch, subject, topic, position')
                 .in('batch', teacherInfo!.assigned_batches)
                 .in('subject', teacherInfo!.assigned_subjects)
                 .order('position', { ascending: true })
@@ -172,7 +172,7 @@ export const TeacherRecordings = () => {
             toast({ title: 'Could not move it', description: error.message, variant: 'destructive' });
             return;
         }
-        const name = bucketId ? (buckets.find(b => b.id === bucketId)?.name ?? 'that week') : UNSORTED_LABEL;
+        const name = bucketId ? (buckets.find(b => b.id === bucketId)?.topic ?? 'that topic') : UNSORTED_LABEL;
         toast({ title: `Moved to ${name}` });
         refreshRecordings();
         queryClient.invalidateQueries({ queryKey: ['student-recordings', rec.batch, rec.subject] });
@@ -191,7 +191,7 @@ export const TeacherRecordings = () => {
             setNewWeekFor(null);
             setNewWeekName('');
         } catch (e) {
-            toast({ title: 'Could not create the week', description: (e as Error).message, variant: 'destructive' });
+            toast({ title: 'Could not create the topic', description: (e as Error).message, variant: 'destructive' });
         } finally {
             setSavingWeek(false);
         }
@@ -216,7 +216,7 @@ export const TeacherRecordings = () => {
         }
         const out = mine
             .filter(b => groups.has(b.id))
-            .map(b => ({ key: b.id, label: b.name, items: groups.get(b.id)! }));
+            .map(b => ({ key: b.id, label: b.topic, items: groups.get(b.id)! }));
         const loose = groups.get('__unsorted__');
         if (loose?.length) out.push({ key: '__unsorted__', label: UNSORTED_LABEL, items: loose });
         return out;
@@ -446,9 +446,9 @@ export const TeacherRecordings = () => {
                                                     <SelectContent onClick={(e) => e.stopPropagation()}>
                                                         <SelectItem value={NO_WEEK}>{UNSORTED_LABEL}</SelectItem>
                                                         {bucketsFor(recording.batch, recording.subject).map((b) => (
-                                                            <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                                                            <SelectItem key={b.id} value={b.id}>{b.topic}</SelectItem>
                                                         ))}
-                                                        <SelectItem value={NEW_WEEK}>+ New week…</SelectItem>
+                                                        <SelectItem value={NEW_WEEK}>+ New topic…</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>
@@ -590,13 +590,13 @@ export const TeacherRecordings = () => {
                 <DialogContent className="max-w-sm gap-0 p-6 sm:rounded-[24px]">
                     <DialogHeader className="space-y-0">
                         <DialogTitle className="pr-10 text-left text-base font-semibold">
-                            New week for {newWeekFor?.subject}
+                            New topic for {newWeekFor?.subject}
                         </DialogTitle>
                     </DialogHeader>
                     <Input
                         autoFocus
                         className="mt-4"
-                        placeholder="Week 1, Chapter 2, Revision…"
+                        placeholder="Topic 1, Chapter 2, Revision…"
                         value={newWeekName}
                         onChange={(e) => setNewWeekName(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter' && newWeekName.trim()) void createWeekAndMove(); }}

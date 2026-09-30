@@ -4,6 +4,7 @@ import { StudentFeedback } from './student/StudentFeedback';
 import { StudentExams } from './student/StudentExams';
 import { StudentSchedule } from './student/StudentSchedule';
 import { FeedbackGate } from './student/FeedbackGate';
+import { DiscussionChannel } from './discussion/DiscussionChannel';
 
 interface StudentDashboardProps {
   activeTab: string;
@@ -32,6 +33,10 @@ export const StudentDashboard = ({ activeTab, onTabChange }: StudentDashboardPro
         return <StudentFeedback />;
       case 'exams':
         return <StudentExams />;
+      case 'assistant':
+        return null; // rendered full-page by StudentChatbot on desktop
+      case 'discussion':
+        return <DiscussionChannel />;
       case 'dashboard':
       default:
         return <StudentMain />;

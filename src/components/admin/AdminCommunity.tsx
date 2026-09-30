@@ -637,7 +637,7 @@ export const AdminCommunity = () => {
 
       {!selectedGroup && (
         <div className={`flex-1 flex flex-col items-center justify-center bg-gray-50 text-gray-400 ${isMobile ? 'hidden' : 'flex'}`}>
-          <Users className="h-10 w-10 text-teal-200 mb-4" />
+          <img src="/art/community-select.png" alt="" aria-hidden width={220} height={220} draggable={false} className="mb-4 object-contain" />
           <p className="text-lg font-medium text-gray-600">Select a group to manage</p>
         </div>
       )}

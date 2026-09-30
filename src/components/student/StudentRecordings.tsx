@@ -15,7 +15,7 @@ import { StudentBackButton } from './StudentBackButton';
 import { useNavigate } from 'react-router-dom';
 import { openInternalRoute } from '@/hooks/useInstallApp';
 import { fetchCachedRecordings } from '@/lib/cachedReads';
-import { useContentBuckets, UNSORTED, UNSORTED_LABEL } from '@/hooks/useContentBuckets';
+import { useContentBuckets, inTopic, UNSORTED, UNSORTED_LABEL } from '@/hooks/useContentBuckets';
 import { ChevronDown } from 'lucide-react';
 
 // Interfaces
@@ -35,6 +35,8 @@ interface StudentRecordingsProps {
     batch?: string;
     subject?: string;
     onBack?: () => void;
+    /** Show only this topic's lectures (a bucket id, or UNSORTED for "Other"). */
+    topicId?: string;
 }
 
 
@@ -161,7 +163,7 @@ const RecordingSkeleton = () => (
 
 
 // Main Component
-export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsProps) => {
+export const StudentRecordings = ({ batch, subject, onBack, topicId }: StudentRecordingsProps) => {
     const { user, profile } = useAuth();
     const queryClient = useQueryClient();
     const navigate = useNavigate();
@@ -210,8 +212,9 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
     });
 
     const filteredRecordings = useMemo(() => (recordings || []).filter(rec =>
+        (!topicId || inTopic(rec.bucket_id, topicId)) &&
         rec.topic.toLowerCase().includes(searchTerm.toLowerCase())
-    ), [recordings, searchTerm]);
+    ), [recordings, searchTerm, topicId]);
 
     // Show only the first `visibleCount`; "Load More" reveals the rest.
     const visibleRecordings = useMemo(
@@ -231,7 +234,8 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
      * back catalogue until someone organises it.
      */
     const sections = useMemo(() => {
-        if (buckets.length === 0) return [];
+        // Inside a single topic there is nothing left to group by.
+        if (topicId || buckets.length === 0) return [];
         const byId = new Map(buckets.map((b) => [b.id, b] as const));
         const groups = new Map<string, RecordingContent[]>();
         for (const rec of filteredRecordings) {
@@ -241,11 +245,11 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
         }
         const out = buckets
             .filter((b) => groups.has(b.id))
-            .map((b) => ({ key: b.id, label: b.name, items: groups.get(b.id)! }));
+            .map((b) => ({ key: b.id, label: b.topic, items: groups.get(b.id)! }));
         const loose = groups.get(UNSORTED);
         if (loose?.length) out.push({ key: UNSORTED, label: UNSORTED_LABEL, items: loose });
         return out;
-    }, [buckets, filteredRecordings]);
+    }, [buckets, filteredRecordings, topicId]);
 
     // Sections start open so a student sees their lectures without hunting.
     const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -345,11 +349,12 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
     // Inline player no longer used — recordings now open in a new tab.
 
     return (
-        <div className="p-3 sm:p-6 bg-white min-h-full font-sans">
+        <div className={topicId ? "font-sans" : "p-3 sm:p-6 bg-white min-h-full font-sans"}>
             {/* Unified White Section for Header + Content */}
-            <div className="bg-white p-4 sm:p-6">
+            <div className={topicId ? "" : "bg-white p-4 sm:p-6"}>
 
-                {/* Header Section */}
+                {/* Header Section — hidden inside a topic, where the tab already names it */}
+                {!topicId && (
                 <div data-tour="recordings-list" className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 sm:mb-8">
                     <div className="flex items-center gap-3">
                         {onBack && <StudentBackButton onClick={onBack} />}
@@ -369,6 +374,7 @@ export const StudentRecordings = ({ batch, subject, onBack }: StudentRecordingsP
                         />
                     </div>
                 </div>
+                )}
 
                 {/* Recordings Grid - Zoom-stable layout with fixed card dimensions */}
                 <div>
