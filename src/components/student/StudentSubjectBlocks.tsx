@@ -244,13 +244,13 @@ export const StudentSubjectBlocks = ({
   ];
 
   return (
-    <div className="w-full max-w-[1840px] mx-auto px-4 md:px-6 py-6 font-sans">
+    <div className="w-full max-w-[1840px] mx-auto px-2 py-3 sm:px-4 sm:py-6 md:px-6 font-sans">
 
       {/* Single framed content card with 1px black border */}
-      <div className="w-full bg-white rounded-lg border border-slate-200 shadow-sm p-6 md:p-8 min-h-[400px]">
+      <div className="w-full bg-white rounded-lg border border-slate-200 shadow-sm p-3 sm:p-6 md:p-8 min-h-[400px]">
 
           {/* Back arrow beside the subject title */}
-          <div className="flex items-center gap-3 mb-8">
+          <div className="flex items-center gap-3 mb-4 sm:mb-8">
             <button
               onClick={onBack}
               aria-label="Back"
@@ -263,7 +263,7 @@ export const StudentSubjectBlocks = ({
             </h2>
           </div>
 
-          <div data-tour="blocks-grid" className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div data-tour="blocks-grid" className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5">
             {blocks.map((block) => (
               <button
                 key={block.id}
@@ -283,7 +283,7 @@ export const StudentSubjectBlocks = ({
                   // Static Border (No hover change)
                   "border border-slate-200", 
                   // No hover effects (transform, shadow, etc. removed)
-                  "p-6", 
+                  "p-4 sm:p-6", 
                   "flex items-stretch gap-4"
                 )}
               >
@@ -353,7 +353,7 @@ export const StudentSubjectBlocks = ({
                     alt=""
                     aria-hidden
                     draggable={false}
-                    className="-my-3 h-20 w-20 shrink-0 self-center object-contain sm:h-24 sm:w-24"
+                    className="-my-3 h-16 w-16 shrink-0 self-center object-contain sm:h-24 sm:w-24"
                   />
                 )}
 

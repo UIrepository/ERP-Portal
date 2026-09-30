@@ -97,7 +97,7 @@ export const StudentUIKiPadhai = ({ batch, subject, onBack, topicId }: StudentUI
   return (
     <div className={topicId ? "font-sans" : "p-3 sm:p-6 md:p-8 bg-[#fcfcfd] min-h-full font-sans"}>
       {/* Main Section Holding Container */}
-      <div className={topicId ? "" : "bg-white p-4 sm:p-6 md:p-8 rounded-lg"}>
+      <div className={topicId ? "" : "bg-white p-3 sm:p-6 md:p-8 rounded-lg"}>
 
         {/* Section Header — hidden inside a topic */}
         {!topicId && (

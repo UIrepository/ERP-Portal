@@ -303,7 +303,7 @@ export const StudentNotes = ({ batch, subject, onBack, topicId }: StudentNotesPr
   return (
     <div className={topicId ? "font-sans" : "p-3 sm:p-6 space-y-6 bg-[#fcfcfd] min-h-full font-sans"}>
       {/* Main Section Holding Container */}
-      <div className={topicId ? "" : "bg-white p-4 sm:p-6 md:p-8 rounded-lg"}>
+      <div className={topicId ? "" : "bg-white p-3 sm:p-6 md:p-8 rounded-lg"}>
           {/* Header Section — hidden inside a topic */}
           {!topicId && (
           <div data-tour="notes-list" className="mb-6 sm:mb-8 border-b border-slate-100 pb-5 sm:pb-6">

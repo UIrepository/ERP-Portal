@@ -72,14 +72,14 @@ export const StudentTopicView = ({ batch, subject, topicId, onBack }: StudentTop
   return (
     <div className="w-full font-sans">
       {/* Topic name */}
-      <div className="flex items-center gap-3 px-4 pt-5 sm:px-8 sm:pt-7">
+      <div className="flex items-center gap-3 px-3 pt-4 sm:px-8 sm:pt-7">
         <StudentBackButton onClick={onBack} />
         <h1 className="min-w-0 truncate text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">{topicName}</h1>
       </div>
 
       {/* Tab bar */}
       {available.length > 0 && (
-        <div className="mt-5 overflow-x-auto px-4 sm:px-8">
+        <div className="mt-3 overflow-x-auto px-3 sm:mt-5 sm:px-8">
           <div
             role="tablist"
             aria-label={`${topicName} content`}
@@ -109,7 +109,7 @@ export const StudentTopicView = ({ batch, subject, topicId, onBack }: StudentTop
       )}
 
       {/* Content */}
-      <div className="px-4 pb-8 pt-6 sm:px-8">
+      <div className="px-3 pb-6 pt-4 sm:px-8 sm:pb-8 sm:pt-6">
         {isLoading ? null : !tab ? (
           <div className="py-16 text-center text-sm text-slate-500">Nothing has been added to this topic yet.</div>
         ) : (

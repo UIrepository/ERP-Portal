@@ -351,7 +351,7 @@ export const StudentRecordings = ({ batch, subject, onBack, topicId }: StudentRe
     return (
         <div className={topicId ? "font-sans" : "p-3 sm:p-6 bg-white min-h-full font-sans"}>
             {/* Unified White Section for Header + Content */}
-            <div className={topicId ? "" : "bg-white p-4 sm:p-6"}>
+            <div className={topicId ? "" : "bg-white p-2 sm:p-6"}>
 
                 {/* Header Section — hidden inside a topic, where the tab already names it */}
                 {!topicId && (
