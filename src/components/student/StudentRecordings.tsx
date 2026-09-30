@@ -42,7 +42,7 @@ interface StudentRecordingsProps {
 
 // Fixed card dimensions for zoom stability (width is responsive: full-width on
 // mobile via Tailwind, fixed 280px from sm+ — see the card classNames below).
-const CARD_HEIGHT = 280;
+const CARD_HEIGHT = 250;
 const BANNER_HEIGHT = 160;
 // Only render this many cards up front; the rest reveal via "Load More". The
 // whole list is already in memory (one cached fetch), this just keeps a batch
@@ -86,43 +86,36 @@ const RecordingCard = ({
                                             flexGrow: 0,
                                         }}
                                     >
-                                        {/* Visual Banner - Fixed Height */}
-                                        <div 
-                                            className="w-full bg-gradient-to-br from-white to-[#f0fdfa] rounded-lg relative flex items-center px-5 border border-[#ccfbf1] overflow-hidden"
+                                        {/* Visual Banner — big lecture number, illustration, play button */}
+                                        <div
+                                            className="w-full rounded-lg relative flex items-center overflow-hidden bg-[#EEF4FE] pl-5 pr-2"
                                             style={{ height: BANNER_HEIGHT, minHeight: BANNER_HEIGHT, maxHeight: BANNER_HEIGHT, flexShrink: 0 }}
                                         >
-                                            {/* Banner Title - Lecture No */}
-                                            <div className="z-10 relative" style={{ flexShrink: 0 }}>
-                                                <span className="text-[#0d9488] font-bold text-xl block tracking-tight whitespace-nowrap">
-                                                    Lecture {lectureNo}
+                                            <div className="z-10 relative flex flex-col" style={{ flexShrink: 0 }}>
+                                                <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#2A5BC4]">Lecture</span>
+                                                <span className="text-[44px] font-extrabold leading-none tracking-tight text-[#1E3A8A] tabular-nums">
+                                                    {String(lectureNo).padStart(2, '0')}
                                                 </span>
                                             </div>
 
-                                            {/* Graphic Elements (Right) - Fixed Position */}
-                                            <div className="absolute right-3 top-1/2 -translate-y-1/2" style={{ flexShrink: 0 }}>
-                                                {/* Logo Circle - Fixed Size */}
-                                                <div 
-                                                    className="bg-[#111] rounded-full flex items-center justify-center border-4 border-[#f0fdfa] shadow-sm select-none overflow-hidden p-2"
-                                                    style={{ width: 100, height: 100, minWidth: 100, minHeight: 100, flexShrink: 0 }}
-                                                >
-                                                    <img 
-                                                        src="https://res.cloudinary.com/dkywjijpv/image/upload/v1769193106/UI_Logo_yiput4.png" 
-                                                        alt="UI Logo" 
-                                                        className="w-full h-full object-contain"
-                                                    />
-                                                </div>
-                                                {/* Play Button Overlay - Fixed Size */}
-                                                <div 
-                                                    className="absolute bottom-0 right-0 bg-[#0d9488] rounded-full flex items-center justify-center text-white border-2 border-white shadow-sm z-20"
-                                                    style={{ width: 36, height: 36, minWidth: 36, minHeight: 36, flexShrink: 0 }}
-                                                >
-                                                    <Play fill="white" className="w-3 h-3 ml-0.5" />
-                                                </div>
+                                            <img
+                                                src="/art/lectures.png"
+                                                alt=""
+                                                aria-hidden
+                                                draggable={false}
+                                                className="absolute right-1 top-1/2 h-[118%] -translate-y-1/2 object-contain select-none"
+                                            />
+
+                                            <div
+                                                className="absolute bottom-2.5 left-5 z-20 flex items-center gap-1.5 rounded-md bg-[#3B7BE8] px-2.5 py-1 text-[11px] font-semibold text-white opacity-90 transition-opacity group-hover:opacity-100"
+                                            >
+                                                <Play fill="white" className="h-3 w-3" />
+                                                Watch
                                             </div>
                                         </div>
 
                                         {/* Info Footer - Fixed layout */}
-                                        <div className="pt-3 px-1 pb-1 flex-1 flex flex-col justify-between overflow-hidden" style={{ minHeight: 0 }}>
+                                        <div className="pt-3 px-1 pb-1 flex-1 flex flex-col justify-start overflow-hidden" style={{ minHeight: 0 }}>
                                             <div className="flex justify-between items-center mb-2 text-slate-500 font-normal text-xs" style={{ flexShrink: 0 }}>
                                                 <span style={{ whiteSpace: 'nowrap' }}>{format(new Date(recording.date), 'dd MMM, yyyy')}</span>
                                                 <div className="flex items-center gap-1" style={{ flexShrink: 0 }}>
