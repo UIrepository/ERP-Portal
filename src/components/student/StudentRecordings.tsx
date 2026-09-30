@@ -103,11 +103,11 @@ const RecordingCard = ({
                                             </div>
 
                                             <img
-                                                src="/art/lectures.png"
+                                                src="/art/brand-owner.png"
                                                 alt=""
                                                 aria-hidden
                                                 draggable={false}
-                                                className="absolute right-1 top-1/2 h-[118%] -translate-y-1/2 object-contain select-none"
+                                                className="absolute bottom-0 right-3 h-[94%] object-contain object-bottom select-none"
                                             />
 
                                             <div
