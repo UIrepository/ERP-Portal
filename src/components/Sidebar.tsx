@@ -66,15 +66,12 @@ interface UserEnrollment {
 
 /** Illustrated nav icons (public/nav/*.png), keyed by tab id. */
 const NAV_ART: Record<string, string> = {
-  dashboard: '/nav/my-learning.png',
-  schedule: '/nav/schedule.png',
-  discussion: '/nav/general-discussion.png',
-  'student-discussion': '/nav/general-discussion.png',
-  support: '/nav/support.png',
-  feedback: '/nav/feedback.png',
-  exams: '/nav/exams.png',
-  'contact-admin': '/nav/contact-admin.png',
-  'get-app': '/nav/get-app.png',
+  dashboard: '/nav/bn-home-outline.png',
+  schedule: '/nav/bn-schedule-outline.png',
+  discussion: '/nav/bn-general-outline.png',
+  'student-discussion': '/nav/bn-general-outline.png',
+  feedback: '/nav/bn-feedback-outline.png',
+  exams: '/nav/bn-exams-outline.png',
   logout: '/nav/logout.png',
 };
 
@@ -219,12 +216,12 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
 
   // Custom illustrated icon when one exists for the item, else the line icon.
   // Illustrations are already transparent, so no chip behind them.
-  const icon = (i: typeof DashboardSquare01Icon, id?: string) => {
+  const icon = (i: typeof DashboardSquare01Icon, id?: string, active = false) => {
     const art = id ? NAV_ART[id] : undefined;
-    if (!art) return <HugeiconsIcon icon={i} size={18} strokeWidth={1.8} className="shrink-0" />;
+    if (!art) return <span className="flex h-7 w-7 shrink-0 items-center justify-center"><HugeiconsIcon icon={i} size={20} strokeWidth={1.8} /></span>;
     return (
       <span className="flex h-7 w-7 shrink-0 items-center justify-center">
-        <img src={art} alt="" aria-hidden className="h-6 w-6 object-contain" draggable={false} />
+        <img src={art} alt="" aria-hidden className={cn('h-5 w-5 object-contain', active && art.includes('/bn-') && 'brightness-0 invert')} draggable={false} />
       </span>
     );
   };
@@ -267,7 +264,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
                       className={navItemClass(false)}
                       onClick={() => navigate('/teacher-community')}
                     >
-                      {icon(tab.icon, tab.id)}
+                      {icon(tab.icon, tab.id, active)}
                       {!collapsed && label}
                     </Button>
                   )}
@@ -284,7 +281,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
                             className={navItemClass(false)}
                             onClick={onSupportClick}
                         >
-                            {icon(tab.icon, tab.id)}
+                            {icon(tab.icon, tab.id, active)}
                             {!collapsed && label}
                         </Button>
                       )}
@@ -298,7 +295,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
                         {withTooltip(tab.label,
                             <AlertDialogTrigger asChild>
                                 <Button variant="ghost" className={navItemClass(active)}>
-                                    {icon(tab.icon, tab.id)}
+                                    {icon(tab.icon, tab.id, active)}
                                     {!collapsed && label}
                                 </Button>
                             </AlertDialogTrigger>
@@ -330,7 +327,7 @@ export const Sidebar = ({ activeTab, onTabChange, onSupportClick, collapsed = fa
                         className={navItemClass(active)}
                         onClick={() => onTabChange(tab.id)}
                     >
-                        {icon(tab.icon, tab.id)}
+                        {icon(tab.icon, tab.id, active)}
                         {!collapsed && label}
                     </Button>
                   )}
