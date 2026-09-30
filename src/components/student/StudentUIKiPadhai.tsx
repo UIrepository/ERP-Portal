@@ -160,9 +160,7 @@ export const StudentUIKiPadhai = ({ batch, subject, onBack, topicId }: StudentUI
             ))
           ) : (
             <div className="col-span-full text-center py-20 bg-white rounded-lg border border-dashed border-slate-200">
-              <div className="inline-block bg-slate-50 rounded-full p-4 mb-3">
-                <Crown className="h-8 w-8 text-slate-300" />
-              </div>
+              <img src="/art/empty.png" alt="" aria-hidden width={160} height={160} draggable={false} className="mx-auto mb-3 object-contain" />
               <h3 className="text-lg font-medium text-gray-900">No Premium Content</h3>
               <p className="text-gray-500 text-sm mt-1">Check back later for exclusive updates.</p>
             </div>

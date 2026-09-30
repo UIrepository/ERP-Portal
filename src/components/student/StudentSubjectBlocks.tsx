@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from '@hugeicons/react';
-import { ArrowLeft01Icon } from '@hugeicons/core-free-icons';
+import { ArrowLeft01Icon, LiveStreaming01Icon } from '@hugeicons/core-free-icons';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
@@ -207,6 +207,30 @@ export const StudentSubjectBlocks = ({
           { id: 'dpps', label: 'DPPs', stats: [isLoading ? 'Loading...' : `${stats?.exercises} DPPs`, 'Daily Practice'] },
         ];
 
+  // Is a class live right now for this subject? Merge-aware: a merged class is
+  // signalled under the primary pair, so check every pair merged with this one.
+  const { data: isLiveNow = false } = useQuery({
+    queryKey: ['subject-live', batch, subject],
+    queryFn: async () => {
+      const [{ data: merges }, { data: active }] = await Promise.all([
+        supabase.from('subject_merges')
+          .select('primary_batch, primary_subject, secondary_batch, secondary_subject')
+          .eq('is_active', true)
+          .or(`and(primary_batch.eq."${batch}",primary_subject.eq."${subject}"),and(secondary_batch.eq."${batch}",secondary_subject.eq."${subject}")`),
+        supabase.from('active_classes').select('batch, subject').eq('is_active', true),
+      ]);
+      const pairs = new Set([`${batch}|${subject}`]);
+      (merges ?? []).forEach((m) => {
+        pairs.add(`${m.primary_batch}|${m.primary_subject}`);
+        pairs.add(`${m.secondary_batch}|${m.secondary_subject}`);
+      });
+      return (active ?? []).some((a) => pairs.has(`${a.batch}|${a.subject}`));
+    },
+    enabled: !!batch && !!subject,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+
   const blocks: Block[] = [
     {
       id: 'live-class',
@@ -299,10 +323,10 @@ export const StudentSubjectBlocks = ({
                       </div>
 
                       {/* Progress row: Lecture: 1/3 | DPP: 0/2 */}
-                      <div className="flex flex-wrap items-center gap-y-1 text-[13px] text-[#71717a]">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-[#71717a] sm:gap-x-0">
                         {block.progress.parts.map((part, index) => (
                           <span key={part.label} className="flex items-center">
-                            {index > 0 && <span className="mx-3 text-[#d4d4d8]">|</span>}
+                            {index > 0 && <span className="mx-3 hidden text-[#d4d4d8] sm:inline">|</span>}
                             {part.label}:&nbsp;
                             <span className="font-semibold text-[#1e293b]">{part.done}/{part.total}</span>
                           </span>
@@ -330,15 +354,21 @@ export const StudentSubjectBlocks = ({
                     </>
                   ) : (
                     <>
-                      <h3 className="text-[17px] font-semibold text-[#1e293b] mb-2">
+                      <h3 className="mb-2 flex items-center gap-2 text-[17px] font-semibold text-[#1e293b]">
                         {block.label}
+                        {block.isLive && isLiveNow && (
+                          <span className="inline-flex items-center gap-1 text-[12px] font-bold uppercase tracking-wide text-red-600">
+                            <HugeiconsIcon icon={LiveStreaming01Icon} size={16} strokeWidth={2} className="animate-pulse" />
+                            Live
+                          </span>
+                        )}
                       </h3>
 
                       {/* Stats Row */}
-                      <div className="flex items-center text-[13px] text-[#71717a] font-normal">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-[#71717a] font-normal sm:gap-x-0">
                         {block.stats.map((stat, index) => (
                           <span key={index} className="flex items-center">
-                            {index > 0 && <span className="mx-3 text-[#d4d4d8]">|</span>}
+                            {index > 0 && <span className="mx-3 hidden text-[#d4d4d8] sm:inline">|</span>}
                             {stat}
                           </span>
                         ))}
@@ -357,15 +387,6 @@ export const StudentSubjectBlocks = ({
                   />
                 )}
 
-                {/* Live Indicator */}
-                {'isLive' in block && block.isLive && (
-                  <div className="absolute top-4 right-4">
-                     <span className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
-                    </span>
-                  </div>
-                )}
               </button>
             ))}
           </div>

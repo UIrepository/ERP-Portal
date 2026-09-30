@@ -111,7 +111,7 @@ export const StudentTopicView = ({ batch, subject, topicId, onBack }: StudentTop
       {/* Content */}
       <div className="px-3 pb-6 pt-4 sm:px-8 sm:pb-8 sm:pt-6">
         {isLoading ? null : !tab ? (
-          <div className="py-16 text-center text-sm text-slate-500">Nothing has been added to this topic yet.</div>
+          <div className="py-12 text-center text-sm text-slate-500"><img src="/art/empty.png" alt="" aria-hidden width={160} height={160} draggable={false} className="mx-auto mb-3 object-contain" />Nothing has been added to this topic yet.</div>
         ) : (
           <>
             {tab === 'lectures' && <StudentRecordings batch={batch} subject={subject} topicId={topicId} />}
